@@ -313,10 +313,11 @@ Scope completed:
 - `全部` range shows current state totals and hides comparison text.
 - `本月` range shows current-month new state additions from state history, not from `UpdatedAt`.
 - A status only counts as a current-month addition when the latest same-month change for that TMDB/state is still `true`; same-month cancellation removes it from the addition count.
-- State changes made while a movie is unidentified become countable only after successful identification assigns a stable TMDB identity. The activation is recorded at the successful identification time with `Source=Identification`.
-- Collection status rows linked to an unidentified or identification-failed `Movie` are excluded from Watch Statistics until that movie is identified successfully.
+- Reset / unidentified placeholder / re-identification paths do not inherit the old `Movie` watched, favorite, want-to-watch, or not-interested state into the newly identified identity.
+- Collection status rows linked to an unidentified or identification-failed `Movie` are excluded from Watch Statistics unless they already match a stable identified target identity.
 - Moving a marked movie out of the library and scanning it back in does not change status-history timing; scan restores library visibility but does not create a new status addition.
-- Re-identification of an already identified marked movie does not create a new `Source=Identification` activation row. The latest-time activation rule is limited to previously unidentified movies gaining a TMDB identity.
+- Successful identification uses the target `Movie`'s existing state. If the target was already marked before, that is existing state and is not recorded as a current-month status addition.
+- Re-identification of an already identified marked movie does not create a status activation row. Same-TMDB duplicate merges may preserve state as the same movie identity, but different-TMDB reassignment does not transfer status.
 - The status comparison text now means `本月比上月`; it no longer uses `本周比上周`.
 - New status history before this stage is not backfilled, so old pre-existing true states are not counted as this month's additions.
 - Playback-dependent statistics follow the selected range, while the calendar has its own independent displayed month.

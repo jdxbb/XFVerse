@@ -16,7 +16,6 @@ internal static class UserMovieStateChangeHistoryRecorder
     internal const string SourceBatch = "Batch";
     internal const string SourceRecommendation = "Recommendation";
     internal const string SourceCollection = "Collection";
-    internal const string SourceIdentification = "Identification";
     internal const string SourceUnknown = "Unknown";
 
     internal static void RecordIfChanged(

@@ -224,20 +224,20 @@ Validation:
 
 Completed:
 - Confirmed the auto-watched "not counted" report was caused by an unidentified movie: state-history writes intentionally skip rows without a stable TMDB identity.
-- Chose successful-identification time as the baseline for old unidentified state becoming countable. This avoids using `UpdatedAt` or other metadata timestamps as a fake user-state time.
-- Added `Source=Identification` for state-history rows created when a previously unidentified movie gains a stable TMDB identity.
-- When a previously unidentified movie is identified successfully, existing `Movie.IsWatched` and `Movie.IsFavorite` states now create status-history activation rows for the newly known TMDB id.
-- Linked `UserMovieCollectionItem` rows are normalized to the identified movie/TMDB identity and true watched / want-to-watch / not-interested states create status-history activation rows when the row previously had no matching TMDB identity.
-- Manual match and Batch-2 apply/merge paths both use the same identification activation behavior.
-- Scan identification that binds a single media file to an existing matched movie moves only that media file's watch-history rows. Whole-movie state/collection transfer is limited to cases where the source placeholder has no other active video source.
-- Watch Statistics collection-state loading now excludes collection rows linked to an unidentified or identification-failed `Movie`.
+- Corrected the identification-state semantic: reset / unidentified placeholder / re-identification paths do not create status-history activation rows.
+- Removed the identification-time activation behavior. There is no `Identification` state-history source for watched, favorite, want-to-watch, or not-interested state.
+- Successful identification uses the target `Movie`'s existing state. If the target movie was already marked before, that remains existing state and is not a current-month addition.
+- Same-TMDB duplicate merges may preserve state because they represent the same movie identity. Different-TMDB reassignment does not transfer watched, favorite, user rating, baseline, or collection status.
+- Manual match and Batch-2 apply/merge paths both use the same no-status-activation behavior.
+- Collection rows linked to unidentified or identification-failed movies remain excluded from Watch Statistics unless they already match a stable identified target identity.
+- Reset / unidentified placeholder / re-identification never turns an old placeholder state into a new monthly status addition.
 - Moving a library record out and scanning the same file back in does not create a status-history row. The scan path reuses the existing `MediaFile` by path and only clears `IsDeleted`, so old user states keep their original state-history timing.
-- Re-identifying an already identified, previously marked movie does not create a new `Source=Identification` activation row. Identification activation rows are limited to movies that did not already have a stable TMDB identity.
+- Re-identifying an already identified, previously marked movie does not create a new status activation row.
 
 Behavior:
-- `全部` still uses the current state snapshot, so an identified movie with retained watched/favorite/collection state is counted normally.
-- `本月` treats old unidentified state as countable when it becomes identified, with `ChangedAtUtc` equal to the successful identification time.
-- Repeated identification of an already identified movie does not create a new activation row for the same TMDB identity.
+- `全部` still uses the current state snapshot for identified movies.
+- `本月` uses only real state-history rows written by user actions, batch operations, recommendation actions, collection actions, or automatic watched.
+- Repeated identification does not create a new activation row.
 
 Validation:
 - `dotnet build MediaLibrary.sln`

@@ -26,11 +26,11 @@
 - Resolved in WI-6.1 status-history correction: status overview no longer uses `Movie.UpdatedAt` or `UserMovieCollectionItem.UpdatedAt` to infer status timing.
 - Resolved in WI-6.1 status-history correction: `本月` status overview uses `UserMovieStateChangeHistories` and the small comparison text means `本月比上月`, not `本周比上周`.
 - Resolved in WI-6.1 status-history correction follow-up: if a state is marked true and then canceled in the same month, the latest in-month state is false and it no longer counts as a current-month addition.
-- Resolved in WI-6.1 status identity follow-up: state changes made while a movie is unidentified are not counted until the movie gains a stable TMDB identity; successful identification records `Source=Identification` activation rows for retained true states.
-- Resolved in WI-6.1 status identity follow-up: collection rows linked to unidentified or identification-failed movies are excluded from Watch Statistics until the linked movie is identified successfully.
+- Resolved in WI-6.1 status identity follow-up: reset / unidentified placeholder / re-identification paths do not inherit old watched, favorite, want-to-watch, or not-interested state into the newly identified identity.
+- Resolved in WI-6.1 status identity follow-up: collection rows linked to unidentified or identification-failed movies are excluded from Watch Statistics unless they already match a stable identified target identity.
 - Resolved in WI-6.1 status identity follow-up: moving a marked movie out of the library and scanning it back in does not count as a new status addition because scan only restores the media file's library visibility.
-- Resolved in WI-6.1 status identity follow-up: AI assisted/manual re-identification of an already identified marked movie does not create a fresh `Source=Identification` status activation.
-- For old unidentified marked movies, the state activation time is the successful identification time, not the original unknown mark time. This is intentional because pre-identification state rows had no stable TMDB id and are not safely reconstructable without relying on metadata timestamps.
+- Resolved in WI-6.1 status identity follow-up: AI assisted/manual re-identification does not create status activation rows. The target movie's existing state is preserved as existing state, not a current-month addition.
+- Same-TMDB duplicate merges may preserve state because they represent the same movie identity; different-TMDB reassignment does not transfer watched, favorite, user rating, automatic-watched baseline, or collection status.
 - Historical state changes before `20260510163406_AddUserMovieStateChangeHistories` cannot be reconstructed. Existing pre-migration true states count in `全部`, but are not backfilled into `本月新增`.
 - Status-history coverage depends on future state changes going through `MovieManagementService`, `UserCollectionService`, or the automatic-watched path. Any future direct field write must add a state-history record in the same transaction.
 - Language distribution currently uses the stored `Language` field. A dedicated TMDB `original_language` field is not available yet.
