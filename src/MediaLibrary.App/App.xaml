@@ -1,0 +1,44 @@
+<Application x:Class="MediaLibrary.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pages="clr-namespace:MediaLibrary.App.Views.Pages"
+             xmlns:viewModels="clr-namespace:MediaLibrary.App.ViewModels.Pages"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.Light.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Theme.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <DataTemplate DataType="{x:Type viewModels:HomeViewModel}">
+                <pages:HomePage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:LibraryViewModel}">
+                <pages:LibraryPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:MovieDetailViewModel}">
+                <pages:MovieDetailPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:ScanTasksViewModel}">
+                <pages:ScanTasksPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:DuplicatesViewModel}">
+                <pages:DuplicatesPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:RecommendationsViewModel}">
+                <pages:RecommendationsPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:WatchInsightsViewModel}">
+                <pages:WatchInsightsPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:FavoritesViewModel}">
+                <pages:FavoritesPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:SettingsViewModel}">
+                <pages:SettingsPage />
+            </DataTemplate>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

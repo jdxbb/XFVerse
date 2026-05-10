@@ -1,0 +1,285 @@
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace MediaLibrary.Core.Helpers;
+
+public static partial class MovieFileNameParser
+{
+    private static readonly string[] NoiseTokens =
+    [
+        "1080p",
+        "2160p",
+        "720p",
+        "480p",
+        "4k",
+        "hdr",
+        "hdr10",
+        "x264",
+        "x265",
+        "h264",
+        "h265",
+        "hevc",
+        "av1",
+        "bluray",
+        "brrip",
+        "webrip",
+        "web-dl",
+        "webdl",
+        "hdrip",
+        "dvdrip",
+        "bdrip",
+        "remux",
+        "aac",
+        "aac2",
+        "aac5",
+        "dts",
+        "truehd",
+        "atmos",
+        "ddp",
+        "ddp5",
+        "10bit",
+        "8bit",
+        "yify",
+        "proper",
+        "repack",
+        "extended",
+        "limited",
+        "multi",
+        "subs",
+        "sub",
+        "dubbed",
+        "dual",
+        "audio",
+        "国语",
+        "国粤",
+        "中英字幕",
+        "中字",
+        "内封",
+        "内嵌",
+        "简中",
+        "繁中"
+    ];
+
+    public static ParsedMovieName Parse(string fileName)
+    {
+        var nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName).Trim();
+        var yearMatch = YearRegex().Match(nameWithoutExtension);
+        var year = ExtractYear(yearMatch);
+
+        var normalized = nameWithoutExtension;
+        normalized = BracketedContentRegex().Replace(normalized, " ");
+        normalized = CleanupSeparatorsRegex().Replace(normalized, " ");
+        normalized = SeasonEpisodeRegex().Replace(normalized, " ");
+        normalized = ReleaseGroupRegex().Replace(normalized, " ");
+
+        foreach (var token in NoiseTokens)
+        {
+            normalized = Regex.Replace(
+                normalized,
+                $@"\b{Regex.Escape(token)}\b",
+                " ",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+
+        if (year.HasValue)
+        {
+            normalized = Regex.Replace(
+                normalized,
+                $@"\b{year.Value}\b",
+                " ",
+                RegexOptions.CultureInvariant);
+        }
+
+        normalized = WhitespaceRegex().Replace(normalized, " ").Trim();
+
+        return new ParsedMovieName
+        {
+            CleanTitle = normalized,
+            ReleaseYear = year
+        };
+    }
+
+    public static double CalculateTitleSimilarity(string left, string right)
+    {
+        var leftVariants = BuildTitleVariants(left);
+        var rightVariants = BuildTitleVariants(right);
+
+        var bestScore = 0d;
+        foreach (var leftVariant in leftVariants)
+        {
+            foreach (var rightVariant in rightVariants)
+            {
+                bestScore = Math.Max(bestScore, CalculateNormalizedSimilarity(leftVariant, rightVariant));
+            }
+        }
+
+        return bestScore;
+    }
+
+    private static IReadOnlyCollection<string> BuildTitleVariants(string value)
+    {
+        var variants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddVariant(variants, value);
+
+        var cleaned = WhitespaceRegex().Replace(BracketedContentRegex().Replace(CleanupSeparatorsRegex().Replace(value, " "), " "), " ").Trim();
+        AddVariant(variants, cleaned);
+        AddVariant(variants, YearRegex().Replace(cleaned, " "));
+
+        var cjkBuilder = new StringBuilder(cleaned.Length);
+        var latinBuilder = new StringBuilder(cleaned.Length);
+        foreach (var ch in cleaned)
+        {
+            if (IsCjk(ch))
+            {
+                cjkBuilder.Append(ch);
+                latinBuilder.Append(' ');
+            }
+            else if (char.IsLetterOrDigit(ch) || char.IsWhiteSpace(ch))
+            {
+                latinBuilder.Append(ch);
+                cjkBuilder.Append(' ');
+            }
+            else
+            {
+                latinBuilder.Append(' ');
+                cjkBuilder.Append(' ');
+            }
+        }
+
+        AddVariant(variants, cjkBuilder.ToString());
+        AddVariant(variants, latinBuilder.ToString());
+
+        foreach (Match match in TitleSegmentRegex().Matches(cleaned))
+        {
+            AddVariant(variants, match.Value);
+        }
+
+        return variants.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+    }
+
+    private static void AddVariant(ISet<string> variants, string? value)
+    {
+        var normalized = NormalizeTitle(value);
+        if (!string.IsNullOrWhiteSpace(normalized))
+        {
+            variants.Add(normalized);
+        }
+    }
+
+    private static string NormalizeTitle(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(ch) || IsCjk(ch))
+            {
+                builder.Append(ch);
+            }
+            else
+            {
+                builder.Append(' ');
+            }
+        }
+
+        return WhitespaceRegex().Replace(builder.ToString(), " ").Trim();
+    }
+
+    private static double CalculateNormalizedSimilarity(string left, string right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return 0d;
+        }
+
+        if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase))
+        {
+            return 1d;
+        }
+
+        var leftTokens = left
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rightTokens = right
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var overlapCount = leftTokens.Intersect(rightTokens, StringComparer.OrdinalIgnoreCase).Count();
+        var unionCount = leftTokens.Union(rightTokens, StringComparer.OrdinalIgnoreCase).Count();
+        var tokenScore = unionCount == 0 ? 0d : (double)overlapCount / unionCount;
+
+        var charScore = 1d - ((double)LevenshteinDistance(left, right) / Math.Max(left.Length, right.Length));
+        var subsetScore = leftTokens.IsSubsetOf(rightTokens) || rightTokens.IsSubsetOf(leftTokens)
+            ? (double)Math.Min(leftTokens.Count, rightTokens.Count) / Math.Max(leftTokens.Count, rightTokens.Count)
+            : 0d;
+
+        return Math.Clamp(Math.Max(subsetScore, (tokenScore * 0.6d) + (charScore * 0.4d)), 0d, 1d);
+    }
+
+    private static int? ExtractYear(Match match)
+    {
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return int.TryParse(match.Value, out var year) ? year : null;
+    }
+
+    private static int LevenshteinDistance(string left, string right)
+    {
+        var matrix = new int[left.Length + 1, right.Length + 1];
+        for (var i = 0; i <= left.Length; i++)
+        {
+            matrix[i, 0] = i;
+        }
+
+        for (var j = 0; j <= right.Length; j++)
+        {
+            matrix[0, j] = j;
+        }
+
+        for (var i = 1; i <= left.Length; i++)
+        {
+            for (var j = 1; j <= right.Length; j++)
+            {
+                var cost = left[i - 1] == right[j - 1] ? 0 : 1;
+                matrix[i, j] = Math.Min(
+                    Math.Min(matrix[i - 1, j] + 1, matrix[i, j - 1] + 1),
+                    matrix[i - 1, j - 1] + cost);
+            }
+        }
+
+        return matrix[left.Length, right.Length];
+    }
+
+    private static bool IsCjk(char ch)
+    {
+        return ch >= 0x4E00 && ch <= 0x9FFF;
+    }
+
+    [GeneratedRegex(@"\b(19\d{2}|20\d{2})\b", RegexOptions.CultureInvariant)]
+    private static partial Regex YearRegex();
+
+    [GeneratedRegex(@"[.\-_·•]+", RegexOptions.CultureInvariant)]
+    private static partial Regex CleanupSeparatorsRegex();
+
+    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}", RegexOptions.CultureInvariant)]
+    private static partial Regex BracketedContentRegex();
+
+    [GeneratedRegex(@"\bS\d{1,2}E\d{1,2}\b|\b\d{1,2}x\d{1,2}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SeasonEpisodeRegex();
+
+    [GeneratedRegex(@"-\s*[A-Za-z0-9]+$|\b(?:GROUP|TEAM|RARBG|YTS|CMCTV|CHD|MNNHD)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ReleaseGroupRegex();
+
+    [GeneratedRegex(@"[\p{IsCJKUnifiedIdeographs}]{2,}|[A-Za-z][A-Za-z0-9'’&\s:]{2,}", RegexOptions.CultureInvariant)]
+    private static partial Regex TitleSegmentRegex();
+
+    [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
+    private static partial Regex WhitespaceRegex();
+}

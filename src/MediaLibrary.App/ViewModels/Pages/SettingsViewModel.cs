@@ -1,0 +1,788 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using MediaLibrary.App.Services.Interfaces;
+using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Models.Settings;
+using MediaLibrary.Core.Services.Interfaces;
+
+namespace MediaLibrary.App.ViewModels.Pages;
+
+public sealed class SettingsViewModel : PageViewModelBase
+{
+    private readonly ISettingsService _settingsService;
+    private readonly IWebDavService _webDavService;
+    private readonly IThemeService _themeService;
+    private readonly IVideoCacheService _videoCacheService;
+    private readonly HttpClient _metadataApiHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(8)
+    };
+    private const long BytesPerGb = 1024L * 1024L * 1024L;
+    private int? _connectionId;
+    private int? _applicationSettingId;
+    private string _connectionName = string.Empty;
+    private string _baseUrl = string.Empty;
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private bool _isConnectionEnabled = true;
+    private string _tmdbReadAccessToken = string.Empty;
+    private string _tmdbApiKey = string.Empty;
+    private string _omdbApiKey = string.Empty;
+    private string _aiBaseUrl = string.Empty;
+    private string _aiApiKey = string.Empty;
+    private string _aiModel = string.Empty;
+    private string _selectedThemeMode = "Light";
+    private string _connectionStatusMessage = "请先保存 WebDAV 连接配置。";
+    private string _scanPathStatusMessage = "当前还没有扫描路径。";
+    private string _apiStatusMessage = "可在这里保存 TMDB、OMDb 与 AI 配置。";
+    private string _themeStatusMessage = "默认使用浅色主题。";
+    private string _videoCacheDirectory = string.Empty;
+    private string _videoCacheUsageText = "视频缓存占用尚未加载。";
+    private string _videoCacheDownloadingText = string.Empty;
+    private string _videoCacheMaxGbText = "50";
+    private string _videoCacheStatusMessage = "视频缓存设置尚未加载。";
+    private int? _editingScanPathId;
+    private string _editingScanPathValue = string.Empty;
+    private string _editingScanPathDisplayName = string.Empty;
+    private bool _editingScanPathEnabled = true;
+    private bool _editingScanPathRecursive = true;
+
+    public SettingsViewModel(
+        ISettingsService settingsService,
+        IWebDavService webDavService,
+        IThemeService themeService,
+        IVideoCacheService videoCacheService)
+        : base("设置", "分区管理 WebDAV、扫描路径、元数据 API、AI、主题与播放器偏好。")
+    {
+        _settingsService = settingsService;
+        _webDavService = webDavService;
+        _themeService = themeService;
+        _videoCacheService = videoCacheService;
+
+        ThemeModes = _themeService.ThemeModes;
+        SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync);
+        TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync);
+        SaveApiSettingsCommand = new AsyncRelayCommand(SaveApiSettingsAsync);
+        TestApiSettingsCommand = new AsyncRelayCommand(TestApiSettingsAsync);
+        SaveAiSettingsCommand = new AsyncRelayCommand(SaveAiSettingsAsync);
+        SaveThemeSettingsCommand = new AsyncRelayCommand(SaveThemeSettingsAsync);
+        BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath);
+        SaveScanPathCommand = new AsyncRelayCommand(SaveScanPathAsync);
+        EditScanPathCommand = new RelayCommand(EditScanPath);
+        DeleteScanPathCommand = new AsyncRelayCommand(DeleteScanPathAsync);
+        ToggleScanPathCommand = new AsyncRelayCommand(ToggleScanPathAsync);
+        CancelEditScanPathCommand = new RelayCommand(CancelEditScanPath);
+        SaveVideoCacheSettingsCommand = new AsyncRelayCommand(SaveVideoCacheSettingsAsync);
+        ClearVideoCacheCommand = new AsyncRelayCommand(ClearVideoCacheAsync);
+        RefreshVideoCacheUsageCommand = new AsyncRelayCommand(RefreshVideoCacheUsageAsync);
+    }
+
+    public ObservableCollection<ScanPath> ScanPaths { get; } = [];
+
+    public IReadOnlyList<string> ThemeModes { get; }
+
+    public AsyncRelayCommand SaveConnectionCommand { get; }
+
+    public AsyncRelayCommand TestConnectionCommand { get; }
+
+    public AsyncRelayCommand SaveApiSettingsCommand { get; }
+
+    public AsyncRelayCommand TestApiSettingsCommand { get; }
+
+    public AsyncRelayCommand SaveAiSettingsCommand { get; }
+
+    public AsyncRelayCommand SaveThemeSettingsCommand { get; }
+
+    public RelayCommand BeginAddScanPathCommand { get; }
+
+    public AsyncRelayCommand SaveScanPathCommand { get; }
+
+    public RelayCommand EditScanPathCommand { get; }
+
+    public AsyncRelayCommand DeleteScanPathCommand { get; }
+
+    public AsyncRelayCommand ToggleScanPathCommand { get; }
+
+    public RelayCommand CancelEditScanPathCommand { get; }
+
+    public AsyncRelayCommand SaveVideoCacheSettingsCommand { get; }
+
+    public AsyncRelayCommand ClearVideoCacheCommand { get; }
+
+    public AsyncRelayCommand RefreshVideoCacheUsageCommand { get; }
+
+    public int? ConnectionId
+    {
+        get => _connectionId;
+        private set
+        {
+            if (SetProperty(ref _connectionId, value))
+            {
+                OnPropertyChanged(nameof(HasSavedConnection));
+            }
+        }
+    }
+
+    public string ConnectionName { get => _connectionName; set => SetProperty(ref _connectionName, value); }
+
+    public string BaseUrl { get => _baseUrl; set => SetProperty(ref _baseUrl, value); }
+
+    public string Username { get => _username; set => SetProperty(ref _username, value); }
+
+    public string Password { get => _password; set => SetProperty(ref _password, value); }
+
+    public bool IsConnectionEnabled { get => _isConnectionEnabled; set => SetProperty(ref _isConnectionEnabled, value); }
+
+    public string TmdbReadAccessToken { get => _tmdbReadAccessToken; set => SetProperty(ref _tmdbReadAccessToken, value); }
+
+    public string TmdbApiKey { get => _tmdbApiKey; set => SetProperty(ref _tmdbApiKey, value); }
+
+    public string OmdbApiKey { get => _omdbApiKey; set => SetProperty(ref _omdbApiKey, value); }
+
+    public string AiBaseUrl { get => _aiBaseUrl; set => SetProperty(ref _aiBaseUrl, value); }
+
+    public string AiApiKey { get => _aiApiKey; set => SetProperty(ref _aiApiKey, value); }
+
+    public string AiModel { get => _aiModel; set => SetProperty(ref _aiModel, value); }
+
+    public string SelectedThemeMode { get => _selectedThemeMode; set => SetProperty(ref _selectedThemeMode, value); }
+
+    public string ConnectionStatusMessage { get => _connectionStatusMessage; set => SetProperty(ref _connectionStatusMessage, value); }
+
+    public string ScanPathStatusMessage { get => _scanPathStatusMessage; set => SetProperty(ref _scanPathStatusMessage, value); }
+
+    public string ApiStatusMessage { get => _apiStatusMessage; set => SetProperty(ref _apiStatusMessage, value); }
+
+    public string ThemeStatusMessage { get => _themeStatusMessage; set => SetProperty(ref _themeStatusMessage, value); }
+
+    public string VideoCacheDirectory { get => _videoCacheDirectory; set => SetProperty(ref _videoCacheDirectory, value); }
+
+    public string VideoCacheUsageText { get => _videoCacheUsageText; set => SetProperty(ref _videoCacheUsageText, value); }
+
+    public string VideoCacheDownloadingText { get => _videoCacheDownloadingText; set => SetProperty(ref _videoCacheDownloadingText, value); }
+
+    public string VideoCacheMaxGbText { get => _videoCacheMaxGbText; set => SetProperty(ref _videoCacheMaxGbText, value); }
+
+    public string VideoCacheStatusMessage { get => _videoCacheStatusMessage; set => SetProperty(ref _videoCacheStatusMessage, value); }
+
+    public bool HasSavedConnection => ConnectionId.HasValue;
+
+    public int? EditingScanPathId
+    {
+        get => _editingScanPathId;
+        private set
+        {
+            if (SetProperty(ref _editingScanPathId, value))
+            {
+                OnPropertyChanged(nameof(IsEditingExistingScanPath));
+                OnPropertyChanged(nameof(ScanPathEditorTitle));
+                OnPropertyChanged(nameof(ScanPathSubmitButtonText));
+            }
+        }
+    }
+
+    public string EditingScanPathValue { get => _editingScanPathValue; set => SetProperty(ref _editingScanPathValue, value); }
+
+    public string EditingScanPathDisplayName { get => _editingScanPathDisplayName; set => SetProperty(ref _editingScanPathDisplayName, value); }
+
+    public bool EditingScanPathEnabled { get => _editingScanPathEnabled; set => SetProperty(ref _editingScanPathEnabled, value); }
+
+    public bool EditingScanPathRecursive { get => _editingScanPathRecursive; set => SetProperty(ref _editingScanPathRecursive, value); }
+
+    public bool IsEditingExistingScanPath => EditingScanPathId.HasValue;
+
+    public string ScanPathEditorTitle => IsEditingExistingScanPath ? "编辑扫描路径" : "新增扫描路径";
+
+    public string ScanPathSubmitButtonText => IsEditingExistingScanPath ? "保存修改" : "新增路径";
+
+    public override Task ActivateAsync(CancellationToken cancellationToken = default)
+    {
+        return LoadAsync(cancellationToken);
+    }
+
+    private async Task LoadAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var connectionTask = _settingsService.GetPrimaryConnectionAsync(cancellationToken);
+            var appSettingTask = _settingsService.GetApplicationSettingAsync(cancellationToken);
+
+            await Task.WhenAll(connectionTask, appSettingTask);
+            ApplyConnection(connectionTask.Result);
+            ApplyApplicationSetting(appSettingTask.Result);
+
+            if (ConnectionId.HasValue)
+            {
+                await LoadScanPathsAsync(ConnectionId.Value, cancellationToken);
+            }
+            else
+            {
+                ScanPaths.Clear();
+                ScanPathStatusMessage = "先保存 WebDAV 连接，再添加扫描路径。";
+            }
+
+            await LoadVideoCacheAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            ConnectionStatusMessage = $"加载设置失败：{exception.Message}";
+            ApiStatusMessage = "接口配置尚未加载。";
+            ScanPathStatusMessage = "扫描路径尚未加载。";
+            VideoCacheStatusMessage = "视频缓存设置尚未加载。";
+        }
+    }
+
+    private void ApplyConnection(WebDavConnectionModel connection)
+    {
+        ConnectionId = connection.Id;
+        ConnectionName = connection.Name;
+        BaseUrl = connection.BaseUrl;
+        Username = connection.Username;
+        Password = connection.Password;
+        IsConnectionEnabled = connection.IsEnabled;
+        ConnectionStatusMessage = ConnectionId.HasValue
+            ? "已加载当前 WebDAV 连接配置。"
+            : "当前还没有保存 WebDAV 连接。";
+    }
+
+    private void ApplyApplicationSetting(ApplicationSettingModel applicationSetting)
+    {
+        _applicationSettingId = applicationSetting.Id;
+        TmdbReadAccessToken = applicationSetting.TmdbReadAccessToken;
+        TmdbApiKey = applicationSetting.TmdbApiKey;
+        OmdbApiKey = applicationSetting.OmdbApiKey;
+        AiBaseUrl = applicationSetting.AiBaseUrl;
+        AiApiKey = applicationSetting.AiApiKey;
+        AiModel = applicationSetting.AiModel;
+        SelectedThemeMode = string.IsNullOrWhiteSpace(applicationSetting.ThemeMode) ? "Light" : applicationSetting.ThemeMode;
+        ApiStatusMessage = "已加载外部接口配置。";
+        ThemeStatusMessage = $"当前主题：{SelectedThemeMode}";
+    }
+
+    private async Task SaveConnectionAsync()
+    {
+        try
+        {
+            var connection = await _settingsService.SaveConnectionAsync(
+                new WebDavConnectionModel
+                {
+                    Id = ConnectionId,
+                    Name = ConnectionName,
+                    BaseUrl = BaseUrl,
+                    Username = Username,
+                    Password = Password,
+                    IsEnabled = IsConnectionEnabled
+                });
+
+            ApplyConnection(connection);
+            ConnectionStatusMessage = "WebDAV 连接配置已保存。";
+
+            if (ConnectionId.HasValue)
+            {
+                await LoadScanPathsAsync(ConnectionId.Value, CancellationToken.None);
+            }
+        }
+        catch (Exception exception)
+        {
+            ConnectionStatusMessage = exception.Message;
+        }
+    }
+
+    private async Task TestConnectionAsync()
+    {
+        var result = await _webDavService.TestConnectionAsync(
+            new WebDavConnectionModel
+            {
+                Id = ConnectionId,
+                Name = ConnectionName,
+                BaseUrl = BaseUrl,
+                Username = Username,
+                Password = Password,
+                IsEnabled = IsConnectionEnabled
+            });
+
+        ConnectionStatusMessage = result.Message;
+    }
+
+    private async Task SaveApiSettingsAsync()
+    {
+        await SaveApplicationSettingsAsync();
+        ApiStatusMessage = "TMDB / OMDb 认证信息已保存。";
+    }
+
+    private async Task TestApiSettingsAsync()
+    {
+        var hasTmdbCredential = !string.IsNullOrWhiteSpace(TmdbReadAccessToken)
+                                || !string.IsNullOrWhiteSpace(TmdbApiKey);
+        var hasOmdbCredential = !string.IsNullOrWhiteSpace(OmdbApiKey);
+        if (!hasTmdbCredential && !hasOmdbCredential)
+        {
+            ApiStatusMessage = "请先填写 TMDB 或 OMDb 的认证信息。";
+            return;
+        }
+
+        ApiStatusMessage = "正在测试元数据接口连接...";
+        var settings = await _settingsService.GetApplicationSettingAsync();
+        var results = new List<string>();
+        var failures = new List<string>();
+
+        if (hasTmdbCredential)
+        {
+            try
+            {
+                await TestTmdbAsync(settings.TmdbBaseUrl);
+                results.Add("TMDB 正常");
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"TMDB 失败：{exception.Message}");
+            }
+        }
+        else
+        {
+            results.Add("TMDB 未配置");
+        }
+
+        if (hasOmdbCredential)
+        {
+            try
+            {
+                await TestOmdbAsync();
+                results.Add("OMDb 正常");
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"OMDb 失败：{exception.Message}");
+            }
+        }
+        else
+        {
+            results.Add("OMDb 未配置");
+        }
+
+        ApiStatusMessage = failures.Count == 0
+            ? $"测试通过：{string.Join("；", results)}。"
+            : $"测试完成：{string.Join("；", results)}。{string.Join("；", failures)}";
+    }
+
+    private async Task SaveAiSettingsAsync()
+    {
+        await SaveApplicationSettingsAsync();
+        ApiStatusMessage = "AI 接口配置已保存。";
+    }
+
+    private async Task TestTmdbAsync(string configuredBaseUrl)
+    {
+        Exception? lastException = null;
+        foreach (var baseUri in BuildTmdbApiBaseUris(configuredBaseUrl))
+        {
+            try
+            {
+                var requestUri = !string.IsNullOrWhiteSpace(TmdbReadAccessToken)
+                    ? new Uri(baseUri, "configuration")
+                    : new Uri(baseUri, $"configuration?api_key={Uri.EscapeDataString(TmdbApiKey.Trim())}");
+                using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                if (!string.IsNullOrWhiteSpace(TmdbReadAccessToken))
+                {
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TmdbReadAccessToken.Trim());
+                }
+
+                using var response = await _metadataApiHttpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase}");
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync();
+                using var document = await JsonDocument.ParseAsync(stream);
+                if (!document.RootElement.TryGetProperty("images", out _))
+                {
+                    throw new InvalidOperationException("返回内容不符合 TMDB 配置接口格式。");
+                }
+
+                return;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+            {
+                lastException = exception;
+            }
+        }
+
+        throw new InvalidOperationException(lastException?.Message ?? "无法访问 TMDB。");
+    }
+
+    private async Task TestOmdbAsync()
+    {
+        var requestUri = new Uri(
+            $"http://www.omdbapi.com/?i=tt1375666&apikey={Uri.EscapeDataString(OmdbApiKey.Trim())}",
+            UriKind.Absolute);
+        using var response = await _metadataApiHttpClient.GetAsync(requestUri);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase}");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var document = await JsonDocument.ParseAsync(stream);
+        var root = document.RootElement;
+        var isSuccess = root.TryGetProperty("Response", out var responseProperty)
+                        && string.Equals(responseProperty.GetString(), "True", StringComparison.OrdinalIgnoreCase);
+        if (!isSuccess)
+        {
+            var error = root.TryGetProperty("Error", out var errorProperty)
+                ? errorProperty.GetString()
+                : "OMDb 返回失败。";
+            throw new InvalidOperationException(error);
+        }
+    }
+
+    private static IEnumerable<Uri> BuildTmdbApiBaseUris(string? configuredBaseUrl)
+    {
+        const string defaultPrimaryApiBaseUrl = "https://api.tmdb.org/3/";
+        const string defaultFallbackApiBaseUrl = "https://api.themoviedb.org/3/";
+        var primary = new Uri(NormalizeTmdbApiBaseUrl(configuredBaseUrl, defaultPrimaryApiBaseUrl), UriKind.Absolute);
+        var fallback = new Uri(defaultFallbackApiBaseUrl, UriKind.Absolute);
+
+        yield return primary;
+        if (!Uri.Compare(primary, fallback, UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase).Equals(0))
+        {
+            yield return fallback;
+        }
+    }
+
+    private static string NormalizeTmdbApiBaseUrl(string? baseUrl, string fallbackBaseUrl)
+    {
+        var normalized = string.IsNullOrWhiteSpace(baseUrl) ? fallbackBaseUrl : baseUrl.Trim();
+        if (!normalized.EndsWith("/", StringComparison.Ordinal))
+        {
+            normalized += "/";
+        }
+
+        if (!normalized.EndsWith("/3/", StringComparison.Ordinal))
+        {
+            normalized = normalized.TrimEnd('/') + "/3/";
+        }
+
+        return normalized;
+    }
+
+    private async Task SaveThemeSettingsAsync()
+    {
+        await _themeService.ApplyAndSaveAsync(SelectedThemeMode);
+        var settings = await _settingsService.GetApplicationSettingAsync();
+        _applicationSettingId = settings.Id;
+        ThemeStatusMessage = $"主题已切换为：{SelectedThemeMode}";
+    }
+
+    private async Task SaveApplicationSettingsAsync()
+    {
+        try
+        {
+            var existing = await _settingsService.GetApplicationSettingAsync();
+            var saved = await _settingsService.SaveApplicationSettingAsync(
+                new ApplicationSettingModel
+                {
+                    Id = _applicationSettingId,
+                    TmdbReadAccessToken = TmdbReadAccessToken,
+                    TmdbApiKey = TmdbApiKey,
+                    OmdbApiKey = OmdbApiKey,
+                    ThemeMode = SelectedThemeMode,
+                    AiBaseUrl = AiBaseUrl,
+                    AiApiKey = AiApiKey,
+                    AiModel = AiModel,
+                    RecentAiRecommendationsJson = existing.RecentAiRecommendationsJson,
+                    CurrentAiRecommendationsJson = existing.CurrentAiRecommendationsJson,
+                    AiRecommendationLibraryFingerprint = existing.AiRecommendationLibraryFingerprint,
+                    TmdbBaseUrl = existing.TmdbBaseUrl
+                });
+
+            _applicationSettingId = saved.Id;
+        }
+        catch (Exception exception)
+        {
+            ApiStatusMessage = $"保存接口配置失败：{exception.Message}";
+        }
+    }
+
+    private async Task LoadVideoCacheAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var settingsTask = _videoCacheService.GetSettingsAsync(cancellationToken);
+            var usageTask = _videoCacheService.GetUsageAsync(cancellationToken);
+            await Task.WhenAll(settingsTask, usageTask);
+
+            ApplyVideoCacheSettings(settingsTask.Result);
+            ApplyVideoCacheUsage(usageTask.Result);
+            VideoCacheStatusMessage = "已加载视频缓存设置。";
+        }
+        catch (Exception exception)
+        {
+            VideoCacheStatusMessage = $"加载视频缓存设置失败：{exception.Message}";
+        }
+    }
+
+    private async Task SaveVideoCacheSettingsAsync()
+    {
+        try
+        {
+            var maxBytes = ParseGigabytes(VideoCacheMaxGbText, "容量上限");
+            await _videoCacheService.SaveSettingsAsync(
+                new VideoCacheSettingsModel
+                {
+                    MaxBytes = maxBytes
+                });
+
+            await RefreshVideoCacheUsageAsync();
+            VideoCacheStatusMessage = "视频缓存设置已保存。";
+        }
+        catch (Exception exception)
+        {
+            VideoCacheStatusMessage = $"保存视频缓存设置失败：{exception.Message}";
+        }
+    }
+
+    private async Task ClearVideoCacheAsync()
+    {
+        try
+        {
+            var result = await _videoCacheService.ClearAllAsync();
+            await RefreshVideoCacheUsageAsync();
+            if (result.BlockedByActiveLease && !result.Succeeded)
+            {
+                VideoCacheStatusMessage = "请先关闭播放器或停止播放后再清空视频缓存。";
+                return;
+            }
+
+            if (result.Succeeded)
+            {
+                var skippedText = result.SkippedActiveCount > 0
+                    ? $" Active cache skipped: {result.SkippedActiveCount}, {FormatFileSize(result.SkippedActiveBytes)}."
+                    : string.Empty;
+                VideoCacheStatusMessage = $"Cleared video cache, freed {FormatFileSize(result.FreedBytes)}. Deleted: full-file {result.DeletedFullFileCount}, mpv-session {result.DeletedMpvSessionCount}, legacy {result.DeletedLegacyCount}.{skippedText}";
+                return;
+            }
+
+            VideoCacheStatusMessage = result.Succeeded
+                ? $"已清空视频缓存，释放 {FormatFileSize(result.FreedBytes)}。"
+                : $"清空视频缓存失败：{result.Error ?? "部分缓存项无法删除。"}";
+        }
+        catch (Exception exception)
+        {
+            VideoCacheStatusMessage = $"清空视频缓存失败：{exception.Message}";
+        }
+    }
+
+    private async Task RefreshVideoCacheUsageAsync()
+    {
+        try
+        {
+            ApplyVideoCacheUsage(await _videoCacheService.GetUsageAsync());
+        }
+        catch (Exception exception)
+        {
+            VideoCacheStatusMessage = $"刷新视频缓存占用失败：{exception.Message}";
+        }
+    }
+
+    private void ApplyVideoCacheSettings(VideoCacheSettingsModel settings)
+    {
+        VideoCacheMaxGbText = FormatGigabytes(settings.MaxBytes);
+    }
+
+    private void ApplyVideoCacheUsage(VideoCacheUsage usage)
+    {
+        VideoCacheDirectory = usage.CacheDirectory;
+        VideoCacheUsageText = $"{FormatFileSize(usage.UsedBytes)} / {FormatFileSize(usage.MaxBytes)}";
+        VideoCacheDownloadingText = usage.DownloadingBytes > 0
+            ? $"下载中：{FormatFileSize(usage.DownloadingBytes)}"
+            : string.Empty;
+
+        var details = new List<string>
+        {
+            $"Full-file cache: {FormatFileSize(usage.FullFileBytes)} ({usage.FullFileItemCount})",
+            $"mpv 播放期磁盘缓存: {FormatFileSize(usage.MpvSessionBytes)} ({usage.MpvSessionDirectoryCount})",
+            "说明：不含 mpv 内存/demux 缓存"
+        };
+
+        if (usage.LegacyBytes > 0 || usage.LegacyItemCount > 0)
+        {
+            details.Add($"Legacy segment cache: {FormatFileSize(usage.LegacyBytes)} ({usage.LegacyItemCount})");
+        }
+
+        if (usage.DownloadingBytes > 0)
+        {
+            details.Add($"Downloading: {FormatFileSize(usage.DownloadingBytes)}");
+        }
+
+        VideoCacheDownloadingText = string.Join(Environment.NewLine, details);
+    }
+
+    private static long ParseGigabytes(string value, string fieldName)
+    {
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var number)
+            && !decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out number))
+        {
+            throw new InvalidOperationException($"{fieldName} 必须是有效数字。");
+        }
+
+        if (number <= 0)
+        {
+            throw new InvalidOperationException($"{fieldName} 必须大于 0。");
+        }
+
+        return (long)Math.Round(number * BytesPerGb, MidpointRounding.AwayFromZero);
+    }
+
+    private static string FormatGigabytes(long bytes)
+    {
+        var gigabytes = (decimal)bytes / BytesPerGb;
+        return gigabytes % 1 == 0
+            ? gigabytes.ToString("0", CultureInfo.CurrentCulture)
+            : gigabytes.ToString("0.##", CultureInfo.CurrentCulture);
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "0 B";
+        }
+
+        var units = new[] { "B", "KB", "MB", "GB", "TB" };
+        var value = (double)bytes;
+        var unitIndex = 0;
+        while (value >= 1024d && unitIndex < units.Length - 1)
+        {
+            value /= 1024d;
+            unitIndex++;
+        }
+
+        return unitIndex == 0
+            ? $"{value:0} {units[unitIndex]}"
+            : $"{value:0.##} {units[unitIndex]}";
+    }
+
+    private void BeginAddScanPath()
+    {
+        if (!HasSavedConnection)
+        {
+            ScanPathStatusMessage = "请先保存 WebDAV 连接配置。";
+            return;
+        }
+
+        EditingScanPathId = null;
+        EditingScanPathValue = string.Empty;
+        EditingScanPathDisplayName = string.Empty;
+        EditingScanPathEnabled = true;
+        EditingScanPathRecursive = true;
+        ScanPathStatusMessage = "正在新增扫描路径。";
+    }
+
+    private void EditScanPath(object? parameter)
+    {
+        if (parameter is not ScanPath scanPath)
+        {
+            return;
+        }
+
+        EditingScanPathId = scanPath.Id;
+        EditingScanPathValue = scanPath.Path;
+        EditingScanPathDisplayName = scanPath.DisplayName;
+        EditingScanPathEnabled = scanPath.IsEnabled;
+        EditingScanPathRecursive = scanPath.IsRecursive;
+        ScanPathStatusMessage = $"正在编辑：{scanPath.DisplayName}";
+    }
+
+    private async Task SaveScanPathAsync()
+    {
+        if (!ConnectionId.HasValue)
+        {
+            ScanPathStatusMessage = "请先保存 WebDAV 连接配置。";
+            return;
+        }
+
+        try
+        {
+            var savedScanPath = await _settingsService.SaveScanPathAsync(
+                new ScanPath
+                {
+                    Id = EditingScanPathId ?? 0,
+                    SourceConnectionId = ConnectionId.Value,
+                    Path = EditingScanPathValue,
+                    DisplayName = EditingScanPathDisplayName,
+                    IsEnabled = EditingScanPathEnabled,
+                    IsRecursive = EditingScanPathRecursive
+                });
+
+            await LoadScanPathsAsync(ConnectionId.Value, CancellationToken.None);
+            ScanPathStatusMessage = $"扫描路径已保存：{savedScanPath.DisplayName}";
+            CancelEditScanPath();
+        }
+        catch (Exception exception)
+        {
+            ScanPathStatusMessage = exception.Message;
+        }
+    }
+
+    private async Task DeleteScanPathAsync(object? parameter)
+    {
+        if (parameter is not ScanPath scanPath || !ConnectionId.HasValue)
+        {
+            return;
+        }
+
+        await _settingsService.DeleteScanPathAsync(scanPath.Id);
+        await LoadScanPathsAsync(ConnectionId.Value, CancellationToken.None);
+        ScanPathStatusMessage = $"已删除扫描路径：{scanPath.DisplayName}";
+
+        if (EditingScanPathId == scanPath.Id)
+        {
+            CancelEditScanPath();
+        }
+    }
+
+    private async Task ToggleScanPathAsync(object? parameter)
+    {
+        if (parameter is not ScanPath scanPath || !ConnectionId.HasValue)
+        {
+            return;
+        }
+
+        await _settingsService.SetScanPathEnabledAsync(scanPath.Id, !scanPath.IsEnabled);
+        await LoadScanPathsAsync(ConnectionId.Value, CancellationToken.None);
+        ScanPathStatusMessage = scanPath.IsEnabled
+            ? $"已停用扫描路径：{scanPath.DisplayName}"
+            : $"已启用扫描路径：{scanPath.DisplayName}";
+    }
+
+    private void CancelEditScanPath()
+    {
+        EditingScanPathId = null;
+        EditingScanPathValue = string.Empty;
+        EditingScanPathDisplayName = string.Empty;
+        EditingScanPathEnabled = true;
+        EditingScanPathRecursive = true;
+    }
+
+    private async Task LoadScanPathsAsync(int sourceConnectionId, CancellationToken cancellationToken)
+    {
+        var scanPaths = await _settingsService.GetScanPathsAsync(sourceConnectionId, cancellationToken);
+        ScanPaths.Clear();
+
+        foreach (var scanPath in scanPaths)
+        {
+            ScanPaths.Add(scanPath);
+        }
+
+        ScanPathStatusMessage = ScanPaths.Count == 0
+            ? "当前还没有扫描路径。"
+            : $"已加载 {ScanPaths.Count} 条扫描路径。";
+    }
+}

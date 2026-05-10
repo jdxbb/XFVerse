@@ -1,0 +1,658 @@
+using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Helpers;
+using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.Enums;
+using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Models.Settings;
+using MediaLibrary.Core.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace MediaLibrary.Core.Services.Implementations;
+
+public sealed class MediaScanService : IMediaScanService
+{
+    private readonly ISettingsService _settingsService;
+    private readonly IWebDavService _webDavService;
+    private readonly IMovieIdentificationService _movieIdentificationService;
+    private readonly ISubtitleBindingService _subtitleBindingService;
+    private readonly IAiClassificationService _aiClassificationService;
+    private readonly IMediaProbeService _mediaProbeService;
+
+    public MediaScanService(
+        ISettingsService settingsService,
+        IWebDavService webDavService,
+        IMovieIdentificationService movieIdentificationService,
+        ISubtitleBindingService subtitleBindingService,
+        IAiClassificationService aiClassificationService,
+        IMediaProbeService mediaProbeService)
+    {
+        _settingsService = settingsService;
+        _webDavService = webDavService;
+        _movieIdentificationService = movieIdentificationService;
+        _subtitleBindingService = subtitleBindingService;
+        _aiClassificationService = aiClassificationService;
+        _mediaProbeService = mediaProbeService;
+    }
+
+    public async Task<ScanOverviewModel> GetOverviewAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = await _settingsService.GetPrimaryConnectionAsync(cancellationToken);
+        if (!connection.Id.HasValue)
+        {
+            return new ScanOverviewModel();
+        }
+
+        var enabledScanPaths = (await _settingsService.GetScanPathsAsync(connection.Id.Value, cancellationToken))
+            .Where(x => x.IsEnabled)
+            .OrderByDescending(x => WebDavPathHelper.MatchPathDepth(x.Path))
+            .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(
+                x => new ScanPathSummaryItem
+                {
+                    Id = x.Id,
+                    DisplayName = x.DisplayName,
+                    Path = x.Path,
+                    IsRecursive = x.IsRecursive
+                })
+            .ToList();
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var recentLogs = await dbContext.ScanTaskLogs
+            .AsNoTracking()
+            .Where(x => x.SourceConnectionId == connection.Id.Value)
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(20)
+            .Select(
+                x => new ScanTaskLogItem
+                {
+                    Id = x.Id,
+                    ScanPathDisplayName = x.ScanPath != null ? x.ScanPath.DisplayName : string.Empty,
+                    ScanPath = x.ScanPath != null ? x.ScanPath.Path : string.Empty,
+                    TaskType = x.TaskType,
+                    Status = x.Status,
+                    StartedAt = ToLocalDisplayTime(x.StartedAt),
+                    EndedAt = x.EndedAt.HasValue ? ToLocalDisplayTime(x.EndedAt.Value) : null,
+                    ScannedCount = x.ScannedCount,
+                    NewFileCount = x.NewFileCount,
+                    UpdatedFileCount = x.UpdatedFileCount,
+                    IgnoredFileCount = x.IgnoredFileCount,
+                    ErrorCount = x.ErrorCount,
+                    ErrorMessage = x.ErrorMessage ?? string.Empty
+                })
+            .ToListAsync(cancellationToken);
+
+        return new ScanOverviewModel
+        {
+            HasConnection = true,
+            ConnectionName = connection.Name,
+            BaseUrl = connection.BaseUrl,
+            LastScanAt = connection.LastScanAt.HasValue ? ToLocalDisplayTime(connection.LastScanAt.Value) : null,
+            EnabledScanPaths = enabledScanPaths,
+            RecentLogs = recentLogs
+        };
+    }
+
+    public async Task<ScanExecutionResult> RunScanAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = await _settingsService.GetPrimaryConnectionAsync(cancellationToken);
+        if (!connection.Id.HasValue)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "请先保存可用的 WebDAV 连接。"
+            };
+        }
+
+        if (!connection.IsEnabled)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "当前 WebDAV 连接已停用。"
+            };
+        }
+
+        var enabledScanPaths = (await _settingsService.GetScanPathsAsync(connection.Id.Value, cancellationToken))
+            .Where(x => x.IsEnabled)
+            .OrderByDescending(x => WebDavPathHelper.MatchPathDepth(x.Path))
+            .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (enabledScanPaths.Count == 0)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "当前没有启用的扫描路径。"
+            };
+        }
+
+        var seenFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var videoMediaFileIds = new HashSet<int>();
+        var successfulLogIds = new List<int>();
+        var totalResult = new ScanExecutionResult
+        {
+            ProcessedPathCount = enabledScanPaths.Count
+        };
+
+        foreach (var scanPath in enabledScanPaths)
+        {
+            var pathResult = await ScanSinglePathAsync(
+                connection,
+                scanPath,
+                seenFilePaths,
+                videoMediaFileIds,
+                cancellationToken);
+
+            totalResult.TotalScannedCount += pathResult.TotalScannedCount;
+            totalResult.NewFileCount += pathResult.NewFileCount;
+            totalResult.UpdatedFileCount += pathResult.UpdatedFileCount;
+            totalResult.IgnoredFileCount += pathResult.IgnoredFileCount;
+            totalResult.ErrorCount += pathResult.ErrorCount;
+
+            if (pathResult.IsSuccessful && pathResult.LogId > 0)
+            {
+                successfulLogIds.Add(pathResult.LogId);
+            }
+        }
+
+        var postStage = new PostScanStageResult();
+        await MarkMissingFilesDeletedAsync(connection.Id.Value, enabledScanPaths, seenFilePaths, cancellationToken);
+
+        try
+        {
+            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(videoMediaFileIds.ToArray(), cancellationToken);
+            postStage.Absorb(identificationResult);
+        }
+        catch (Exception exception)
+        {
+            postStage.AddError("Identify.Stage", TrimMessage(exception.Message));
+        }
+
+        try
+        {
+            await ClassifyAffectedMoviesAsync(videoMediaFileIds, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            postStage.AddWarning("AI.Classify", TrimMessage(exception.Message));
+        }
+
+        try
+        {
+            await _subtitleBindingService.RebuildBindingsAsync(connection.Id.Value, videoMediaFileIds.ToArray(), cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            postStage.AddWarning("Subtitle.Binding", TrimMessage(exception.Message));
+        }
+
+        if (successfulLogIds.Count > 0 && postStage.HasIssues)
+        {
+            await MarkLogsAsPartialSuccessAsync(successfulLogIds, postStage, cancellationToken);
+            totalResult.ErrorCount += postStage.IssueCount;
+        }
+
+        if (successfulLogIds.Count > 0)
+        {
+            await UpdateConnectionLastScanAtAsync(connection.Id.Value, cancellationToken);
+        }
+
+        QueueMediaProbe(videoMediaFileIds);
+
+        totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
+        return totalResult;
+    }
+
+    private void QueueMediaProbe(IReadOnlyCollection<int> mediaFileIds)
+    {
+        if (mediaFileIds.Count == 0)
+        {
+            return;
+        }
+
+        var ids = mediaFileIds.ToArray();
+        _ = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    await _mediaProbeService.EnqueueMediaFilesAsync(ids);
+                }
+                catch
+                {
+                    // Media probing is best-effort and must not affect scan results.
+                }
+            });
+    }
+
+    private async Task<PathScanExecutionResult> ScanSinglePathAsync(
+        WebDavConnectionModel connection,
+        ScanPath scanPath,
+        HashSet<string> seenFilePaths,
+        HashSet<int> videoMediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var now = DateTime.UtcNow;
+        var log = new ScanTaskLog
+        {
+            SourceConnectionId = connection.Id!.Value,
+            ScanPathId = scanPath.Id,
+            TaskType = ScanTaskType.Refresh,
+            Status = ScanTaskStatus.Running,
+            StartedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        dbContext.ScanTaskLogs.Add(log);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var result = new PathScanExecutionResult
+        {
+            LogId = log.Id
+        };
+
+        List<RemoteEntry> remoteEntries;
+        try
+        {
+            remoteEntries = await CollectRemoteFilesAsync(connection, scanPath, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            result.ErrorCount++;
+            await CompletePathLogAsync(log, result, ScanTaskStatus.Failed, $"[WebDAV.List] {TrimMessage(exception.Message)}", dbContext, cancellationToken);
+            return result;
+        }
+
+        try
+        {
+            var existingFiles = await LoadExistingFilesForPathAsync(dbContext, connection.Id.Value, scanPath.Path, cancellationToken);
+
+            foreach (var remoteEntry in remoteEntries.OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase))
+            {
+                var mediaType = MediaFileRules.GetMediaType(remoteEntry.Name);
+                if (mediaType == MediaType.Other)
+                {
+                    result.IgnoredFileCount++;
+                    continue;
+                }
+
+                if (!seenFilePaths.Add(remoteEntry.Path))
+                {
+                    result.IgnoredFileCount++;
+                    continue;
+                }
+
+                result.TotalScannedCount++;
+
+                if (!existingFiles.TryGetValue(remoteEntry.Path, out var mediaFile))
+                {
+                    mediaFile = new MediaFile
+                    {
+                        SourceConnectionId = connection.Id.Value,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    dbContext.MediaFiles.Add(mediaFile);
+                    existingFiles[remoteEntry.Path] = mediaFile;
+                    result.NewFileCount++;
+                }
+                else if (HasMaterialChange(mediaFile, remoteEntry, mediaType, scanPath.Id))
+                {
+                    result.UpdatedFileCount++;
+                }
+
+                mediaFile.ScanPathId = scanPath.Id;
+                mediaFile.FileName = remoteEntry.Name;
+                mediaFile.FilePath = remoteEntry.Path;
+                mediaFile.RemoteUri = string.IsNullOrWhiteSpace(remoteEntry.RemoteUri) ? null : remoteEntry.RemoteUri;
+                mediaFile.Extension = Path.GetExtension(remoteEntry.Name).ToLowerInvariant();
+                mediaFile.FileSize = remoteEntry.ContentLength ?? 0L;
+                mediaFile.LastModifiedAt = remoteEntry.LastModifiedAt;
+                mediaFile.MediaType = mediaType;
+                mediaFile.IsDeleted = false;
+                mediaFile.LastSeenAt = DateTime.UtcNow;
+                mediaFile.UpdatedAt = DateTime.UtcNow;
+
+                if (mediaType == MediaType.Video && mediaFile.Id > 0)
+                {
+                    videoMediaFileIds.Add(mediaFile.Id);
+                }
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            foreach (var mediaFileId in dbContext.ChangeTracker.Entries<MediaFile>()
+                         .Select(x => x.Entity)
+                         .Where(x => x.MediaType == MediaType.Video)
+                         .Select(x => x.Id)
+                         .Where(x => x > 0))
+            {
+                videoMediaFileIds.Add(mediaFileId);
+            }
+
+            result.IsSuccessful = true;
+            await CompletePathLogAsync(log, result, ScanTaskStatus.Success, string.Empty, dbContext, cancellationToken);
+            return result;
+        }
+        catch (Exception exception)
+        {
+            result.ErrorCount++;
+            await CompletePathLogAsync(log, result, ScanTaskStatus.Failed, $"[MediaFile.Upsert] {TrimMessage(exception.Message)}", dbContext, cancellationToken);
+            return result;
+        }
+    }
+
+    private async Task<List<RemoteEntry>> CollectRemoteFilesAsync(
+        WebDavConnectionModel connection,
+        ScanPath scanPath,
+        CancellationToken cancellationToken)
+    {
+        var files = new List<RemoteEntry>();
+        var queue = new Queue<PendingDirectory>();
+        queue.Enqueue(new PendingDirectory(scanPath.Path, null));
+
+        while (queue.Count > 0)
+        {
+            var currentDirectory = queue.Dequeue();
+            var children = await _webDavService.ListDirectoryAsync(
+                connection,
+                currentDirectory.Path,
+                currentDirectory.RemoteUri,
+                cancellationToken);
+
+            foreach (var child in children)
+            {
+                if (child.IsDirectory)
+                {
+                    if (scanPath.IsRecursive)
+                    {
+                        queue.Enqueue(new PendingDirectory(child.Path, child.RemoteUri));
+                    }
+
+                    continue;
+                }
+
+                files.Add(child);
+            }
+        }
+
+        return files;
+    }
+
+    private sealed record PendingDirectory(string Path, string? RemoteUri);
+
+    private static async Task<Dictionary<string, MediaFile>> LoadExistingFilesForPathAsync(
+        AppDbContext dbContext,
+        int sourceConnectionId,
+        string scanPath,
+        CancellationToken cancellationToken)
+    {
+        var normalizedPath = WebDavPathHelper.NormalizeVirtualPath(scanPath);
+        var childPrefix = normalizedPath == "/" ? "/" : normalizedPath + "/";
+
+        return await dbContext.MediaFiles
+            .Where(
+                x => x.SourceConnectionId == sourceConnectionId
+                     && (normalizedPath == "/"
+                         || x.FilePath == normalizedPath
+                         || x.FilePath.StartsWith(childPrefix)))
+            .ToDictionaryAsync(x => x.FilePath, StringComparer.OrdinalIgnoreCase, cancellationToken);
+    }
+
+    private static bool HasMaterialChange(MediaFile mediaFile, RemoteEntry remoteEntry, MediaType mediaType, int scanPathId)
+    {
+        return mediaFile.ScanPathId != scanPathId
+               || !string.Equals(mediaFile.FileName, remoteEntry.Name, StringComparison.Ordinal)
+               || !string.Equals(mediaFile.RemoteUri ?? string.Empty, remoteEntry.RemoteUri ?? string.Empty, StringComparison.Ordinal)
+               || mediaFile.FileSize != (remoteEntry.ContentLength ?? 0L)
+               || mediaFile.LastModifiedAt != remoteEntry.LastModifiedAt
+               || mediaFile.MediaType != mediaType
+               || mediaFile.IsDeleted;
+    }
+
+    private static async Task MarkMissingFilesDeletedAsync(
+        int sourceConnectionId,
+        IReadOnlyCollection<ScanPath> enabledScanPaths,
+        HashSet<string> seenFilePaths,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var normalizedPaths = enabledScanPaths
+            .Select(x => WebDavPathHelper.NormalizeVirtualPath(x.Path))
+            .ToArray();
+
+        var candidates = await dbContext.MediaFiles
+            .Where(x => x.SourceConnectionId == sourceConnectionId && !x.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        foreach (var mediaFile in candidates.Where(mediaFile => IsUnderEnabledPath(mediaFile.FilePath, normalizedPaths)))
+        {
+            if (seenFilePaths.Contains(mediaFile.FilePath))
+            {
+                continue;
+            }
+
+            mediaFile.IsDeleted = true;
+            mediaFile.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static bool IsUnderEnabledPath(string filePath, IReadOnlyCollection<string> enabledPaths)
+    {
+        var normalizedFilePath = WebDavPathHelper.NormalizeVirtualPath(filePath);
+        return enabledPaths.Any(
+            enabledPath => enabledPath == "/"
+                           || string.Equals(normalizedFilePath, enabledPath, StringComparison.OrdinalIgnoreCase)
+                           || normalizedFilePath.StartsWith(enabledPath + "/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static async Task UpdateConnectionLastScanAtAsync(int connectionId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var connection = await dbContext.SourceConnections.FirstOrDefaultAsync(x => x.Id == connectionId, cancellationToken);
+        if (connection is null)
+        {
+            return;
+        }
+
+        connection.LastScanAt = DateTime.UtcNow;
+        connection.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ClassifyAffectedMoviesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        if (mediaFileIds.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var movieIds = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(x => mediaFileIds.Contains(x.Id) && x.MovieId.HasValue)
+            .Select(x => x.MovieId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var movieId in movieIds)
+        {
+            var needsClassification = await dbContext.Movies
+                .AsNoTracking()
+                .AnyAsync(
+                    x => x.Id == movieId
+                         && (string.IsNullOrWhiteSpace(x.AiTagsText)
+                             || string.IsNullOrWhiteSpace(x.EmotionTagsText)
+                             || string.IsNullOrWhiteSpace(x.SceneTagsText)),
+                    cancellationToken);
+
+            if (needsClassification)
+            {
+                await _aiClassificationService.ClassifyMovieAsync(movieId, cancellationToken);
+            }
+        }
+    }
+
+    private static async Task CompletePathLogAsync(
+        ScanTaskLog log,
+        PathScanExecutionResult result,
+        ScanTaskStatus status,
+        string errorMessage,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        log.Status = status;
+        log.ScannedCount = result.TotalScannedCount;
+        log.NewFileCount = result.NewFileCount;
+        log.UpdatedFileCount = result.UpdatedFileCount;
+        log.IgnoredFileCount = result.IgnoredFileCount;
+        log.ErrorCount = result.ErrorCount;
+        log.ErrorMessage = string.IsNullOrWhiteSpace(errorMessage) ? null : errorMessage;
+        log.EndedAt = DateTime.UtcNow;
+        log.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task MarkLogsAsPartialSuccessAsync(
+        IReadOnlyCollection<int> logIds,
+        PostScanStageResult postStage,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var logs = await dbContext.ScanTaskLogs
+            .Where(x => logIds.Contains(x.Id) && x.Status == ScanTaskStatus.Success)
+            .ToListAsync(cancellationToken);
+
+        if (logs.Count == 0)
+        {
+            return;
+        }
+
+        var summary = postStage.BuildSummary();
+        foreach (var log in logs)
+        {
+            log.Status = ScanTaskStatus.PartialSuccess;
+            log.ErrorCount += postStage.IssueCount;
+            log.ErrorMessage = string.IsNullOrWhiteSpace(log.ErrorMessage)
+                ? summary
+                : $"{log.ErrorMessage}；{summary}";
+            log.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string BuildStatusMessage(ScanExecutionResult totalResult, PostScanStageResult postStage)
+    {
+        if (totalResult.ErrorCount == 0 && !postStage.HasIssues)
+        {
+            return $"扫描完成，共扫描 {totalResult.TotalScannedCount} 个文件。";
+        }
+
+        if (postStage.HasIssues && totalResult.ErrorCount == postStage.IssueCount)
+        {
+            return $"扫描入库完成，共扫描 {totalResult.TotalScannedCount} 个文件；识别/元数据阶段存在问题。{postStage.BuildSummary()}";
+        }
+
+        return $"扫描完成，共扫描 {totalResult.TotalScannedCount} 个文件；存在 {totalResult.ErrorCount} 个问题。{postStage.BuildSummary()}";
+    }
+
+    private static DateTime ToLocalDisplayTime(DateTime value)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        return utc.ToLocalTime();
+    }
+
+    private static string TrimMessage(string message)
+    {
+        return string.IsNullOrWhiteSpace(message) ? "未知错误" : message.Trim();
+    }
+
+    private sealed class PathScanExecutionResult
+    {
+        public int LogId { get; set; }
+
+        public bool IsSuccessful { get; set; }
+
+        public int TotalScannedCount { get; set; }
+
+        public int NewFileCount { get; set; }
+
+        public int UpdatedFileCount { get; set; }
+
+        public int IgnoredFileCount { get; set; }
+
+        public int ErrorCount { get; set; }
+    }
+
+    private sealed class PostScanStageResult
+    {
+        private readonly List<string> _messages = [];
+
+        public int ErrorCount { get; private set; }
+
+        public int WarningCount { get; private set; }
+
+        public bool HasIssues => IssueCount > 0;
+
+        public int IssueCount => ErrorCount + WarningCount;
+
+        public void Absorb(IdentificationRunResult result)
+        {
+            ErrorCount += result.ErrorCount;
+            WarningCount += result.WarningCount;
+            foreach (var message in result.Messages)
+            {
+                AddMessage(message);
+            }
+        }
+
+        public void AddError(string stage, string message)
+        {
+            ErrorCount++;
+            AddMessage($"[{stage}] {message}");
+        }
+
+        public void AddWarning(string stage, string message)
+        {
+            WarningCount++;
+            AddMessage($"[{stage}] {message}");
+        }
+
+        public string BuildSummary()
+        {
+            if (!HasIssues)
+            {
+                return string.Empty;
+            }
+
+            var parts = new List<string>();
+            if (ErrorCount > 0)
+            {
+                parts.Add($"错误 {ErrorCount}");
+            }
+
+            if (WarningCount > 0)
+            {
+                parts.Add($"警告 {WarningCount}");
+            }
+
+            var detail = _messages.Count > 0 ? $"：{string.Join("；", _messages)}" : string.Empty;
+            return $"识别/元数据阶段{string.Join("，", parts)}{detail}";
+        }
+
+        private void AddMessage(string message)
+        {
+            if (_messages.Count >= 5 || _messages.Contains(message, StringComparer.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _messages.Add(message);
+        }
+    }
+}

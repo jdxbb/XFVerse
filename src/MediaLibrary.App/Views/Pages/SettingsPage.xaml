@@ -1,0 +1,233 @@
+<UserControl x:Class="MediaLibrary.App.Views.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
+             xmlns:entities="clr-namespace:MediaLibrary.Core.Models.Entities;assembly=MediaLibrary.Core">
+    <Border Style="{StaticResource PageCardStyle}">
+        <TabControl Style="{StaticResource ModernTabControlStyle}" ItemContainerStyle="{StaticResource ModernTabItemStyle}">
+            <TabItem Header="WebDAV">
+                <Grid Margin="0,18,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="420" />
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="连接配置" Style="{StaticResource CardTitleTextStyle}" />
+                        <TextBlock Margin="0,10,0,0" Text="保存当前 WebDAV 连接，并可直接测试连通性。" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Margin="0,18,0,0" Text="连接名称" Style="{StaticResource BodyTextStyle}" />
+                        <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding ConnectionName, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="0,10,0,0" Text="BaseUrl" Style="{StaticResource BodyTextStyle}" />
+                        <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="0,10,0,0" Text="用户名" Style="{StaticResource BodyTextStyle}" />
+                        <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="0,10,0,0" Text="密码" Style="{StaticResource BodyTextStyle}" />
+                        <PasswordBox Style="{StaticResource FormPasswordBoxStyle}"
+                                     helpers:PasswordBoxBindingHelper.BindPassword="True"
+                                     helpers:PasswordBoxBindingHelper.BoundPassword="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <CheckBox Content="启用当前连接" IsChecked="{Binding IsConnectionEnabled}" Style="{StaticResource FormCheckBoxStyle}" />
+                        <StackPanel Margin="0,20,0,0" Orientation="Horizontal">
+                            <Button Content="保存配置" Command="{Binding SaveConnectionCommand}" Style="{StaticResource PrimaryButtonStyle}" />
+                            <Button Margin="12,0,0,0" Content="测试连接" Command="{Binding TestConnectionCommand}" Style="{StaticResource SecondaryButtonStyle}" />
+                        </StackPanel>
+                        <TextBlock Margin="0,16,0,0" Text="{Binding ConnectionStatusMessage}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="扫描路径管理" Style="{StaticResource CardTitleTextStyle}" />
+                        <TextBlock Margin="0,10,0,0" Text="{Binding ScanPathStatusMessage}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="340" />
+                            </Grid.ColumnDefinitions>
+
+                            <ListBox ItemsSource="{Binding ScanPaths}" Style="{StaticResource SectionListBoxStyle}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type entities:ScanPath}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="220" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding DisplayName}" Style="{StaticResource SectionTitleTextStyle}" />
+                                                <TextBlock Margin="0,6,0,0" Text="{Binding Path}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Margin="0,6,0,0" Text="{Binding IsRecursive, StringFormat=递归：{0}}" Style="{StaticResource BodyTextStyle}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <Button Content="编辑"
+                                                        Command="{Binding DataContext.EditScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                <Button Margin="8,0,0,0"
+                                                        Command="{Binding DataContext.ToggleScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                            <Setter Property="Content" Value="停用" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                                    <Setter Property="Content" Value="启用" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Margin="8,0,0,0"
+                                                        Content="删除"
+                                                        Command="{Binding DataContext.DeleteScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Border Grid.Column="2" Style="{StaticResource CompactCardStyle}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock Text="{Binding ScanPathEditorTitle}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        <Button DockPanel.Dock="Right"
+                                                Content="新增"
+                                                Command="{Binding BeginAddScanPathCommand}"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                    </DockPanel>
+                                    <TextBlock Margin="0,16,0,0" Text="路径" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding EditingScanPathValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,10,0,0" Text="显示名称" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding EditingScanPathDisplayName, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Content="启用该扫描路径" IsChecked="{Binding EditingScanPathEnabled}" Style="{StaticResource FormCheckBoxStyle}" />
+                                    <CheckBox Content="递归扫描子目录" IsChecked="{Binding EditingScanPathRecursive}" Style="{StaticResource FormCheckBoxStyle}" />
+                                    <StackPanel Margin="0,18,0,0" Orientation="Horizontal">
+                                        <Button Content="{Binding ScanPathSubmitButtonText}" Command="{Binding SaveScanPathCommand}" Style="{StaticResource PrimaryButtonStyle}" />
+                                        <Button Margin="10,0,0,0" Content="取消" Command="{Binding CancelEditScanPathCommand}" Style="{StaticResource SecondaryButtonStyle}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="视频缓存">
+                <Grid Margin="0,18,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="520" />
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="视频缓存" Style="{StaticResource CardTitleTextStyle}" />
+                        <TextBlock Margin="0,10,0,0"
+                                   Text="视频缓存用于提升 WebDAV 播放体验。播放 WebDAV 视频时会自动在后台缓存；清空缓存不会删除影片库、播放历史、字幕、海报或元数据。"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource BodyTextStyle}" />
+
+                        <TextBlock Margin="0,18,0,0" Text="缓存目录" Style="{StaticResource BodyTextStyle}" />
+                        <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                 Text="{Binding VideoCacheDirectory, Mode=OneWay}"
+                                 IsReadOnly="True" />
+
+                        <TextBlock Margin="0,14,0,0" Text="当前占用" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="{Binding VideoCacheUsageText}"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="{Binding VideoCacheDownloadingText}"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+
+                        <TextBlock Margin="0,16,0,0" Text="容量上限（GB）" Style="{StaticResource BodyTextStyle}" />
+                        <TextBox Width="180"
+                                 HorizontalAlignment="Left"
+                                 Style="{StaticResource FormTextBoxStyle}"
+                                 Text="{Binding VideoCacheMaxGbText, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <StackPanel Margin="0,20,0,0" Orientation="Horizontal">
+                            <Button Content="保存视频缓存设置"
+                                    Command="{Binding SaveVideoCacheSettingsCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                            <Button Margin="12,0,0,0"
+                                    Content="刷新占用"
+                                    Command="{Binding RefreshVideoCacheUsageCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                        </StackPanel>
+
+                        <TextBlock Margin="0,16,0,0"
+                                   Text="{Binding VideoCacheStatusMessage}"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+                    </StackPanel>
+
+                    <Border Grid.Column="2" Style="{StaticResource CompactCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="清空视频缓存" Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Margin="0,10,0,0"
+                                       Text="清空只会删除视频缓存目录中的缓存项和临时文件，并保留 settings.json。若播放器正在使用本地缓存，请先停止播放或关闭播放器。"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource BodyTextStyle}" />
+                            <Button Margin="0,18,0,0"
+                                    Width="150"
+                                    HorizontalAlignment="Left"
+                                    Content="清空视频缓存"
+                                    Command="{Binding ClearVideoCacheCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="元数据 API">
+                <StackPanel Width="720" Margin="0,18,0,0" HorizontalAlignment="Left">
+                    <TextBlock Text="TMDB / OMDb 配置" Style="{StaticResource CardTitleTextStyle}" />
+                    <TextBlock Margin="0,10,0,0" Text="TMDB 用于识别和元数据，OMDb 用于评分补充。认证信息只保存在本地数据库。" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
+                    <TextBlock Margin="0,18,0,0" Text="TMDB Read Access Token（优先）" Style="{StaticResource BodyTextStyle}" />
+                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding TmdbReadAccessToken, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Margin="0,10,0,0" Text="TMDB API Key（备用）" Style="{StaticResource BodyTextStyle}" />
+                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding TmdbApiKey, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Margin="0,10,0,0" Text="OMDb API Key" Style="{StaticResource BodyTextStyle}" />
+                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding OmdbApiKey, UpdateSourceTrigger=PropertyChanged}" />
+                    <StackPanel Margin="0,18,0,0" Orientation="Horizontal">
+                        <Button Width="160" Content="保存接口配置" Command="{Binding SaveApiSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" />
+                        <Button Margin="12,0,0,0" Width="160" Content="测试连接" Command="{Binding TestApiSettingsCommand}" Style="{StaticResource SecondaryButtonStyle}" />
+                    </StackPanel>
+                    <TextBlock Margin="0,14,0,0" Text="{Binding ApiStatusMessage}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="AI">
+                <StackPanel Width="720" Margin="0,18,0,0" HorizontalAlignment="Left">
+                    <TextBlock Text="OpenAI-compatible AI 配置" Style="{StaticResource CardTitleTextStyle}" />
+                    <TextBlock Margin="0,10,0,0" Text="用于 AI 分类、推荐理由和辅助识别。接口不可用时会使用本地规则降级。" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
+                    <TextBlock Margin="0,18,0,0" Text="Base URL" Style="{StaticResource BodyTextStyle}" />
+                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiBaseUrl, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Margin="0,10,0,0" Text="API Key" Style="{StaticResource BodyTextStyle}" />
+                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiApiKey, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Margin="0,10,0,0" Text="模型名称" Style="{StaticResource BodyTextStyle}" />
+                    <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiModel, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Margin="0,18,0,0" Width="150" HorizontalAlignment="Left" Content="保存 AI 配置" Command="{Binding SaveAiSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" />
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="主题">
+                <StackPanel Width="420" Margin="0,18,0,0" HorizontalAlignment="Left">
+                    <TextBlock Text="外观主题" Style="{StaticResource CardTitleTextStyle}" />
+                    <TextBlock Margin="0,10,0,0" Text="第三轮提供浅色 / 深色双主题。浅色主题用于默认展示，深色主题适合观影管理场景。" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
+                    <ComboBox Margin="0,18,0,0"
+                              ItemsSource="{Binding ThemeModes}"
+                              SelectedItem="{Binding SelectedThemeMode}"
+                              Style="{StaticResource FormComboBoxStyle}" />
+                    <Button Margin="0,18,0,0" Width="120" HorizontalAlignment="Left" Content="应用主题" Command="{Binding SaveThemeSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" />
+                    <TextBlock Margin="0,14,0,0" Text="{Binding ThemeStatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+    </Border>
+</UserControl>

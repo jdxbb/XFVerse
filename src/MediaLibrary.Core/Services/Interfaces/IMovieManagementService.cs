@@ -1,0 +1,34 @@
+using MediaLibrary.Core.Models.ReadModels;
+
+namespace MediaLibrary.Core.Services.Interfaces;
+
+public interface IMovieManagementService
+{
+    Task SetDefaultMediaFileAsync(
+        int movieId,
+        int mediaFileId,
+        CancellationToken cancellationToken = default);
+
+    Task SetFavoriteAsync(
+        int movieId,
+        bool isFavorite,
+        CancellationToken cancellationToken = default);
+
+    Task SetWatchedAsync(
+        int movieId,
+        bool isWatched,
+        CancellationToken cancellationToken = default);
+
+    Task RemoveFromLibraryAsync(
+        int movieId,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteMovieRecordAsync(
+        int movieId,
+        CancellationToken cancellationToken = default);
+
+    Task<ResetSourceResult> ResetMediaFileToUnidentifiedAsync(
+        int movieId,
+        int mediaFileId,
+        CancellationToken cancellationToken = default);
+}

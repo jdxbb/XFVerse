@@ -1,0 +1,204 @@
+using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Models.Enums;
+using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace MediaLibrary.Core.Services.Implementations;
+
+public sealed class MovieDetailQueryService : IMovieDetailQueryService
+{
+    public async Task<MovieDetailModel?> GetMovieDetailAsync(
+        int movieId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var movie = await dbContext.Movies
+            .AsNoTracking()
+            .Where(x => x.Id == movieId)
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.Title,
+                    x.OriginalTitle,
+                    x.ReleaseYear,
+                    x.Overview,
+                    x.PosterRemoteUrl,
+                    x.PosterLocalPath,
+                    x.Country,
+                    x.Language,
+                    x.RuntimeMinutes,
+                    x.GenresText,
+                    x.AiTagsText,
+                    x.EmotionTagsText,
+                    x.SceneTagsText,
+                    x.TmdbId,
+                    x.ImdbId,
+                    x.IdentificationStatus,
+                    x.IdentifiedConfidence,
+                    x.DefaultMediaFileId,
+                    x.IsFavorite,
+                    x.IsWatched
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (movie is null)
+        {
+            return null;
+        }
+
+        var isNotInterested = await dbContext.UserMovieCollectionItems
+            .AsNoTracking()
+            .Where(x => x.IsNotInterested)
+            .AnyAsync(
+                x => x.MovieId == movie.Id
+                     || (movie.TmdbId.HasValue && x.TmdbId == movie.TmdbId.Value)
+                     || (!string.IsNullOrWhiteSpace(movie.ImdbId) && x.ImdbId == movie.ImdbId)
+                     || (x.Title == movie.Title && x.ReleaseYear == movie.ReleaseYear),
+                cancellationToken);
+
+        var ratings = await dbContext.RatingSources
+            .AsNoTracking()
+            .Where(rating => rating.MovieId == movieId)
+            .OrderByDescending(rating => rating.LastUpdatedAt ?? rating.CreatedAt)
+            .Select(
+                rating => new MovieRatingItem
+                {
+                    SourceName = rating.SourceName,
+                    ScoreValue = rating.ScoreValue,
+                    ScoreScale = rating.ScoreScale,
+                    VoteCount = rating.VoteCount,
+                    SourceUrl = rating.SourceUrl ?? string.Empty,
+                    LastUpdatedAt = rating.LastUpdatedAt ?? rating.CreatedAt
+                })
+            .ToListAsync(cancellationToken);
+
+        var sources = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(mediaFile => mediaFile.MovieId == movieId
+                                && !mediaFile.IsDeleted
+                                && mediaFile.MediaType == MediaType.Video)
+            .OrderBy(mediaFile => mediaFile.Id != movie.DefaultMediaFileId)
+            .ThenBy(mediaFile => mediaFile.FileName)
+            .Select(
+                mediaFile => new MovieSourceItem
+                {
+                    MediaFileId = mediaFile.Id,
+                    FileName = mediaFile.FileName,
+                    FilePath = mediaFile.FilePath,
+                    Extension = mediaFile.Extension,
+                    FileSize = mediaFile.FileSize,
+                    LastModifiedAt = mediaFile.LastModifiedAt,
+                    DurationSeconds = mediaFile.DurationSeconds,
+                    ResolutionWidth = mediaFile.ResolutionWidth,
+                    ResolutionHeight = mediaFile.ResolutionHeight,
+                    VideoCodec = mediaFile.VideoCodec,
+                    AudioCodec = mediaFile.AudioCodec,
+                    AudioChannels = mediaFile.AudioChannels,
+                    AudioSampleRate = mediaFile.AudioSampleRate,
+                    OverallBitrateKbps = mediaFile.OverallBitrateKbps,
+                    VideoBitrateKbps = mediaFile.VideoBitrateKbps,
+                    AudioBitrateKbps = mediaFile.AudioBitrateKbps,
+                    MediaProbeStatus = mediaFile.MediaProbeStatus,
+                    MediaProbeError = mediaFile.MediaProbeError,
+                    MediaProbedAt = mediaFile.MediaProbedAt,
+                    ProtocolType = mediaFile.SourceConnection!.ProtocolType,
+                    IsDefault = mediaFile.Id == movie.DefaultMediaFileId
+                })
+            .ToListAsync(cancellationToken);
+
+        var sourceIds = sources.Select(source => source.MediaFileId).ToArray();
+        var latestHistoryRows = sourceIds.Length == 0
+            ? []
+            : await dbContext.WatchHistories
+                .AsNoTracking()
+                .Where(history => history.MovieId == movieId && sourceIds.Contains(history.MediaFileId))
+                .OrderByDescending(history => history.EndedAt ?? history.StartedAt)
+                .Select(
+                    history => new
+                    {
+                        history.MediaFileId,
+                        LastPlayedAt = history.EndedAt ?? history.StartedAt,
+                        history.LastPlayPositionSeconds
+                    })
+                .ToListAsync(cancellationToken);
+
+        var latestHistoryBySource = latestHistoryRows
+            .GroupBy(history => history.MediaFileId)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        var subtitleBindings = sourceIds.Length == 0
+            ? []
+            : await dbContext.SubtitleBindings
+                .AsNoTracking()
+                .Where(binding => sourceIds.Contains(binding.MediaFileId)
+                                  && binding.SubtitleMediaFile != null
+                                  && !binding.SubtitleMediaFile.IsDeleted)
+                .OrderBy(binding => binding.Priority)
+                .Select(
+                    binding => new
+                    {
+                        binding.MediaFileId,
+                        Item = new SubtitleBindingItem
+                        {
+                            SubtitleMediaFileId = binding.SubtitleMediaFileId,
+                            FileName = binding.SubtitleMediaFile!.FileName,
+                            FilePath = binding.SubtitleMediaFile.FilePath,
+                            MatchType = binding.MatchType,
+                            Language = binding.Language ?? string.Empty,
+                            IsAutoLoaded = binding.IsAutoLoaded,
+                            Priority = binding.Priority
+                        }
+                    })
+                .ToListAsync(cancellationToken);
+
+        var subtitlesBySource = subtitleBindings
+            .GroupBy(binding => binding.MediaFileId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<SubtitleBindingItem>)group.Select(binding => binding.Item).ToList());
+
+        foreach (var source in sources)
+        {
+            source.SubtitleBindings = subtitlesBySource.TryGetValue(source.MediaFileId, out var subtitles)
+                ? subtitles
+                : [];
+
+            if (latestHistoryBySource.TryGetValue(source.MediaFileId, out var history))
+            {
+                source.LastPlayedAt = history.LastPlayedAt;
+                source.LastPlayPositionSeconds = history.LastPlayPositionSeconds;
+            }
+        }
+
+        return new MovieDetailModel
+        {
+            MovieId = movie.Id,
+            Title = movie.Title,
+            OriginalTitle = movie.OriginalTitle ?? string.Empty,
+            ReleaseYear = movie.ReleaseYear,
+            Overview = movie.Overview ?? string.Empty,
+            PosterRemoteUrl = movie.PosterRemoteUrl ?? string.Empty,
+            PosterLocalPath = movie.PosterLocalPath ?? string.Empty,
+            Country = movie.Country ?? string.Empty,
+            Language = movie.Language ?? string.Empty,
+            RuntimeMinutes = movie.RuntimeMinutes,
+            GenresText = movie.GenresText ?? string.Empty,
+            AiTagsText = AiTagVocabulary.NormalizeText(movie.AiTagsText, AiTagVocabulary.TypeTags),
+            EmotionTagsText = AiTagVocabulary.NormalizeText(movie.EmotionTagsText, AiTagVocabulary.EmotionTags),
+            SceneTagsText = AiTagVocabulary.NormalizeText(movie.SceneTagsText, AiTagVocabulary.SceneTags),
+            TmdbId = movie.TmdbId,
+            ImdbId = movie.ImdbId ?? string.Empty,
+            IdentificationStatus = movie.IdentificationStatus,
+            IdentifiedConfidence = movie.IdentifiedConfidence,
+            DefaultMediaFileId = movie.DefaultMediaFileId,
+            IsFavorite = movie.IsFavorite,
+            IsWatched = movie.IsWatched,
+            IsNotInterested = isNotInterested,
+            Ratings = ratings,
+            Sources = sources
+        };
+    }
+}
