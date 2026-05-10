@@ -148,7 +148,8 @@ public sealed class UserCollectionService : IUserCollectionService
 
     public async Task AddWantToWatchAsync(
         AiRecommendationItem recommendation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
@@ -158,9 +159,14 @@ public sealed class UserCollectionService : IUserCollectionService
             throw new InvalidOperationException("已看影片不能加入想看。");
         }
 
+        var now = DateTime.UtcNow;
+        var oldWantToWatch = entity?.IsWantToWatch ?? false;
+        var oldNotInterested = entity?.IsNotInterested ?? false;
+        var oldWatched = entity?.IsWatched ?? false;
+
         entity ??= new UserMovieCollectionItem
         {
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
 
         if (entity.Id == 0)
@@ -191,14 +197,48 @@ public sealed class UserCollectionService : IUserCollectionService
         entity.IsNotInterested = false;
         entity.IsWatched = recommendation.IsWatched;
         entity.IsInLibrary = recommendation.IsInLibrary;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldWantToWatch,
+            entity.IsWantToWatch,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            oldNotInterested,
+            entity.IsNotInterested,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            oldWatched,
+            entity.IsWatched,
+            changeSource,
+            now);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RemoveWantToWatchAsync(
         AiRecommendationItem recommendation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
@@ -207,17 +247,31 @@ public sealed class UserCollectionService : IUserCollectionService
             return;
         }
 
+        var now = DateTime.UtcNow;
+        var oldWantToWatch = entity.IsWantToWatch;
         if (entity.IsWatched)
         {
             entity.IsWantToWatch = false;
-            entity.UpdatedAt = DateTime.UtcNow;
+            entity.UpdatedAt = now;
         }
         else
         {
             entity.IsWantToWatch = false;
-            entity.UpdatedAt = DateTime.UtcNow;
+            entity.UpdatedAt = now;
             CleanupCollectionEntityIfEmpty(dbContext, entity);
         }
+
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldWantToWatch,
+            entity.IsWantToWatch,
+            changeSource,
+            now);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -225,7 +279,8 @@ public sealed class UserCollectionService : IUserCollectionService
     public async Task SetWatchedAsync(
         AiRecommendationItem recommendation,
         bool isWatched,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
@@ -234,11 +289,15 @@ public sealed class UserCollectionService : IUserCollectionService
             return;
         }
 
+        var now = DateTime.UtcNow;
+        var oldEntityWatched = entity?.IsWatched ?? false;
+        var oldEntityWantToWatch = entity?.IsWantToWatch ?? false;
+
         if (entity is null)
         {
             entity = new UserMovieCollectionItem
             {
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = now
             };
             dbContext.UserMovieCollectionItems.Add(entity);
         }
@@ -250,7 +309,29 @@ public sealed class UserCollectionService : IUserCollectionService
             entity.IsWantToWatch = false;
         }
 
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            oldEntityWatched,
+            entity.IsWatched,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldEntityWantToWatch,
+            entity.IsWantToWatch,
+            changeSource,
+            now);
         CleanupCollectionEntityIfEmpty(dbContext, entity);
 
         if (recommendation.MovieId > 0)
@@ -258,16 +339,40 @@ public sealed class UserCollectionService : IUserCollectionService
             var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == recommendation.MovieId, cancellationToken);
             if (movie is not null)
             {
+                var oldMovieWatched = movie.IsWatched;
+                var oldMovieFavorite = movie.IsFavorite;
                 movie.IsWatched = isWatched;
                 if (!isWatched)
                 {
                     movie.IsFavorite = false;
-                    movie.AutoWatchedBaselineAtUtc = DateTime.UtcNow;
+                    movie.AutoWatchedBaselineAtUtc = now;
                     WatchCompletionDiagnostics.Write(
                         $"watch-completion-baseline-set movieId={movie.Id} baselineUtc={movie.AutoWatchedBaselineAtUtc:O}");
                 }
 
-                movie.UpdatedAt = DateTime.UtcNow;
+                movie.UpdatedAt = now;
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    movie.TmdbId,
+                    movie.Id,
+                    collectionItemId: null,
+                    movie.Title,
+                    UserMovieStateChangeHistoryRecorder.StateWatched,
+                    oldMovieWatched,
+                    movie.IsWatched,
+                    changeSource,
+                    now);
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    movie.TmdbId,
+                    movie.Id,
+                    collectionItemId: null,
+                    movie.Title,
+                    UserMovieStateChangeHistoryRecorder.StateFavorite,
+                    oldMovieFavorite,
+                    movie.IsFavorite,
+                    changeSource,
+                    now);
             }
         }
 
@@ -277,7 +382,8 @@ public sealed class UserCollectionService : IUserCollectionService
     public async Task SetNotInterestedAsync(
         AiRecommendationItem recommendation,
         bool isNotInterested,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
@@ -287,23 +393,39 @@ public sealed class UserCollectionService : IUserCollectionService
             return;
         }
 
+        var now = DateTime.UtcNow;
+        var oldNotInterested = entity?.IsNotInterested ?? false;
+        var oldWantToWatch = entity?.IsWantToWatch ?? false;
+
         if (entity is null)
         {
             entity = new UserMovieCollectionItem
             {
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = now
             };
             dbContext.UserMovieCollectionItems.Add(entity);
         }
 
         if (movie is not null)
         {
+            var oldMovieFavorite = movie.IsFavorite;
             ApplyMovieSnapshot(entity, movie);
             entity.IsWatched = movie.IsWatched;
             if (isNotInterested)
             {
                 movie.IsFavorite = false;
-                movie.UpdatedAt = DateTime.UtcNow;
+                movie.UpdatedAt = now;
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    movie.TmdbId,
+                    movie.Id,
+                    collectionItemId: null,
+                    movie.Title,
+                    UserMovieStateChangeHistoryRecorder.StateFavorite,
+                    oldMovieFavorite,
+                    movie.IsFavorite,
+                    changeSource,
+                    now);
             }
         }
         else
@@ -318,7 +440,29 @@ public sealed class UserCollectionService : IUserCollectionService
             entity.IsWantToWatch = false;
         }
 
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            oldNotInterested,
+            entity.IsNotInterested,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldWantToWatch,
+            entity.IsWantToWatch,
+            changeSource,
+            now);
         CleanupCollectionEntityIfEmpty(dbContext, entity);
         await dbContext.SaveChangesAsync(cancellationToken);
         WriteNotInterestedStateLog(isNotInterested ? "recommendation-not-interested-marked" : "recommendation-not-interested-unmarked", entity);
@@ -327,7 +471,8 @@ public sealed class UserCollectionService : IUserCollectionService
     public async Task SetNotInterestedAsync(
         int movieId,
         bool isNotInterested,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         var movie = await dbContext.Movies
@@ -341,11 +486,16 @@ public sealed class UserCollectionService : IUserCollectionService
             return;
         }
 
+        var now = DateTime.UtcNow;
+        var oldNotInterested = entity?.IsNotInterested ?? false;
+        var oldWantToWatch = entity?.IsWantToWatch ?? false;
+        var oldMovieFavorite = movie.IsFavorite;
+
         if (entity is null)
         {
             entity = new UserMovieCollectionItem
             {
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = now
             };
             dbContext.UserMovieCollectionItems.Add(entity);
         }
@@ -357,10 +507,43 @@ public sealed class UserCollectionService : IUserCollectionService
         {
             entity.IsWantToWatch = false;
             movie.IsFavorite = false;
-            movie.UpdatedAt = DateTime.UtcNow;
+            movie.UpdatedAt = now;
         }
 
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            movie.Id,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            oldNotInterested,
+            entity.IsNotInterested,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            movie.Id,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldWantToWatch,
+            entity.IsWantToWatch,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            movie.TmdbId,
+            movie.Id,
+            collectionItemId: null,
+            movie.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldMovieFavorite,
+            movie.IsFavorite,
+            changeSource,
+            now);
         CleanupCollectionEntityIfEmpty(dbContext, entity);
         await dbContext.SaveChangesAsync(cancellationToken);
         WriteNotInterestedStateLog(isNotInterested ? "recommendation-not-interested-marked" : "recommendation-not-interested-unmarked", entity);
@@ -407,9 +590,47 @@ public sealed class UserCollectionService : IUserCollectionService
             return;
         }
 
+        var now = DateTime.UtcNow;
+        var oldWantToWatch = entity.IsWantToWatch;
+        var oldWatched = entity.IsWatched;
+        var oldNotInterested = entity.IsNotInterested;
         entity.IsWantToWatch = false;
         entity.IsWatched = false;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.IsNotInterested = false;
+        entity.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldWantToWatch,
+            entity.IsWantToWatch,
+            UserMovieStateChangeHistoryRecorder.SourceCollection,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            oldWatched,
+            entity.IsWatched,
+            UserMovieStateChangeHistoryRecorder.SourceCollection,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            oldNotInterested,
+            entity.IsNotInterested,
+            UserMovieStateChangeHistoryRecorder.SourceCollection,
+            now);
         CleanupCollectionEntityIfEmpty(dbContext, entity);
         await dbContext.SaveChangesAsync(cancellationToken);
     }

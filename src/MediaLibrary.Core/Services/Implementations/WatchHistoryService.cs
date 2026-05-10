@@ -273,15 +273,52 @@ public sealed class WatchHistoryService : IWatchHistoryService
         Movie movie,
         CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
+        var oldMovieWatched = movie.IsWatched;
         movie.IsWatched = true;
-        movie.UpdatedAt = DateTime.UtcNow;
+        movie.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            movie.TmdbId,
+            movie.Id,
+            collectionItemId: null,
+            movie.Title,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            oldMovieWatched,
+            movie.IsWatched,
+            UserMovieStateChangeHistoryRecorder.SourceAutoWatched,
+            now);
 
         var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
         foreach (var item in collectionItems.Where(x => x.IsWantToWatch || !x.IsWatched))
         {
+            var oldWantToWatch = item.IsWantToWatch;
+            var oldWatched = item.IsWatched;
             item.IsWantToWatch = false;
             item.IsWatched = true;
-            item.UpdatedAt = DateTime.UtcNow;
+            item.UpdatedAt = now;
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                item.TmdbId ?? movie.TmdbId,
+                movie.Id,
+                item.Id == 0 ? null : item.Id,
+                item.Title,
+                UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+                oldWantToWatch,
+                item.IsWantToWatch,
+                UserMovieStateChangeHistoryRecorder.SourceAutoWatched,
+                now);
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                item.TmdbId ?? movie.TmdbId,
+                movie.Id,
+                item.Id == 0 ? null : item.Id,
+                item.Title,
+                UserMovieStateChangeHistoryRecorder.StateWatched,
+                oldWatched,
+                item.IsWatched,
+                UserMovieStateChangeHistoryRecorder.SourceAutoWatched,
+                now);
         }
     }
 

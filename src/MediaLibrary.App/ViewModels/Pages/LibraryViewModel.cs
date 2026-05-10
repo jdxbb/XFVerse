@@ -539,11 +539,11 @@ public sealed class LibraryViewModel : PageViewModelBase
                 {
                     if (item.IsInLibrary && item.MovieId > 0)
                     {
-                        await _movieManagementService.SetWatchedAsync(item.MovieId, isWatched);
+                        await _movieManagementService.SetWatchedAsync(item.MovieId, isWatched, changeSource: "Batch");
                     }
                     else
                     {
-                        await _userCollectionService.SetWatchedAsync(BuildRecommendationItem(item.Movie), isWatched);
+                        await _userCollectionService.SetWatchedAsync(BuildRecommendationItem(item.Movie), isWatched, changeSource: "Batch");
                     }
 
                     successCount++;

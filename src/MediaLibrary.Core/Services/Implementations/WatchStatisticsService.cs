@@ -235,6 +235,11 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .AsNoTracking()
             .Select(x => (DateTime?)(x.LastUpdatedAt ?? x.CreatedAt))
             .MaxAsync(cancellationToken);
+        var stateHistoryCount = await dbContext.UserMovieStateChangeHistories.AsNoTracking().CountAsync(cancellationToken);
+        var stateHistoryMaxChangedAt = await dbContext.UserMovieStateChangeHistories
+            .AsNoTracking()
+            .Select(x => (DateTime?)x.ChangedAtUtc)
+            .MaxAsync(cancellationToken);
 
         var rawFingerprint = string.Join(
             "|",
@@ -243,7 +248,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             $"media:{mediaFileCount}:{FormatFingerprintDate(mediaFileMaxUpdatedAt)}:{FormatFingerprintDate(mediaFileMaxCreatedAt)}",
             $"history:{watchHistoryCount}:{FormatFingerprintDate(watchHistoryMaxActivityAt)}:{FormatFingerprintDate(watchHistoryMaxCreatedAt)}",
             $"collections:{collectionItemCount}:{FormatFingerprintDate(collectionItemMaxUpdatedAt)}",
-            $"ratings:{ratingSourceCount}:{FormatFingerprintDate(ratingSourceMaxUpdatedAt)}");
+            $"ratings:{ratingSourceCount}:{FormatFingerprintDate(ratingSourceMaxUpdatedAt)}",
+            $"stateHistory:{stateHistoryCount}:{FormatFingerprintDate(stateHistoryMaxChangedAt)}");
 
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawFingerprint)))
             .ToLowerInvariant();
@@ -306,6 +312,18 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                     DurationWatchedSeconds = x.DurationWatchedSeconds
                 })
                 .ToListAsync(cancellationToken);
+        var stateHistories = await dbContext.UserMovieStateChangeHistories
+            .AsNoTracking()
+            .Where(x => x.TmdbId > 0)
+            .Select(x => new StateChangeStatsRow
+            {
+                Id = x.Id,
+                TmdbId = x.TmdbId,
+                StateType = x.StateType,
+                NewValue = x.NewValue,
+                ChangedAtUtc = x.ChangedAtUtc
+            })
+            .ToListAsync(cancellationToken);
 
         var movieById = identifiedMovies.ToDictionary(x => x.Id);
         var ratingByMovieId = ratingSources
@@ -347,7 +365,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             HasWatchHistoryData = rangeHistories.Count > 0
         };
 
-        ApplyStatusCounts(snapshot, identifiedMovies, collectionItems);
+        ApplyStatusCounts(snapshot, identifiedMovies, collectionItems, stateHistories, timeRange, currentMonthStart);
         snapshot.TotalWatchSeconds = rangeHistories.Sum(x => (long)x.DurationWatchedSeconds);
         snapshot.MonthlyWatchCount = CountDistinctWatchedMovies(rangeHistories, movieById);
         snapshot.MonthlyFrequentTags = BuildMonthlyFrequentTags(rangeHistories, movieById, TopTagCount);
@@ -377,7 +395,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             snapshot.WarningMessages.Add("No valid watch history is available in the selected range; watch-history modules will remain empty.");
         }
 
-        snapshot.WarningMessages.Add("Status deltas from last week require historical status snapshots and are unavailable in WI-2.");
+        snapshot.WarningMessages.Add("Status changes before the state history table was created cannot be reconstructed.");
         snapshot.WarningMessages.Add("Language distribution uses the current stored language field; original_language is not available yet.");
         return snapshot;
     }
@@ -407,7 +425,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 EmotionTagsText = x.EmotionTagsText,
                 SceneTagsText = x.SceneTagsText,
                 IsFavorite = x.IsFavorite,
-                IsWatched = x.IsWatched
+                IsWatched = x.IsWatched,
+                UpdatedAt = x.UpdatedAt
             })
             .ToListAsync(cancellationToken);
     }
@@ -420,7 +439,12 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .AsNoTracking()
             .Where(x => x.TmdbId.HasValue
                 && x.TmdbId.Value > 0
-                && !string.IsNullOrWhiteSpace(x.Title))
+                && !string.IsNullOrWhiteSpace(x.Title)
+                && (!x.MovieId.HasValue
+                    || dbContext.Movies.Any(movie => movie.Id == x.MovieId.Value
+                        && movie.TmdbId == x.TmdbId
+                        && (movie.IdentificationStatus == IdentificationStatus.Matched
+                            || movie.IdentificationStatus == IdentificationStatus.ManualConfirmed))))
             .Select(x => new CollectionItemStatsRow
             {
                 Id = x.Id,
@@ -439,7 +463,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 OmdbVoteCount = x.OmdbVoteCount,
                 IsWantToWatch = x.IsWantToWatch,
                 IsWatched = x.IsWatched,
-                IsNotInterested = x.IsNotInterested
+                IsNotInterested = x.IsNotInterested,
+                UpdatedAt = x.UpdatedAt
             })
             .ToListAsync(cancellationToken);
     }
@@ -447,47 +472,131 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
     private static void ApplyStatusCounts(
         WatchStatisticsSnapshot snapshot,
         IReadOnlyCollection<MovieStatsRow> movies,
-        IReadOnlyCollection<CollectionItemStatsRow> collectionItems)
+        IReadOnlyCollection<CollectionItemStatsRow> collectionItems,
+        IReadOnlyCollection<StateChangeStatsRow> stateHistories,
+        WatchStatisticsTimeRange timeRange,
+        DateTime currentMonthStart)
     {
-        var watchedKeys = movies
-            .Where(x => x.IsWatched)
-            .Select(x => BuildTmdbKey(x.TmdbId))
-            .ToHashSet(StringComparer.Ordinal);
-        watchedKeys.UnionWith(collectionItems
-            .Where(x => x.IsWatched)
-            .Select(x => BuildTmdbKey(x.TmdbId)));
-
-        var unwatchedKeys = movies
-            .Where(x => !x.IsWatched)
-            .Select(x => BuildTmdbKey(x.TmdbId))
-            .ToHashSet(StringComparer.Ordinal);
-        unwatchedKeys.ExceptWith(watchedKeys);
-
-        var favoriteKeys = movies
-            .Where(x => x.IsFavorite)
-            .Select(x => BuildTmdbKey(x.TmdbId))
-            .ToHashSet(StringComparer.Ordinal);
-
-        var wantToWatchKeys = collectionItems
-            .Where(x => x.IsWantToWatch)
-            .Select(x => BuildTmdbKey(x.TmdbId))
-            .ToHashSet(StringComparer.Ordinal);
-
-        var notInterestedKeys = collectionItems
-            .Where(x => x.IsNotInterested)
-            .Select(x => BuildTmdbKey(x.TmdbId))
-            .ToHashSet(StringComparer.Ordinal);
-
-        snapshot.WatchedCount = watchedKeys.Count;
-        snapshot.UnwatchedCount = unwatchedKeys.Count;
-        snapshot.FavoriteCount = favoriteKeys.Count;
-        snapshot.WantToWatchCount = wantToWatchKeys.Count;
-        snapshot.NotInterestedCount = notInterestedKeys.Count;
-        snapshot.WatchedDeltaFromLastWeek = null;
+        snapshot.UnwatchedCount = 0;
         snapshot.UnwatchedDeltaFromLastWeek = null;
-        snapshot.FavoriteDeltaFromLastWeek = null;
-        snapshot.WantToWatchDeltaFromLastWeek = null;
-        snapshot.NotInterestedDeltaFromLastWeek = null;
+
+        if (timeRange == WatchStatisticsTimeRange.All)
+        {
+            var watchedKeys = movies
+                .Where(x => x.IsWatched)
+                .Select(x => BuildTmdbKey(x.TmdbId))
+                .ToHashSet(StringComparer.Ordinal);
+            watchedKeys.UnionWith(collectionItems
+                .Where(x => x.IsWatched)
+                .Select(x => BuildTmdbKey(x.TmdbId)));
+
+            var favoriteKeys = movies
+                .Where(x => x.IsFavorite)
+                .Select(x => BuildTmdbKey(x.TmdbId))
+                .ToHashSet(StringComparer.Ordinal);
+
+            var wantToWatchKeys = collectionItems
+                .Where(x => x.IsWantToWatch)
+                .Select(x => BuildTmdbKey(x.TmdbId))
+                .ToHashSet(StringComparer.Ordinal);
+
+            var notInterestedKeys = collectionItems
+                .Where(x => x.IsNotInterested)
+                .Select(x => BuildTmdbKey(x.TmdbId))
+                .ToHashSet(StringComparer.Ordinal);
+
+            snapshot.WatchedCount = watchedKeys.Count;
+            snapshot.FavoriteCount = favoriteKeys.Count;
+            snapshot.WantToWatchCount = wantToWatchKeys.Count;
+            snapshot.NotInterestedCount = notInterestedKeys.Count;
+            snapshot.WatchedDeltaFromLastWeek = null;
+            snapshot.FavoriteDeltaFromLastWeek = null;
+            snapshot.WantToWatchDeltaFromLastWeek = null;
+            snapshot.NotInterestedDeltaFromLastWeek = null;
+            return;
+        }
+
+        var currentMonthEnd = currentMonthStart.AddMonths(1);
+        var previousMonthStart = currentMonthStart.AddMonths(-1);
+        snapshot.WatchedCount = CountMonthlyStateAdds(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            currentMonthStart,
+            currentMonthEnd);
+        snapshot.FavoriteCount = CountMonthlyStateAdds(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            currentMonthStart,
+            currentMonthEnd);
+        snapshot.WantToWatchCount = CountMonthlyStateAdds(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            currentMonthStart,
+            currentMonthEnd);
+        snapshot.NotInterestedCount = CountMonthlyStateAdds(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            currentMonthStart,
+            currentMonthEnd);
+
+        snapshot.WatchedDeltaFromLastWeek = CalculateMonthlyStateDelta(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            previousMonthStart,
+            currentMonthStart,
+            currentMonthEnd);
+        snapshot.FavoriteDeltaFromLastWeek = CalculateMonthlyStateDelta(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            previousMonthStart,
+            currentMonthStart,
+            currentMonthEnd);
+        snapshot.WantToWatchDeltaFromLastWeek = CalculateMonthlyStateDelta(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            previousMonthStart,
+            currentMonthStart,
+            currentMonthEnd);
+        snapshot.NotInterestedDeltaFromLastWeek = CalculateMonthlyStateDelta(
+            stateHistories,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            previousMonthStart,
+            currentMonthStart,
+            currentMonthEnd);
+    }
+
+    private static int CountMonthlyStateAdds(
+        IEnumerable<StateChangeStatsRow> stateHistories,
+        string stateType,
+        DateTime rangeStart,
+        DateTime rangeEnd)
+    {
+        return stateHistories
+            .Where(x => string.Equals(x.StateType, stateType, StringComparison.Ordinal)
+                && IsWithinLocalRange(x.ChangedAtUtc, rangeStart, rangeEnd))
+            .GroupBy(x => BuildTmdbKey(x.TmdbId), StringComparer.Ordinal)
+            .Select(x => x
+                .OrderByDescending(item => item.ChangedAtUtc)
+                .ThenByDescending(item => item.Id)
+                .First())
+            .Count(x => x.NewValue);
+    }
+
+    private static int? CalculateMonthlyStateDelta(
+        IReadOnlyCollection<StateChangeStatsRow> stateHistories,
+        string stateType,
+        DateTime previousMonthStart,
+        DateTime currentMonthStart,
+        DateTime currentMonthEnd)
+    {
+        var previousCount = CountMonthlyStateAdds(stateHistories, stateType, previousMonthStart, currentMonthStart);
+        if (previousCount == 0)
+        {
+            return null;
+        }
+
+        var currentCount = CountMonthlyStateAdds(stateHistories, stateType, currentMonthStart, currentMonthEnd);
+        return currentCount - previousCount;
     }
 
     private static List<WatchStatisticsTagItem> BuildMonthlyFrequentTags(
@@ -1215,6 +1324,16 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .ToList();
     }
 
+    private static bool IsWithinLocalRange(
+        DateTime value,
+        DateTime? rangeStart,
+        DateTime? rangeEnd)
+    {
+        var localValue = ToLocalTime(value);
+        return (!rangeStart.HasValue || localValue >= rangeStart.Value)
+            && (!rangeEnd.HasValue || localValue < rangeEnd.Value);
+    }
+
     private static IEnumerable<MovieStatsRow> EnumerateDistinctWatchedMovies(
         IEnumerable<WatchHistoryStatsRow> histories,
         IReadOnlyDictionary<int, MovieStatsRow> movieById)
@@ -1339,6 +1458,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         public bool IsFavorite { get; set; }
 
         public bool IsWatched { get; set; }
+
+        public DateTime UpdatedAt { get; set; }
     }
 
     private sealed class CollectionItemStatsRow
@@ -1376,6 +1497,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         public bool IsWatched { get; set; }
 
         public bool IsNotInterested { get; set; }
+
+        public DateTime UpdatedAt { get; set; }
     }
 
     private sealed class MediaFileStatsRow
@@ -1413,6 +1536,19 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         public DateTime? EndedAt { get; set; }
 
         public int DurationWatchedSeconds { get; set; }
+    }
+
+    private sealed class StateChangeStatsRow
+    {
+        public long Id { get; set; }
+
+        public int TmdbId { get; set; }
+
+        public string StateType { get; set; } = string.Empty;
+
+        public bool NewValue { get; set; }
+
+        public DateTime ChangedAtUtc { get; set; }
     }
 
     private sealed class MovieProfileRow

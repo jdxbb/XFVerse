@@ -341,40 +341,22 @@
                             </StackPanel>
                         </Border>
 
-                        <Grid Margin="0,18,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="18" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Border Grid.Column="0" Style="{StaticResource PageCardStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="观影人格" Style="{StaticResource InsightCardHeaderStyle}" />
-                                    <Border Margin="0,14,0,0" Padding="14" CornerRadius="12" Background="{DynamicResource BrushAccentSoft}">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding ProfilePersonaType}" Style="{StaticResource SectionTitleTextStyle}" />
-                                            <TextBlock Margin="0,6,0,0" Text="{Binding ProfilePersonaTitle}" Style="{StaticResource BodyTextStyle}" />
-                                        </StackPanel>
-                                    </Border>
-                                    <TextBlock Margin="0,14,0,0"
-                                               Text="{Binding ProfilePersonaDescription}"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBlock Margin="0,12,0,0" Text="人格图片资源后续接入，本阶段只显示结构化画像。" Style="{StaticResource BodyMutedTextStyle}" />
-                                </StackPanel>
-                            </Border>
-
-                            <Border Grid.Column="2" Style="{StaticResource PageCardStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="口味线索" Style="{StaticResource InsightCardHeaderStyle}" />
-                                    <TextBlock Margin="0,10,0,0"
-                                               Text="{Binding ProfileHeroSubtitle}"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
+                        <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="观影人格" Style="{StaticResource InsightCardHeaderStyle}" />
+                                <Border Margin="0,14,0,0" Padding="14" CornerRadius="12" Background="{DynamicResource BrushAccentSoft}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding ProfilePersonaType}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        <TextBlock Margin="0,6,0,0" Text="{Binding ProfilePersonaTitle}" Style="{StaticResource BodyTextStyle}" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Margin="0,14,0,0"
+                                           Text="{Binding ProfilePersonaDescription}"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                <TextBlock Margin="0,12,0,0" Text="人格图片资源后续接入，本阶段只显示结构化画像。" Style="{StaticResource BodyMutedTextStyle}" />
+                            </StackPanel>
+                        </Border>
 
                         <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
                             <StackPanel>
@@ -645,20 +627,40 @@
                         <StackPanel>
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Left">
-                                    <TextBlock Text="当前状态总览" Style="{StaticResource InsightCardHeaderStyle}" />
-                                    <TextBlock Margin="0,8,0,0" Text="状态固定统计全部影片；下方播放数据可切换本月 / 全部。" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <TextBlock Text="{Binding OverviewTitle}" Style="{StaticResource InsightCardHeaderStyle}" />
+                                    <TextBlock Margin="0,8,0,0" Text="{Binding OverviewSubtitle}" Style="{StaticResource BodyMutedTextStyle}" />
                                 </StackPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                                     <Button MinWidth="64"
                                             Margin="0,0,8,0"
                                             Content="本月"
-                                            Command="{Binding SelectMonthRangeCommand}"
-                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                            Command="{Binding SelectMonthRangeCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMonthRangeSelected}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                     <Button MinWidth="64"
                                             Margin="0,0,12,0"
                                             Content="全部"
-                                            Command="{Binding SelectAllRangeCommand}"
-                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                            Command="{Binding SelectAllRangeCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsAllRangeSelected}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                     <TextBlock Margin="0,0,12,0"
                                                VerticalAlignment="Center"
                                                Text="{Binding LastStatisticsRefreshedAtText}"
@@ -707,7 +709,18 @@
                                                     <TextBlock Text="{Binding ValueText}" Style="{StaticResource MetricTextStyle}" />
                                                     <TextBlock Margin="6,12,0,0" Text="{Binding UnitText}" Style="{StaticResource BodyMutedTextStyle}" />
                                                 </StackPanel>
-                                                <TextBlock Margin="0,8,0,0" Text="{Binding DeltaText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Margin="0,8,0,0" Text="{Binding DeltaText}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasDelta}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>

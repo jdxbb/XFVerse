@@ -308,19 +308,30 @@ Status:
 
 Scope completed:
 - Added Watch Statistics time range selector: `本月` and `全部`, defaulting to `本月`.
-- Status overview remains all-time and now displays only `已看`, `喜爱`, `想看`, and `不想看`.
+- Added `UserMovieStateChangeHistories` to record actual user state changes for `已看`, `喜爱`, `想看`, and `不想看`.
+- Status overview now displays only `已看`, `喜爱`, `想看`, and `不想看`, and follows the selected `本月 / 全部` statistics range.
+- `全部` range shows current state totals and hides comparison text.
+- `本月` range shows current-month new state additions from state history, not from `UpdatedAt`.
+- A status only counts as a current-month addition when the latest same-month change for that TMDB/state is still `true`; same-month cancellation removes it from the addition count.
+- State changes made while a movie is unidentified become countable only after successful identification assigns a stable TMDB identity. The activation is recorded at the successful identification time with `Source=Identification`.
+- Collection status rows linked to an unidentified or identification-failed `Movie` are excluded from Watch Statistics until that movie is identified successfully.
+- Moving a marked movie out of the library and scanning it back in does not change status-history timing; scan restores library visibility but does not create a new status addition.
+- Re-identification of an already identified marked movie does not create a new `Source=Identification` activation row. The latest-time activation rule is limited to previously unidentified movies gaining a TMDB identity.
+- The status comparison text now means `本月比上月`; it no longer uses `本周比上周`.
+- New status history before this stage is not backfilled, so old pre-existing true states are not counted as this month's additions.
 - Playback-dependent statistics follow the selected range, while the calendar has its own independent displayed month.
 - Watch count is distinct watched movies in the selected range, not play-record count.
 - Tags, preference graph, tag ranking, and taste combination map count distinct watched movies by tag/combination occurrence.
 - Calendar supports previous/next month and `回到当前月`, bounded by first valid watch history month and current month.
 - Calendar heat levels use fixed thresholds and include a legend.
 - Profile Analysis remains a long-term profile and is not affected by statistics range or calendar month.
+- Profile Analysis no longer shows the extra `口味线索` card.
 - Invalid persona fallback now regenerates or supplies a `多元杂食者`-compatible description.
 - Taste quadrant X/Y now comes from AI output and is only clamped by service validation.
 
 Out of scope kept:
 - No profile-driven recommendation.
-- No database field or migration.
+- No recommendation-related database or prompt changes.
 - No final UI redesign.
 - No persona image assets.
 

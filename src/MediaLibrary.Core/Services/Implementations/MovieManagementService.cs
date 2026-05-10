@@ -38,7 +38,8 @@ public sealed class MovieManagementService : IMovieManagementService
     public async Task SetFavoriteAsync(
         int movieId,
         bool isFavorite,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
@@ -50,16 +51,41 @@ public sealed class MovieManagementService : IMovieManagementService
             throw new InvalidOperationException("只有已看影片可以标记喜爱。");
         }
 
+        var now = DateTime.UtcNow;
+        var oldFavorite = movie.IsFavorite;
         movie.IsFavorite = isFavorite;
-        movie.UpdatedAt = DateTime.UtcNow;
+        movie.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            movie.TmdbId,
+            movie.Id,
+            collectionItemId: null,
+            movie.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldFavorite,
+            movie.IsFavorite,
+            changeSource,
+            now);
 
         if (isFavorite)
         {
             var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
             foreach (var item in collectionItems)
             {
+                var oldNotInterested = item.IsNotInterested;
                 item.IsNotInterested = false;
-                item.UpdatedAt = DateTime.UtcNow;
+                item.UpdatedAt = now;
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    item.TmdbId ?? movie.TmdbId,
+                    movie.Id,
+                    item.Id == 0 ? null : item.Id,
+                    item.Title,
+                    UserMovieStateChangeHistoryRecorder.StateNotInterested,
+                    oldNotInterested,
+                    item.IsNotInterested,
+                    changeSource,
+                    now);
                 CleanupCollectionEntityIfEmpty(dbContext, item);
             }
         }
@@ -70,32 +96,82 @@ public sealed class MovieManagementService : IMovieManagementService
     public async Task SetWatchedAsync(
         int movieId,
         bool isWatched,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
         var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken)
             ?? throw new InvalidOperationException("影片不存在。");
 
+        var now = DateTime.UtcNow;
+        var oldMovieWatched = movie.IsWatched;
+        var oldMovieFavorite = movie.IsFavorite;
         movie.IsWatched = isWatched;
         if (!isWatched)
         {
             movie.IsFavorite = false;
-            movie.AutoWatchedBaselineAtUtc = DateTime.UtcNow;
+            movie.AutoWatchedBaselineAtUtc = now;
             WatchCompletionDiagnostics.Write(
                 $"watch-completion-baseline-set movieId={movie.Id} baselineUtc={movie.AutoWatchedBaselineAtUtc:O}");
         }
 
-        movie.UpdatedAt = DateTime.UtcNow;
+        movie.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            movie.TmdbId,
+            movie.Id,
+            collectionItemId: null,
+            movie.Title,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            oldMovieWatched,
+            movie.IsWatched,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            movie.TmdbId,
+            movie.Id,
+            collectionItemId: null,
+            movie.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldMovieFavorite,
+            movie.IsFavorite,
+            changeSource,
+            now);
 
         if (isWatched)
         {
             var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
             foreach (var item in collectionItems.Where(x => x.IsWantToWatch || x.IsWatched != isWatched))
             {
+                var oldWantToWatch = item.IsWantToWatch;
+                var oldWatched = item.IsWatched;
                 item.IsWantToWatch = false;
                 item.IsWatched = true;
-                item.UpdatedAt = DateTime.UtcNow;
+                item.UpdatedAt = now;
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    item.TmdbId ?? movie.TmdbId,
+                    movie.Id,
+                    item.Id == 0 ? null : item.Id,
+                    item.Title,
+                    UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+                    oldWantToWatch,
+                    item.IsWantToWatch,
+                    changeSource,
+                    now);
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    item.TmdbId ?? movie.TmdbId,
+                    movie.Id,
+                    item.Id == 0 ? null : item.Id,
+                    item.Title,
+                    UserMovieStateChangeHistoryRecorder.StateWatched,
+                    oldWatched,
+                    item.IsWatched,
+                    changeSource,
+                    now);
             }
         }
         else
@@ -103,8 +179,20 @@ public sealed class MovieManagementService : IMovieManagementService
             var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
             foreach (var item in collectionItems.Where(x => x.IsWatched))
             {
+                var oldWatched = item.IsWatched;
                 item.IsWatched = false;
-                item.UpdatedAt = DateTime.UtcNow;
+                item.UpdatedAt = now;
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    item.TmdbId ?? movie.TmdbId,
+                    movie.Id,
+                    item.Id == 0 ? null : item.Id,
+                    item.Title,
+                    UserMovieStateChangeHistoryRecorder.StateWatched,
+                    oldWatched,
+                    item.IsWatched,
+                    changeSource,
+                    now);
                 CleanupCollectionEntityIfEmpty(dbContext, item);
             }
         }

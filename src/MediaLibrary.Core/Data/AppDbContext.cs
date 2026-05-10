@@ -35,6 +35,8 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<WatchInsightCacheEntry> WatchInsightCacheEntries => Set<WatchInsightCacheEntry>();
 
+    public DbSet<UserMovieStateChangeHistory> UserMovieStateChangeHistories => Set<UserMovieStateChangeHistory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new SourceConnectionConfiguration());
@@ -49,6 +51,7 @@ public sealed class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new UserMovieCollectionItemConfiguration());
         modelBuilder.ApplyConfiguration(new ExternalMetadataCacheConfiguration());
         modelBuilder.ApplyConfiguration(new WatchInsightCacheEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new UserMovieStateChangeHistoryConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

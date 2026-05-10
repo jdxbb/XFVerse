@@ -12,12 +12,14 @@ public interface IMovieManagementService
     Task SetFavoriteAsync(
         int movieId,
         bool isFavorite,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual");
 
     Task SetWatchedAsync(
         int movieId,
         bool isWatched,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual");
 
     Task RemoveFromLibraryAsync(
         int movieId,

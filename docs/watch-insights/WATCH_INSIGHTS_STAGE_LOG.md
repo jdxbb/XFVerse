@@ -220,6 +220,29 @@ Validation:
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
 
+## WI-6.1 Status Identity Follow-up
+
+Completed:
+- Confirmed the auto-watched "not counted" report was caused by an unidentified movie: state-history writes intentionally skip rows without a stable TMDB identity.
+- Chose successful-identification time as the baseline for old unidentified state becoming countable. This avoids using `UpdatedAt` or other metadata timestamps as a fake user-state time.
+- Added `Source=Identification` for state-history rows created when a previously unidentified movie gains a stable TMDB identity.
+- When a previously unidentified movie is identified successfully, existing `Movie.IsWatched` and `Movie.IsFavorite` states now create status-history activation rows for the newly known TMDB id.
+- Linked `UserMovieCollectionItem` rows are normalized to the identified movie/TMDB identity and true watched / want-to-watch / not-interested states create status-history activation rows when the row previously had no matching TMDB identity.
+- Manual match and Batch-2 apply/merge paths both use the same identification activation behavior.
+- Scan identification that binds a single media file to an existing matched movie moves only that media file's watch-history rows. Whole-movie state/collection transfer is limited to cases where the source placeholder has no other active video source.
+- Watch Statistics collection-state loading now excludes collection rows linked to an unidentified or identification-failed `Movie`.
+- Moving a library record out and scanning the same file back in does not create a status-history row. The scan path reuses the existing `MediaFile` by path and only clears `IsDeleted`, so old user states keep their original state-history timing.
+- Re-identifying an already identified, previously marked movie does not create a new `Source=Identification` activation row. Identification activation rows are limited to movies that did not already have a stable TMDB identity.
+
+Behavior:
+- `全部` still uses the current state snapshot, so an identified movie with retained watched/favorite/collection state is counted normally.
+- `本月` treats old unidentified state as countable when it becomes identified, with `ChangedAtUtc` equal to the successful identification time.
+- Repeated identification of an already identified movie does not create a new activation row for the same TMDB identity.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
 ## WI-6.1 Statistics Range and Profile Semantics Fix Completed
 
 Goal: correct Watch Statistics time ranges and profile-generation semantics without adding DB fields, migrations, recommendation integration, or final UI redesign.
@@ -239,7 +262,9 @@ Completed:
 - Statistics cache scope is now separated by range and calendar month, for example `range:month:yyyyMM:calendar:yyyyMM` and `range:all:calendar:yyyyMM`.
 - Statistics fingerprint now includes the statistics scope key so month/all/calendar payloads cannot pollute each other.
 - Statistics Tab now has a `本月 / 全部` range selector, defaulting to `本月`.
-- Status overview is fixed to all-time scope and now shows four cards only: `已看`, `喜爱`, `想看`, `不想看`.
+- Status overview shows four cards only: `已看`, `喜爱`, `想看`, `不想看`.
+- Status overview now follows the selected statistics range. The current month range uses each status source row's `UpdatedAt`; the all-time range counts all current states.
+- The `本月 / 全部` range buttons now show a selected state.
 - Playback-dependent modules follow the selected range: watch duration, watched movie count, frequent tags, preference graph, tag ranking, rhythm, duration distribution, and taste combination map.
 - Watch count now means distinct TMDB movies with valid watch history in the selected range.
 - Frequent tags, tag rankings, preference graph, and taste combinations are counted by distinct watched movies in the selected range, not by watch duration or repeat play count.
@@ -251,6 +276,7 @@ Completed:
 - Invalid AI persona type now triggers a small second AI request to generate matching `多元杂食者` title/description; if that fails, a fixed safe description is used.
 - Profile quadrant X/Y now comes from AI output; service only clamps to -100..100 and rejects newly generated profile JSON with missing or invalid X/Y.
 - Prompt version was bumped to `wi-profile-range-quadrant-v5`.
+- Removed the Profile Analysis `口味线索` card; the profile page keeps summary, persona, DNA, quadrant, and watch-more-vs-like as the primary modules.
 
 Boundaries kept:
 - No database field or migration.
@@ -259,6 +285,56 @@ Boundaries kept:
 - No profile time range; Profile Analysis remains a global long-term profile.
 
 Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+## WI-6.1 Status Overview History Correction Completed
+
+Goal: correct status overview wording and state-change timing so `本月` does not use `Movie.UpdatedAt` or `UserMovieCollectionItem.UpdatedAt` as a proxy for user status changes.
+
+Problem:
+- `UpdatedAt` can be changed by metadata, poster, rating, tag, scan, merge, or visibility updates.
+- Using `UpdatedAt` made a movie look like it was newly marked watched/favorite/want/not-interested in the current month even when only non-status data changed.
+
+Completed:
+- Added `UserMovieStateChangeHistory` entity and EF configuration.
+- Added `UserMovieStateChangeHistories` to `AppDbContext`.
+- Generated and applied migration `20260510163406_AddUserMovieStateChangeHistories`.
+- Added centralized state-change recording for actual boolean transitions only.
+- Recorded `Watched`, `Favorite`, `WantToWatch`, and `NotInterested` changes with `OldValue`, `NewValue`, `ChangedAtUtc`, `TmdbId`, optional `MovieId`, optional collection item id, and source.
+- Connected history writes to:
+  - manual library watched/favorite changes through `MovieManagementService`;
+  - external/collection watched, want-to-watch, and not-interested changes through `UserCollectionService`;
+  - automatic watched changes through `WatchHistoryService` with `Source=AutoWatched`;
+  - batch watched/unwatched operations with `Source=Batch`;
+  - recommendation want-to-watch/not-interested operations with `Source=Recommendation`.
+- Reworked Watch Statistics status overview:
+  - `全部` uses current entity state snapshot, unified by TMDB id, and shows no comparison text.
+  - `本月` uses `UserMovieStateChangeHistories` and counts distinct TMDB ids whose latest state change in the current natural month is `NewValue=true`.
+  - If a movie is marked true and then canceled in the same month, it no longer counts as a current-month addition.
+  - `本月` comparison text is `较上月 +N`, `较上月 -N`, `与上月持平`, or `暂无上月记录`.
+- Updated statistics fingerprint to include state-history count and max `ChangedAtUtc`.
+- Updated status overview UI title/subtitle:
+  - `全部`: `当前状态总览`.
+  - `本月`: `本月状态新增`.
+- Kept `未看` removed from the status overview.
+
+Boundaries kept:
+- No recommendation-system changes.
+- No player core changes beyond recording automatic-watched state history in the existing auto-watched write path.
+- No resource-library delete semantic changes.
+- No fake state-history backfill.
+
+Compatibility:
+- Existing true states before the new table are still counted in `全部`.
+- Existing true states before the new table are not counted as `本月新增`.
+- Historical state changes before this migration cannot be accurately reconstructed.
+
+Validation:
+- `dotnet ef migrations add AddUserMovieStateChangeHistories --project src/MediaLibrary.Core/MediaLibrary.Core.csproj --startup-project src/MediaLibrary.Core/MediaLibrary.Core.csproj`
+- Result: migration generated successfully.
+- `dotnet ef database update --project src/MediaLibrary.Core/MediaLibrary.Core.csproj --startup-project src/MediaLibrary.Core/MediaLibrary.Core.csproj`
+- Result: migration applied successfully.
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
 

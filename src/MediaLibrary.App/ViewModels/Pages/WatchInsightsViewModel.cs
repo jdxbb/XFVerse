@@ -353,6 +353,12 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public bool IsAllRangeSelected => _statisticsTimeRange == WatchStatisticsTimeRange.All;
 
+    public string OverviewTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "当前状态总览" : "本月状态新增";
+
+    public string OverviewSubtitle => _statisticsTimeRange == WatchStatisticsTimeRange.All
+        ? "显示当前全部已标记状态，按 TMDB 去重；全部范围不显示月度对比。"
+        : "显示本月新增状态；较上月变化来自状态变更历史。";
+
     public string TotalWatchTimeTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "累计观影时长" : "本月观影时长";
 
     public string WatchCountTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "累计看过" : "本月看过";
@@ -934,10 +940,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private void BuildOverview(WatchStatisticsSnapshot snapshot)
     {
         OverviewCards.Clear();
-        OverviewCards.Add(new("已看", snapshot.WatchedCount.ToString(), "部", FormatDelta(snapshot.WatchedDeltaFromLastWeek), "已"));
-        OverviewCards.Add(new("喜爱", snapshot.FavoriteCount.ToString(), "部", FormatDelta(snapshot.FavoriteDeltaFromLastWeek), "喜"));
-        OverviewCards.Add(new("想看", snapshot.WantToWatchCount.ToString(), "部", FormatDelta(snapshot.WantToWatchDeltaFromLastWeek), "想"));
-        OverviewCards.Add(new("不想看", snapshot.NotInterestedCount.ToString(), "部", FormatDelta(snapshot.NotInterestedDeltaFromLastWeek), "避"));
+        OverviewCards.Add(new("已看", snapshot.WatchedCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek), "已"));
+        OverviewCards.Add(new("喜爱", snapshot.FavoriteCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek), "喜"));
+        OverviewCards.Add(new("想看", snapshot.WantToWatchCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek), "想"));
+        OverviewCards.Add(new("不想看", snapshot.NotInterestedCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek), "避"));
 
         TotalWatchTimeText = FormatSeconds(snapshot.TotalWatchSeconds);
         MonthlyWatchCountText = $"{snapshot.MonthlyWatchCount}部";
@@ -1154,18 +1160,23 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             .ToList();
     }
 
-    private static string FormatDelta(int? delta)
+    private static string FormatDelta(WatchStatisticsTimeRange timeRange, int? delta)
     {
+        if (timeRange == WatchStatisticsTimeRange.All)
+        {
+            return string.Empty;
+        }
+
         if (!delta.HasValue)
         {
-            return "不足以计算";
+            return "暂无上月记录";
         }
 
         return delta.Value switch
         {
-            > 0 => $"+{delta.Value}",
-            < 0 => delta.Value.ToString(),
-            _ => "0"
+            > 0 => $"较上月 +{delta.Value}",
+            < 0 => $"较上月 {delta.Value}",
+            _ => "与上月持平"
         };
     }
 
@@ -1237,6 +1248,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(StatisticsRangeText));
         OnPropertyChanged(nameof(IsMonthRangeSelected));
         OnPropertyChanged(nameof(IsAllRangeSelected));
+        OnPropertyChanged(nameof(OverviewTitle));
+        OnPropertyChanged(nameof(OverviewSubtitle));
         OnPropertyChanged(nameof(TotalWatchTimeTitle));
         OnPropertyChanged(nameof(WatchCountTitle));
         OnPropertyChanged(nameof(FrequentTagsTitle));
@@ -1353,7 +1366,10 @@ public sealed record ProfilePlaceholderCard(string Title, string State, string D
 
 public sealed record WarningMessageItem(string Text);
 
-public sealed record OverviewMetricCard(string Title, string ValueText, string UnitText, string DeltaText, string IconText);
+public sealed record OverviewMetricCard(string Title, string ValueText, string UnitText, string DeltaText, string IconText)
+{
+    public bool HasDelta => !string.IsNullOrWhiteSpace(DeltaText);
+}
 
 public sealed record TagChipItem(string Label, string DetailText);
 

@@ -1173,13 +1173,13 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         {
             if (previousState)
             {
-                await _userCollectionService.RemoveWantToWatchAsync(item);
+                await _userCollectionService.RemoveWantToWatchAsync(item, changeSource: "Recommendation");
                 item.IsWantToWatch = false;
                 StatusMessage = $"已取消想看：{item.Title}";
             }
             else
             {
-                await _userCollectionService.AddWantToWatchAsync(item);
+                await _userCollectionService.AddWantToWatchAsync(item, changeSource: "Recommendation");
                 item.IsWantToWatch = true;
                 item.IsNotInterested = false;
                 StatusMessage = $"已加入想看：{item.Title}";
@@ -1219,7 +1219,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         var targetNotInterested = !previousNotInterested;
         try
         {
-            await _userCollectionService.SetNotInterestedAsync(item, targetNotInterested);
+            await _userCollectionService.SetNotInterestedAsync(item, targetNotInterested, changeSource: "Recommendation");
             item.IsNotInterested = targetNotInterested;
             if (targetNotInterested)
             {

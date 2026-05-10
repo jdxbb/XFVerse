@@ -22,9 +22,17 @@
 - Persona poster/image resources are not implemented. WI-6 displays text-only persona data.
 - Profile manual-refresh UI is implemented in WI-6, but final visual polish is still deferred.
 - Profile automatic refresh is independent from real-time statistics refresh and remains gated by fingerprint change plus at least 1 day since the last automatic profile refresh.
-- Last-week deltas for watched, unwatched, favorite, want-to-watch, and not-interested remain unavailable because there is no historical status snapshot/change table yet.
 - Resolved in WI-6.1 UI口径: Watch Statistics status overview no longer displays `未看`.
-- Last-week deltas for watched, favorite, want-to-watch, and not-interested remain unavailable because there is no historical status snapshot/change table yet.
+- Resolved in WI-6.1 status-history correction: status overview no longer uses `Movie.UpdatedAt` or `UserMovieCollectionItem.UpdatedAt` to infer status timing.
+- Resolved in WI-6.1 status-history correction: `本月` status overview uses `UserMovieStateChangeHistories` and the small comparison text means `本月比上月`, not `本周比上周`.
+- Resolved in WI-6.1 status-history correction follow-up: if a state is marked true and then canceled in the same month, the latest in-month state is false and it no longer counts as a current-month addition.
+- Resolved in WI-6.1 status identity follow-up: state changes made while a movie is unidentified are not counted until the movie gains a stable TMDB identity; successful identification records `Source=Identification` activation rows for retained true states.
+- Resolved in WI-6.1 status identity follow-up: collection rows linked to unidentified or identification-failed movies are excluded from Watch Statistics until the linked movie is identified successfully.
+- Resolved in WI-6.1 status identity follow-up: moving a marked movie out of the library and scanning it back in does not count as a new status addition because scan only restores the media file's library visibility.
+- Resolved in WI-6.1 status identity follow-up: AI assisted/manual re-identification of an already identified marked movie does not create a fresh `Source=Identification` status activation.
+- For old unidentified marked movies, the state activation time is the successful identification time, not the original unknown mark time. This is intentional because pre-identification state rows had no stable TMDB id and are not safely reconstructable without relying on metadata timestamps.
+- Historical state changes before `20260510163406_AddUserMovieStateChangeHistories` cannot be reconstructed. Existing pre-migration true states count in `全部`, but are not backfilled into `本月新增`.
+- Status-history coverage depends on future state changes going through `MovieManagementService`, `UserCollectionService`, or the automatic-watched path. Any future direct field write must add a state-history record in the same transaction.
 - Language distribution currently uses the stored `Language` field. A dedicated TMDB `original_language` field is not available yet.
 - Library-external collection items still lack AI type/emotion/scene snapshot fields; WI-2 uses collection genres where external tag data is needed.
 - Calendar previous/next month controls are visible but disabled in WI-3 because WI-2 only exposes the current-month global statistics snapshot.

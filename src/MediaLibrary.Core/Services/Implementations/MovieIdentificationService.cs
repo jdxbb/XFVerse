@@ -408,6 +408,7 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         CancellationToken cancellationToken,
         bool includeOmdbRating = true)
     {
+        var currentMovieHadTmdb = currentMovie.TmdbId is > 0;
         var existingMatchedMovie = await dbContext.Movies
             .Include(x => x.MediaFiles)
             .Include(x => x.RatingSources)
@@ -425,6 +426,8 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         }
 
         var targetMovie = existingMatchedMovie ?? currentMovie;
+        var oldTargetWatched = targetMovie.IsWatched;
+        var oldTargetFavorite = targetMovie.IsFavorite;
         var noop = new IdentificationRunResult();
         await ApplyMetadataAsync(
             dbContext,
@@ -443,6 +446,11 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             targetMovie.UserRating ??= currentMovie.UserRating;
             targetMovie.LastPlayedAt = MaxDate(targetMovie.LastPlayedAt, currentMovie.LastPlayedAt);
             targetMovie.AutoWatchedBaselineAtUtc = MaxDate(targetMovie.AutoWatchedBaselineAtUtc, currentMovie.AutoWatchedBaselineAtUtc);
+            if (!currentMovieHadTmdb)
+            {
+                RecordMovieStateChangeOnIdentification(dbContext, targetMovie, oldTargetWatched, oldTargetFavorite);
+            }
+
             currentMovie.IsFavorite = false;
             currentMovie.IsWatched = false;
             currentMovie.UserRating = null;
@@ -492,10 +500,21 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
 
             foreach (var collectionItem in currentCollectionItems)
             {
+                var previousTmdbId = collectionItem.TmdbId;
                 collectionItem.MovieId = targetMovie.Id;
                 collectionItem.IsInLibrary = targetMovie.MediaFiles.Any(x => x.MediaType == MediaType.Video)
                                              || currentMediaFiles.Any(x => x.MediaType == MediaType.Video);
+                ApplyIdentificationSnapshot(collectionItem, targetMovie);
                 collectionItem.UpdatedAt = DateTime.UtcNow;
+                if (!currentMovieHadTmdb)
+                {
+                    RecordCollectionStateActivationsOnIdentification(
+                        dbContext,
+                        targetMovie,
+                        collectionItem,
+                        previousTmdbId,
+                        DateTime.UtcNow);
+                }
             }
 
             if (!targetMovie.DefaultMediaFileId.HasValue)
@@ -511,6 +530,13 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
                 .Where(x => x.MediaType == MediaType.Video)
                 .Select(x => x.Id)
                 .FirstOrDefault();
+        }
+
+        if (!currentMovieHadTmdb && existingMatchedMovie is null)
+        {
+            var now = DateTime.UtcNow;
+            RecordMovieStateActivationsOnIdentification(dbContext, targetMovie, now);
+            await NormalizeCollectionItemsForIdentifiedMovieAsync(dbContext, targetMovie, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -535,6 +561,7 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         var currentMovie = mediaFile.MovieId.HasValue
             ? await LoadMovieAggregateAsync(dbContext, mediaFile.MovieId.Value, cancellationToken)
             : null;
+        var currentMovieHadTmdb = currentMovie?.TmdbId is > 0;
 
         var targetMovie = !string.IsNullOrWhiteSpace(candidate.ImdbId) || candidate.TmdbId > 0
             ? await dbContext.Movies
@@ -562,7 +589,64 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             }
         }
 
+        var oldTargetWatched = targetMovie.IsWatched;
+        var oldTargetFavorite = targetMovie.IsFavorite;
         await ApplyMetadataAsync(dbContext, targetMovie, candidate, status, candidate.Confidence, result, cancellationToken);
+
+        if (currentMovie is not null && currentMovie.Id != targetMovie.Id)
+        {
+            var transferWholeCurrentMovie = currentMovie.MediaFiles
+                .Where(x => x.MediaType == MediaType.Video && !x.IsDeleted)
+                .All(x => x.Id == mediaFile.Id);
+            var currentWatchHistories = await dbContext.WatchHistories
+                .Where(x => x.MovieId == currentMovie.Id && x.MediaFileId == mediaFile.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var history in currentWatchHistories)
+            {
+                history.MovieId = targetMovie.Id;
+            }
+
+            if (transferWholeCurrentMovie)
+            {
+                targetMovie.IsFavorite |= currentMovie.IsFavorite;
+                targetMovie.IsWatched |= currentMovie.IsWatched;
+                targetMovie.UserRating ??= currentMovie.UserRating;
+                targetMovie.LastPlayedAt = MaxDate(targetMovie.LastPlayedAt, currentMovie.LastPlayedAt);
+                targetMovie.AutoWatchedBaselineAtUtc = MaxDate(targetMovie.AutoWatchedBaselineAtUtc, currentMovie.AutoWatchedBaselineAtUtc);
+                if (!currentMovieHadTmdb)
+                {
+                    RecordMovieStateChangeOnIdentification(dbContext, targetMovie, oldTargetWatched, oldTargetFavorite);
+                }
+
+                var currentCollectionItems = await dbContext.UserMovieCollectionItems
+                    .Where(x => x.MovieId == currentMovie.Id)
+                    .ToListAsync(cancellationToken);
+                var now = DateTime.UtcNow;
+                foreach (var collectionItem in currentCollectionItems)
+                {
+                    var previousTmdbId = collectionItem.TmdbId;
+                    collectionItem.MovieId = targetMovie.Id;
+                    collectionItem.IsInLibrary = targetMovie.MediaFiles.Any(x => x.MediaType == MediaType.Video) || mediaFile.MediaType == MediaType.Video;
+                    ApplyIdentificationSnapshot(collectionItem, targetMovie);
+                    collectionItem.UpdatedAt = now;
+                    if (!currentMovieHadTmdb)
+                    {
+                        RecordCollectionStateActivationsOnIdentification(
+                            dbContext,
+                            targetMovie,
+                            collectionItem,
+                            previousTmdbId,
+                            now);
+                    }
+                }
+
+                currentMovie.IsFavorite = false;
+                currentMovie.IsWatched = false;
+                currentMovie.UserRating = null;
+                currentMovie.LastPlayedAt = null;
+                currentMovie.AutoWatchedBaselineAtUtc = null;
+            }
+        }
 
         mediaFile.Movie = targetMovie;
         mediaFile.UpdatedAt = DateTime.UtcNow;
@@ -572,12 +656,203 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             targetMovie.DefaultMediaFileId = mediaFile.Id;
         }
 
+        if (!currentMovieHadTmdb && currentMovie is not null && currentMovie.Id == targetMovie.Id)
+        {
+            var now = DateTime.UtcNow;
+            RecordMovieStateActivationsOnIdentification(dbContext, targetMovie, now);
+            await NormalizeCollectionItemsForIdentifiedMovieAsync(dbContext, targetMovie, cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (currentMovie is not null && currentMovie.Id != targetMovie.Id)
         {
             await CleanupMovieIfOrphanedAsync(dbContext, currentMovie.Id, cancellationToken);
         }
+    }
+
+    private static void RecordMovieStateChangeOnIdentification(
+        AppDbContext dbContext,
+        Movie targetMovie,
+        bool oldWatched,
+        bool oldFavorite)
+    {
+        var now = DateTime.UtcNow;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            targetMovie.TmdbId,
+            targetMovie.Id,
+            collectionItemId: null,
+            targetMovie.Title,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            oldWatched,
+            targetMovie.IsWatched,
+            UserMovieStateChangeHistoryRecorder.SourceIdentification,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            targetMovie.TmdbId,
+            targetMovie.Id,
+            collectionItemId: null,
+            targetMovie.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldFavorite,
+            targetMovie.IsFavorite,
+            UserMovieStateChangeHistoryRecorder.SourceIdentification,
+            now);
+    }
+
+    private static void RecordMovieStateActivationsOnIdentification(
+        AppDbContext dbContext,
+        Movie movie,
+        DateTime changedAtUtc)
+    {
+        if (movie.IsWatched)
+        {
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                movie.TmdbId,
+                movie.Id,
+                collectionItemId: null,
+                movie.Title,
+                UserMovieStateChangeHistoryRecorder.StateWatched,
+                oldValue: false,
+                newValue: true,
+                source: UserMovieStateChangeHistoryRecorder.SourceIdentification,
+                changedAtUtc: changedAtUtc);
+        }
+
+        if (movie.IsFavorite)
+        {
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                movie.TmdbId,
+                movie.Id,
+                collectionItemId: null,
+                movie.Title,
+                UserMovieStateChangeHistoryRecorder.StateFavorite,
+                oldValue: false,
+                newValue: true,
+                source: UserMovieStateChangeHistoryRecorder.SourceIdentification,
+                changedAtUtc: changedAtUtc);
+        }
+    }
+
+    private static async Task NormalizeCollectionItemsForIdentifiedMovieAsync(
+        AppDbContext dbContext,
+        Movie movie,
+        CancellationToken cancellationToken)
+    {
+        if (movie.TmdbId is not > 0)
+        {
+            return;
+        }
+
+        var collectionItems = await dbContext.UserMovieCollectionItems
+            .Where(x => x.MovieId == movie.Id || x.TmdbId == movie.TmdbId.Value)
+            .ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var collectionItem in collectionItems)
+        {
+            var previousTmdbId = collectionItem.TmdbId;
+            ApplyIdentificationSnapshot(collectionItem, movie);
+            collectionItem.UpdatedAt = now;
+            RecordCollectionStateActivationsOnIdentification(
+                dbContext,
+                movie,
+                collectionItem,
+                previousTmdbId,
+                now);
+        }
+    }
+
+    private static void RecordCollectionStateActivationsOnIdentification(
+        AppDbContext dbContext,
+        Movie movie,
+        UserMovieCollectionItem collectionItem,
+        int? previousTmdbId,
+        DateTime changedAtUtc)
+    {
+        if (movie.TmdbId is not > 0 || previousTmdbId == movie.TmdbId.Value)
+        {
+            return;
+        }
+
+        if (collectionItem.IsWatched)
+        {
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                movie.TmdbId,
+                movie.Id,
+                collectionItem.Id == 0 ? null : collectionItem.Id,
+                collectionItem.Title,
+                UserMovieStateChangeHistoryRecorder.StateWatched,
+                oldValue: false,
+                newValue: true,
+                source: UserMovieStateChangeHistoryRecorder.SourceIdentification,
+                changedAtUtc: changedAtUtc);
+        }
+
+        if (collectionItem.IsWantToWatch)
+        {
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                movie.TmdbId,
+                movie.Id,
+                collectionItem.Id == 0 ? null : collectionItem.Id,
+                collectionItem.Title,
+                UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+                oldValue: false,
+                newValue: true,
+                source: UserMovieStateChangeHistoryRecorder.SourceIdentification,
+                changedAtUtc: changedAtUtc);
+        }
+
+        if (collectionItem.IsNotInterested)
+        {
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                movie.TmdbId,
+                movie.Id,
+                collectionItem.Id == 0 ? null : collectionItem.Id,
+                collectionItem.Title,
+                UserMovieStateChangeHistoryRecorder.StateNotInterested,
+                oldValue: false,
+                newValue: true,
+                source: UserMovieStateChangeHistoryRecorder.SourceIdentification,
+                changedAtUtc: changedAtUtc);
+        }
+    }
+
+    private static void ApplyIdentificationSnapshot(
+        UserMovieCollectionItem collectionItem,
+        Movie movie)
+    {
+        collectionItem.MovieId = movie.Id;
+        collectionItem.TmdbId = movie.TmdbId;
+        collectionItem.Title = movie.Title;
+        collectionItem.OriginalTitle = movie.OriginalTitle ?? string.Empty;
+        collectionItem.ReleaseYear = movie.ReleaseYear;
+        collectionItem.PosterRemoteUrl = movie.PosterRemoteUrl ?? string.Empty;
+        collectionItem.Overview = movie.Overview ?? string.Empty;
+        collectionItem.GenresText = movie.GenresText ?? string.Empty;
+        collectionItem.Country = movie.Country ?? string.Empty;
+        collectionItem.Language = movie.Language ?? string.Empty;
+        collectionItem.RuntimeMinutes = movie.RuntimeMinutes;
+        collectionItem.ImdbId = movie.ImdbId ?? string.Empty;
+        collectionItem.IsInLibrary = movie.MediaFiles.Any(media => media.MediaType == MediaType.Video && !media.IsDeleted);
+
+        var tmdbRating = movie.RatingSources
+            .FirstOrDefault(x => string.Equals(x.SourceName, "TMDB", StringComparison.OrdinalIgnoreCase));
+        var omdbRating = movie.RatingSources
+            .FirstOrDefault(x => string.Equals(x.SourceName, "OMDb", StringComparison.OrdinalIgnoreCase));
+        collectionItem.TmdbRating = tmdbRating?.ScoreValue;
+        collectionItem.TmdbVoteCount = tmdbRating?.VoteCount;
+        collectionItem.OmdbScoreValue = omdbRating?.ScoreValue;
+        collectionItem.OmdbScoreScale = omdbRating?.ScoreScale;
+        collectionItem.OmdbVoteCount = omdbRating?.VoteCount;
+        collectionItem.OmdbSourceUrl = omdbRating?.SourceUrl ?? string.Empty;
+        collectionItem.OmdbLastUpdatedAt = omdbRating?.LastUpdatedAt;
     }
 
     private async Task ApplyMetadataAsync(
