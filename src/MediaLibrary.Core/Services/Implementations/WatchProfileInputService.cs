@@ -592,7 +592,7 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
         WatchProfileStatisticsSummary statisticsSummary)
     {
         var builder = new StringBuilder();
-        builder.Append("profile-input:v3-semantic|");
+        builder.Append("profile-input:v4-semantic-no-visibility-timestamps|");
 
         foreach (var sample in signalSamples.OrderBy(x => x.TmdbId))
         {
@@ -615,7 +615,6 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
                 .Append(sample.WatchCount).Append(':')
                 .Append(sample.CompletedCount).Append(':')
                 .Append(FormatFingerprintDate(sample.LastWatchedAtUtc)).Append(':')
-                .Append(FormatFingerprintDate(sample.SortAtUtc)).Append(':')
                 .Append(BuildTagsHash(sample.TypeTags)).Append(':')
                 .Append(BuildTagsHash(sample.EmotionTags)).Append(':')
                 .Append(BuildTagsHash(sample.SceneTags))

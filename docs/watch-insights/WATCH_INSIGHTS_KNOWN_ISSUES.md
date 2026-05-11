@@ -31,6 +31,8 @@
 - Resolved in WI-6.1 status identity follow-up: moving a marked movie out of the library and scanning it back in does not count as a new status addition because scan only restores the media file's library visibility.
 - Resolved in WI-6.1 status identity follow-up: AI assisted/manual re-identification does not create status activation rows. The target movie's existing state is preserved as existing state, not a current-month addition.
 - Same-TMDB duplicate merges may preserve state because they represent the same movie identity; different-TMDB reassignment does not transfer watched, favorite, user rating, automatic-watched baseline, or collection status.
+- Resolved in WI-6.1 delete-record follow-up: deleting a movie record removes its owned state-history rows, and Watch Statistics ignores orphaned state-history rows left by earlier builds.
+- Resolved in WI-6.1 profile fingerprint follow-up: moving a marked movie out of the library preserves state/history and no longer changes the profile fingerprint through collection visibility timestamp churn alone.
 - Historical state changes before `20260510163406_AddUserMovieStateChangeHistories` cannot be reconstructed. Existing pre-migration true states count in `全部`, but are not backfilled into `本月新增`.
 - Status-history coverage depends on future state changes going through `MovieManagementService`, `UserCollectionService`, or the automatic-watched path. Any future direct field write must add a state-history record in the same transaction.
 - Language distribution currently uses the stored `Language` field. A dedicated TMDB `original_language` field is not available yet.

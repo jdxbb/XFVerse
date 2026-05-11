@@ -18,6 +18,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
     private const int ValidWatchSecondsThreshold = 60;
     private const int TopTagCount = 10;
     private const int TopSmallTagCount = 3;
+    private const string StatisticsLogicVersion = "wi-6.1-state-history-active-owner-v2";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -244,6 +245,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         var rawFingerprint = string.Join(
             "|",
             $"scope:{scopeKey}",
+            $"logic:{StatisticsLogicVersion}",
             $"movies:{movieCount}:{FormatFingerprintDate(movieMaxUpdatedAt)}",
             $"media:{mediaFileCount}:{FormatFingerprintDate(mediaFileMaxUpdatedAt)}:{FormatFingerprintDate(mediaFileMaxCreatedAt)}",
             $"history:{watchHistoryCount}:{FormatFingerprintDate(watchHistoryMaxActivityAt)}:{FormatFingerprintDate(watchHistoryMaxCreatedAt)}",
@@ -270,6 +272,10 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         var identifiedMovies = await LoadIdentifiedMoviesAsync(dbContext, cancellationToken);
         var identifiedMovieIds = identifiedMovies.Select(x => x.Id).ToHashSet();
         var collectionItems = await LoadIdentifiedCollectionItemsAsync(dbContext, cancellationToken);
+        var identifiedTmdbIds = identifiedMovies.Select(x => x.TmdbId)
+            .Concat(collectionItems.Select(x => x.TmdbId))
+            .ToHashSet();
+        var collectionItemIds = collectionItems.Select(x => x.Id).ToHashSet();
         var mediaFiles = identifiedMovieIds.Count == 0
             ? []
             : await dbContext.MediaFiles
@@ -319,11 +325,18 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             {
                 Id = x.Id,
                 TmdbId = x.TmdbId,
+                MovieId = x.MovieId,
+                UserMovieCollectionItemId = x.UserMovieCollectionItemId,
                 StateType = x.StateType,
                 NewValue = x.NewValue,
                 ChangedAtUtc = x.ChangedAtUtc
             })
             .ToListAsync(cancellationToken);
+        stateHistories = stateHistories
+            .Where(x => identifiedTmdbIds.Contains(x.TmdbId)
+                && (!x.MovieId.HasValue || identifiedMovieIds.Contains(x.MovieId.Value))
+                && (!x.UserMovieCollectionItemId.HasValue || collectionItemIds.Contains(x.UserMovieCollectionItemId.Value)))
+            .ToList();
 
         var movieById = identifiedMovies.ToDictionary(x => x.Id);
         var ratingByMovieId = ratingSources
@@ -1543,6 +1556,10 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         public long Id { get; set; }
 
         public int TmdbId { get; set; }
+
+        public int? MovieId { get; set; }
+
+        public int? UserMovieCollectionItemId { get; set; }
 
         public string StateType { get; set; } = string.Empty;
 

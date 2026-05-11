@@ -288,6 +288,25 @@ Validation:
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
 
+## WI-6.1 Delete-Record State History Follow-up
+
+Completed:
+- Fixed a status-history ownership bug where deleting a movie record could leave its `UserMovieStateChangeHistories` rows behind, causing `本月状态新增` to keep counting a deleted movie.
+- `DeleteMovieRecordAsync` now removes state-history rows owned by the deleted movie or by deleted collection items.
+- `DeleteCollectionRecordAsync` now removes state-history rows owned by the deleted collection item.
+- Watch Statistics now ignores orphaned state-history rows whose `MovieId` or `UserMovieCollectionItemId` no longer belongs to a current identified movie / collection item.
+- Statistics fingerprint includes a logic version so existing cached statistics are invalidated after this ownership-filter change.
+
+Behavior:
+- `删除影片记录` removes the movie from resource library, collection state, Watch Insights statistics, and future profile input.
+- Existing orphaned state-history rows from earlier builds no longer affect the current-month status cards.
+- `移出资源库` is unchanged: it still preserves state/history and should not remove status-history rows.
+- Profile input fingerprint no longer includes visibility/order-only timestamps from preserved collection state, so moving a marked movie out of the library does not by itself force profile regeneration.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
 ## WI-6.1 Status Overview History Correction Completed
 
 Goal: correct status overview wording and state-change timing so `本月` does not use `Movie.UpdatedAt` or `UserMovieCollectionItem.UpdatedAt` as a proxy for user status changes.

@@ -384,6 +384,17 @@ public sealed class MovieManagementService : IMovieManagementService
         var mediaFileIdSet = mediaFileIds.ToHashSet();
 
         var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
+        var collectionItemIds = collectionItems.Select(x => x.Id).ToHashSet();
+        var stateHistories = await dbContext.UserMovieStateChangeHistories
+            .Where(x => x.MovieId == movieId
+                || (x.UserMovieCollectionItemId.HasValue
+                    && collectionItemIds.Contains(x.UserMovieCollectionItemId.Value)))
+            .ToListAsync(cancellationToken);
+        if (stateHistories.Count > 0)
+        {
+            dbContext.UserMovieStateChangeHistories.RemoveRange(stateHistories);
+        }
+
         if (collectionItems.Count > 0)
         {
             dbContext.UserMovieCollectionItems.RemoveRange(collectionItems);

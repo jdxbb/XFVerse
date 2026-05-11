@@ -646,6 +646,14 @@ public sealed class UserCollectionService : IUserCollectionService
             return;
         }
 
+        var stateHistories = await dbContext.UserMovieStateChangeHistories
+            .Where(x => x.UserMovieCollectionItemId == entity.Id)
+            .ToListAsync(cancellationToken);
+        if (stateHistories.Count > 0)
+        {
+            dbContext.UserMovieStateChangeHistories.RemoveRange(stateHistories);
+        }
+
         dbContext.UserMovieCollectionItems.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
     }

@@ -316,6 +316,8 @@ Scope completed:
 - Reset / unidentified placeholder / re-identification paths do not inherit the old `Movie` watched, favorite, want-to-watch, or not-interested state into the newly identified identity.
 - Collection status rows linked to an unidentified or identification-failed `Movie` are excluded from Watch Statistics unless they already match a stable identified target identity.
 - Moving a marked movie out of the library and scanning it back in does not change status-history timing; scan restores library visibility but does not create a new status addition.
+- Deleting a movie record removes its software-owned state history, and Watch Statistics ignores orphaned state-history rows whose movie or collection owner no longer exists.
+- Moving a marked movie out of the library preserves its state/history and must not change the long-term profile input fingerprint unless an actual state, history, tag, rating, or metadata signal changed.
 - Successful identification uses the target `Movie`'s existing state. If the target was already marked before, that is existing state and is not recorded as a current-month status addition.
 - Re-identification of an already identified marked movie does not create a status activation row. Same-TMDB duplicate merges may preserve state as the same movie identity, but different-TMDB reassignment does not transfer status.
 - The status comparison text now means `本月比上月`; it no longer uses `本周比上周`.
