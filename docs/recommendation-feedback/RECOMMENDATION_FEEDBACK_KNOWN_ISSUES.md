@@ -37,6 +37,7 @@
 - RF-2 custom preference diagnostics may log enabled state, text length, and a short hash, but must not log full preference text or the full AI prompt.
 - RF-2 prompt-injection safety does not rely on the model fully obeying user text. User preference text is treated as soft taste input only; local hard filters remain the enforcement layer for not-interested, watched-state, scope, and safety rules.
 - 2026-05-10 log validation found the RF-1 / RF-2 diagnostics normal. Candidate-pool refill cancellation with `foreground-request` and request cancellation with `TaskCanceledException` are expected coordination noise when foreground refreshes supersede in-flight work.
+- WI-R profile context diagnostics may log profile presence, persona type, and short fingerprint prefixes, but must not log full profile JSON, full recommendation prompt, full AI response, paths, URLs, tokens, or API keys.
 
 ## Maintenance Rules
 

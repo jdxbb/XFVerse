@@ -145,3 +145,16 @@ public sealed class WatchProfileFuturePreference
 
     public List<string> LessLikelyToEnjoy { get; set; } = [];
 }
+
+public sealed class WatchProfileRecommendationContext
+{
+    public bool HasProfile { get; set; }
+
+    public string SkipReason { get; set; } = string.Empty;
+
+    public string PersonaType { get; set; } = string.Empty;
+
+    public string PromptSection { get; set; } = string.Empty;
+
+    public string FingerprintPart { get; set; } = "profile:none";
+}

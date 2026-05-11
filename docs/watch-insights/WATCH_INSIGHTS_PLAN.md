@@ -205,7 +205,7 @@ Scope completed:
 Profile rules:
 - Data is insufficient when unique signal movies are fewer than 8, effective signal buckets are fewer than 2, or no usable tags exist.
 - The AI output must be JSON and is parsed into `WatchProfileSnapshot`.
-- `persona.type` is restricted to the final fixed 20-type persona set.
+- `persona.type` is restricted to the final fixed 23-type persona set.
 - Watch DNA supports six genes: type, emotion, scene, rhythm, narrative, and exploration.
 - Taste quadrant uses a local two-axis score: familiar-safe to fresh-exploratory, and easy-casual to emotional-immersive.
 - RF-2 custom recommendation preferences are not included in profile input.
@@ -222,20 +222,24 @@ Final persona set:
 9. 现实观察者
 10. 动作爽片玩家
 11. 文艺审美家
-12. 多元杂食者
+12. 惊悚氛围控
 13. 黑色幽默爱好者
 14. 浪漫幻想派
 15. 暗黑猎奇者
-16. 家庭温情派
-17. 历史史诗控
-18. 动画想象派
-19. 犯罪人性派
-20. 轻松下饭派
+16. 史诗世界观派
+17. 轻松娱乐派
+18. 人性剖析者
+19. 怀旧年代派
+20. 小众寻宝者
+21. 爆笑解压派
+22. 动画叙事派
+23. 纪录求真者
 
 Persona boundary rules:
 - The first 10 persona names remain unchanged.
-- The later 10 types have explicit boundaries to reduce overlap: broad taste maps to `多元杂食者`, active novelty-seeking maps to `类型探索家`, dark/abnormal atmosphere maps to `暗黑猎奇者`, moral/crime human nature maps to `犯罪人性派`, and low-cost casual viewing maps to `轻松下饭派`.
-- If AI returns a persona outside the fixed set, the service falls back to `多元杂食者` and records a warning.
+- The final set removes `多元杂食者`; broad active exploration now falls back to `类型探索家`.
+- The later types separate close meanings: horror / pressure maps to `惊悚氛围控`, weird cult darkness maps to `暗黑猎奇者`, comedy pressure release maps to `爆笑解压派`, broad low-pressure entertainment maps to `轻松娱乐派`, animation craft and story maps to `动画叙事派`, and factual / documentary viewing maps to `纪录求真者`.
+- If AI returns a persona outside the fixed set, the service falls back to `类型探索家` and records a warning.
 - Persona image/poster assets are not part of WI-5 and remain a later UI asset stage.
 
 Out of scope kept:
@@ -329,7 +333,7 @@ Scope completed:
 - Calendar heat levels use fixed thresholds and include a legend.
 - Profile Analysis remains a long-term profile and is not affected by statistics range or calendar month.
 - Profile Analysis no longer shows the extra `口味线索` card.
-- Invalid persona fallback now regenerates or supplies a `多元杂食者`-compatible description.
+- Invalid persona fallback now regenerates or supplies a `类型探索家`-compatible description.
 - Taste quadrant X/Y now comes from AI output and is only clamped by service validation.
 
 Out of scope kept:
@@ -392,7 +396,7 @@ Status:
 
 Scope completed:
 - Added persona poster resource structure under `Assets/WatchPersonas/{key}/`.
-- Generated 20 persona key folders from the provided placeholder inputs `1男.png` and `1女.png`.
+- Initially generated 20 persona key folders from the provided placeholder inputs `1男.png` and `1女.png`; WI-8.1 extends the final set to 23.
 - Each persona folder contains `{key}_male.png` and `{key}_female.png`.
 - Added the shared frame resource at `Assets/WatchPersonas/Frames/persona_card_frame_default.png`.
 - Included `Assets/WatchPersonas/**/*` as WPF `Resource` items so images are packaged with the app.
@@ -415,10 +419,61 @@ Out of scope kept:
 - No database field or migration.
 - No final visual design pass.
 
+### WI-8.1: Persona Taxonomy 23-Type Update
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Updated fixed persona taxonomy from 20 to 23 types.
+- Removed `多元杂食者` / `eclectic_omnivore` from the legal persona set.
+- Replaced slot 12 with `惊悚氛围控` / `thriller_atmosphere_fan`.
+- Added slot 21 `爆笑解压派` / `comedy_relief_fan`.
+- Added slot 22 `动画叙事派` / `animation_narrative_fan`.
+- Added slot 23 `纪录求真者` / `documentary_truth_seeker`.
+- Updated `WatchProfileService.PersonaTypes`, persona definitions, selection rules, invalid-type fallback, and profile prompt version `wi-profile-persona-23-v6`.
+- Invalid AI persona type now falls back to `类型探索家`; fallback title / description are type-explorer compatible.
+- Added poster resource folders for the four new formal keys using the current `1男.png` / `1女.png` placeholders.
+- Kept legacy `eclectic_omnivore` resources in place to avoid deleting possible user assets, but it is no longer a formal persona key.
+- Added legacy UI fallback from `童心奇想家` to `animation_narrative_fan`; `童心奇想家` is not a legal persona type.
+
+Out of scope kept:
+- No profile regeneration or AI call.
+- No database field or migration.
+- No recommendation logic change.
+- No final visual design pass.
+
+### WI-9 / WI-R: Profile-Driven Recommendation
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Existing AI recommendation now reads the cached Watch Profile as a long-term soft preference context.
+- Recommendation reads profile data through `IWatchProfileService.GetRecommendationContextAsync()`, which is cache-only and never triggers profile AI generation.
+- No profile / insufficient profile / parse failure / service error falls back to the existing recommendation logic with a stable `profile:none` fingerprint part.
+- Custom recommendation preference remains higher priority than profile context; the profile section is explicitly framed as background only.
+- Not-interested remains local hard filtering and is not weakened by profile context.
+- Recommendation prompt now includes a compact profile summary: persona, taste summary, DNA, quadrant, and watch-vs-like signals.
+- Recommendation reasons may lightly mention profile fit, but must not expose internal scores, DNA fields, or system field names.
+- Recommendation reason guidance now asks for longer 70-130 character reasons, less templated wording, and avoids repeatedly opening with watched / want-to-watch phrasing.
+- The recommendation prompt JSON example uses the same 70-130 character reason range to avoid shortening conflicts.
+- Recommendation fingerprint includes a stable profile fingerprint part based on cached profile payload hash, source fingerprint, schema/prompt version, generated time, and cache refresh time.
+- Recommendation fingerprint also includes a recommendation prompt version so reason-writing prompt changes invalidate old exact cache / candidate-pool combinations.
+- Reason cache reuse is retained within the same recommendation reason prompt version; the cache document version was bumped once to clear old short / templated reasons after the prompt update.
+- Profile changes naturally make exact recommendation cache and candidate-pool combinations stale through the existing fingerprint mismatch protection.
+
+Out of scope kept:
+- No recommendation UI change.
+- No home page or discovery page change.
+- No profile AI generation inside recommendation requests.
+- No profile switch or settings entry.
+- No database field or migration.
+
 ## Stage Acceptance Criteria
 
 - Watch Insights remains independent from player, Library Batch Ops, and Recommendation Feedback stages.
 - First version uses real local data.
 - Statistics and profile cache do not use `ApplicationSetting`.
 - AI profile generation is cached and controlled by explicit refresh rules in later stages.
-- Image/profile-driven recommendation is not introduced until a separate stage.
+- Profile-driven recommendation is connected as a soft preference in WI-9 / WI-R; it remains disconnected from hard filters and does not trigger profile AI generation.

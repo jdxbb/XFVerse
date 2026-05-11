@@ -23,7 +23,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private const double TasteGraphFirstNodeY = 52d;
     private const double TasteGraphNodeSpacingY = 44d;
     private const string PersonaPosterDefaultGender = "female";
-    private const string PersonaPosterFallbackKey = "eclectic_omnivore";
+    private const string PersonaPosterFallbackKey = "genre_explorer";
     private const string PersonaFrameUri = "pack://application:,,,/Assets/WatchPersonas/Frames/persona_card_frame_default.png";
     private static readonly string[] PersonaPosterExtensions = [".png", ".jpg", ".jpeg", ".webp"];
     private static readonly IReadOnlyDictionary<string, string> PersonaTypeKeys =
@@ -40,7 +40,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ["现实观察者"] = "realism_observer",
             ["动作爽片玩家"] = "action_player",
             ["文艺审美家"] = "arthouse_aesthete",
-            ["多元杂食者"] = "eclectic_omnivore",
+            ["惊悚氛围控"] = "thriller_atmosphere_fan",
             ["黑色幽默爱好者"] = "dark_humorist",
             ["浪漫幻想派"] = "romantic_dreamer",
             ["暗黑猎奇者"] = "dark_curiosity_seeker",
@@ -48,7 +48,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ["轻松娱乐派"] = "easy_entertainment_fan",
             ["人性剖析者"] = "human_nature_analyst",
             ["怀旧年代派"] = "nostalgia_time_traveler",
-            ["小众寻宝者"] = "niche_treasure_hunter"
+            ["小众寻宝者"] = "niche_treasure_hunter",
+            ["爆笑解压派"] = "comedy_relief_fan",
+            ["动画叙事派"] = "animation_narrative_fan",
+            ["纪录求真者"] = "documentary_truth_seeker",
+            ["童心奇想家"] = "animation_narrative_fan"
         };
     private static readonly TimeSpan DataChangedRefreshDebounce = TimeSpan.FromMilliseconds(600);
     private readonly IWatchStatisticsService _statisticsService;

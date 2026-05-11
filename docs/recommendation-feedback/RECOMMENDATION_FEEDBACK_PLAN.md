@@ -221,3 +221,18 @@ Acceptance criteria:
 - No database schema or migration changes are introduced unless explicitly justified and approved during the relevant plan phase.
 - Stage documents are kept current after each completed sub-stage.
 - Recommendation Feedback was closed after RF-1, RF-1.1, RF-2, prompt-sampling adjustment, and log validation.
+
+## Watch Insights WI-R Integration
+
+- Watch Insights profile context is now available to AI recommendations as a soft long-term taste background.
+- The recommendation prompt can include a compact profile summary when a valid cached profile exists.
+- Recommendation requests do not generate or refresh the Watch Profile; they read cache only.
+- Custom recommendation preference remains higher priority than profile context.
+- Not-interested remains the local hard filter and is never downgraded by profile context.
+- Profile context participates in the recommendation fingerprint through a compact profile fingerprint part.
+- Recommendation prompt version also participates in the fingerprint so reason-writing prompt changes invalidate old exact cache / candidate-pool entries.
+- Recommendation reasons now use a fuller 70-130 character target and can lightly mention profile fit, while avoiding repeated fixed watched / want-to-watch openings.
+- The recommendation prompt JSON output example uses the same 70-130 character reason range.
+- Same-version reason reuse remains enabled, but the cache document version was bumped once to clear old reason text after the prompt update.
+- Missing or unusable profile cache uses stable `profile:none` and preserves the previous recommendation behavior.
+- No recommendation UI, database schema, migration, or home/discovery page behavior changed.

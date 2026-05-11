@@ -220,6 +220,99 @@ Validation:
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
 
+## WI-8.1 Completed
+
+Goal: update the Watch Profile persona taxonomy from 20 to 23 formal persona types and keep profile validation, prompt rules, poster mapping, and docs aligned.
+
+Completed:
+- Replaced the old slot 12 `多元杂食者` with `惊悚氛围控`.
+- Removed `多元杂食者` / `eclectic_omnivore` from the legal persona set and fallback target.
+- Added `爆笑解压派`, `动画叙事派`, and `纪录求真者` as slots 21-23.
+- Updated `WatchProfileService.PersonaTypes`, persona definitions, persona selection rules, invalid persona fallback, and profile prompt version to `wi-profile-persona-23-v6`.
+- Invalid AI `persona.type` now falls back to `类型探索家`; fallback title / description also match `类型探索家`.
+- Updated `WatchInsightsViewModel` persona poster mapping to the 23 formal keys.
+- Added legacy UI compatibility so old cached `童心奇想家` can use the `animation_narrative_fan` poster fallback without becoming a legal persona type.
+- Created four new poster resource folders from the current placeholder images:
+  - `thriller_atmosphere_fan`
+  - `comedy_relief_fan`
+  - `animation_narrative_fan`
+  - `documentary_truth_seeker`
+- Kept legacy `eclectic_omnivore` resources in place and did not delete user assets.
+
+Boundaries kept:
+- No profile regeneration.
+- No AI call.
+- No recommendation logic change.
+- No database field or migration.
+- No final UI visual redesign.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+## WI-9 / WI-R Completed
+
+Goal: connect the cached Watch Profile to the existing AI recommendation system as a soft long-term taste background.
+
+Completed:
+- Added a cache-only recommendation context method to `IWatchProfileService`.
+- The recommendation context reads `WatchInsightCacheEntries` with `kind=profile`, `scopeKey=global`.
+- Recommendation context does not call `GetProfileAsync()` and does not trigger profile AI generation.
+- Recommendation prompt receives a compact profile section containing persona, summary keywords, DNA, quadrant, and watch-vs-like signals.
+- Prompt wording keeps the priority order: local hard filters and scope rules first, custom recommendation preference second, profile context third as soft background.
+- Recommendation reason guidance was adjusted to allow fuller 70-130 character reasons, reduce fixed watched / want-to-watch phrasing, and naturally mention profile fit when useful.
+- The AI JSON output example was aligned to the same 70-130 character reason range so it no longer contradicts the main reason guidance.
+- Recommendation fingerprint now includes a profile fingerprint part.
+- Recommendation fingerprint also includes a recommendation prompt version, so prompt wording changes can stale old candidate pools and exact cache entries.
+- Recommendation cache document version was bumped once for the reason-prompt update, clearing old cached recommendation reasons while preserving same-version reason reuse afterwards.
+- When no usable profile cache exists, fingerprint uses `profile:none` and recommendations follow the previous logic.
+- Profile changes invalidate exact recommendation cache and candidate-pool combinations through the existing fingerprint mismatch path.
+- Added privacy-safe diagnostics for profile context load/skip, profile fingerprint, and prompt application.
+
+Boundaries kept:
+- No recommendation UI change.
+- No home page or discovery page change.
+- No recommendation-triggered profile AI call.
+- No database field or migration.
+- No Watch Insights statistics, profile generation prompt, persona posters, player, library, or scan changes.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+## WI-9 Polish: Profile AI Model Tiering And Parallel Card Prompts
+
+Status:
+- Completed in this pass.
+
+Completed:
+- Split Watch Profile generation from one large AI prompt into five card-level AI requests:
+  - Taste summary.
+  - Persona.
+  - Watch DNA.
+  - Taste quadrant.
+  - Watch-more-vs-like conclusion.
+- The five profile card requests run concurrently with a guarded max concurrency of 5.
+- Watch-more-vs-like rankings remain local statistics; AI only generates the conclusion sentence.
+- The cached payload remains the same `WatchProfileSnapshot` shape.
+- Profile prompt version was bumped to `wi-profile-persona-23-parallel-v7` so old one-shot profile output is not reused as current profile output.
+- Added AI request tiers:
+  - Watch Profile uses DeepSeek `deepseek-v4-pro` with thinking enabled, `reasoning_effort=high`, and 180-second timeout when the configured endpoint is DeepSeek.
+  - Recommendation uses DeepSeek `deepseek-v4-flash` and 90-second timeout when the configured endpoint is DeepSeek.
+  - Classification and other existing calls continue using the global configured model; old DeepSeek compatibility names map to `deepseek-v4-flash`.
+- Non-DeepSeek OpenAI-compatible endpoints continue using the user-configured model, avoiding hard-coded DeepSeek names on other providers.
+
+Boundaries kept:
+- No UI change.
+- No recommendation UI change.
+- No database field or migration.
+- No profile cache table/schema change.
+- No classification prompt semantic change.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
 ## WI-7: Verification and Closure
 
 Status:
@@ -409,7 +502,7 @@ Audit result:
 - Monthly watch count was based on valid `WatchHistory` rows, so repeat plays of the same movie inflated the count.
 - Frequent tags, monthly rankings, and taste combinations were weighted by watch duration or mixed score, while the corrected product口径 requires distinct watched movies and tag/combination occurrence counts.
 - Calendar month switching was still disabled and heat levels were relative to the most active date in the shown month.
-- Profile persona fallback changed invalid `persona.type` to `多元杂食者`, but could retain an incompatible AI description.
+- Profile persona fallback previously used `多元杂食者` and could retain an incompatible AI description; WI-8.1 supersedes the fallback target with `类型探索家`.
 - Profile quadrant X/Y was overwritten by local scores; WI-6.1 requires AI-provided X/Y with service-side range validation only.
 
 Completed:
@@ -429,7 +522,7 @@ Completed:
 - Calendar heat levels now use fixed thresholds: none, <30 minutes, 30-60 minutes, 1-2 hours, and 2+ hours.
 - Calendar monthly cards now follow the displayed calendar month and use longest continuous watch streak within that month.
 - Profile input now asks Watch Statistics for the all-time range so profile remains a long-term profile.
-- Invalid AI persona type now triggers a small second AI request to generate matching `多元杂食者` title/description; if that fails, a fixed safe description is used.
+- Invalid AI persona type now triggers a small second AI request to generate matching fallback title/description; WI-8.1 changes the fallback target to `类型探索家`.
 - Profile quadrant X/Y now comes from AI output; service only clamps to -100..100 and rejects newly generated profile JSON with missing or invalid X/Y.
 - Prompt version was bumped to `wi-profile-range-quadrant-v5`.
 - Removed the Profile Analysis `口味线索` card; the profile page keeps summary, persona, DNA, quadrant, and watch-more-vs-like as the primary modules.
@@ -964,7 +1057,7 @@ Completed:
 - Added source fingerprinting for profile-related movie state, collection state, watch histories, rating sources, and the WI-2 statistics fingerprint.
 - Added data-insufficient rules: fewer than 8 signal movies, fewer than 2 signal buckets, or no usable tags means no AI call.
 - Added AI JSON prompt and parser for `WatchProfileSnapshot`.
-- Enforced the fixed 20 persona-type set and fallback to `多元杂食者` for invalid AI output.
+- Enforced the then-current persona-type set. WI-8.1 supersedes this with 23 persona types and fallback to `类型探索家`.
 - Enforced six Watch DNA genes and score/confidence clamping.
 - Made taste quadrant scores local-statistics-first and clamped to -100 to 100.
 - Cached successful profile output under `kind=profile`, `scopeKey=global`.
@@ -985,23 +1078,23 @@ Validation:
 
 ## WI-5 Persona Set Finalization
 
-Goal: update the Watch Profile persona taxonomy to the final fixed 20-type set without changing UI, cache schema, recommendation logic, or database schema.
+Goal: update the Watch Profile persona taxonomy to the fixed persona set without changing UI, cache schema, recommendation logic, or database schema. This section is superseded by WI-8.1, which updates the final set to 23 types.
 
 Audit result:
 - The persona type list is defined once in `WatchProfileService.PersonaTypes`.
-- `WatchProfileService` already validates `persona.type` and falls back to `多元杂食者` when AI returns a type outside the fixed set.
+- `WatchProfileService` validates `persona.type`; WI-8.1 changes invalid fallback to `类型探索家`.
 - `WatchProfileSnapshot` stores persona fields but does not hard-code persona names.
 - `WatchProfileInputService` does not define persona types.
 - The WI-5 prompt already injected the persona list, but did not yet include the final boundary definitions and selection rules.
 
 Completed:
-- Confirmed the final 20 persona names are represented in `WatchProfileService.PersonaTypes`.
+- Confirmed the then-current persona names were represented in `WatchProfileService.PersonaTypes`; WI-8.1 supersedes this with 23 formal persona types.
 - Added final persona boundary definitions to the profile prompt.
 - Added conflict-resolution selection rules so AI picks the strongest differentiating feature.
-- Updated invalid persona warning to `AI 返回了未知人格类型，已回退为多元杂食者。`.
+- WI-8.1 updates invalid persona warning to `AI 返回了未知人格类型，已回退为类型探索家。`.
 - Documented the final persona set and boundary policy.
 
-Final persona set:
+Superseded persona set:
 1. 情绪沉浸者
 2. 悬疑解谜者
 3. 类型探索家
@@ -1013,15 +1106,18 @@ Final persona set:
 9. 现实观察者
 10. 动作爽片玩家
 11. 文艺审美家
-12. 多元杂食者
+12. 惊悚氛围控
 13. 黑色幽默爱好者
 14. 浪漫幻想派
 15. 暗黑猎奇者
-16. 家庭温情派
-17. 历史史诗控
-18. 动画想象派
-19. 犯罪人性派
-20. 轻松下饭派
+16. 史诗世界观派
+17. 轻松娱乐派
+18. 人性剖析者
+19. 怀旧年代派
+20. 小众寻宝者
+21. 爆笑解压派
+22. 动画叙事派
+23. 纪录求真者
 
 Boundaries kept:
 - No UI change.

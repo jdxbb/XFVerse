@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Models.Settings;
 using MediaLibrary.Core.Services.Interfaces;
 
 namespace MediaLibrary.Core.Services.Implementations;
@@ -11,7 +14,11 @@ public sealed class WatchProfileService : IWatchProfileService
     private const string ProfileKind = "profile";
     private const string GlobalScopeKey = "global";
     private const int CurrentProfileSchemaVersion = 2;
-    private const string CurrentPromptVersion = "wi-profile-range-quadrant-v5";
+    private const string CurrentPromptVersion = "wi-profile-persona-23-parallel-v7";
+    private const string FallbackPersonaType = "类型探索家";
+    private const string FallbackPersonaTitle = "类型探索家";
+    private const string FallbackPersonaDescription = "你的观影口味覆盖多个方向，更愿意主动尝试不同类型与风格，而不是被单一标签固定。";
+    private const int MaxParallelProfileCardRequests = 5;
 
     private static readonly TimeSpan AutoRefreshInterval = TimeSpan.FromDays(1);
 
@@ -34,55 +41,64 @@ public sealed class WatchProfileService : IWatchProfileService
         "现实观察者",
         "动作爽片玩家",
         "文艺审美家",
-        "多元杂食者",
+        "惊悚氛围控",
         "黑色幽默爱好者",
         "浪漫幻想派",
         "暗黑猎奇者",
-        "家庭温情派",
-        "历史史诗控",
-        "动画想象派",
-        "犯罪人性派",
-        "轻松下饭派"
+        "史诗世界观派",
+        "轻松娱乐派",
+        "人性剖析者",
+        "怀旧年代派",
+        "小众寻宝者",
+        "爆笑解压派",
+        "动画叙事派",
+        "纪录求真者"
     ];
 
     private static readonly string[] PersonaTypeDefinitions =
     [
-        "1. 情绪沉浸者：关键词是强情绪、共鸣、后劲、哭点、心理余韵。边界是重在被情绪击中，不是单纯喜欢美学或现实题材。",
-        "2. 悬疑解谜者：关键词是谜团、反转、推理、信息差、真相揭开。边界是重在解谜过程，不是单纯犯罪或人性灰度。",
-        "3. 类型探索家：关键词是陌生类型、新国家、新年代、新风格、主动尝试。边界是重在探索未知，不是单纯什么都能看。",
-        "4. 经典收藏家：关键词是影史经典、老片、代表作、长期价值、反复回味。边界是重在经典价值和收藏感，不是单纯高分。",
-        "5. 治愈陪伴型：关键词是温暖、修复、陪伴、安心、柔软。边界是重在情绪被照顾，不是单纯轻松搞笑。",
-        "6. 高分严选派：关键词是评分、口碑、奖项、质量筛选、避雷。边界是重在先看质量背书，不是收藏经典或导演作者。",
-        "7. 作者导演迷：关键词是导演风格、镜头语言、作者表达、个人印记。边界是重在创作者表达，不是单纯文艺审美。",
-        "8. 科幻幻想旅人：关键词是科幻、奇幻、世界观、设定、宏大想象。边界是重在设定和世界观，不是动画媒介本身。",
-        "9. 现实观察者：关键词是现实主义、社会议题、生活质感、普通人、人间观察。边界是重在看见真实世界，不是情绪沉浸或犯罪黑暗面。",
-        "10. 动作爽片玩家：关键词是快节奏、动作、刺激、爽感、视觉冲击。边界是重在直接快感和能量释放，不是惊悚猎奇。",
-        "11. 文艺审美家：关键词是影像美学、氛围、构图、留白、诗意、慢节奏。边界是重在审美和形式感；和情绪沉浸者区分时看影像气质是否强于情绪冲击；和作者导演迷区分时看最终画面和氛围体验是否强于导演表达。",
-        "12. 多元杂食者：关键词是口味宽、兼容度高、类型不挑、随缘观看、覆盖面广。边界是重在什么都能吃；和类型探索家区分时，多元杂食者不一定主动追求新奇。",
-        "13. 黑色幽默爱好者：关键词是荒诞、讽刺、冷幽默、反差、荒谬人生、怪诞喜剧。边界是重在笑里带刺；不同于轻松下饭派的低负担快乐，也不同于暗黑猎奇者对阴暗和异常的追求。",
-        "14. 浪漫幻想派：关键词是爱情、青春、命运感、遗憾、心动、理想化关系。边界是重在关系中的浪漫和情感想象；比情绪沉浸者更集中在爱情、青春、遗憾和命运感。",
-        "15. 暗黑猎奇者：关键词是惊悚、恐怖、怪诞、压抑、边缘题材、异常体验。边界是重在安全距离内探索黑暗和异常；不同于犯罪人性派的道德人性关注，也不同于悬疑解谜者对真相的关注。",
-        "16. 家庭温情派：关键词是亲情、成长、家庭关系、代际关系、日常牵绊。边界是重在家庭和成长关系；比治愈陪伴型更聚焦家庭、亲情、成长与和解。",
-        "17. 历史史诗控：关键词是历史、战争、传记、时代洪流、宏大叙事、文明感。边界是重在时间尺度和时代重量；不同于经典收藏家的影史地位和收藏价值。",
-        "18. 动画想象派：关键词是动画媒介、手绘感、奇思妙想、童心、色彩、幻想表达。边界是重在动画作为表达方式；不同于科幻幻想旅人的世界观和设定偏好。",
-        "19. 犯罪人性派：关键词是犯罪、道德困境、人性灰度、社会黑暗面、角色动机。边界是重在犯罪背后的人性和道德；不同于悬疑解谜者的推理真相，也比现实观察者更聚焦犯罪和灰色人性。",
-        "20. 轻松下饭派：关键词是喜剧、轻松、短平快、低负担、随手看、放松娱乐。边界是重在低心理成本；不同于治愈陪伴型的温柔修复，也不同于动作爽片玩家的刺激爽感。"
+        "1. 情绪沉浸者：容易被电影情绪带入，重视共情、氛围和情感余韵。",
+        "2. 悬疑解谜者：喜欢推理、反转、线索、谜题和层层揭开的故事。",
+        "3. 类型探索家：喜欢主动尝试不同类型，不满足于固定口味。",
+        "4. 经典收藏家：偏爱经典老片、影史佳作、值得反复收藏的作品。",
+        "5. 治愈陪伴型：喜欢温暖、柔软、安心、陪伴感强的电影。",
+        "6. 高分严选派：看重评分、口碑、奖项和大众认可度，倾向筛选高质量作品。",
+        "7. 作者导演迷：关注导演风格、作者表达、镜头语言和创作理念。",
+        "8. 科幻幻想旅人：喜欢科幻、奇幻、异世界、未来感和想象力丰富的作品。",
+        "9. 现实观察者：喜欢现实主义、社会议题、生活质感和真实人物处境。",
+        "10. 动作爽片玩家：喜欢高能动作、追逐、打斗、爆炸、节奏刺激的爽片体验。",
+        "11. 文艺审美家：重视画面美感、构图、色彩、音乐和整体艺术气质。",
+        "12. 惊悚氛围控：喜欢恐怖片、惊悚片、压迫感、紧张感和黑夜试胆式观影体验。",
+        "13. 黑色幽默爱好者：喜欢荒诞、反讽、冷幽默、尖锐但有趣的故事。",
+        "14. 浪漫幻想派：喜欢爱情、幻想、梦境感、浪漫氛围和理想化情绪。",
+        "15. 暗黑猎奇者：喜欢怪诞、邪典、边缘、奇异设定和暗黑审美，不等同于恐怖片爱好者。",
+        "16. 史诗世界观派：喜欢宏大设定、复杂世界观、历史感、文明感和长篇叙事。",
+        "17. 轻松娱乐派：看电影主要为了放松、解压、开心，不追求太沉重的表达。",
+        "18. 人性剖析者：喜欢复杂人物、心理变化、道德困境和人性深处的冲突。",
+        "19. 怀旧年代派：偏爱年代感、旧时光、复古影像和带有回忆滤镜的作品。",
+        "20. 小众寻宝者：喜欢发现冷门佳作、小众电影、独立片和被低估的作品。",
+        "21. 爆笑解压派：喜欢喜剧、无厘头、生活笑料、轻松爆笑和快乐续命型电影。",
+        "22. 动画叙事派：喜欢动画电影独特的视觉语言、叙事、美术风格和情感内核，不把动画等同于低龄内容。",
+        "23. 纪录求真者：喜欢纪录片、真实事件、人物档案、自然人文和知识型观影体验。"
     ];
 
     private static readonly string[] PersonaSelectionRules =
     [
         "如果解谜过程强于犯罪题材，选悬疑解谜者。",
-        "如果道德灰度和人性主题强于解谜，选犯罪人性派。",
+        "如果复杂人物、心理变化、道德困境强于解谜过程，选人性剖析者。",
         "如果情绪冲击强于画面审美，选情绪沉浸者。",
         "如果影像氛围强于情绪冲击，选文艺审美家。",
         "如果主动探索陌生类型，选类型探索家。",
-        "如果口味广泛但无明确探索倾向，选多元杂食者。",
+        "如果口味广泛且愿意主动尝试不同类型，选类型探索家。",
         "如果情绪修复和温暖陪伴强，选治愈陪伴型。",
-        "如果低负担娱乐和随手观看强，选轻松下饭派。",
+        "如果泛轻松、低负担、放松观看强，选轻松娱乐派；如果明确偏喜剧、无厘头和爆笑解压，选爆笑解压派。",
         "如果世界观和设定强，选科幻幻想旅人。",
-        "如果动画媒介和童心表达强，选动画想象派。",
-        "如果历史时代重量强，选历史史诗控。",
-        "如果影史地位和收藏价值强，选经典收藏家。"
+        "如果动画媒介、视觉语言、美术风格和情感内核强，选动画叙事派。",
+        "如果历史感、文明感和宏大世界设定强，选史诗世界观派。",
+        "如果影史地位和收藏价值强，选经典收藏家。",
+        "如果恐怖片、惊悚片、压迫感和黑夜试胆式体验强，选惊悚氛围控；如果怪诞、邪典、边缘设定和暗黑审美强，选暗黑猎奇者。",
+        "如果真实事件、人物档案、自然人文或知识型观看强，选纪录求真者；如果广义现实生活和社会议题强，选现实观察者。",
+        "如果小众独立片、冷门佳作和被低估作品强，选小众寻宝者；如果只是尝试类型更多，选类型探索家。"
     ];
 
     private static readonly string[] DnaGenes =
@@ -236,17 +252,10 @@ public sealed class WatchProfileService : IWatchProfileService
         try
         {
             var stopwatch = Stopwatch.StartNew();
-            Log($"watch-profile-ai-start sampleMovies={input.SignalMovieCount}");
-            var response = await _aiService.GenerateTextAsync(
-                BuildSystemPrompt(),
-                BuildUserPrompt(input),
-                cancellationToken);
-            if (string.IsNullOrWhiteSpace(response))
-            {
-                throw new InvalidOperationException("AI profile response was empty or AI settings are incomplete.");
-            }
-
-            var profile = ParseProfile(response);
+            Log(
+                "watch-profile-ai-start "
+                + $"sampleMovies={input.SignalMovieCount} mode=parallel cards=5 maxConcurrency={MaxParallelProfileCardRequests}");
+            var profile = await GenerateProfileInParallelAsync(input, cancellationToken);
             var invalidPersonaType = !IsPersonaTypeValid(profile.Persona?.Type);
             if (invalidPersonaType)
             {
@@ -259,13 +268,13 @@ public sealed class WatchProfileService : IWatchProfileService
                     ApplyFixedPersonaFallback(profile);
                 }
 
-                AddUnique(profile.WarningMessages, "AI 返回非法人格类型，已回退为多元杂食者。");
-                AddUnique(profile.Meta.WarningMessages, "AI 返回非法人格类型，已回退为多元杂食者。");
+                AddUnique(profile.WarningMessages, "AI 返回非法人格类型，已回退为类型探索家。");
+                AddUnique(profile.Meta.WarningMessages, "AI 返回非法人格类型，已回退为类型探索家。");
             }
 
             NormalizeProfile(profile, input, loadedFromCache: false);
             stopwatch.Stop();
-            Log($"watch-profile-ai-complete elapsedMs={stopwatch.ElapsedMilliseconds}");
+            Log($"watch-profile-ai-complete elapsedMs={stopwatch.ElapsedMilliseconds} mode=parallel");
 
             var payloadJson = JsonSerializer.Serialize(profile, JsonOptions);
             var cacheStopwatch = Stopwatch.StartNew();
@@ -306,6 +315,166 @@ public sealed class WatchProfileService : IWatchProfileService
         }
     }
 
+    public async Task<WatchProfileRecommendationContext> GetRecommendationContextAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var cache = await _cacheService.GetAsync(ProfileKind, GlobalScopeKey, cancellationToken);
+            if (cache is null)
+            {
+                Log("recommendation-profile-context-skipped reason=no-cache");
+                return CreateSkippedRecommendationContext("no-cache");
+            }
+
+            if (cache.IsStale)
+            {
+                Log("recommendation-profile-context-skipped reason=stale");
+                return CreateSkippedRecommendationContext("stale");
+            }
+
+            if (cache.ExpiresAtUtc.HasValue && cache.ExpiresAtUtc.Value <= DateTime.UtcNow)
+            {
+                Log("recommendation-profile-context-skipped reason=expired");
+                return CreateSkippedRecommendationContext("expired");
+            }
+
+            if (!TryDeserializeProfile(cache.PayloadJson, out var profile) || profile is null)
+            {
+                Log("recommendation-profile-context-skipped reason=parse-failed");
+                return CreateSkippedRecommendationContext("parse-failed");
+            }
+
+            if (!profile.HasProfile || !profile.CanGenerateProfile)
+            {
+                var reason = string.IsNullOrWhiteSpace(profile.InsufficientReason)
+                    ? "insufficient"
+                    : "insufficient";
+                Log($"recommendation-profile-context-skipped reason={reason}");
+                return CreateSkippedRecommendationContext(reason);
+            }
+
+            var context = BuildRecommendationContext(cache, profile);
+            Log(
+                "recommendation-profile-context-loaded "
+                + $"hasProfile=true persona={AiPerfDiagnostics.FormatValue(context.PersonaType)}");
+            Log($"recommendation-profile-fingerprint hash={ShortFingerprint(context.FingerprintPart)}");
+            return context;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Log($"recommendation-profile-context-skipped reason=service-error errorType={exception.GetType().Name}");
+            return CreateSkippedRecommendationContext("service-error");
+        }
+    }
+
+    private async Task<WatchProfileSnapshot> GenerateProfileInParallelAsync(
+        WatchProfileInputSnapshot input,
+        CancellationToken cancellationToken)
+    {
+        using var throttler = new SemaphoreSlim(MaxParallelProfileCardRequests, MaxParallelProfileCardRequests);
+        var summaryTask = RunProfileCardRequestAsync(
+            "summary",
+            BuildCardSystemPrompt("观影口味总结"),
+            BuildSummaryCardPrompt(input),
+            ParseSummaryCard,
+            throttler,
+            cancellationToken);
+        var personaTask = RunProfileCardRequestAsync(
+            "persona",
+            BuildCardSystemPrompt("观影人格"),
+            BuildPersonaCardPrompt(input),
+            ParsePersonaCard,
+            throttler,
+            cancellationToken);
+        var dnaTask = RunProfileCardRequestAsync(
+            "dna",
+            BuildCardSystemPrompt("观影 DNA"),
+            BuildDnaCardPrompt(input),
+            ParseDnaCard,
+            throttler,
+            cancellationToken);
+        var quadrantTask = RunProfileCardRequestAsync(
+            "quadrant",
+            BuildCardSystemPrompt("口味象限"),
+            BuildQuadrantCardPrompt(input),
+            ParseQuadrantCard,
+            throttler,
+            cancellationToken);
+        var watchVsLikeTask = RunProfileCardRequestAsync(
+            "watch-vs-like",
+            BuildCardSystemPrompt("看得多 vs 真喜欢"),
+            BuildWatchVsLikeCardPrompt(input),
+            ParseWatchVsLikeCard,
+            throttler,
+            cancellationToken);
+
+        await Task.WhenAll(summaryTask, personaTask, dnaTask, quadrantTask, watchVsLikeTask);
+        return new WatchProfileSnapshot
+        {
+            Meta = new WatchProfileMeta
+            {
+                GeneratedAtUtc = DateTime.UtcNow,
+                SourceFingerprint = input.SourceFingerprint,
+                ProfileSchemaVersion = CurrentProfileSchemaVersion,
+                PromptVersion = CurrentPromptVersion,
+                SignalMovieCount = input.SignalMovieCount,
+                Confidence = 60
+            },
+            Summary = await summaryTask,
+            Persona = await personaTask,
+            DNA = await dnaTask,
+            Quadrant = await quadrantTask,
+            WatchVsLike = await watchVsLikeTask,
+            Likes = new WatchProfileLikes(),
+            Dislikes = new WatchProfileDislikes(),
+            FuturePreference = new WatchProfileFuturePreference()
+        };
+    }
+
+    private async Task<T> RunProfileCardRequestAsync<T>(
+        string cardName,
+        string systemPrompt,
+        string userPrompt,
+        Func<string, T> parse,
+        SemaphoreSlim throttler,
+        CancellationToken cancellationToken)
+    {
+        await throttler.WaitAsync(cancellationToken);
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            Log($"watch-profile-ai-card-start card={cardName}");
+            var response = await _aiService.GenerateTextAsync(
+                systemPrompt,
+                userPrompt,
+                AiRequestOptions.WatchProfile,
+                cancellationToken);
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                throw new InvalidOperationException($"AI profile card response was empty: {cardName}.");
+            }
+
+            var result = parse(response);
+            stopwatch.Stop();
+            Log($"watch-profile-ai-card-complete card={cardName} elapsedMs={stopwatch.ElapsedMilliseconds}");
+            return result;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Log($"watch-profile-ai-card-failed card={cardName} errorType={exception.GetType().Name}");
+            throw;
+        }
+        finally
+        {
+            throttler.Release();
+        }
+    }
+
     private static string? GetCacheMissReason(
         WatchInsightCacheSnapshot cache,
         WatchProfileSnapshot profile,
@@ -338,6 +507,184 @@ public sealed class WatchProfileService : IWatchProfileService
         }
 
         return nowUtc - cache.LastAutoRefreshAtUtc.Value < AutoRefreshInterval;
+    }
+
+    private static WatchProfileRecommendationContext CreateSkippedRecommendationContext(string reason)
+    {
+        return new WatchProfileRecommendationContext
+        {
+            HasProfile = false,
+            SkipReason = reason,
+            FingerprintPart = "profile:none"
+        };
+    }
+
+    private static WatchProfileRecommendationContext BuildRecommendationContext(
+        WatchInsightCacheSnapshot cache,
+        WatchProfileSnapshot profile)
+    {
+        profile.Meta ??= new WatchProfileMeta();
+        profile.Summary ??= new WatchProfileSummary();
+        profile.Persona ??= new WatchProfilePersona();
+        profile.DNA ??= [];
+        profile.Quadrant ??= new WatchProfileQuadrant();
+        profile.WatchVsLike ??= new WatchProfileWatchVsLike();
+
+        var lines = new List<string>
+        {
+            "用户长期观影画像（软偏好背景，不是硬过滤；自定义推荐偏好优先于画像）："
+        };
+
+        var persona = FormatProfileParts(
+            profile.Persona.Type,
+            profile.Persona.Title,
+            profile.Persona.Description);
+        if (!string.IsNullOrWhiteSpace(persona))
+        {
+            lines.Add($"- 观影人格：{persona}");
+        }
+
+        var summary = FormatProfileParts(
+            profile.Summary.Text,
+            FormatList(profile.Summary.Keywords, 6));
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            lines.Add($"- 口味总结：{summary}");
+        }
+
+        var dna = BuildRecommendationDnaSummary(profile.DNA);
+        if (!string.IsNullOrWhiteSpace(dna))
+        {
+            lines.Add($"- 观影 DNA：{dna}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.Quadrant.QuadrantName)
+            || !string.IsNullOrWhiteSpace(profile.Quadrant.Description))
+        {
+            lines.Add(
+                "- 口味象限："
+                + $"{profile.Quadrant.QuadrantName} "
+                + $"(X={profile.Quadrant.XAxisScore}, Y={profile.Quadrant.YAxisScore})。"
+                + profile.Quadrant.Description);
+        }
+
+        var watchVsLike = BuildRecommendationWatchVsLikeSummary(profile.WatchVsLike);
+        if (!string.IsNullOrWhiteSpace(watchVsLike))
+        {
+            lines.Add($"- 看得多 vs 真喜欢：{watchVsLike}");
+        }
+
+        lines.Add("使用方式：画像只能帮助排序、选择相邻探索和解释匹配点；不要因为画像硬排除候选片，也不要机械重复画像标签。推荐理由可以轻度体现画像匹配，但不要提及内部字段名、X/Y 分数或 DNA 分数。");
+
+        return new WatchProfileRecommendationContext
+        {
+            HasProfile = true,
+            PersonaType = profile.Persona.Type,
+            PromptSection = string.Join(Environment.NewLine, lines),
+            FingerprintPart = BuildRecommendationProfileFingerprint(cache, profile)
+        };
+    }
+
+    private static string BuildRecommendationDnaSummary(IReadOnlyList<WatchProfileDnaGene> dna)
+    {
+        if (dna.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var parts = dna
+            .Where(x => !string.IsNullOrWhiteSpace(x.Gene))
+            .Take(6)
+            .Select(
+                x =>
+                {
+                    var tags = FormatList(x.Tags, 3);
+                    var label = FormatProfileParts(x.Label, tags);
+                    var description = string.IsNullOrWhiteSpace(x.Description) ? string.Empty : $"：{x.Description}";
+                    return string.IsNullOrWhiteSpace(label)
+                        ? $"{x.Gene}{description}"
+                        : $"{x.Gene}={label}{description}";
+                })
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
+
+        return string.Join("；", parts);
+    }
+
+    private static string BuildRecommendationWatchVsLikeSummary(WatchProfileWatchVsLike watchVsLike)
+    {
+        var parts = new List<string>();
+        var watched = FormatList(watchVsLike.OftenWatchedTypes, 3);
+        if (!string.IsNullOrWhiteSpace(watched))
+        {
+            parts.Add($"经常观看 {watched}");
+        }
+
+        var liked = FormatList(watchVsLike.OftenLikedTypes, 3);
+        if (!string.IsNullOrWhiteSpace(liked))
+        {
+            parts.Add($"经常喜爱 {liked}");
+        }
+
+        var wanted = FormatList(watchVsLike.OftenWantedTypes, 3);
+        if (!string.IsNullOrWhiteSpace(wanted))
+        {
+            parts.Add($"经常想看 {wanted}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(watchVsLike.Conclusion))
+        {
+            parts.Add(watchVsLike.Conclusion);
+        }
+
+        return string.Join("；", parts);
+    }
+
+    private static string BuildRecommendationProfileFingerprint(
+        WatchInsightCacheSnapshot cache,
+        WatchProfileSnapshot profile)
+    {
+        var payloadHash = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(cache.PayloadJson ?? string.Empty)))
+            .ToLowerInvariant();
+        var raw = string.Join(
+            "|",
+            "profile",
+            cache.SourceFingerprint,
+            cache.RefreshedAtUtc.Ticks,
+            profile.Meta.SourceFingerprint,
+            profile.Meta.ProfileSchemaVersion,
+            profile.Meta.PromptVersion,
+            profile.Meta.GeneratedAtUtc.Ticks,
+            payloadHash);
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))
+            .ToLowerInvariant();
+        return $"profile:{hash}";
+    }
+
+    private static string FormatList(IEnumerable<string>? values, int maxCount)
+    {
+        if (values is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            "、",
+            values
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .Take(maxCount));
+    }
+
+    private static string FormatProfileParts(params string[] parts)
+    {
+        return string.Join(
+            "；",
+            parts
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim()));
     }
 
     private static bool TryDeserializeProfile(string payloadJson, out WatchProfileSnapshot? profile)
@@ -461,8 +808,8 @@ public sealed class WatchProfileService : IWatchProfileService
 
         if (!PersonaTypes.Contains(profile.Persona.Type, StringComparer.Ordinal))
         {
-            profile.Persona.Type = "多元杂食者";
-            warnings.Add("AI 返回了未知人格类型，已回退为多元杂食者。");
+            profile.Persona.Type = FallbackPersonaType;
+            warnings.Add("AI 返回了未知人格类型，已回退为类型探索家。");
         }
 
         if (string.IsNullOrWhiteSpace(profile.Persona.Title))
@@ -811,6 +1158,7 @@ public sealed class WatchProfileService : IWatchProfileService
             var response = await _aiService.GenerateTextAsync(
                 BuildPersonaFallbackSystemPrompt(),
                 BuildPersonaFallbackUserPrompt(profile, input),
+                AiRequestOptions.WatchProfile,
                 cancellationToken);
             if (string.IsNullOrWhiteSpace(response))
             {
@@ -824,8 +1172,8 @@ public sealed class WatchProfileService : IWatchProfileService
                 return false;
             }
 
-            profile.Persona.Type = "多元杂食者";
-            profile.Persona.Title = string.IsNullOrWhiteSpace(persona.Title) ? "多元杂食者" : persona.Title.Trim();
+            profile.Persona.Type = FallbackPersonaType;
+            profile.Persona.Title = string.IsNullOrWhiteSpace(persona.Title) ? FallbackPersonaTitle : persona.Title.Trim();
             profile.Persona.Description = string.IsNullOrWhiteSpace(persona.Description)
                 ? BuildFixedPersonaFallbackDescription(input)
                 : NormalizeProfileSentence(persona.Description);
@@ -844,8 +1192,8 @@ public sealed class WatchProfileService : IWatchProfileService
     {
         return """
         你只负责修正观影人格文案。只能输出 JSON 对象，不输出 Markdown 或解释文本。
-        persona.type 已固定为“多元杂食者”，不要改变类型。
-        title 和 description 必须与“多元杂食者”匹配，description 要基于给定摘要解释口味宽、兼容度高或类型覆盖面广，不要编造推荐结果。
+        persona.type 已固定为“类型探索家”，不要改变类型。
+        title 和 description 必须与“类型探索家”匹配，description 要基于给定摘要解释主动尝试不同类型与风格、不会被单一口味固定，不要编造推荐结果。
         """;
     }
 
@@ -855,7 +1203,7 @@ public sealed class WatchProfileService : IWatchProfileService
     {
         var payload = new
         {
-            fixedType = "多元杂食者",
+            fixedType = FallbackPersonaType,
             signalMovieCount = input.SignalMovieCount,
             summary = profile.Summary,
             watchVsLike = profile.WatchVsLike,
@@ -871,27 +1219,266 @@ public sealed class WatchProfileService : IWatchProfileService
 
         return $$"""
         请只返回以下 JSON：
-        {"title":"多元杂食者","description":"","confidence":0}
+        {"title":"类型探索家","description":"","confidence":0}
 
         输入数据：
         {{JsonSerializer.Serialize(payload, JsonOptions)}}
         """;
     }
 
+    private static WatchProfileSummary ParseSummaryCard(string text)
+    {
+        var root = ParseCardRoot(text);
+        var target = root.TryGetProperty("summary", out var summary) ? summary : root;
+        return JsonSerializer.Deserialize<WatchProfileSummary>(target.GetRawText(), JsonOptions)
+               ?? throw new JsonException("AI profile summary card could not be parsed.");
+    }
+
+    private static WatchProfilePersona ParsePersonaCard(string text)
+    {
+        var root = ParseCardRoot(text);
+        var target = root.TryGetProperty("persona", out var persona) ? persona : root;
+        return JsonSerializer.Deserialize<WatchProfilePersona>(target.GetRawText(), JsonOptions)
+               ?? throw new JsonException("AI profile persona card could not be parsed.");
+    }
+
+    private static List<WatchProfileDnaGene> ParseDnaCard(string text)
+    {
+        var root = ParseCardRoot(text);
+        if (!root.TryGetProperty("dna", out var dna) || dna.ValueKind != JsonValueKind.Array)
+        {
+            throw new JsonException("AI profile DNA card is missing dna array.");
+        }
+
+        return JsonSerializer.Deserialize<List<WatchProfileDnaGene>>(dna.GetRawText(), JsonOptions)
+               ?? throw new JsonException("AI profile DNA card could not be parsed.");
+    }
+
+    private static WatchProfileQuadrant ParseQuadrantCard(string text)
+    {
+        var json = ExtractJsonObject(text);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (!root.TryGetProperty("quadrant", out var quadrant))
+        {
+            Log("watch-profile-quadrant-missing error=missing-quadrant");
+            throw new JsonException("AI profile quadrant card is missing quadrant.");
+        }
+
+        if (!TryReadQuadrantNumber(quadrant, "xAxisScore")
+            || !TryReadQuadrantNumber(quadrant, "yAxisScore"))
+        {
+            Log("watch-profile-quadrant-missing error=missing-or-invalid-axis");
+            throw new JsonException("AI profile quadrant card is missing valid x/y scores.");
+        }
+
+        return JsonSerializer.Deserialize<WatchProfileQuadrant>(quadrant.GetRawText(), JsonOptions)
+               ?? throw new JsonException("AI profile quadrant card could not be parsed.");
+    }
+
+    private static WatchProfileWatchVsLike ParseWatchVsLikeCard(string text)
+    {
+        var root = ParseCardRoot(text);
+        var target = root.TryGetProperty("watchVsLike", out var watchVsLike) ? watchVsLike : root;
+        return JsonSerializer.Deserialize<WatchProfileWatchVsLike>(target.GetRawText(), JsonOptions)
+               ?? throw new JsonException("AI profile watch-vs-like card could not be parsed.");
+    }
+
+    private static JsonElement ParseCardRoot(string text)
+    {
+        var json = ExtractJsonObject(text);
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
+    private static string BuildCardSystemPrompt(string cardName)
+    {
+        return $$$"""
+        你是观影偏好画像分析助手，当前只负责生成“{{{cardName}}}”这一张画像卡片。
+        只能基于用户提供的结构化观影数据分析，不得编造没有数据支持的偏好。
+        喜爱权重最高；想看代表未来兴趣；不想看代表负反馈；已看代表实际观看行为但不一定等于喜欢；WatchHistory 观看时长代表投入程度。
+        自定义推荐偏好不在输入中，也不得假设。未识别、识别失败、无 TMDB 身份影片已被排除。
+        只返回指定 JSON 对象，不要输出 Markdown、解释文本、代码块、推荐片单、文件路径、URL、账号或 token。
+        """;
+    }
+
+    private static string BuildSummaryCardPrompt(WatchProfileInputSnapshot input)
+    {
+        var payload = BuildProfileEvidencePayload(input);
+        return $$$"""
+        任务：只生成观影口味总结卡片。
+        输出 JSON：
+        {"summary":{"text":"","keywords":[]}}
+
+        要求：
+        1. summary.text 写 2-4 句自然语言总结，可以比其他模块更完整；说明总体口味、选择动机和观看投入方式。
+        2. 不要机械复述关键词，不要连续堆砌标签。
+        3. summary.keywords 最多 6 个，可基于画像总结生成，不要求必须来自影片标签。
+        4. 关键词应覆盖题材、情绪、观看方式、审美倾向、探索倾向等不同维度，不要语义高度重复。
+
+        输入数据：
+        {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
+        """;
+    }
+
+    private static string BuildPersonaCardPrompt(WatchProfileInputSnapshot input)
+    {
+        var payload = new
+        {
+            data = BuildProfileEvidencePayload(input),
+            personaTypes = PersonaTypes,
+            personaTypeDefinitions = PersonaTypeDefinitions,
+            personaSelectionRules = PersonaSelectionRules
+        };
+        return $$$"""
+        任务：只生成观影人格卡片。
+        输出 JSON：
+        {"persona":{"type":"类型探索家","title":"类型探索家","description":"","confidence":0}}
+
+        要求：
+        1. persona.type 只能是以下集合之一：{{{string.Join("、", PersonaTypes)}}}。
+        2. 必须参考 personaTypeDefinitions 和 personaSelectionRules 选择最强差异化人格，不要只按题材表面相似度选择。
+        3. persona.description 要解释为什么归为该人格，必须结合观看、喜爱、想看或不想看等行为信号。
+        4. 不要简单罗列关键词，也不要写成标签堆叠。
+        5. confidence 范围 0-100。
+
+        输入数据：
+        {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
+        """;
+    }
+
+    private static string BuildDnaCardPrompt(WatchProfileInputSnapshot input)
+    {
+        var payload = new
+        {
+            data = BuildProfileEvidencePayload(input),
+            requiredDnaGenes = DnaGenes,
+            narrativeTags = NarrativeTags
+        };
+        return $$$"""
+        任务：只生成观影 DNA 卡片。
+        输出 JSON：
+        {"dna":[
+          {"gene":"类型基因","label":"","tags":[],"score":0,"description":"","confidence":0},
+          {"gene":"情绪基因","label":"","tags":[],"score":0,"description":"","confidence":0},
+          {"gene":"场景基因","label":"","tags":[],"score":0,"description":"","confidence":0},
+          {"gene":"叙事基因","label":"","tags":[],"score":0,"description":"","confidence":0},
+          {"gene":"节奏基因","label":"","tags":[],"score":0,"description":"","confidence":0},
+          {"gene":"探索基因","label":"","tags":[],"score":0,"description":"","confidence":0}
+        ]}
+
+        要求：
+        1. DNA 必须包含六个基因：{{{string.Join("、", DnaGenes)}}}。
+        2. 类型基因、情绪基因、场景基因、叙事基因的 tags 各输出 3 个标签。
+        3. 叙事基因 tags 只能从 narrativeTags 集合中选择，不要为每部影片生成叙事标签。
+        4. 类型/情绪/场景/叙事基因的 description 必须解释标签组合背后的偏好，不要把 tags 改写成一句话。
+        5. 节奏基因用 score 表示 0=慢热、100=紧凑；description 必须与 score 方向一致：0-35 慢热，36-64 均衡，65-100 紧凑。
+        6. 探索基因用 score 表示 0=稳定、100=新鲜；description 必须与 score 方向一致：0-35 稳定，36-64 平衡，65-100 新鲜。
+        7. score、confidence 范围 0-100。
+
+        输入数据：
+        {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
+        """;
+    }
+
+    private static string BuildQuadrantCardPrompt(WatchProfileInputSnapshot input)
+    {
+        var payload = new
+        {
+            data = BuildProfileEvidencePayload(input),
+            quadrant = new
+            {
+                xAxis = "-100=熟悉安全，100=新鲜探索",
+                yAxis = "-100=轻松消遣，100=情绪沉浸",
+                scoringOwner = "AI must output xAxisScore and yAxisScore from the provided data; service only clamps range."
+            }
+        };
+        return $$$"""
+        任务：只生成口味象限卡片。
+        输出 JSON：
+        {"quadrant":{"xAxisScore":0,"yAxisScore":0,"quadrantName":"","description":""}}
+
+        要求：
+        1. xAxisScore、yAxisScore 必须由你输出，范围 -100 到 100；缺失或非数字会被视为画像生成错误。
+        2. X 轴：-100=熟悉安全，100=新鲜探索。
+        3. Y 轴：-100=轻松消遣，100=情绪沉浸。
+        4. quadrantName 使用对应象限名称。
+        5. quadrant.description 必须解释分数依据，不要提内部字段名。
+
+        输入数据：
+        {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
+        """;
+    }
+
+    private static string BuildWatchVsLikeCardPrompt(WatchProfileInputSnapshot input)
+    {
+        var payload = new
+        {
+            localRankings = new
+            {
+                oftenWatchedTypes = input.StatisticsSummary.OftenWatchedTypes,
+                oftenLikedTypes = input.StatisticsSummary.OftenLikedTypes,
+                oftenWantedTypes = input.StatisticsSummary.OftenWantedTypes
+            },
+            data = BuildProfileEvidencePayload(input)
+        };
+        return $$$"""
+        任务：只生成“看得多 vs 真喜欢”卡片的结论文案。
+        输出 JSON：
+        {"watchVsLike":{"oftenWatchedTypes":[],"oftenLikedTypes":[],"oftenWantedTypes":[],"conclusion":""}}
+
+        要求：
+        1. oftenWatchedTypes、oftenLikedTypes、oftenWantedTypes 三个排行由本地统计提供，服务层会用 localRankings 覆盖，不要虚构排行。
+        2. 你只需要写 conclusion，一句话解释“经常观看 / 经常喜爱 / 经常想看”之间的行为差异。
+        3. conclusion 不要超过 120 字，不要输出推荐片单。
+
+        输入数据：
+        {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
+        """;
+    }
+
+    private static object BuildProfileEvidencePayload(WatchProfileInputSnapshot input)
+    {
+        return new
+        {
+            dataRules = new
+            {
+                likedWeight = "highest",
+                watchedMeaning = "actual behavior, not always preference",
+                wantToWatchMeaning = "future interest",
+                notInterestedMeaning = "negative signal",
+                customRecommendationPreferencesIncluded = false,
+                unidentifiedMoviesExcluded = true
+            },
+            input.SignalMovieCount,
+            input.BucketCount,
+            input.TagCount,
+            input.StatisticsSummary,
+            samples = new
+            {
+                watched = input.WatchedSamples,
+                favorite = input.FavoriteSamples,
+                wantToWatch = input.WantToWatchSamples,
+                notInterested = input.NotInterestedSamples,
+                recentHistory = input.RecentHistorySamples
+            }
+        };
+    }
+
     private static void ApplyFixedPersonaFallback(WatchProfileSnapshot profile)
     {
         profile.Persona ??= new WatchProfilePersona();
-        profile.Persona.Type = "多元杂食者";
-        profile.Persona.Title = "多元杂食者";
-        profile.Persona.Description = "你的观影信号暂时难以落到单一人格上，更像是在多个类型和情绪方向之间自然切换。";
+        profile.Persona.Type = FallbackPersonaType;
+        profile.Persona.Title = FallbackPersonaTitle;
+        profile.Persona.Description = FallbackPersonaDescription;
         profile.Persona.Confidence = Clamp(profile.Persona.Confidence == 0 ? 50 : profile.Persona.Confidence, 0, 100);
     }
 
     private static string BuildFixedPersonaFallbackDescription(WatchProfileInputSnapshot input)
     {
         return input.SignalMovieCount >= 8
-            ? "你的观影信号分布在多个类型和情绪方向上，更像自然扩展的多元口味，而不是被单一题材绑定。"
-            : "当前样本还不够集中，暂时更适合作为多元杂食者处理。";
+            ? FallbackPersonaDescription
+            : "当前样本还不够集中，暂时更适合作为类型探索家处理。";
     }
 
     private static bool IsPersonaTypeValid(string? personaType)
@@ -924,102 +1511,6 @@ public sealed class WatchProfileService : IWatchProfileService
             IsUnchanged = false,
             WarningMessages = [errorMessage]
         };
-    }
-
-    private static string BuildSystemPrompt()
-    {
-        return """
-        你是观影偏好画像分析助手。只能基于用户提供的结构化观影数据分析，不得编造没有数据支持的偏好。
-        喜爱权重最高；想看代表未来兴趣；不想看代表负反馈；已看代表实际观看行为但不一定等于喜欢；WatchHistory 观看时长代表投入程度。
-        自定义推荐偏好不在输入中，也不得假设。未识别、识别失败、无 TMDB 身份影片已被排除。
-        画像是偏好总结，不是推荐结果。必须只返回 JSON 对象，不要输出 Markdown、解释文本或代码块。
-        persona.type 必须从最终版固定 20 个观影人格类型中选择，不得自创；选择时必须参考类型边界说明，避免把相近人格混淆。
-        口味象限必须由你基于输入数据输出二维坐标字段 xAxisScore/yAxisScore；服务层只做 -100 到 100 的范围校验，不会用本地分数覆盖。
-        输出文案要像产品画像：具体、有判断力、少说空话。整份画像必须围绕一个核心判断展开：Summary 负责给出总判断，Persona 负责解释人格归因，DNA 负责拆解维度证据，WatchVsLike 负责解释行为差异。不要让各模块各说各的，也不要互相复述；DNA 描述要解释标签组合的偏好含义。
-        """;
-    }
-
-    private static string BuildUserPrompt(WatchProfileInputSnapshot input)
-    {
-        var payload = new
-        {
-            dataRules = new
-            {
-                likedWeight = "highest",
-                watchedMeaning = "actual behavior, not always preference",
-                wantToWatchMeaning = "future interest",
-                notInterestedMeaning = "negative signal",
-                customRecommendationPreferencesIncluded = false,
-                unidentifiedMoviesExcluded = true
-            },
-            personaTypes = PersonaTypes,
-            personaTypeDefinitions = PersonaTypeDefinitions,
-            personaSelectionRules = PersonaSelectionRules,
-            requiredDnaGenes = DnaGenes,
-            narrativeTags = NarrativeTags,
-            quadrant = new
-            {
-                xAxis = "-100=熟悉安全，100=新鲜探索",
-                yAxis = "-100=轻松消遣，100=情绪沉浸",
-                scoringOwner = "AI must output xAxisScore and yAxisScore from the provided data; service only clamps range."
-            },
-            input.SignalMovieCount,
-            input.BucketCount,
-            input.TagCount,
-            input.StatisticsSummary,
-            samples = new
-            {
-                watched = input.WatchedSamples,
-                favorite = input.FavoriteSamples,
-                wantToWatch = input.WantToWatchSamples,
-                notInterested = input.NotInterestedSamples,
-                recentHistory = input.RecentHistorySamples
-            }
-        };
-
-        return $$"""
-        请根据下面 JSON 数据生成观影画像。只输出 JSON，字段固定为：
-        {
-          "meta":{"generatedAtUtc":"2026-01-01T00:00:00Z","sourceFingerprint":"","profileSchemaVersion":{{CurrentProfileSchemaVersion}},"promptVersion":"{{CurrentPromptVersion}}","signalMovieCount":0,"confidence":0,"warningMessages":[]},
-          "summary":{"text":"","keywords":[]},
-          "persona":{"type":"多元杂食者","title":"多元杂食者","description":"","confidence":0},
-          "dna":[
-            {"gene":"类型基因","label":"","tags":[],"score":0,"description":"","confidence":0},
-            {"gene":"情绪基因","label":"","tags":[],"score":0,"description":"","confidence":0},
-            {"gene":"场景基因","label":"","tags":[],"score":0,"description":"","confidence":0},
-            {"gene":"叙事基因","label":"","tags":[],"score":0,"description":"","confidence":0},
-            {"gene":"节奏基因","label":"","tags":[],"score":0,"description":"","confidence":0},
-            {"gene":"探索基因","label":"","tags":[],"score":0,"description":"","confidence":0}
-          ],
-          "quadrant":{"xAxisScore":0,"yAxisScore":0,"quadrantName":"","description":""},
-          "watchVsLike":{"oftenWatchedTypes":[],"oftenLikedTypes":[],"oftenWantedTypes":[],"conclusion":""},
-          "likes":{"preferredGenres":[],"preferredEmotions":[],"preferredScenes":[],"preferredCountries":[],"preferredLanguages":[]},
-          "dislikes":{"avoidGenres":[],"avoidEmotions":[],"avoidScenes":[],"negativeSummary":""},
-          "futurePreference":{"likelyToEnjoy":[],"lessLikelyToEnjoy":[]},
-          "caveats":[]
-        }
-
-        约束：
-        1. persona.type 只能是以下集合之一：{{string.Join("、", PersonaTypes)}}。
-        2. 必须参考输入中的 personaTypeDefinitions 和 personaSelectionRules 选择最强差异化人格，不要只按题材表面相似度选择。
-        3. summary.text 写 2-4 句自然语言总结，可以比其他模块更完整；说明总体口味、选择动机和观看投入方式，但不要机械复述 6 个关键词，不要和 persona.description 大段重复。
-        4. summary.keywords 最多 6 个，可由你基于画像总结生成，不要求必须来自影片标签；关键词应覆盖题材、情绪、观看方式、审美倾向、探索倾向等不同维度，不要使用语义高度重复的词。
-        5. persona.description 要解释为什么归为该人格，必须结合观看、喜爱、想看或不想看等行为信号；不要简单罗列关键词，也不要复述 summary.text。
-        6. DNA 必须包含六个基因：{{string.Join("、", DnaGenes)}}。
-        7. 类型基因、情绪基因、场景基因、叙事基因的 tags 各输出 3 个标签；叙事基因 tags 只能从 narrativeTags 集合中选择，不要为每部影片生成叙事标签。
-        8. 类型/情绪/场景/叙事基因的 description 必须解释标签组合背后的偏好，不要把 tags 改写成一句话，不要逐字重复 tags。
-        9. 节奏基因用 score 表示 0=慢热、100=紧凑；description 必须与 score 方向一致：0-35 慢热，36-64 均衡，65-100 紧凑。
-        10. 探索基因用 score 表示 0=稳定、100=新鲜；description 必须与 score 方向一致：0-35 稳定，36-64 平衡，65-100 新鲜。
-        11. Summary、Persona、DNA 描述之间必须围绕同一个核心画像判断，但提供不同解释角度，不要完全复述。
-        12. score、confidence 范围 0-100。
-        13. xAxisScore、yAxisScore 必须由你输出，范围 -100 到 100；缺失或非数字会被视为画像生成错误。quadrant.description 必须解释分数依据。
-        14. watchVsLike 的三个排行会由本地统计覆盖；你只需要给 conclusion 写一句行为差异解释，不要虚构排行。
-        15. 不要输出推荐片单。
-        16. 不要引用文件路径、URL、账号、token 或任何未提供内容。
-
-        输入数据：
-        {{JsonSerializer.Serialize(payload, JsonOptions)}}
-        """;
     }
 
     private static void AddUnique(ICollection<string> list, string value)

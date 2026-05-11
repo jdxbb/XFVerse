@@ -7,4 +7,7 @@ public interface IWatchProfileService
     Task<WatchProfileSnapshot> GetProfileAsync(
         bool forceRefresh = false,
         CancellationToken cancellationToken = default);
+
+    Task<WatchProfileRecommendationContext> GetRecommendationContextAsync(
+        CancellationToken cancellationToken = default);
 }

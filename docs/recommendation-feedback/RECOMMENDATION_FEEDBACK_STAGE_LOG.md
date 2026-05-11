@@ -229,3 +229,29 @@ Log validation:
 Closure:
 - RF-1 not-interested, RF-1.1 library not-interested recovery, and RF-2 custom recommendation preferences are implemented, build-verified, manually accepted where applicable, and log-validated.
 - Recommendation Feedback is closed for this phase.
+
+## 2026-05-11 Watch Insights WI-R Profile Context Integration
+
+Goal: connect Watch Insights profile output to existing AI recommendations without changing recommendation UI or hard-filter behavior.
+
+Completed:
+- Recommendation requests now read a compact, cached Watch Profile context when available.
+- Profile context is a soft long-term taste background only.
+- Custom recommendation preference remains the stronger, current-session preference signal.
+- Not-interested local filtering remains the hard filter and is not affected by profile context.
+- Recommendation fingerprint includes a profile fingerprint part, so profile cache changes stale previous recommendation cache / candidate-pool combinations through existing fingerprint matching.
+- Recommendation fingerprint also includes a recommendation prompt version, so reason-writing prompt changes stale old exact cache / candidate-pool combinations.
+- Recommendation reason guidance now requests fuller 70-130 character phrasing and allows natural profile-fit wording without exposing internal profile scores or fields.
+- The recommendation prompt JSON output example was aligned to the same 70-130 character reason range.
+- Recommendation cache document version was bumped once to clear old short / templated recommendation reasons; same-version reason reuse remains enabled.
+- Missing, insufficient, stale, expired, or parse-failed profile cache falls back to `profile:none` and keeps the previous recommendation path.
+- Recommendation flow does not call profile AI generation.
+
+Boundaries kept:
+- No recommendation UI, home page, discovery page, database, migration, player, library, or scan change.
+- No new profile switch or settings entry.
+- No full profile JSON, full prompt, AI response, paths, URLs, tokens, or API keys are logged.
+
+Build:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
