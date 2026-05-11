@@ -6,9 +6,10 @@ public enum NavigationPageKey
     Library = 2,
     MovieDetail = 3,
     ScanTasks = 4,
-    Duplicates = 5,
     Recommendations = 6,
     WatchInsights = 7,
     Favorites = 8,
-    Settings = 9
+    Settings = 9,
+    MovieDiscovery = 10,
+    WatchHistory = 11
 }

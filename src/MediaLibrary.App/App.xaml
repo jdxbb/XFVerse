@@ -18,14 +18,17 @@
             <DataTemplate DataType="{x:Type viewModels:LibraryViewModel}">
                 <pages:LibraryPage />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:MovieDiscoveryViewModel}">
+                <pages:MovieDiscoveryPage />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:WatchHistoryViewModel}">
+                <pages:WatchHistoryPage />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type viewModels:MovieDetailViewModel}">
                 <pages:MovieDetailPage />
             </DataTemplate>
             <DataTemplate DataType="{x:Type viewModels:ScanTasksViewModel}">
                 <pages:ScanTasksPage />
-            </DataTemplate>
-            <DataTemplate DataType="{x:Type viewModels:DuplicatesViewModel}">
-                <pages:DuplicatesPage />
             </DataTemplate>
             <DataTemplate DataType="{x:Type viewModels:RecommendationsViewModel}">
                 <pages:RecommendationsPage />

@@ -54,7 +54,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         IMovieIdentificationService movieIdentificationService,
         IUserCollectionService userCollectionService,
         IConfirmationDialogService confirmationDialogService)
-        : base("资源库", "浏览真实影片数据，支持海报墙 / 列表切换、搜索、排序和基础筛选。")
+        : base("媒体库", "浏览真实影片数据，支持海报墙 / 列表切换、搜索、排序和基础筛选。")
     {
         _libraryQueryService = libraryQueryService;
         _navigationStateService = navigationStateService;

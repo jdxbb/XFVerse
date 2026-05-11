@@ -58,7 +58,7 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
 
         var recentlyAdded = await inLibraryMoviesQuery
             .OrderByDescending(x => x.CreatedAt)
-            .Take(6)
+            .Take(8)
             .Select(
                 x => new HomeMovieItem
                 {
@@ -134,7 +134,7 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
 
         var recentlyAdded = await inLibraryMoviesQuery
             .OrderByDescending(x => x.CreatedAt)
-            .Take(6)
+            .Take(8)
             .Select(
                 x => new HomeMovieItem
                 {

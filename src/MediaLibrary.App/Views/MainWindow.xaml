@@ -10,13 +10,22 @@
         MinWidth="1180"
         MinHeight="760"
         WindowStartupLocation="CenterScreen">
-    <Grid Background="{DynamicResource BrushBackground}">
+    <Grid x:Name="RootGrid" Background="{DynamicResource BrushBackground}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="248" />
+            <ColumnDefinition Width="{Binding DataContext.SidebarColumnWidth, ElementName=RootGrid}" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Style="{StaticResource SidebarBorderStyle}">
+        <Border Grid.Column="0">
+            <Border.Style>
+                <Style TargetType="Border" BasedOn="{StaticResource SidebarBorderStyle}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSidebarExpanded}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -24,15 +33,28 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Margin="24,30,24,24">
-                    <TextBlock Text="智能影音库" Style="{StaticResource SidebarBrandTextStyle}" />
-                    <TextBlock Text="WebDAV 路径 · Metadata 识别 · AI"
-                               Style="{StaticResource SidebarHintTextStyle}" />
-                </StackPanel>
+                <Grid Margin="24,30,18,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="智能影音库" Style="{StaticResource SidebarBrandTextStyle}" />
+                        <TextBlock Text="WebDAV 路径 · Metadata 识别 · AI"
+                                   Style="{StaticResource SidebarHintTextStyle}" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Width="36"
+                            Height="36"
+                            Padding="0"
+                            Content="‹"
+                            Command="{Binding ToggleSidebarCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                </Grid>
 
                 <ListBox Grid.Row="1"
                          Margin="14,0,14,16"
-                         ItemsSource="{Binding NavigationItems}"
+                         ItemsSource="{Binding VisibleNavigationItems}"
                          SelectedItem="{Binding SelectedNavigationItem, Mode=TwoWay}"
                          Style="{StaticResource NavigationListBoxStyle}">
                     <ListBox.ItemTemplate>
@@ -42,16 +64,116 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <Border Grid.Row="2" Margin="16,0,16,22" Style="{StaticResource SidebarFooterCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="第三轮目标" Foreground="{DynamicResource BrushSidebarForeground}" FontWeight="SemiBold" />
-                        <TextBlock Margin="0,8,0,0"
-                                   Text="播放、续播、AI 推荐、统计首页和成品级界面。"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource BrushSidebarMuted}"
-                                   FontSize="12" />
-                    </StackPanel>
-                </Border>
+                <Grid Grid.Row="2" Margin="16,0,16,22">
+                    <Button x:Name="UserMenuButton"
+                            Padding="12"
+                            Command="{Binding ToggleUserMenuCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}">
+                        <Grid Width="194">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="38"
+                                    Height="38"
+                                    CornerRadius="19"
+                                    Background="{DynamicResource BrushAccent}">
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding UserAvatarInitial}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource BrushOnAccent}" />
+                            </Border>
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="{Binding UserDisplayName}"
+                                           Foreground="{DynamicResource BrushForegroundPrimary}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="本地用户"
+                                           Foreground="{DynamicResource BrushForegroundMuted}"
+                                           FontSize="12" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       Text="⌃"
+                                       Foreground="{DynamicResource BrushForegroundMuted}" />
+                        </Grid>
+                    </Button>
+
+                    <Popup AllowsTransparency="True"
+                           DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                           IsOpen="{Binding IsUserMenuOpen, Mode=TwoWay}"
+                           Placement="Top"
+                           PlacementTarget="{Binding ElementName=UserMenuButton}"
+                           StaysOpen="False"
+                           VerticalOffset="-8">
+                        <Border Width="226"
+                                Padding="14"
+                                Background="{DynamicResource BrushSurface}"
+                                BorderBrush="{DynamicResource BrushBorder}"
+                                BorderThickness="1"
+                                CornerRadius="16">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="42"
+                                            Height="42"
+                                            CornerRadius="21"
+                                            Background="{DynamicResource BrushAccent}">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding UserAvatarInitial}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource BrushOnAccent}" />
+                                    </Border>
+                                    <StackPanel Margin="10,0,0,0"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding UserDisplayName}"
+                                                   Style="{StaticResource SectionTitleTextStyle}" />
+                                        <TextBlock Text="本地用户"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <Separator Margin="0,12,0,12" />
+                                <Button HorizontalContentAlignment="Left"
+                                        Content="个人资料"
+                                        Command="{Binding OpenUserProfileCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <Button Margin="0,8,0,0"
+                                        HorizontalContentAlignment="Left"
+                                        Content="扫描任务"
+                                        Command="{Binding OpenScanTasksFromMenuCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <Button Margin="0,8,0,0"
+                                        HorizontalContentAlignment="Left"
+                                        Content="设置"
+                                        Command="{Binding OpenSettingsFromMenuCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <Button Margin="0,8,0,0"
+                                        HorizontalContentAlignment="Left"
+                                        Content="退出登录"
+                                        Command="{Binding LogoutCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <TextBlock Margin="0,10,0,0"
+                                           Text="{Binding UserMenuStatusMessage}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasUserMenuStatusMessage}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
             </Grid>
         </Border>
 
@@ -64,18 +186,37 @@
             <Border Grid.Row="0" Style="{StaticResource TopBarBorderStyle}">
                 <Grid Margin="30,22">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel>
+                    <Button Width="42"
+                            Height="42"
+                            Padding="0"
+                            Margin="0,0,16,0"
+                            Content="☰"
+                            Command="{Binding ToggleSidebarCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <StackPanel Grid.Column="1">
                         <TextBlock Text="{Binding CurrentPageTitle}" Style="{StaticResource PageTitleTextStyle}" />
                         <TextBlock Margin="0,6,0,0"
                                    Text="{Binding CurrentPageSubtitle}"
                                    Style="{StaticResource BodyMutedTextStyle}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Content="切换主题"
                                 Command="{Binding ToggleThemeCommand}"
                                 Style="{StaticResource SecondaryButtonStyle}" />

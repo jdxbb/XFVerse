@@ -11,13 +11,8 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class HomeViewModel : PageViewModelBase
 {
-    private const string RecommendationStatusEmpty = "Empty";
-    private const string RecommendationStatusError = "Error";
-    private const string RecommendationStatusMissingSeed = "MissingSeed";
-    private const string HomeMissingRecommendationSeedMessage = "先标记几部影片后，AI 会为你生成推荐。";
-    private const string HomeEmptyRecommendationMessage = "当前筛选条件下暂无可推荐影片。";
-    private const string HomeNotRequestedRecommendationMessage = "AI 推荐尚未生成，进入 AI 推荐页生成推荐。";
     private readonly IHomeDashboardQueryService _dashboardQueryService;
+    private readonly IWatchStatisticsService _watchStatisticsService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IPlayerWindowService _playerWindowService;
@@ -27,7 +22,6 @@ public sealed class HomeViewModel : PageViewModelBase
     private int _watchedCount;
     private int _favoriteCount;
     private string _lastScanStatus = "暂无扫描记录";
-    private string _recommendationsStatusMessage = string.Empty;
     private bool _isRefreshing;
     private bool _pendingRefresh;
     private bool _hasLoadedDashboard;
@@ -35,15 +29,19 @@ public sealed class HomeViewModel : PageViewModelBase
 
     public HomeViewModel(
         IHomeDashboardQueryService dashboardQueryService,
+        IWatchStatisticsService watchStatisticsService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
-        IPlayerWindowService playerWindowService)
-        : base("首页", "片库概览、最近播放、推荐内容、统计分布与扫描状态。")
+        IPlayerWindowService playerWindowService,
+        RecommendationsViewModel aiRecommendationViewModel)
+        : base("首页", "片库预览、继续观看、最近新增与推荐发现。")
     {
         _dashboardQueryService = dashboardQueryService;
+        _watchStatisticsService = watchStatisticsService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _playerWindowService = playerWindowService;
+        AiRecommendationViewModel = aiRecommendationViewModel;
         _dataRefreshService.DataChanged += OnDataChanged;
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
 
@@ -51,9 +49,12 @@ public sealed class HomeViewModel : PageViewModelBase
         ContinuePlaybackCommand = new AsyncRelayCommand(ContinuePlaybackAsync, CanContinuePlayback);
         OpenLibraryCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.Library));
         OpenFavoritesCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.Favorites));
-        OpenRecommendationsCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.Recommendations));
         OpenScanTasksCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.ScanTasks));
+        NavigateToWatchHistoryCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.WatchHistory));
+        NavigateToMovieDiscoveryCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.MovieDiscovery));
     }
+
+    public ObservableCollection<HomeStatusMetricItem> LibraryStatusOverview { get; } = [];
 
     public ObservableCollection<HomeMovieItem> RecentlyAdded { get; } = [];
 
@@ -64,8 +65,6 @@ public sealed class HomeViewModel : PageViewModelBase
     public ObservableCollection<CollectionMovieItem> FavoriteCollectionItems { get; } = [];
 
     public ObservableCollection<CollectionMovieItem> WantToWatchItems { get; } = [];
-
-    public ObservableCollection<AiRecommendationItem> Recommendations { get; } = [];
 
     public ObservableCollection<ChartSliceItem> GenreDistribution { get; } = [];
 
@@ -83,9 +82,13 @@ public sealed class HomeViewModel : PageViewModelBase
 
     public RelayCommand OpenFavoritesCommand { get; }
 
-    public RelayCommand OpenRecommendationsCommand { get; }
-
     public RelayCommand OpenScanTasksCommand { get; }
+
+    public RelayCommand NavigateToWatchHistoryCommand { get; }
+
+    public RelayCommand NavigateToMovieDiscoveryCommand { get; }
+
+    public RecommendationsViewModel AiRecommendationViewModel { get; }
 
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
 
@@ -98,12 +101,6 @@ public sealed class HomeViewModel : PageViewModelBase
     public int FavoriteCount { get => _favoriteCount; private set => SetProperty(ref _favoriteCount, value); }
 
     public string LastScanStatus { get => _lastScanStatus; private set => SetProperty(ref _lastScanStatus, value); }
-
-    public string RecommendationsStatusMessage
-    {
-        get => _recommendationsStatusMessage;
-        private set => SetProperty(ref _recommendationsStatusMessage, value);
-    }
 
     public override bool IsRefreshing => _isRefreshing;
 
@@ -172,7 +169,8 @@ public sealed class HomeViewModel : PageViewModelBase
                     await RefreshRecentPlaybackAsync();
                     break;
                 case AppDataChangeReason.CollectionChanged:
-                    await RefreshCollectionAsync();
+                    await RefreshLibraryOverviewAsync();
+                    await RefreshRecommendationsAsync();
                     break;
                 case AppDataChangeReason.RecommendationChanged:
                     await RefreshRecommendationsAsync();
@@ -197,7 +195,6 @@ public sealed class HomeViewModel : PageViewModelBase
         var failures = new List<string>();
         await TryRefreshAsync("片库概览", () => RefreshLibraryOverviewAsync(cancellationToken), failures);
         await TryRefreshAsync("最近播放", () => RefreshRecentPlaybackAsync(cancellationToken), failures);
-        await TryRefreshAsync("收藏夹", () => RefreshCollectionAsync(cancellationToken), failures);
         await TryRefreshAsync("AI 推荐", () => RefreshRecommendationsAsync(cancellationToken), failures);
 
         _hasLoadedDashboard = true;
@@ -234,6 +231,7 @@ public sealed class HomeViewModel : PageViewModelBase
         Replace(YearDistribution, dashboard.YearDistribution);
         Replace(WatchedDistribution, dashboard.WatchedDistribution);
         Replace(RatingDistribution, dashboard.RatingDistribution);
+        await RefreshLibraryStatusOverviewAsync(cancellationToken);
     }
 
     private async Task RefreshScanOverviewAsync(CancellationToken cancellationToken = default)
@@ -245,6 +243,7 @@ public sealed class HomeViewModel : PageViewModelBase
         FavoriteCount = dashboard.FavoriteCount;
         LastScanStatus = dashboard.LastScanStatus;
         Replace(RecentlyAdded, dashboard.RecentlyAdded);
+        await RefreshLibraryStatusOverviewAsync(cancellationToken);
     }
 
     private async Task RefreshRecentPlaybackAsync(CancellationToken cancellationToken = default)
@@ -263,31 +262,44 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private async Task RefreshRecommendationsAsync(CancellationToken cancellationToken = default)
     {
+        await AiRecommendationViewModel.ActivateAsync(cancellationToken);
+    }
+
+    private async Task RefreshLibraryStatusOverviewAsync(CancellationToken cancellationToken = default)
+    {
         try
         {
-            var state = await _dashboardQueryService.GetRecommendationsPreviewStateAsync(cancellationToken);
-            var hasVisibleRecommendations = Recommendations.Count > 0;
-            var shouldPreserveVisibleRecommendations = state.Items.Count == 0
-                                                       && hasVisibleRecommendations
-                                                       && state.IsPending
-                                                       && state.IsUpdating;
-            if (state.Items.Count > 0)
-            {
-                Replace(Recommendations, state.Items);
-            }
-            else if (!shouldPreserveVisibleRecommendations)
-            {
-                Replace(Recommendations, state.Items);
-            }
-
-            RecommendationsStatusMessage = shouldPreserveVisibleRecommendations
-                ? "正在后台更新推荐..."
-                : BuildRecommendationsStatusMessage(state);
+            var snapshot = await _watchStatisticsService.GetStatisticsAsync(
+                WatchStatisticsTimeRange.All,
+                calendarMonth: null,
+                forceRefresh: false,
+                cancellationToken);
+            ReplaceLibraryStatusOverview(
+                snapshot.WatchedCount,
+                snapshot.FavoriteCount,
+                snapshot.WantToWatchCount,
+                snapshot.NotInterestedCount);
         }
         catch
         {
-            throw;
+            ReplaceLibraryStatusOverview(WatchedCount, FavoriteCount, 0, 0);
         }
+    }
+
+    private void ReplaceLibraryStatusOverview(
+        int watchedCount,
+        int favoriteCount,
+        int wantToWatchCount,
+        int notInterestedCount)
+    {
+        Replace(
+            LibraryStatusOverview,
+            [
+                new HomeStatusMetricItem("已看", watchedCount.ToString(), "部"),
+                new HomeStatusMetricItem("喜爱", favoriteCount.ToString(), "部"),
+                new HomeStatusMetricItem("想看", wantToWatchCount.ToString(), "部"),
+                new HomeStatusMetricItem("不想看", notInterestedCount.ToString(), "部")
+            ]);
     }
 
     private void OpenMovie(object? parameter)
@@ -403,55 +415,6 @@ public sealed class HomeViewModel : PageViewModelBase
                && (!activeMediaFileId.HasValue || movie.MediaFileId == activeMediaFileId);
     }
 
-    private static string BuildRecommendationsStatusMessage(AiRecommendationPreviewState state)
-    {
-        if (string.Equals(state.Status, RecommendationStatusError, StringComparison.OrdinalIgnoreCase))
-        {
-            return string.IsNullOrWhiteSpace(state.Message)
-                ? "AI 推荐生成失败，请稍后重试。"
-                : state.Message;
-        }
-
-        if (state.Items.Count > 0)
-        {
-            return state.IsUpdating ? "正在后台更新推荐..." : string.Empty;
-        }
-
-        if (string.Equals(state.Status, RecommendationStatusEmpty, StringComparison.OrdinalIgnoreCase))
-        {
-            return HomeEmptyRecommendationMessage;
-        }
-
-        if (string.Equals(state.Status, RecommendationStatusMissingSeed, StringComparison.OrdinalIgnoreCase)
-            || !state.CanRequest)
-        {
-            return string.IsNullOrWhiteSpace(state.Message)
-                ? HomeMissingRecommendationSeedMessage
-                : state.Message;
-        }
-
-        if (state.IsPending && state.IsUpdating)
-        {
-            return "正在后台更新推荐...";
-        }
-
-        if (state.IsPending)
-        {
-            return string.IsNullOrWhiteSpace(state.Message)
-                ? "正在等待 AI 分析并推荐影片"
-                : state.Message;
-        }
-
-        if (!state.HasRequested)
-        {
-            return string.IsNullOrWhiteSpace(state.Message)
-                ? HomeNotRequestedRecommendationMessage
-                : state.Message;
-        }
-
-        return "当前默认组合暂无推荐结果。";
-    }
-
     private void OpenCollectionMovie(CollectionMovieItem movie)
     {
         if (movie.IsInLibrary && movie.MovieId.HasValue)
@@ -508,3 +471,5 @@ public sealed class HomeViewModel : PageViewModelBase
         }
     }
 }
+
+public sealed record HomeStatusMetricItem(string Title, string ValueText, string UnitText);

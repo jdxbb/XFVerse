@@ -1,0 +1,46 @@
+<Window x:Class="MediaLibrary.App.Views.Dialogs.UserProfileDialogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="个人资料"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <Border Width="420"
+            Padding="24"
+            Background="{DynamicResource BrushSurface}"
+            BorderBrush="{DynamicResource BrushBorder}"
+            BorderThickness="1"
+            CornerRadius="18">
+        <StackPanel>
+            <TextBlock Text="个人资料" Style="{StaticResource CardTitleTextStyle}" />
+
+            <StackPanel Margin="0,20,0,0" Orientation="Horizontal">
+                <Border Width="54"
+                        Height="54"
+                        CornerRadius="27"
+                        Background="{DynamicResource BrushAccent}">
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Text="J"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource BrushOnAccent}" />
+                </Border>
+                <StackPanel Margin="14,4,0,0">
+                    <TextBlock Text="James" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock Margin="0,6,0,0"
+                               Text="个人资料功能将在后续阶段完善。"
+                               Style="{StaticResource BodyMutedTextStyle}" />
+                </StackPanel>
+            </StackPanel>
+
+            <Button Margin="0,24,0,0"
+                    MinWidth="92"
+                    HorizontalAlignment="Right"
+                    Content="关闭"
+                    Click="CloseButton_Click"
+                    Style="{StaticResource PrimaryButtonStyle}" />
+        </StackPanel>
+    </Border>
+</Window>

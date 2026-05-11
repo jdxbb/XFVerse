@@ -60,9 +60,10 @@ public static class AppServiceProvider
 
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<LibraryViewModel>();
+        services.AddSingleton<MovieDiscoveryViewModel>();
+        services.AddSingleton<WatchHistoryViewModel>();
         services.AddSingleton<MovieDetailViewModel>();
         services.AddSingleton<ScanTasksViewModel>();
-        services.AddSingleton<DuplicatesViewModel>();
         services.AddSingleton<RecommendationsViewModel>();
         services.AddSingleton<WatchInsightsViewModel>();
         services.AddSingleton<FavoritesViewModel>();
