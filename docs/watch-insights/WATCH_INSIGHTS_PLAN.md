@@ -338,12 +338,82 @@ Out of scope kept:
 - No final UI redesign.
 - No persona image assets.
 
+### WI-6.2: Taste Combination Map Three-Column Graph
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Replaced the old free-node/canvas taste combination map with a structured three-column relationship graph.
+- Columns are `Type`, `Emotion`, and `Scene`.
+- Relationships are displayed as direct lines between the three columns: `Type -> Emotion -> Scene`.
+- Line thickness represents combination occurrence count.
+- The visible module contains only the three-column line map and the Top10 combination list.
+- The Top10 list remains visible and shows each combination as `Type -> Emotion -> Scene` with an occurrence count.
+- Data still follows the WI-6.1 statistics range: current month or all time.
+- Weighting uses combination occurrence count, not movie count, watched duration, or playback count.
+- Node limits are Top6 per column. Link limits are Top12 for type-emotion and Top12 for emotion-scene. Top combinations remain Top10.
+- Empty state remains component-level when the selected range has no usable type/emotion/scene combination.
+
+Out of scope kept:
+- No recommendation-system connection.
+- No statistics口径 change beyond UI projection.
+- No database field or migration.
+- No final visual design pass.
+- No animation or force-directed graph.
+
 ### WI-7: Verification and Closure
 
-Planned scope:
-- Verify statistics, cache behavior, stale behavior, empty states, and profile refresh behavior.
-- Update stage documents.
-- Confirm no test data remains.
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Verified DI, navigation, profile Tab, statistics Tab, range switching, calendar month switching, state history, caches, automatic-watched linkage, profile refresh semantics, empty/error states, and the WI-6.2 taste combination graph.
+- Confirmed no new database field or migration is needed for WI-7.
+- Confirmed statistics and profile refresh remain independent.
+- Confirmed Watch Insights remains disconnected from profile-driven recommendation.
+- Applied two closure-level fixes:
+  - Statistics deduplicates watched movies by TMDB id, not just `MovieId`.
+  - Profile service no longer overwrites rhythm/exploration DNA descriptions with local fixed text.
+- Cleaned Known Issues so current limitations are separated from fixed historical issues.
+
+Functional mainline result:
+- Watch Insights first-version real-data mainline is complete.
+- Remaining work is explicitly deferred to later stages:
+  - WI-8 persona poster/image assets.
+  - WI-R profile-driven recommendation.
+  - UI-5 watch-history page/date navigation.
+  - Final UI visual polish.
+
+### WI-8: Persona Poster and Common Frame Integration
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Added persona poster resource structure under `Assets/WatchPersonas/{key}/`.
+- Generated 20 persona key folders from the provided placeholder inputs `1男.png` and `1女.png`.
+- Each persona folder contains `{key}_male.png` and `{key}_female.png`.
+- Added the shared frame resource at `Assets/WatchPersonas/Frames/persona_card_frame_default.png`.
+- Included `Assets/WatchPersonas/**/*` as WPF `Resource` items so images are packaged with the app.
+- Added `Persona.Type -> key` mapping in `WatchInsightsViewModel`.
+- Profile persona card now displays a 3:4 poster area with the persona body image and the shared transparent frame overlaid.
+- Default display gender is `female`; real user preference remains deferred.
+- Poster fallback is resource-based and does not use absolute paths:
+  1. `{key}_{gender}`
+  2. `{key}_female`
+  3. `{key}_male`
+  4. `default_{gender}`
+  5. `default`
+  6. UI text placeholder
+- Frame fallback is: shared frame if present, otherwise body image only.
+
+Out of scope kept:
+- No profile-driven recommendation.
+- No AI prompt/profile cache/statistics logic change.
+- No user gender setting UI.
+- No database field or migration.
+- No final visual design pass.
 
 ## Stage Acceptance Criteria
 

@@ -535,6 +535,11 @@ public sealed class WatchProfileService : IWatchProfileService
 
             gene.Score = Clamp(gene.Score, 0, 100);
             gene.Confidence = Clamp(gene.Confidence, 0, 100);
+            if (string.IsNullOrWhiteSpace(gene.Description) && IsProgressDnaGene(gene.Gene))
+            {
+                warnings.Add($"AI 未返回{gene.Gene}描述，已保留为空，避免伪造画像文案。");
+            }
+
             gene.Description = NormalizeDnaDescription(gene);
             normalized.Add(gene);
         }
@@ -635,23 +640,24 @@ public sealed class WatchProfileService : IWatchProfileService
 
     private static string NormalizeDnaDescription(WatchProfileDnaGene gene)
     {
-        if (string.Equals(gene.Gene, "节奏基因", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(gene.Description))
         {
-            return BuildPaceDescription(gene.Score);
+            return string.Empty;
         }
 
-        if (string.Equals(gene.Gene, "探索基因", StringComparison.Ordinal))
-        {
-            return BuildExplorationDescription(gene.Score);
-        }
-
-        if (string.IsNullOrWhiteSpace(gene.Description)
-            || DescriptionLooksLikeTagList(gene.Description, gene.Tags))
+        if (!IsProgressDnaGene(gene.Gene)
+            && DescriptionLooksLikeTagList(gene.Description, gene.Tags))
         {
             return BuildTagGeneFallbackDescription(gene.Gene);
         }
 
         return NormalizeProfileSentence(gene.Description);
+    }
+
+    private static bool IsProgressDnaGene(string geneName)
+    {
+        return string.Equals(geneName, DnaGenes[4], StringComparison.Ordinal)
+            || string.Equals(geneName, DnaGenes[5], StringComparison.Ordinal);
     }
 
     private static bool DescriptionLooksLikeTagList(string description, IReadOnlyCollection<string> tags)
@@ -680,26 +686,6 @@ public sealed class WatchProfileService : IWatchProfileService
             "场景基因" => "这些线索说明你常把电影当作进入特定氛围的方式。",
             "叙事基因" => "你更容易被叙事结构、人物动机或信息推进带动。",
             _ => "继续积累标签和观影记录后，这个维度会更清晰。"
-        };
-    }
-
-    private static string BuildPaceDescription(int score)
-    {
-        return score switch
-        {
-            <= 35 => "更偏慢热铺陈，愿意给故事和氛围留出展开时间。",
-            <= 64 => "在铺陈和推进之间比较平衡，既能接受慢热，也需要适度推进。",
-            _ => "更偏紧凑推进，容易被节奏明确、信息密度高的影片吸引。"
-        };
-    }
-
-    private static string BuildExplorationDescription(int score)
-    {
-        return score switch
-        {
-            <= 35 => "更偏稳定选择，常回到熟悉类型和可靠口味。",
-            <= 64 => "稳定口味与新鲜尝试并存，会在熟悉范围内适度扩展。",
-            _ => "更偏新鲜探索，愿意跨类型、跨风格寻找不同体验。"
         };
     }
 

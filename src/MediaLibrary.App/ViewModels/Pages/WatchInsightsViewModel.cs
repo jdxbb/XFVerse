@@ -13,6 +13,43 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 {
     private const string ProfileTabKey = "profile";
     private const string StatisticsTabKey = "statistics";
+    private const int TasteGraphNodeLimit = 6;
+    private const int TasteGraphLinkLimit = 12;
+    private const double TasteGraphNodeWidth = 138d;
+    private const double TasteGraphNodeHeight = 36d;
+    private const double TasteGraphTypeX = 20d;
+    private const double TasteGraphEmotionX = 250d;
+    private const double TasteGraphSceneX = 480d;
+    private const double TasteGraphFirstNodeY = 52d;
+    private const double TasteGraphNodeSpacingY = 44d;
+    private const string PersonaPosterDefaultGender = "female";
+    private const string PersonaPosterFallbackKey = "eclectic_omnivore";
+    private const string PersonaFrameUri = "pack://application:,,,/Assets/WatchPersonas/Frames/persona_card_frame_default.png";
+    private static readonly string[] PersonaPosterExtensions = [".png", ".jpg", ".jpeg", ".webp"];
+    private static readonly IReadOnlyDictionary<string, string> PersonaTypeKeys =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["情绪沉浸者"] = "emotion_immersive",
+            ["悬疑解谜者"] = "mystery_solver",
+            ["类型探索家"] = "genre_explorer",
+            ["经典收藏家"] = "classic_collector",
+            ["治愈陪伴型"] = "healing_companion",
+            ["高分严选派"] = "rating_curator",
+            ["作者导演迷"] = "auteur_follower",
+            ["科幻幻想旅人"] = "sci_fantasy_traveler",
+            ["现实观察者"] = "realism_observer",
+            ["动作爽片玩家"] = "action_player",
+            ["文艺审美家"] = "arthouse_aesthete",
+            ["多元杂食者"] = "eclectic_omnivore",
+            ["黑色幽默爱好者"] = "dark_humorist",
+            ["浪漫幻想派"] = "romantic_dreamer",
+            ["暗黑猎奇者"] = "dark_curiosity_seeker",
+            ["史诗世界观派"] = "epic_worldbuilder",
+            ["轻松娱乐派"] = "easy_entertainment_fan",
+            ["人性剖析者"] = "human_nature_analyst",
+            ["怀旧年代派"] = "nostalgia_time_traveler",
+            ["小众寻宝者"] = "niche_treasure_hunter"
+        };
     private static readonly TimeSpan DataChangedRefreshDebounce = TimeSpan.FromMilliseconds(600);
     private readonly IWatchStatisticsService _statisticsService;
     private readonly IWatchProfileService _profileService;
@@ -125,9 +162,9 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public ObservableCollection<DurationBucketItem> DurationBuckets { get; } = [];
 
-    public ObservableCollection<TasteMapNodeItem> TasteMapNodes { get; } = [];
+    public ObservableCollection<TasteGraphNodeItem> TasteGraphNodes { get; } = [];
 
-    public ObservableCollection<TasteMapEdgeItem> TasteMapEdges { get; } = [];
+    public ObservableCollection<TasteGraphLinkItem> TasteGraphLinks { get; } = [];
 
     public ObservableCollection<TasteCombinationRankItem> TasteCombinationTop10 { get; } = [];
 
@@ -325,6 +362,16 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public string ProfilePersonaDescription { get; private set; } = string.Empty;
 
+    public string PersonaPosterGender { get; private set; } = PersonaPosterDefaultGender;
+
+    public string PersonaPosterImageUri { get; private set; } = string.Empty;
+
+    public string PersonaPosterFrameUri { get; private set; } = ResourceExists(PersonaFrameUri) ? PersonaFrameUri : string.Empty;
+
+    public bool HasPersonaPoster => !string.IsNullOrWhiteSpace(PersonaPosterImageUri);
+
+    public bool HasPersonaPosterFrame => !string.IsNullOrWhiteSpace(PersonaPosterFrameUri);
+
     public string ProfilePersonaConfidenceText { get; private set; } = "0%";
 
     public double ProfilePersonaConfidenceValue { get; private set; }
@@ -414,7 +461,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public bool HasRhythmData => Statistics.HasWatchHistoryData;
 
-    public bool HasTasteCombinationData => TasteMapNodes.Count > 0 || TasteCombinationTop10.Count > 0;
+    public bool HasTasteCombinationData => TasteCombinationTop10.Count > 0 || TasteGraphNodes.Count > 0;
 
     public bool HasWatchLikeData => WatchLikeGroups.Any(x => x.Items.Count > 0);
 
@@ -711,7 +758,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         BuildPreferenceBubbles(snapshot);
         BuildMonthlyRankings(snapshot);
         BuildRhythm(snapshot);
-        BuildTasteMap(snapshot);
+        BuildTasteCombinationGraph(snapshot);
         BuildWatchLikeComparison(snapshot);
         if (Profile is not null)
         {
@@ -737,6 +784,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         ProfilePersonaType = string.IsNullOrWhiteSpace(snapshot.Persona.Type) ? "--" : snapshot.Persona.Type;
         ProfilePersonaTitle = string.IsNullOrWhiteSpace(snapshot.Persona.Title) ? ProfilePersonaType : snapshot.Persona.Title;
         ProfilePersonaDescription = snapshot.Persona.Description;
+        ApplyPersonaPoster(ProfilePersonaType);
         ProfilePersonaConfidenceValue = Math.Clamp(snapshot.Persona.Confidence, 0, 100);
         ProfilePersonaConfidenceText = $"{ProfilePersonaConfidenceValue:0}%";
         ProfileQuadrantName = string.IsNullOrWhiteSpace(snapshot.Quadrant.QuadrantName) ? "--" : snapshot.Quadrant.QuadrantName;
@@ -773,6 +821,85 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         ReplaceChips(LessLikelyToEnjoy, snapshot.FuturePreference.LessLikelyToEnjoy);
         BuildProfileWatchLikeComparison(snapshot);
         RaiseProfileDisplayStateChanged();
+    }
+
+    private void ApplyPersonaPoster(string personaType)
+    {
+        PersonaPosterGender = PersonaPosterDefaultGender;
+        var personaKey = ResolvePersonaKey(personaType);
+        PersonaPosterImageUri = ResolvePersonaPosterUri(personaKey, PersonaPosterGender);
+        PersonaPosterFrameUri = ResourceExists(PersonaFrameUri) ? PersonaFrameUri : string.Empty;
+    }
+
+    private static string ResolvePersonaKey(string personaType)
+    {
+        return !string.IsNullOrWhiteSpace(personaType)
+            && PersonaTypeKeys.TryGetValue(personaType.Trim(), out var key)
+                ? key
+                : PersonaPosterFallbackKey;
+    }
+
+    private static string ResolvePersonaPosterUri(string personaKey, string gender)
+    {
+        foreach (var candidate in EnumeratePersonaPosterCandidates(personaKey, gender))
+        {
+            if (ResourceExists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static IEnumerable<string> EnumeratePersonaPosterCandidates(string personaKey, string gender)
+    {
+        var normalizedGender = string.Equals(gender, "male", StringComparison.OrdinalIgnoreCase)
+            ? "male"
+            : "female";
+        foreach (var extension in PersonaPosterExtensions)
+        {
+            yield return BuildPersonaPosterUri(personaKey, normalizedGender, extension);
+        }
+
+        foreach (var extension in PersonaPosterExtensions)
+        {
+            yield return BuildPersonaPosterUri(personaKey, "female", extension);
+        }
+
+        foreach (var extension in PersonaPosterExtensions)
+        {
+            yield return BuildPersonaPosterUri(personaKey, "male", extension);
+        }
+
+        foreach (var extension in PersonaPosterExtensions)
+        {
+            yield return $"pack://application:,,,/Assets/WatchPersonas/default_{normalizedGender}{extension}";
+        }
+
+        foreach (var extension in PersonaPosterExtensions)
+        {
+            yield return $"pack://application:,,,/Assets/WatchPersonas/default{extension}";
+        }
+    }
+
+    private static string BuildPersonaPosterUri(string personaKey, string gender, string extension)
+    {
+        return $"pack://application:,,,/Assets/WatchPersonas/{personaKey}/{personaKey}_{gender}{extension}";
+    }
+
+    private static bool ResourceExists(string uri)
+    {
+        try
+        {
+            var resourceUri = new Uri(uri, UriKind.Absolute);
+            using var stream = Application.GetResourceStream(resourceUri)?.Stream;
+            return stream is not null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void BuildWarningMessages(WatchStatisticsSnapshot snapshot)
@@ -873,7 +1000,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 gene.Gene,
                 tags,
                 Math.Clamp(gene.Score, 0, 100),
-                string.IsNullOrWhiteSpace(gene.Description) ? "继续积累标签和观影记录后会更准确。" : gene.Description,
+                gene.Description ?? string.Empty,
                 isProgressGene,
                 isPace ? "慢热" : isExploration ? "稳定" : string.Empty,
                 isPace ? "紧凑" : isExploration ? "新鲜" : string.Empty));
@@ -1074,47 +1201,228 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         }
     }
 
-    private void BuildTasteMap(WatchStatisticsSnapshot snapshot)
+    private static List<TasteCombinationNode> SelectTasteNodes(
+        IEnumerable<TasteCombinationNode> nodes,
+        string kind)
     {
-        TasteMapNodes.Clear();
-        TasteMapEdges.Clear();
+        return nodes
+            .Where(x => string.Equals(x.Kind, kind, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase)
+            .Take(TasteGraphNodeLimit)
+            .ToList();
+    }
+
+    private static void AddTasteCount(
+        IDictionary<string, int> counts,
+        string label,
+        int count)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return;
+        }
+
+        var normalized = label.Trim();
+        counts[normalized] = counts.TryGetValue(normalized, out var current) ? current + count : count;
+    }
+
+    private void BuildTasteCanvasGraph(WatchStatisticsSnapshot snapshot)
+    {
+        var nodeById = snapshot.TasteCombinationNodes.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
+        var graphNodeById = new Dictionary<string, TasteGraphNodeItem>(StringComparer.OrdinalIgnoreCase);
+        var typeNodes = SelectTasteNodes(snapshot.TasteCombinationNodes, "type");
+        var emotionNodes = SelectTasteNodes(snapshot.TasteCombinationNodes, "emotion");
+        var sceneNodes = SelectTasteNodes(snapshot.TasteCombinationNodes, "scene");
+
+        AddTasteGraphNodes(typeNodes, TasteGraphTypeX, graphNodeById);
+        AddTasteGraphNodes(emotionNodes, TasteGraphEmotionX, graphNodeById);
+        AddTasteGraphNodes(sceneNodes, TasteGraphSceneX, graphNodeById);
+
+        AddTasteGraphLinks(snapshot.TasteCombinationEdges, nodeById, graphNodeById, "type", "emotion");
+        AddTasteGraphLinks(snapshot.TasteCombinationEdges, nodeById, graphNodeById, "emotion", "scene");
+
+        if (snapshot.TasteCombinationTop10.Count > 0 && (TasteGraphNodes.Count == 0 || TasteGraphLinks.Count == 0))
+        {
+            BuildTasteCanvasGraphFallbackFromCombinations(snapshot);
+        }
+    }
+
+    private void AddTasteGraphNodes(
+        IReadOnlyList<TasteCombinationNode> nodes,
+        double x,
+        IDictionary<string, TasteGraphNodeItem> graphNodeById)
+    {
+        for (var index = 0; index < nodes.Count; index++)
+        {
+            var node = nodes[index];
+            var graphNode = new TasteGraphNodeItem(
+                node.Id,
+                node.Label,
+                node.Kind,
+                x,
+                TasteGraphFirstNodeY + index * TasteGraphNodeSpacingY,
+                TasteGraphNodeWidth,
+                TasteGraphNodeHeight,
+                node.Count);
+            TasteGraphNodes.Add(graphNode);
+            graphNodeById[node.Id] = graphNode;
+        }
+    }
+
+    private void AddTasteGraphLinks(
+        IEnumerable<TasteCombinationEdge> edges,
+        IReadOnlyDictionary<string, TasteCombinationNode> nodeById,
+        IReadOnlyDictionary<string, TasteGraphNodeItem> graphNodeById,
+        string sourceKind,
+        string targetKind)
+    {
+        var links = edges
+            .Where(x => graphNodeById.ContainsKey(x.SourceId)
+                && graphNodeById.ContainsKey(x.TargetId)
+                && nodeById.TryGetValue(x.SourceId, out var source)
+                && nodeById.TryGetValue(x.TargetId, out var target)
+                && string.Equals(source.Kind, sourceKind, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(target.Kind, targetKind, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.SourceId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.TargetId, StringComparer.OrdinalIgnoreCase)
+            .Take(TasteGraphLinkLimit)
+            .ToList();
+        var maxCount = links.Count == 0 ? 0 : links.Max(x => x.Count);
+
+        foreach (var edge in links)
+        {
+            var source = graphNodeById[edge.SourceId];
+            var target = graphNodeById[edge.TargetId];
+            TasteGraphLinks.Add(new TasteGraphLinkItem(
+                source.RightX,
+                source.CenterY,
+                target.LeftX,
+                target.CenterY,
+                CalculateTasteLineThickness(edge.Count, maxCount),
+                edge.Count));
+        }
+    }
+
+    private void BuildTasteCanvasGraphFallbackFromCombinations(WatchStatisticsSnapshot snapshot)
+    {
+        TasteGraphNodes.Clear();
+        TasteGraphLinks.Clear();
+
+        var typeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var emotionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var sceneCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var typeEmotionCounts = new Dictionary<string, (string Source, string Target, int Count)>(StringComparer.OrdinalIgnoreCase);
+        var emotionSceneCounts = new Dictionary<string, (string Source, string Target, int Count)>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in snapshot.TasteCombinationTop10)
+        {
+            AddTasteCount(typeCounts, item.Type, item.OccurrenceCount);
+            AddTasteCount(emotionCounts, item.Emotion, item.OccurrenceCount);
+            AddTasteCount(sceneCounts, item.Scene, item.OccurrenceCount);
+
+            var typeEmotionKey = $"{item.Type}|{item.Emotion}";
+            typeEmotionCounts[typeEmotionKey] = typeEmotionCounts.TryGetValue(typeEmotionKey, out var typeEmotion)
+                ? (typeEmotion.Source, typeEmotion.Target, typeEmotion.Count + item.OccurrenceCount)
+                : (item.Type, item.Emotion, item.OccurrenceCount);
+
+            var emotionSceneKey = $"{item.Emotion}|{item.Scene}";
+            emotionSceneCounts[emotionSceneKey] = emotionSceneCounts.TryGetValue(emotionSceneKey, out var emotionScene)
+                ? (emotionScene.Source, emotionScene.Target, emotionScene.Count + item.OccurrenceCount)
+                : (item.Emotion, item.Scene, item.OccurrenceCount);
+        }
+
+        var graphNodeById = new Dictionary<string, TasteGraphNodeItem>(StringComparer.OrdinalIgnoreCase);
+        AddFallbackGraphNodes(typeCounts, "type", TasteGraphTypeX, graphNodeById);
+        AddFallbackGraphNodes(emotionCounts, "emotion", TasteGraphEmotionX, graphNodeById);
+        AddFallbackGraphNodes(sceneCounts, "scene", TasteGraphSceneX, graphNodeById);
+        AddFallbackGraphLinks(typeEmotionCounts.Values, "type", "emotion", graphNodeById);
+        AddFallbackGraphLinks(emotionSceneCounts.Values, "emotion", "scene", graphNodeById);
+    }
+
+    private void AddFallbackGraphNodes(
+        IReadOnlyDictionary<string, int> counts,
+        string kind,
+        double x,
+        IDictionary<string, TasteGraphNodeItem> graphNodeById)
+    {
+        var items = counts
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(TasteGraphNodeLimit)
+            .ToList();
+
+        for (var index = 0; index < items.Count; index++)
+        {
+            var item = items[index];
+            var id = BuildTasteGraphNodeId(kind, item.Key);
+            var graphNode = new TasteGraphNodeItem(
+                id,
+                item.Key,
+                kind,
+                x,
+                TasteGraphFirstNodeY + index * TasteGraphNodeSpacingY,
+                TasteGraphNodeWidth,
+                TasteGraphNodeHeight,
+                item.Value);
+            TasteGraphNodes.Add(graphNode);
+            graphNodeById[id] = graphNode;
+        }
+    }
+
+    private void AddFallbackGraphLinks(
+        IEnumerable<(string Source, string Target, int Count)> links,
+        string sourceKind,
+        string targetKind,
+        IReadOnlyDictionary<string, TasteGraphNodeItem> graphNodeById)
+    {
+        var items = links
+            .Where(x => graphNodeById.ContainsKey(BuildTasteGraphNodeId(sourceKind, x.Source))
+                && graphNodeById.ContainsKey(BuildTasteGraphNodeId(targetKind, x.Target)))
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.Source, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.Target, StringComparer.OrdinalIgnoreCase)
+            .Take(TasteGraphLinkLimit)
+            .ToList();
+        var maxCount = items.Count == 0 ? 0 : items.Max(x => x.Count);
+
+        foreach (var item in items)
+        {
+            var source = graphNodeById[BuildTasteGraphNodeId(sourceKind, item.Source)];
+            var target = graphNodeById[BuildTasteGraphNodeId(targetKind, item.Target)];
+            TasteGraphLinks.Add(new TasteGraphLinkItem(
+                source.RightX,
+                source.CenterY,
+                target.LeftX,
+                target.CenterY,
+                CalculateTasteLineThickness(item.Count, maxCount),
+                item.Count));
+        }
+    }
+
+    private static string BuildTasteGraphNodeId(string kind, string label)
+    {
+        return $"{kind}:{label.Trim().ToLowerInvariant()}";
+    }
+
+    private static double CalculateTasteLineThickness(int count, int maxCount)
+    {
+        if (count <= 0 || maxCount <= 0)
+        {
+            return 1.5d;
+        }
+
+        return Math.Clamp(1.5d + count / (double)maxCount * 5d, 1.5d, 6.5d);
+    }
+
+    private void BuildTasteCombinationGraph(WatchStatisticsSnapshot snapshot)
+    {
+        TasteGraphNodes.Clear();
+        TasteGraphLinks.Clear();
         TasteCombinationTop10.Clear();
 
-        var topNodes = snapshot.TasteCombinationNodes.Take(12).ToList();
-        var nodeMap = new Dictionary<string, TasteMapNodeItem>(StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < topNodes.Count; index++)
-        {
-            var node = topNodes[index];
-            var angle = Math.PI * 2d * index / Math.Max(1, topNodes.Count);
-            var radius = node.Kind switch
-            {
-                "type" => 94d,
-                "emotion" => 126d,
-                _ => 158d
-            };
-            var x = 190d + Math.Cos(angle) * radius;
-            var y = 120d + Math.Sin(angle) * radius * 0.62d;
-            var size = Math.Clamp(44d + node.Weight * 2.2d, 48d, 92d);
-            var displayNode = new TasteMapNodeItem(node.Id, node.Label, node.Kind, x, y, size, node.Count);
-            TasteMapNodes.Add(displayNode);
-            nodeMap[node.Id] = displayNode;
-        }
-
-        foreach (var edge in snapshot.TasteCombinationEdges.Take(18))
-        {
-            if (!nodeMap.TryGetValue(edge.SourceId, out var source)
-                || !nodeMap.TryGetValue(edge.TargetId, out var target))
-            {
-                continue;
-            }
-
-            TasteMapEdges.Add(new TasteMapEdgeItem(
-                source.CenterX,
-                source.CenterY,
-                target.CenterX,
-                target.CenterY,
-                Math.Clamp(edge.Weight / 4d, 1d, 5d)));
-        }
+        BuildTasteCanvasGraph(snapshot);
 
         var maxScore = snapshot.TasteCombinationTop10.Count == 0
             ? 0
@@ -1285,6 +1593,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(ProfilePersonaType));
         OnPropertyChanged(nameof(ProfilePersonaTitle));
         OnPropertyChanged(nameof(ProfilePersonaDescription));
+        OnPropertyChanged(nameof(PersonaPosterGender));
+        OnPropertyChanged(nameof(PersonaPosterImageUri));
+        OnPropertyChanged(nameof(PersonaPosterFrameUri));
+        OnPropertyChanged(nameof(HasPersonaPoster));
+        OnPropertyChanged(nameof(HasPersonaPosterFrame));
         OnPropertyChanged(nameof(ProfilePersonaConfidenceText));
         OnPropertyChanged(nameof(ProfilePersonaConfidenceValue));
         OnPropertyChanged(nameof(ProfileQuadrantName));
@@ -1439,31 +1752,56 @@ public sealed record DurationBucketItem(
     string PercentText,
     double ProgressValue);
 
-public sealed record TasteMapNodeItem(
+public sealed record TasteGraphNodeItem(
     string Id,
     string Label,
     string Kind,
     double X,
     double Y,
-    double Size,
+    double Width,
+    double Height,
     int Count)
 {
-    public double CenterX => X + Size / 2d;
+    public double LeftX => X;
 
-    public double CenterY => Y + Size / 2d;
+    public double RightX => X + Width;
+
+    public double CenterY => Y + Height / 2d;
 
     public string CountText => $"{Count}次";
 }
 
-public sealed record TasteMapEdgeItem(
+public sealed record TasteGraphLinkItem(
     double X1,
     double Y1,
     double X2,
     double Y2,
-    double StrokeThickness);
+    double StrokeThickness,
+    int Count);
 
 public sealed record TasteCombinationRankItem(
     int Rank,
     string Label,
     string CountText,
-    double ProgressValue);
+    double ProgressValue)
+{
+    public string TypeLabel => SplitCombinationLabel(0);
+
+    public string EmotionLabel => SplitCombinationLabel(1);
+
+    public string SceneLabel => SplitCombinationLabel(2);
+
+    public string OccurrenceText => $"出现 {ExtractLeadingNumber(CountText)} 次";
+
+    private string SplitCombinationLabel(int index)
+    {
+        var parts = Label.Split(" x ", StringSplitOptions.TrimEntries);
+        return index < parts.Length ? parts[index] : string.Empty;
+    }
+
+    private static int ExtractLeadingNumber(string text)
+    {
+        var digits = new string(text.TakeWhile(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var value) ? value : 0;
+    }
+}

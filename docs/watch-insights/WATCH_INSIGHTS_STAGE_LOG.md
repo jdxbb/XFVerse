@@ -220,6 +220,162 @@ Validation:
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
 
+## WI-7: Verification and Closure
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Verified Watch Insights navigation/DI wiring:
+  - `WatchInsightsViewModel` is registered in DI.
+  - `IWatchStatisticsService`, `IWatchProfileInputService`, and `IWatchProfileService` are registered.
+  - `NavigationPageKey.WatchInsights` and the `WatchInsightsViewModel -> WatchInsightsPage` DataTemplate are present.
+- Verified Statistics Tab behavior:
+  - Default statistics range is `本月`.
+  - Range selector supports `本月 / 全部`.
+  - Range-dependent modules use the selected range: watch time, watched movie count, frequent tags, preference graph, tag ranking, rhythm, duration distribution, and taste combination map.
+  - Calendar month is independent from statistics range.
+- Verified Status Overview behavior:
+  - Only `已看`, `喜爱`, `想看`, and `不想看` are displayed.
+  - `全部` shows current status totals and hides comparison text.
+  - `本月` uses `UserMovieStateChangeHistories` for current-month additions and `本月比上月`.
+  - `UpdatedAt` is not used as state-change time.
+- Verified Calendar behavior:
+  - Calendar defaults to current month.
+  - Previous/next month navigation is bounded by first valid watch-history month and current month.
+  - `回到当前月` is shown only outside the current month.
+  - Heat levels use fixed thresholds.
+- Verified Profile Analysis behavior:
+  - Profile remains a long-term/global profile.
+  - Statistics range and calendar month do not affect profile cache or AI refresh.
+  - Manual profile refresh skips AI when source fingerprint and prompt/schema version are unchanged.
+  - Data-insufficient and AI-failure states keep component-level fallback behavior.
+- Verified cache behavior:
+  - Statistics cache scope is range/calendar aware.
+  - Profile cache remains `kind=profile`, `scopeKey=global`.
+  - Statistics refresh and profile refresh stay separated.
+- Verified WI-6.2 taste combination map:
+  - The old free-node map is no longer used.
+  - UI uses a three-column `类型 / 情绪 / 场景` graph.
+  - Lines connect `类型 -> 情绪` and `情绪 -> 场景`.
+  - Line thickness reflects combination occurrence count.
+  - Top10 remains the only companion list.
+- Minimal closure fixes:
+  - Distinct watched movie enumeration now deduplicates by TMDB id, preventing duplicate Movie rows for the same TMDB from double-counting watched movies, tags, and taste combinations.
+  - Rhythm/exploration DNA descriptions are no longer overwritten by local fixed text. AI descriptions are preserved; missing progress-gene descriptions are recorded as warnings and left empty instead of being fabricated.
+  - The UI projection no longer inserts a generic DNA description when the profile service intentionally leaves it empty.
+- Cleaned `WATCH_INSIGHTS_KNOWN_ISSUES.md` so fixed items are no longer mixed into current Known Issues.
+
+Out of scope kept:
+- No new DB field or migration.
+- No recommendation-system or profile-driven recommendation connection.
+- No persona poster/image resources.
+- No final UI redesign.
+- No player, resource library, Library Batch Ops, scan, or settings changes.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+Closure recommendation:
+- Watch Insights functional mainline is complete.
+- Suggested next stages:
+  - `WI-8`: persona poster/image asset integration.
+  - `WI-R`: profile-driven recommendation integration.
+  - `UI-5`: watch-history page and calendar-date navigation.
+
+## WI-8: Persona Poster and Common Frame Integration
+
+Status:
+- Completed in this pass.
+
+Input resource audit:
+- Found male placeholder: `Assets/WatchPersonas/1男.png`.
+- Found female placeholder: `Assets/WatchPersonas/1女.png`.
+- Found shared transparent frame: `Assets/WatchPersonas/Frames/persona_card_frame_default.png`.
+- No numeric `1-20` legacy folders were present.
+
+Resource generation:
+- Created 20 persona key folders:
+  - `emotion_immersive`
+  - `mystery_solver`
+  - `genre_explorer`
+  - `classic_collector`
+  - `healing_companion`
+  - `rating_curator`
+  - `auteur_follower`
+  - `sci_fantasy_traveler`
+  - `realism_observer`
+  - `action_player`
+  - `arthouse_aesthete`
+  - `eclectic_omnivore`
+  - `dark_humorist`
+  - `romantic_dreamer`
+  - `dark_curiosity_seeker`
+  - `epic_worldbuilder`
+  - `easy_entertainment_fan`
+  - `human_nature_analyst`
+  - `nostalgia_time_traveler`
+  - `niche_treasure_hunter`
+- Copied 20 male placeholder posters and 20 female placeholder posters.
+- Existing target posters would be skipped instead of overwritten; this run skipped 0 existing target posters.
+- Original `1男.png` / `1女.png` were preserved.
+
+Code changes:
+- Added WPF `Resource` inclusion for `Assets/WatchPersonas/**/*` in `MediaLibrary.App.csproj`.
+- Added stable `Persona.Type -> key` mapping in `WatchInsightsViewModel`.
+- Added poster URI fallback resolution without absolute paths.
+- Added shared-frame URI resolution with safe fallback when the frame is missing.
+- Updated the Profile Analysis persona card to show:
+  - poster body image,
+  - shared transparent frame overlay,
+  - persona type/title/description.
+- Default poster gender is `female`.
+
+Boundaries kept:
+- No AI profile generation or prompt change.
+- No profile-driven recommendation.
+- No statistics service change.
+- No database field or migration.
+- No runtime image cache.
+- No final visual polish.
+
+Validation:
+- Confirmed 20 persona folders, 40 generated persona images, and shared frame exist.
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+## WI-6.2 Completed
+
+Goal: make the Watch Statistics taste combination map read as a clear three-column relationship graph instead of a free-node map.
+
+Audit result:
+- `WatchStatisticsService` already used the WI-6.1口径: selected statistics range, valid watched histories, identified movies, distinct movies, type x emotion x scene combinations, and occurrence-count sorting.
+- The previous UI still projected `TasteMapNodes` / `TasteMapEdges` into a Canvas-style free-node graph.
+- The previous Top10 list existed, but the relationship between type, emotion, and scene was not explicit enough.
+
+Completed:
+- Added ViewModel projections for positioned graph nodes, direct graph lines, and Top10 combination rows.
+- Replaced the old Canvas/free-node display with:
+  - three columns: type / emotion / scene
+  - direct lines between type -> emotion and emotion -> scene
+  - Top10 rows showing type -> emotion -> scene and occurrence count
+- Line thickness is based on combination occurrence count.
+- The visible module contains only the three-column line map and the Top10 combination list; no extra relationship cards are shown.
+- Limited nodes to Top6 per column, links to Top12 per side, and combinations to Top10.
+- Added fallback projection from Top10 combinations so non-empty combination data does not render as an empty graph if edge filtering removes too much.
+- Kept the selected statistics time range as the source of truth; no profile, AI, recommendation, calendar, or database behavior was changed.
+
+Boundaries kept:
+- No recommendation-system connection.
+- No database field or migration.
+- No final visual redesign.
+- No animation or force-directed graph.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
 ## WI-6.1 Status Identity Follow-up
 
 Completed:

@@ -344,17 +344,76 @@
                         <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="观影人格" Style="{StaticResource InsightCardHeaderStyle}" />
-                                <Border Margin="0,14,0,0" Padding="14" CornerRadius="12" Background="{DynamicResource BrushAccentSoft}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding ProfilePersonaType}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,6,0,0" Text="{Binding ProfilePersonaTitle}" Style="{StaticResource BodyTextStyle}" />
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="210" />
+                                        <ColumnDefinition Width="18" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Width="210"
+                                            Height="280"
+                                            CornerRadius="10"
+                                            ClipToBounds="True"
+                                            Background="{DynamicResource BrushAccentSoft}">
+                                        <Grid>
+                                            <Image Source="{Binding PersonaPosterImageUri}"
+                                                   Stretch="UniformToFill">
+                                                <Image.Style>
+                                                    <Style TargetType="Image">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasPersonaPoster}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                            <Image Source="{Binding PersonaPosterFrameUri}"
+                                                   Stretch="Fill"
+                                                   IsHitTestVisible="False">
+                                                <Image.Style>
+                                                    <Style TargetType="Image">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasPersonaPosterFrame}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Text="人格海报待接入">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasPersonaPoster}" Value="False">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <Border Padding="14" CornerRadius="12" Background="{DynamicResource BrushAccentSoft}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding ProfilePersonaType}" Style="{StaticResource SectionTitleTextStyle}" />
+                                                <TextBlock Margin="0,6,0,0" Text="{Binding ProfilePersonaTitle}" Style="{StaticResource BodyTextStyle}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Margin="0,14,0,0"
+                                                   Text="{Binding ProfilePersonaDescription}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
                                     </StackPanel>
-                                </Border>
-                                <TextBlock Margin="0,14,0,0"
-                                           Text="{Binding ProfilePersonaDescription}"
-                                           TextWrapping="Wrap"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
-                                <TextBlock Margin="0,12,0,0" Text="人格图片资源后续接入，本阶段只显示结构化画像。" Style="{StaticResource BodyMutedTextStyle}" />
+                                </Grid>
                             </StackPanel>
                         </Border>
 
@@ -1117,8 +1176,11 @@
                                     </Border.Style>
                                     <TextBlock Text="暂无可组合的类型、情绪和场景标签。" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                 </Border>
-                                <Canvas Margin="0,18,0,0" Height="280" Background="{DynamicResource BrushSurfaceAlt}">
-                                    <ItemsControl ItemsSource="{Binding TasteMapEdges}">
+                                <Canvas Margin="0,18,0,0" MinWidth="640" Height="340" Background="{DynamicResource BrushSurfaceAlt}">
+                                    <TextBlock Canvas.Left="20" Canvas.Top="16" Text="类型" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Canvas.Left="250" Canvas.Top="16" Text="情绪" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Canvas.Left="480" Canvas.Top="16" Text="场景" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <ItemsControl ItemsSource="{Binding TasteGraphLinks}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <Canvas />
@@ -1126,11 +1188,19 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Line X1="{Binding X1}" Y1="{Binding Y1}" X2="{Binding X2}" Y2="{Binding Y2}" Stroke="#99B94D67" StrokeThickness="{Binding StrokeThickness}" />
+                                                <Line X1="{Binding X1}"
+                                                      Y1="{Binding Y1}"
+                                                      X2="{Binding X2}"
+                                                      Y2="{Binding Y2}"
+                                                      Stroke="{DynamicResource BrushAccent}"
+                                                      StrokeThickness="{Binding StrokeThickness}"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      Opacity="0.58" />
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <ItemsControl ItemsSource="{Binding TasteMapNodes}">
+                                    <ItemsControl ItemsSource="{Binding TasteGraphNodes}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <Canvas />
@@ -1144,22 +1214,27 @@
                                         </ItemsControl.ItemContainerStyle>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Width="{Binding Size}"
-                                                        Height="{Binding Size}"
+                                                <Border Width="{Binding Width}"
+                                                        Height="{Binding Height}"
+                                                        Padding="10,0"
                                                         CornerRadius="999"
-                                                        Background="{DynamicResource BrushAccentSoft}"
+                                                        Background="{DynamicResource BrushSurface}"
                                                         BorderBrush="{DynamicResource BrushBorder}"
                                                         BorderThickness="1">
-                                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                        <TextBlock HorizontalAlignment="Center" Text="{Binding Label}" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
-                                                        <TextBlock HorizontalAlignment="Center" Text="{Binding Kind}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                    </StackPanel>
+                                                    <Grid VerticalAlignment="Center">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
+                                                        <TextBlock Grid.Column="1" Margin="8,0,0,0" Text="{Binding CountText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                    </Grid>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+                                    <TextBlock Canvas.Left="20" Canvas.Top="312" Text="组合出现次数越多，线越粗；节点表示参与组合的标签出现次数。" Style="{StaticResource BodyMutedTextStyle}" />
                                 </Canvas>
-                                <TextBlock Margin="0,10,0,0" Text="连线越粗，共现强度越高；节点不可点击。" Style="{StaticResource BodyMutedTextStyle}" />
                             </StackPanel>
 
                             <Border Grid.Column="2" Style="{StaticResource CompactCardStyle}">
@@ -1178,10 +1253,22 @@
                                                         <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding Rank}" Style="{StaticResource BodyTextStyle}" />
                                                     </Border>
                                                     <StackPanel Grid.Column="1" Margin="8,0">
-                                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
-                                                        <ProgressBar Margin="0,6,0,0" Height="6" Maximum="100" Value="{Binding ProgressValue, Mode=OneWay}" />
+                                                        <WrapPanel>
+                                                            <Border Margin="0,0,6,6" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushSurfaceAlt}">
+                                                                <TextBlock Text="{Binding TypeLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
+                                                            </Border>
+                                                            <TextBlock Margin="0,2,6,0" Text="→" Style="{StaticResource BodyMutedTextStyle}" />
+                                                            <Border Margin="0,0,6,6" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushAccentSoft}">
+                                                                <TextBlock Text="{Binding EmotionLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
+                                                            </Border>
+                                                            <TextBlock Margin="0,2,6,0" Text="→" Style="{StaticResource BodyMutedTextStyle}" />
+                                                            <Border Margin="0,0,0,6" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushSurfaceAlt}">
+                                                                <TextBlock Text="{Binding SceneLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
+                                                            </Border>
+                                                        </WrapPanel>
+                                                        <ProgressBar Margin="0,2,0,0" Height="6" Maximum="100" Value="{Binding ProgressValue, Mode=OneWay}" />
                                                     </StackPanel>
-                                                    <TextBlock Grid.Column="2" HorizontalAlignment="Right" Text="{Binding CountText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                    <TextBlock Grid.Column="2" HorizontalAlignment="Right" Text="{Binding OccurrenceText}" Style="{StaticResource BodyMutedTextStyle}" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

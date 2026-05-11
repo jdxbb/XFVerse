@@ -1351,9 +1351,10 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         IEnumerable<WatchHistoryStatsRow> histories,
         IReadOnlyDictionary<int, MovieStatsRow> movieById)
     {
+        var seenTmdbIds = new HashSet<int>();
         foreach (var movieId in histories.Select(x => x.MovieId).Distinct())
         {
-            if (movieById.TryGetValue(movieId, out var movie))
+            if (movieById.TryGetValue(movieId, out var movie) && seenTmdbIds.Add(movie.TmdbId))
             {
                 yield return movie;
             }
@@ -1364,11 +1365,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         IEnumerable<WatchHistoryStatsRow> histories,
         IReadOnlyDictionary<int, MovieStatsRow> movieById)
     {
-        return histories
-            .Select(x => x.MovieId)
-            .Where(movieById.ContainsKey)
-            .Distinct()
-            .Count();
+        return EnumerateDistinctWatchedMovies(histories, movieById).Count();
     }
 
     private static List<MovieProfileRow> BuildRangeProfileRows(
