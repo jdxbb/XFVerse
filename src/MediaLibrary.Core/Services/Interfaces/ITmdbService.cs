@@ -13,6 +13,7 @@ public interface ITmdbService
         string query,
         int page,
         int? releaseYear = null,
+        string region = "",
         CancellationToken cancellationToken = default);
 
     Task<TmdbPersonSearchPage> SearchPeopleAsync(

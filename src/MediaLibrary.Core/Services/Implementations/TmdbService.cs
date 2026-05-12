@@ -327,6 +327,7 @@ public sealed class TmdbService : ITmdbService
         string query,
         int page,
         int? releaseYear = null,
+        string region = "",
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -345,6 +346,11 @@ public sealed class TmdbService : ITmdbService
         if (releaseYear.HasValue)
         {
             queryString += $"&year={releaseYear.Value}&primary_release_year={releaseYear.Value}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(region))
+        {
+            queryString += $"&region={Uri.EscapeDataString(region.Trim())}";
         }
 
         var requestStopwatch = Stopwatch.StartNew();

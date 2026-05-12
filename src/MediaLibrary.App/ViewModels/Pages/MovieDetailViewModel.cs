@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Collections.Concurrent;
 using System.Net.Http;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
@@ -11,6 +12,11 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class MovieDetailViewModel : PageViewModelBase
 {
+    private const string ExternalAiAnalyzingText = "AI 正在分析影片";
+    private const string ExternalAiMissingText = "尚未分类";
+
+    private static readonly ConcurrentDictionary<int, AiMovieTags> ExternalAiTagCache = new();
+
     private readonly INavigationStateService _navigationStateService;
     private readonly IPlayerWindowService _playerWindowService;
     private readonly IMovieDetailQueryService _movieDetailQueryService;
@@ -432,6 +438,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private async Task LoadExternalRecommendationAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken)
     {
+        ApplyCachedExternalTags(recommendation);
+        var shouldAutoClassify = NeedsExternalAutoClassification(recommendation);
+
         _movieId = null;
         _tmdbId = recommendation.TmdbId;
         _externalRecommendation = recommendation;
@@ -454,16 +463,22 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         Country = string.IsNullOrWhiteSpace(recommendation.Country) ? "-" : recommendation.Country;
         Language = string.IsNullOrWhiteSpace(recommendation.Language) ? "-" : recommendation.Language;
         RuntimeText = recommendation.RuntimeMinutes.HasValue ? $"{recommendation.RuntimeMinutes.Value} 分钟" : "-";
-        GenresText = string.IsNullOrWhiteSpace(recommendation.Tags) ? "未提供" : recommendation.Tags;
-        AiTagsText = string.IsNullOrWhiteSpace(recommendation.Tags) ? "尚未分类" : recommendation.Tags;
-        EmotionTagsText = string.IsNullOrWhiteSpace(recommendation.EmotionTagsText) ? "未提供" : recommendation.EmotionTagsText;
-        SceneTagsText = string.IsNullOrWhiteSpace(recommendation.SceneTagsText) ? "未提供" : recommendation.SceneTagsText;
+        if (shouldAutoClassify)
+        {
+            ShowExternalAiAnalyzingState(recommendation);
+        }
+        else
+        {
+            ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
+        }
         IdentificationStatusText = "库外推荐";
         ConfidenceText = "-";
         TmdbIdText = recommendation.TmdbId?.ToString() ?? "-";
         ImdbIdText = string.IsNullOrWhiteSpace(recommendation.ImdbId) ? "-" : recommendation.ImdbId;
         DefaultSourceDisplay = "影片未入库，暂无播放源。";
-        StatusMessage = "当前页面展示的是未入库影片详情，仅展示评分、标签与基础信息，无法播放。";
+        StatusMessage = shouldAutoClassify
+            ? "当前页面展示的是未入库影片详情，AI 正在分析影片。"
+            : "当前页面展示的是未入库影片详情，仅展示评分、标签与基础信息，无法播放。";
         ManualSearchQuery = recommendation.Title;
         ManualSearchYear = recommendation.ReleaseYear?.ToString() ?? string.Empty;
 
@@ -493,7 +508,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         RefreshWantToWatchCommandState();
         RefreshNotInterestedCommandState();
         RefreshWatchedCommandState();
-        if (NeedsExternalAutoClassification(recommendation))
+        if (shouldAutoClassify)
         {
             await ClassifyExternalRecommendationAsync(recommendation, cancellationToken);
         }
@@ -503,6 +518,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         AiRecommendationItem recommendation,
         CancellationToken cancellationToken)
     {
+        ShowExternalAiAnalyzingState(recommendation);
         StatusMessage = "当前页面展示的是未入库影片详情，正在生成 AI 标签。";
         try
         {
@@ -510,10 +526,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             recommendation.Tags = string.IsNullOrWhiteSpace(tags.AiTagsText) ? recommendation.Tags : tags.AiTagsText;
             recommendation.EmotionTagsText = string.IsNullOrWhiteSpace(tags.EmotionTagsText) ? recommendation.EmotionTagsText : tags.EmotionTagsText;
             recommendation.SceneTagsText = string.IsNullOrWhiteSpace(tags.SceneTagsText) ? recommendation.SceneTagsText : tags.SceneTagsText;
-            AiTagsText = string.IsNullOrWhiteSpace(recommendation.Tags) ? "尚未分类" : recommendation.Tags;
-            GenresText = AiTagsText;
-            EmotionTagsText = string.IsNullOrWhiteSpace(recommendation.EmotionTagsText) ? "未提供" : recommendation.EmotionTagsText;
-            SceneTagsText = string.IsNullOrWhiteSpace(recommendation.SceneTagsText) ? "未提供" : recommendation.SceneTagsText;
+            CacheExternalTags(recommendation);
+            ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
             StatusMessage = "当前页面展示的是未入库影片详情，AI 标签已自动生成。";
         }
         catch (OperationCanceledException)
@@ -522,6 +536,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
         catch (Exception exception)
         {
+            ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
             StatusMessage = $"未入库影片 AI 标签生成失败：{DescribeException(exception)}";
         }
     }
@@ -1119,6 +1134,66 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                && (string.IsNullOrWhiteSpace(detail.AiTagsText)
                    || string.IsNullOrWhiteSpace(detail.EmotionTagsText)
                    || string.IsNullOrWhiteSpace(detail.SceneTagsText));
+    }
+
+    private void ShowExternalAiAnalyzingState(AiRecommendationItem recommendation)
+    {
+        GenresText = string.IsNullOrWhiteSpace(recommendation.Tags)
+            ? ExternalAiAnalyzingText
+            : recommendation.Tags;
+        AiTagsText = string.IsNullOrWhiteSpace(recommendation.Tags)
+            ? ExternalAiAnalyzingText
+            : recommendation.Tags;
+        EmotionTagsText = string.IsNullOrWhiteSpace(recommendation.EmotionTagsText)
+            ? ExternalAiAnalyzingText
+            : recommendation.EmotionTagsText;
+        SceneTagsText = string.IsNullOrWhiteSpace(recommendation.SceneTagsText)
+            ? ExternalAiAnalyzingText
+            : recommendation.SceneTagsText;
+    }
+
+    private void ApplyExternalTagDisplay(AiRecommendationItem recommendation, string missingText)
+    {
+        AiTagsText = string.IsNullOrWhiteSpace(recommendation.Tags) ? missingText : recommendation.Tags;
+        GenresText = AiTagsText;
+        EmotionTagsText = string.IsNullOrWhiteSpace(recommendation.EmotionTagsText)
+            ? missingText
+            : recommendation.EmotionTagsText;
+        SceneTagsText = string.IsNullOrWhiteSpace(recommendation.SceneTagsText)
+            ? missingText
+            : recommendation.SceneTagsText;
+    }
+
+    private static void ApplyCachedExternalTags(AiRecommendationItem recommendation)
+    {
+        if (recommendation.TmdbId is not > 0
+            || !ExternalAiTagCache.TryGetValue(recommendation.TmdbId.Value, out var cachedTags))
+        {
+            return;
+        }
+
+        recommendation.Tags = string.IsNullOrWhiteSpace(cachedTags.AiTagsText) ? recommendation.Tags : cachedTags.AiTagsText;
+        recommendation.EmotionTagsText = string.IsNullOrWhiteSpace(cachedTags.EmotionTagsText)
+            ? recommendation.EmotionTagsText
+            : cachedTags.EmotionTagsText;
+        recommendation.SceneTagsText = string.IsNullOrWhiteSpace(cachedTags.SceneTagsText)
+            ? recommendation.SceneTagsText
+            : cachedTags.SceneTagsText;
+    }
+
+    private static void CacheExternalTags(AiRecommendationItem recommendation)
+    {
+        if (recommendation.TmdbId is not > 0 || NeedsExternalAutoClassification(recommendation))
+        {
+            return;
+        }
+
+        ExternalAiTagCache[recommendation.TmdbId.Value] = new AiMovieTags
+        {
+            AiTagsText = recommendation.Tags,
+            EmotionTagsText = recommendation.EmotionTagsText,
+            SceneTagsText = recommendation.SceneTagsText
+        };
     }
 
     private static bool NeedsExternalAutoClassification(AiRecommendationItem recommendation)
