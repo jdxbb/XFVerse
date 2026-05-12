@@ -493,6 +493,37 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         RefreshWantToWatchCommandState();
         RefreshNotInterestedCommandState();
         RefreshWatchedCommandState();
+        if (NeedsExternalAutoClassification(recommendation))
+        {
+            await ClassifyExternalRecommendationAsync(recommendation, cancellationToken);
+        }
+    }
+
+    private async Task ClassifyExternalRecommendationAsync(
+        AiRecommendationItem recommendation,
+        CancellationToken cancellationToken)
+    {
+        StatusMessage = "当前页面展示的是未入库影片详情，正在生成 AI 标签。";
+        try
+        {
+            var tags = await _aiClassificationService.ClassifyExternalMovieAsync(recommendation, cancellationToken);
+            recommendation.Tags = string.IsNullOrWhiteSpace(tags.AiTagsText) ? recommendation.Tags : tags.AiTagsText;
+            recommendation.EmotionTagsText = string.IsNullOrWhiteSpace(tags.EmotionTagsText) ? recommendation.EmotionTagsText : tags.EmotionTagsText;
+            recommendation.SceneTagsText = string.IsNullOrWhiteSpace(tags.SceneTagsText) ? recommendation.SceneTagsText : tags.SceneTagsText;
+            AiTagsText = string.IsNullOrWhiteSpace(recommendation.Tags) ? "尚未分类" : recommendation.Tags;
+            GenresText = AiTagsText;
+            EmotionTagsText = string.IsNullOrWhiteSpace(recommendation.EmotionTagsText) ? "未提供" : recommendation.EmotionTagsText;
+            SceneTagsText = string.IsNullOrWhiteSpace(recommendation.SceneTagsText) ? "未提供" : recommendation.SceneTagsText;
+            StatusMessage = "当前页面展示的是未入库影片详情，AI 标签已自动生成。";
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"未入库影片 AI 标签生成失败：{DescribeException(exception)}";
+        }
     }
 
     private async Task OpenPlayerAsync(object? parameter)
@@ -1088,6 +1119,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                && (string.IsNullOrWhiteSpace(detail.AiTagsText)
                    || string.IsNullOrWhiteSpace(detail.EmotionTagsText)
                    || string.IsNullOrWhiteSpace(detail.SceneTagsText));
+    }
+
+    private static bool NeedsExternalAutoClassification(AiRecommendationItem recommendation)
+    {
+        return string.IsNullOrWhiteSpace(recommendation.Tags)
+               || string.IsNullOrWhiteSpace(recommendation.EmotionTagsText)
+               || string.IsNullOrWhiteSpace(recommendation.SceneTagsText);
     }
 
     private static string DescribeException(Exception exception)

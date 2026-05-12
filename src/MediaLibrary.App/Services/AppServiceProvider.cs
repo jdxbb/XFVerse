@@ -45,6 +45,7 @@ public static class AppServiceProvider
         services.AddSingleton<IRecommendationPreferenceService, RecommendationPreferenceService>();
         services.AddSingleton<IRecommendationService, RecommendationService>();
         services.AddSingleton<IUserCollectionService, UserCollectionService>();
+        services.AddSingleton<IDiscoveryMovieStatusResolver, DiscoveryMovieStatusResolver>();
         services.AddSingleton<IWatchInsightCacheService, WatchInsightCacheService>();
         services.AddSingleton<IWatchStatisticsService, WatchStatisticsService>();
         services.AddSingleton<IWatchProfileInputService, WatchProfileInputService>();

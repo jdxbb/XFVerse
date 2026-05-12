@@ -21,6 +21,7 @@ public sealed class TmdbService : ITmdbService
     private const string TmdbSearchCacheType = "Search";
     private const string TmdbDetailCacheType = "Detail";
     private const string TmdbExternalIdsCacheType = "ExternalIds";
+    private const int DiscoveryPageSize = 20;
     internal const int HttpConcurrencyLimit = 3;
     private const int SearchCacheLimit = 300;
     private const int DetailCacheLimit = 600;
@@ -322,6 +323,270 @@ public sealed class TmdbService : ITmdbService
         return detailsCandidate;
     }
 
+    public async Task<TmdbMovieDiscoveryPage> SearchDiscoveryMoviesAsync(
+        string query,
+        int page,
+        int? releaseYear = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return CreateEmptyDiscoveryPage(page);
+        }
+
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return CreateEmptyDiscoveryPage(page, "未配置 TMDB API。");
+        }
+
+        var safePage = Math.Clamp(page, 1, 500);
+        var queryString = $"search/movie?language={TmdbLanguage}&include_adult=false&page={safePage}&query={Uri.EscapeDataString(query.Trim())}";
+        if (releaseYear.HasValue)
+        {
+            queryString += $"&year={releaseYear.Value}&primary_release_year={releaseYear.Value}";
+        }
+
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await SendGetAsync(queryString, options, cancellationToken);
+            EnsureSuccessStatusCode(response);
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+            return BuildDiscoveryPage(document.RootElement, safePage);
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-discovery-search", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public async Task<TmdbPersonSearchPage> SearchPeopleAsync(
+        string query,
+        int page,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return CreateEmptyPersonSearchPage(page);
+        }
+
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return CreateEmptyPersonSearchPage(page, "未配置 TMDB API。");
+        }
+
+        var safePage = Math.Clamp(page, 1, 500);
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await SendGetAsync(
+                $"search/person?language={TmdbLanguage}&include_adult=false&page={safePage}&query={Uri.EscapeDataString(query.Trim())}",
+                options,
+                cancellationToken);
+            EnsureSuccessStatusCode(response);
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+            return BuildPersonSearchPage(document.RootElement, safePage);
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-person-search", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public async Task<TmdbMovieDiscoveryPage> GetPersonMovieCreditsAsync(
+        int personId,
+        int page,
+        string personName = "",
+        CancellationToken cancellationToken = default)
+    {
+        if (personId <= 0)
+        {
+            return CreateEmptyDiscoveryPage(page, "未找到相关人物，可尝试英文名或原名。");
+        }
+
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return CreateEmptyDiscoveryPage(page, "未配置 TMDB API。");
+        }
+
+        var safePage = Math.Max(1, page);
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var creditsResponse = await SendGetAsync($"person/{personId}/movie_credits?language={TmdbLanguage}", options, cancellationToken);
+            EnsureSuccessStatusCode(creditsResponse);
+
+            await using var creditsStream = await creditsResponse.Content.ReadAsStreamAsync(cancellationToken);
+            using var creditsDocument = await JsonDocument.ParseAsync(creditsStream, cancellationToken: cancellationToken);
+            var allCredits = BuildPersonMovieCredits(creditsDocument.RootElement);
+            var totalResults = allCredits.Count;
+            var totalPages = totalResults == 0 ? 0 : (int)Math.Ceiling(totalResults / (double)DiscoveryPageSize);
+            var pageItems = allCredits
+                .Skip((safePage - 1) * DiscoveryPageSize)
+                .Take(DiscoveryPageSize)
+                .ToList();
+
+            var displayName = string.IsNullOrWhiteSpace(personName) ? "该人物" : personName.Trim();
+            return new TmdbMovieDiscoveryPage
+            {
+                Results = pageItems,
+                Page = safePage,
+                TotalPages = totalPages,
+                TotalResults = totalResults,
+                ResultMessage = totalResults == 0
+                    ? "未找到相关影片。"
+                    : $"按人物“{displayName}”匹配到相关影片。"
+            };
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-person-movie-credits", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public async Task<TmdbMovieDiscoveryPage> SearchDiscoveryMoviesByPersonAsync(
+        string query,
+        int page,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return CreateEmptyDiscoveryPage(page);
+        }
+
+        var safePage = Math.Max(1, page);
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            var people = await SearchPeopleAsync(query, 1, cancellationToken);
+            var person = people.Results.FirstOrDefault();
+            if (person is null)
+            {
+                return CreateEmptyDiscoveryPage(safePage, "未找到相关人物，可尝试英文名或原名。");
+            }
+
+            return await GetPersonMovieCreditsAsync(person.TmdbId, safePage, person.Name, cancellationToken);
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-discovery-person-search", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public Task<TmdbMovieDiscoveryPage> GetPopularMoviesAsync(
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        return GetDiscoveryListPageAsync(
+            $"movie/popular?language={Uri.EscapeDataString(safeLanguage)}&page={safePage}",
+            safePage,
+            "tmdb-discovery-popular",
+            cancellationToken);
+    }
+
+    public Task<TmdbMovieDiscoveryPage> GetTopRatedMoviesAsync(
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        return GetDiscoveryListPageAsync(
+            $"movie/top_rated?language={Uri.EscapeDataString(safeLanguage)}&page={safePage}",
+            safePage,
+            "tmdb-discovery-top-rated",
+            cancellationToken);
+    }
+
+    public Task<TmdbMovieDiscoveryPage> GetTrendingMoviesAsync(
+        string timeWindow,
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        var safeWindow = string.Equals(timeWindow, "week", StringComparison.OrdinalIgnoreCase) ? "week" : "day";
+        return GetDiscoveryListPageAsync(
+            $"trending/movie/{safeWindow}?language={Uri.EscapeDataString(safeLanguage)}&page={safePage}",
+            safePage,
+            $"tmdb-discovery-trending-{safeWindow}",
+            cancellationToken);
+    }
+
+    private async Task<TmdbMovieDiscoveryPage> GetDiscoveryListPageAsync(
+        string queryString,
+        int page,
+        string diagnosticsName,
+        CancellationToken cancellationToken)
+    {
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return CreateEmptyDiscoveryPage(page, "未配置 TMDB API。");
+        }
+
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await SendGetAsync(queryString, options, cancellationToken);
+            EnsureSuccessStatusCode(response);
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+            return BuildDiscoveryPage(document.RootElement, page);
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall(diagnosticsName, requestStopwatch.Elapsed, isError);
+        }
+    }
+
     private async Task<TmdbRequestOptions> GetRequestOptionsAsync(CancellationToken cancellationToken)
     {
         var settings = await _settingsService.GetApplicationSettingAsync(cancellationToken);
@@ -421,6 +686,11 @@ public sealed class TmdbService : ITmdbService
         }
 
         return normalized;
+    }
+
+    private static string NormalizeLanguage(string language)
+    {
+        return string.IsNullOrWhiteSpace(language) ? TmdbLanguage : language.Trim();
     }
 
     private static string AppendQueryParameter(string requestUri, string name, string value)
@@ -585,6 +855,177 @@ public sealed class TmdbService : ITmdbService
         };
     }
 
+    private static TmdbMovieDiscoveryPage CreateEmptyDiscoveryPage(int page, string resultMessage = "")
+    {
+        return new TmdbMovieDiscoveryPage
+        {
+            Results = [],
+            Page = Math.Max(1, page),
+            TotalPages = 0,
+            TotalResults = 0,
+            ResultMessage = resultMessage
+        };
+    }
+
+    private static TmdbPersonSearchPage CreateEmptyPersonSearchPage(int page, string resultMessage = "")
+    {
+        return new TmdbPersonSearchPage
+        {
+            Results = [],
+            Page = Math.Max(1, page),
+            TotalPages = 0,
+            TotalResults = 0,
+            ResultMessage = resultMessage
+        };
+    }
+
+    private static TmdbPersonSearchPage BuildPersonSearchPage(JsonElement root, int fallbackPage)
+    {
+        var results = new List<TmdbPersonSearchItem>();
+        if (root.TryGetProperty("results", out var resultArray) && resultArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in resultArray.EnumerateArray())
+            {
+                var personId = GetInt(item, "id");
+                if (personId is not > 0)
+                {
+                    continue;
+                }
+
+                results.Add(
+                    new TmdbPersonSearchItem
+                    {
+                        TmdbId = personId.Value,
+                        Name = GetString(item, "name"),
+                        OriginalName = GetString(item, "original_name"),
+                        Popularity = GetDouble(item, "popularity") ?? 0d
+                    });
+            }
+        }
+
+        return new TmdbPersonSearchPage
+        {
+            Results = results,
+            Page = GetInt(root, "page") ?? fallbackPage,
+            TotalPages = GetInt(root, "total_pages") ?? 0,
+            TotalResults = GetInt(root, "total_results") ?? results.Count
+        };
+    }
+
+    private static TmdbMovieDiscoveryPage BuildDiscoveryPage(JsonElement root, int fallbackPage)
+    {
+        var results = new List<TmdbMovieDiscoveryItem>();
+        if (root.TryGetProperty("results", out var resultArray) && resultArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in resultArray.EnumerateArray())
+            {
+                if (BuildDiscoveryItem(item) is { } movie)
+                {
+                    results.Add(movie);
+                }
+            }
+        }
+
+        return new TmdbMovieDiscoveryPage
+        {
+            Results = results,
+            Page = GetInt(root, "page") ?? fallbackPage,
+            TotalPages = GetInt(root, "total_pages") ?? 0,
+            TotalResults = GetInt(root, "total_results") ?? results.Count
+        };
+    }
+
+    private static TmdbMovieDiscoveryItem? BuildDiscoveryItem(JsonElement item)
+    {
+        var tmdbId = GetInt(item, "id");
+        if (tmdbId is not > 0)
+        {
+            return null;
+        }
+
+        var releaseDate = GetString(item, "release_date");
+        return new TmdbMovieDiscoveryItem
+        {
+            TmdbId = tmdbId.Value,
+            Title = GetString(item, "title"),
+            OriginalTitle = GetString(item, "original_title"),
+            ReleaseDate = releaseDate,
+            ReleaseYear = ParseYear(releaseDate),
+            Overview = GetString(item, "overview"),
+            PosterRemoteUrl = BuildPosterUrl(GetString(item, "poster_path")),
+            GenreIds = EnumerateIntArray(item, "genre_ids").ToList(),
+            GenresText = string.Join(" / ", EnumerateArrayStrings(item, "genres", "name")),
+            Country = string.Join(" / ", EnumerateArrayStrings(item, "production_countries", "name")),
+            Language = string.Join(" / ", EnumerateArrayStrings(item, "spoken_languages", "english_name")),
+            RuntimeMinutes = GetInt(item, "runtime"),
+            ImdbId = GetString(item, "imdb_id"),
+            OriginalLanguage = GetString(item, "original_language"),
+            OriginCountries = EnumerateStringArray(item, "origin_country").ToList(),
+            TmdbRating = GetDouble(item, "vote_average"),
+            TmdbVoteCount = GetInt(item, "vote_count"),
+            Popularity = GetDouble(item, "popularity")
+        };
+    }
+
+    private static IReadOnlyList<TmdbMovieDiscoveryItem> BuildPersonMovieCredits(JsonElement root)
+    {
+        var candidates = new List<PersonCreditCandidate>();
+        AddPersonCredits(root, "cast", rolePriority: 0, candidates);
+        AddPersonCredits(root, "crew", rolePriority: 1, candidates);
+
+        return candidates
+            .GroupBy(candidate => candidate.Movie.TmdbId)
+            .Select(
+                group => group
+                    .OrderBy(candidate => candidate.RolePriority)
+                    .ThenBy(candidate => candidate.Order)
+                    .ThenByDescending(candidate => candidate.Movie.Popularity ?? 0d)
+                    .ThenByDescending(candidate => candidate.Movie.TmdbVoteCount ?? 0)
+                    .First())
+            .OrderByDescending(candidate => candidate.Movie.Popularity ?? 0d)
+            .ThenByDescending(candidate => candidate.Movie.TmdbVoteCount ?? 0)
+            .ThenByDescending(candidate => candidate.Movie.ReleaseYear ?? 0)
+            .Select(candidate => candidate.Movie)
+            .ToList();
+    }
+
+    private static void AddPersonCredits(
+        JsonElement root,
+        string propertyName,
+        int rolePriority,
+        ICollection<PersonCreditCandidate> candidates)
+    {
+        if (!root.TryGetProperty(propertyName, out var array) || array.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var item in array.EnumerateArray())
+        {
+            if (BuildDiscoveryItem(item) is not { } movie)
+            {
+                continue;
+            }
+
+            var order = GetInt(item, "order") ?? int.MaxValue;
+            if (rolePriority > 0)
+            {
+                var job = GetString(item, "job");
+                order = IsPrimaryCrewJob(job) ? 0 : 50;
+            }
+
+            candidates.Add(new PersonCreditCandidate(movie, rolePriority, order));
+        }
+    }
+
+    private static bool IsPrimaryCrewJob(string job)
+    {
+        return string.Equals(job, "Director", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Writer", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Screenplay", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Story", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static IReadOnlyList<MetadataSearchCandidate> CloneCandidates(IEnumerable<MetadataSearchCandidate> candidates)
     {
         return candidates.Select(CloneCandidate).ToList();
@@ -628,6 +1069,41 @@ public sealed class TmdbService : ITmdbService
         foreach (var item in arrayElement.EnumerateArray())
         {
             var value = GetString(item, itemPropertyName);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    private static IEnumerable<int> EnumerateIntArray(JsonElement element, string arrayPropertyName)
+    {
+        if (!element.TryGetProperty(arrayPropertyName, out var arrayElement) || arrayElement.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in arrayElement.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out var value))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    private static IEnumerable<string> EnumerateStringArray(JsonElement element, string arrayPropertyName)
+    {
+        if (!element.TryGetProperty(arrayPropertyName, out var arrayElement) || arrayElement.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in arrayElement.EnumerateArray())
+        {
+            var value = item.ValueKind == JsonValueKind.String
+                ? item.GetString() ?? string.Empty
+                : item.ToString();
             if (!string.IsNullOrWhiteSpace(value))
             {
                 yield return value;
@@ -719,6 +1195,8 @@ public sealed class TmdbService : ITmdbService
     private sealed record CacheEntry<T>(T Value, DateTime ExpiresAtUtc);
 
     private sealed record TmdbExternalIdsPersistentPayload(string ImdbId);
+
+    private sealed record PersonCreditCandidate(TmdbMovieDiscoveryItem Movie, int RolePriority, int Order);
 
     private sealed record TmdbRequestOptions(string ApiBaseUrl, string ReadAccessToken, string ApiKey)
     {

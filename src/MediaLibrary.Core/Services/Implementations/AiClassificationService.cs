@@ -71,6 +71,53 @@ public sealed class AiClassificationService : IAiClassificationService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<AiMovieTags> ClassifyExternalMovieAsync(
+        AiRecommendationItem recommendation,
+        CancellationToken cancellationToken = default)
+    {
+        var local = BuildLocalTags(recommendation.Tags, recommendation.Overview);
+        try
+        {
+            var text = await _aiService.GenerateTextAsync(
+                $$"""
+                你是影音库标签助手。只能从下面的固定词表中选择标签，不能创造新标签、近义标签或英文标签。
+                类型标签词表：{{string.Join("、", AiTagVocabulary.TypeTags)}}
+                情绪标签词表：{{string.Join("、", AiTagVocabulary.EmotionTags)}}
+                观看场景词表：{{string.Join("、", AiTagVocabulary.SceneTags)}}
+                输出要求：
+                1. 只返回 JSON，不要解释。
+                2. 字段固定为 aiTags、emotionTags、sceneTags。
+                3. 每个字段都是中文字符串数组。
+                4. 每类选择 1 到 4 个标签。
+                5. 所有标签必须来自对应词表。
+                示例：{"aiTags":["剧情"],"emotionTags":["温暖"],"sceneTags":["独自观看"]}
+                """,
+                $"片名：{recommendation.Title}\n原名：{recommendation.OriginalTitle}\n年份：{recommendation.ReleaseYear}\n类型：{recommendation.Tags}\n简介：{recommendation.Overview}",
+                cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                var parsed = ParseTags(text);
+                return new AiMovieTags
+                {
+                    AiTagsText = parsed.aiTags.Count > 0 ? string.Join("、", parsed.aiTags) : local.aiTags,
+                    EmotionTagsText = parsed.emotionTags.Count > 0 ? string.Join("、", parsed.emotionTags) : local.emotionTags,
+                    SceneTagsText = parsed.sceneTags.Count > 0 ? string.Join("、", parsed.sceneTags) : local.sceneTags
+                };
+            }
+        }
+        catch
+        {
+        }
+
+        return new AiMovieTags
+        {
+            AiTagsText = local.aiTags,
+            EmotionTagsText = local.emotionTags,
+            SceneTagsText = local.sceneTags
+        };
+    }
+
     public async Task<AiSearchSuggestion> SuggestSearchQueryAsync(int movieId, CancellationToken cancellationToken = default)
     {
         var result = await SuggestSearchQueryWithStatusAsync(movieId, cancellationToken);

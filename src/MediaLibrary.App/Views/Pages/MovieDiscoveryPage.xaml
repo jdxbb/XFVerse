@@ -11,7 +11,7 @@
             <StackPanel>
                 <TextBlock Text="影片发现" Style="{StaticResource CardTitleTextStyle}" />
                 <TextBlock Margin="0,8,0,0"
-                           Text="影片搜索和榜单将在后续阶段接入，AI 推荐已承接当前功能。"
+                           Text="通过 TMDB 搜索影片和人物作品；AI 推荐继续使用现有推荐流程。"
                            Style="{StaticResource BodyMutedTextStyle}" />
             </StackPanel>
 
@@ -20,16 +20,794 @@
                         SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
                         Style="{StaticResource ModernTabControlStyle}">
                 <TabItem Header="影片搜索" Style="{StaticResource ModernTabItemStyle}">
-                    <Border Margin="0,18,0,0" Style="{StaticResource CompactCardStyle}">
-                        <TextBlock Text="影片搜索功能将在后续阶段接入。"
-                                   Style="{StaticResource BodyTextStyle}" />
-                    </Border>
+                    <Grid Margin="0,18,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <TextBlock Text="搜索类型" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding SearchTypeOptions}"
+                                              SelectedItem="{Binding SelectedSearchType}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="关键词" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <TextBox MinWidth="320"
+                                             ToolTip="输入影片名、原名或人物名"
+                                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource FormTextBoxStyle}">
+                                        <TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                                        </TextBox.InputBindings>
+                                    </TextBox>
+                                </StackPanel>
+
+                                <Button Grid.Column="4"
+                                        MinWidth="96"
+                                        VerticalAlignment="Bottom"
+                                        Content="搜索"
+                                        Command="{Binding SearchCommand}"
+                                        Style="{StaticResource PrimaryButtonStyle}" />
+                            </Grid>
+
+                            <WrapPanel Margin="0,14,0,0">
+                                <StackPanel Width="132" Margin="0,0,12,12">
+                                    <TextBlock Text="类型" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding GenreFilterOptions}"
+                                              SelectedItem="{Binding SelectedGenreFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="132" Margin="0,0,12,12">
+                                    <TextBlock Text="地区" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding RegionFilterOptions}"
+                                              SelectedItem="{Binding SelectedRegionFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="132" Margin="0,0,12,12">
+                                    <TextBlock Text="观看状态" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding WatchStatusFilterOptions}"
+                                              SelectedItem="{Binding SelectedWatchStatusFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="116" Margin="0,0,12,12">
+                                    <TextBlock Text="顺序" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding SortDirectionOptions}"
+                                              SelectedItem="{Binding SelectedSortDirection}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="132" Margin="0,0,12,12">
+                                    <TextBlock Text="排序" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding SortOptions}"
+                                              SelectedItem="{Binding SelectedSortOption}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="116" Margin="0,0,12,12">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="年代" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding DecadeFilterOptions}"
+                                              SelectedItem="{Binding SelectedDecadeFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="116" Margin="0,0,12,12">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="语言" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding LanguageFilterOptions}"
+                                              SelectedItem="{Binding SelectedLanguageFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <Button MinWidth="96"
+                                        Margin="0,20,12,12"
+                                        Content="清除筛选"
+                                        Command="{Binding ClearSearchFiltersCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+
+                                <Button MinWidth="96"
+                                        Margin="0,20,0,12"
+                                        Content="切布局"
+                                        Command="{Binding ShowLayoutSwitchPlaceholderCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <Border Grid.Row="2" Style="{StaticResource CompactCardStyle}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding SearchStatusMessage}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Text="{Binding SearchSummaryText}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyTextStyle}" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Grid Grid.Row="1" Margin="0,16,0,0">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="正在搜索...">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSearchLoading}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding SearchStatusMessage}"
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowSearchEmptyState}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel>
+                                            <ItemsControl ItemsSource="{Binding SearchMovies}">
+                                                <ItemsControl.Style>
+                                                    <Style TargetType="ItemsControl">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasSearchMovies}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ItemsControl.Style>
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Width="232"
+                                                                Margin="0,0,18,18"
+                                                                Style="{StaticResource CompactCardStyle}">
+                                                            <Border.InputBindings>
+                                                                <MouseBinding MouseAction="LeftClick"
+                                                                              Command="{Binding DataContext.OpenSearchMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                              CommandParameter="{Binding}" />
+                                                            </Border.InputBindings>
+                                                            <StackPanel>
+                                                                <Grid Height="300">
+                                                                    <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
+                                                                        <Grid>
+                                                                            <TextBlock HorizontalAlignment="Center"
+                                                                                       VerticalAlignment="Center"
+                                                                                       Text="无海报"
+                                                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                                                            <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                        </Grid>
+                                                                    </Border>
+
+                                                                    <Border HorizontalAlignment="Left"
+                                                                            VerticalAlignment="Top"
+                                                                            Margin="10"
+                                                                            Padding="9,5"
+                                                                            CornerRadius="999"
+                                                                            Background="{DynamicResource BrushAccent}">
+                                                                        <TextBlock Text="{Binding AvailabilityText}"
+                                                                                   Foreground="{DynamicResource BrushOnAccent}"
+                                                                                   FontWeight="SemiBold" />
+                                                                    </Border>
+
+                                                                    <Button HorizontalAlignment="Right"
+                                                                            VerticalAlignment="Top"
+                                                                            Margin="10"
+                                                                            Content="{Binding WantToWatchButtonText}"
+                                                                            Command="{Binding DataContext.ToggleSearchWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                            CommandParameter="{Binding}">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
+                                                                </Grid>
+
+                                                                <TextBlock Margin="0,14,0,0"
+                                                                           Text="{Binding Title}"
+                                                                           TextWrapping="Wrap"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           Style="{StaticResource SectionTitleTextStyle}" />
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding OriginalTitleText}"
+                                                                           TextWrapping="Wrap">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding OriginalTitleText}" Value="">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+
+                                                                <DockPanel Margin="0,8,0,0">
+                                                                    <TextBlock Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    <TextBlock DockPanel.Dock="Right"
+                                                                               Text="{Binding RatingText}"
+                                                                               FontWeight="SemiBold"
+                                                                               Style="{StaticResource BodyTextStyle}" />
+                                                                </DockPanel>
+
+                                                                <TextBlock Margin="0,8,0,0"
+                                                                           Text="{Binding DisplayTags}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock Margin="0,6,0,0"
+                                                                           Text="{Binding EmotionTagsText}"
+                                                                           TextWrapping="Wrap">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding EmotionTagsText}" Value="">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+
+                                                                <WrapPanel Margin="0,10,0,0">
+                                                                    <Border Margin="0,0,8,8"
+                                                                            Padding="8,4"
+                                                                            CornerRadius="999"
+                                                                            Background="{DynamicResource BrushSurfaceAlt}">
+                                                                        <TextBlock Text="{Binding WatchStateText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    </Border>
+                                                                    <Border Margin="0,0,8,8"
+                                                                            Padding="8,4"
+                                                                            CornerRadius="999"
+                                                                            Background="{DynamicResource BrushAccentSoft}">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="想看" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    </Border>
+                                                                    <Border Margin="0,0,8,8"
+                                                                            Padding="8,4"
+                                                                            CornerRadius="999"
+                                                                            Background="{DynamicResource BrushSurfaceAlt}">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="喜爱" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    </Border>
+                                                                    <Border Margin="0,0,8,8"
+                                                                            Padding="8,4"
+                                                                            CornerRadius="999"
+                                                                            Background="{DynamicResource BrushSurfaceAlt}">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsNotInterested}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="不想看" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    </Border>
+                                                                </WrapPanel>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <Button Width="128"
+                                                    Margin="0,4,0,0"
+                                                    HorizontalAlignment="Center"
+                                                    Content="{Binding LoadMoreSearchButtonText}"
+                                                    Command="{Binding LoadMoreSearchCommand}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding CanLoadMoreSearch}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </TabItem>
                 <TabItem Header="榜单" Style="{StaticResource ModernTabItemStyle}">
-                    <Border Margin="0,18,0,0" Style="{StaticResource CompactCardStyle}">
-                        <TextBlock Text="榜单功能将在后续阶段接入。"
-                                   Style="{StaticResource BodyTextStyle}" />
-                    </Border>
+                    <Grid Margin="0,18,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Border Style="{StaticResource CompactCardStyle}">
+                            <DockPanel LastChildFill="True">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Menu VerticalAlignment="Center">
+                                        <MenuItem Header="{Binding RankingTimeText}"
+                                                  IsEnabled="{Binding IsRankingTimeSelectable}">
+                                            <MenuItem Header="今日趋势"
+                                                      Command="{Binding SelectTrendingTimeCommand}"
+                                                      CommandParameter="今日趋势" />
+                                            <MenuItem Header="本周趋势"
+                                                      Command="{Binding SelectTrendingTimeCommand}"
+                                                      CommandParameter="本周趋势" />
+                                        </MenuItem>
+                                    </Menu>
+                                </StackPanel>
+
+                                <StackPanel>
+                                    <TextBlock Text="{Binding RankingTitle}" Style="{StaticResource CardTitleTextStyle}" />
+                                    <WrapPanel Margin="0,10,0,0">
+                                        <Menu Margin="0,0,12,0">
+                                            <MenuItem Header="选择榜单">
+                                                <MenuItem Header="热门榜"
+                                                          Command="{Binding SelectRankingTypeCommand}"
+                                                          CommandParameter="热门榜" />
+                                                <MenuItem Header="高分榜"
+                                                          Command="{Binding SelectRankingTypeCommand}"
+                                                          CommandParameter="高分榜" />
+                                                <MenuItem Header="趋势榜"
+                                                          Command="{Binding SelectRankingTypeCommand}"
+                                                          CommandParameter="趋势榜" />
+                                            </MenuItem>
+                                        </Menu>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="{Binding RankingStatusMessage}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                    </WrapPanel>
+                                    <TextBlock Margin="0,8,0,0"
+                                               Text="{Binding RankingSummaryText}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyTextStyle}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Grid.Row="2" Style="{StaticResource CompactCardStyle}">
+                            <Grid>
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="正在加载榜单...">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRankingLoading}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding RankingStatusMessage}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowRankingEmptyState}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <ScrollViewer x:Name="RankingScrollViewer"
+                                              VerticalScrollBarVisibility="Auto"
+                                              ScrollChanged="RankingScrollViewer_OnScrollChanged">
+                                    <StackPanel>
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasRankingMovies}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+
+                                        <Border Margin="0,0,0,18"
+                                                Style="{StaticResource CompactCardStyle}"
+                                                DataContext="{Binding TopRankingMovie}">
+                                            <Border.InputBindings>
+                                                <MouseBinding MouseAction="LeftClick"
+                                                              Command="{Binding DataContext.OpenRankingMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              CommandParameter="{Binding}" />
+                                            </Border.InputBindings>
+                                            <Grid MinHeight="360">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="250" />
+                                                    <ColumnDefinition Width="18" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Grid Height="340">
+                                                    <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
+                                                        <Grid>
+                                                            <TextBlock HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       Text="无海报"
+                                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                                            <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <Border HorizontalAlignment="Left"
+                                                            VerticalAlignment="Top"
+                                                            Margin="12"
+                                                            Padding="10,6"
+                                                            CornerRadius="999"
+                                                            Background="{DynamicResource BrushAccent}">
+                                                        <TextBlock Text="{Binding RankText}"
+                                                                   Foreground="{DynamicResource BrushOnAccent}"
+                                                                   FontWeight="SemiBold" />
+                                                    </Border>
+                                                    <Button HorizontalAlignment="Right"
+                                                            VerticalAlignment="Top"
+                                                            Margin="12"
+                                                            Content="{Binding WantToWatchButtonText}"
+                                                            Command="{Binding DataContext.ToggleRankingWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="2" Margin="0,16,0,10">
+                                                    <TextBlock Text="{Binding RatingText}" Style="{StaticResource MetricTextStyle}" />
+                                                    <TextBlock Margin="0,8,0,0"
+                                                               Text="{Binding TitleWithOriginalText}"
+                                                               TextWrapping="Wrap"
+                                                               Style="{StaticResource CardTitleTextStyle}" />
+                                                    <TextBlock Margin="0,8,0,0"
+                                                               Text="{Binding YearText}"
+                                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                                    <TextBlock Margin="0,8,0,0"
+                                                               Text="{Binding DisplayTags}"
+                                                               TextWrapping="Wrap"
+                                                               Style="{StaticResource BodyTextStyle}" />
+                                                    <TextBlock Margin="0,6,0,0"
+                                                               Text="{Binding EmotionTagsText}"
+                                                               TextWrapping="Wrap">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding EmotionTagsText}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <ScrollViewer Margin="0,12,0,0"
+                                                                  Height="128"
+                                                                  VerticalScrollBarVisibility="Auto">
+                                                        <TextBlock Text="{Binding OverviewText}"
+                                                                   TextWrapping="Wrap"
+                                                                   Style="{StaticResource BodyTextStyle}" />
+                                                    </ScrollViewer>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <ItemsControl ItemsSource="{Binding RankingRows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,14" MinHeight="210">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="1" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Grid DataContext="{Binding LeftItem}" Margin="0,0,14,0">
+                                                            <Grid.InputBindings>
+                                                                <MouseBinding MouseAction="LeftClick"
+                                                                              Command="{Binding DataContext.OpenRankingMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                              CommandParameter="{Binding}" />
+                                                            </Grid.InputBindings>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="136" />
+                                                                <ColumnDefinition Width="12" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Grid Height="196">
+                                                                <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
+                                                                    <Grid>
+                                                                        <TextBlock HorizontalAlignment="Center"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Text="无海报"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                    </Grid>
+                                                                </Border>
+                                                                <Border HorizontalAlignment="Left"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="8"
+                                                                        Padding="8,4"
+                                                                        CornerRadius="999"
+                                                                        Background="{DynamicResource BrushAccent}">
+                                                                    <TextBlock Text="{Binding RankText}"
+                                                                               Foreground="{DynamicResource BrushOnAccent}"
+                                                                               FontWeight="SemiBold" />
+                                                                </Border>
+                                                                <Button HorizontalAlignment="Right"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="8"
+                                                                        Content="{Binding WantToWatchButtonText}"
+                                                                        Command="{Binding DataContext.ToggleRankingWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                            </Grid>
+
+                                                            <StackPanel Grid.Column="2" Margin="0,10,0,6">
+                                                                <DockPanel>
+                                                                    <TextBlock Text="{Binding RatingText}" FontWeight="SemiBold" Style="{StaticResource BodyTextStyle}" />
+                                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </DockPanel>
+                                                                <TextBlock Margin="0,8,0,0"
+                                                                           Text="{Binding TitleWithOriginalText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource SectionTitleTextStyle}" />
+                                                                <TextBlock Margin="0,6,0,0"
+                                                                           Text="{Binding DisplayTags}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding EmotionTagsText}"
+                                                                           TextWrapping="Wrap">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding EmotionTagsText}" Value="">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <ScrollViewer Margin="0,8,0,0" Height="70" VerticalScrollBarVisibility="Auto">
+                                                                    <TextBlock Text="{Binding OverviewText}"
+                                                                               TextWrapping="Wrap"
+                                                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </ScrollViewer>
+                                                            </StackPanel>
+                                                        </Grid>
+
+                                                        <Border Grid.Column="1" Background="{DynamicResource BrushBorder}" />
+
+                                                        <Grid Grid.Column="2"
+                                                              DataContext="{Binding RightItem}"
+                                                              Margin="14,0,0,0">
+                                                            <Grid.Style>
+                                                                <Style TargetType="Grid">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding DataContext.HasRightItem, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Grid.Style>
+                                                            <Grid.InputBindings>
+                                                                <MouseBinding MouseAction="LeftClick"
+                                                                              Command="{Binding DataContext.OpenRankingMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                              CommandParameter="{Binding}" />
+                                                            </Grid.InputBindings>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="136" />
+                                                                <ColumnDefinition Width="12" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Grid Height="196">
+                                                                <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
+                                                                    <Grid>
+                                                                        <TextBlock HorizontalAlignment="Center"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Text="无海报"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                    </Grid>
+                                                                </Border>
+                                                                <Border HorizontalAlignment="Left"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="8"
+                                                                        Padding="8,4"
+                                                                        CornerRadius="999"
+                                                                        Background="{DynamicResource BrushAccent}">
+                                                                    <TextBlock Text="{Binding RankText}"
+                                                                               Foreground="{DynamicResource BrushOnAccent}"
+                                                                               FontWeight="SemiBold" />
+                                                                </Border>
+                                                                <Button HorizontalAlignment="Right"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="8"
+                                                                        Content="{Binding WantToWatchButtonText}"
+                                                                        Command="{Binding DataContext.ToggleRankingWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                            </Grid>
+
+                                                            <StackPanel Grid.Column="2" Margin="0,10,0,6">
+                                                                <DockPanel>
+                                                                    <TextBlock Text="{Binding RatingText}" FontWeight="SemiBold" Style="{StaticResource BodyTextStyle}" />
+                                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </DockPanel>
+                                                                <TextBlock Margin="0,8,0,0"
+                                                                           Text="{Binding TitleWithOriginalText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource SectionTitleTextStyle}" />
+                                                                <TextBlock Margin="0,6,0,0"
+                                                                           Text="{Binding DisplayTags}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding EmotionTagsText}"
+                                                                           TextWrapping="Wrap">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding EmotionTagsText}" Value="">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <ScrollViewer Margin="0,8,0,0" Height="70" VerticalScrollBarVisibility="Auto">
+                                                                    <TextBlock Text="{Binding OverviewText}"
+                                                                               TextWrapping="Wrap"
+                                                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </ScrollViewer>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock Margin="0,10,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   Text="正在加载更多...">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsRankingLoadingMore}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </TabItem>
                 <TabItem Header="AI 推荐" Style="{StaticResource ModernTabItemStyle}">
                     <ContentControl Margin="0,18,0,0"
