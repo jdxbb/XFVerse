@@ -17,9 +17,43 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string WatchedFilterWatched = "已看";
     private const string WatchedFilterUnwatched = "未看";
     private const string WatchedFilterNotInterested = "不想看";
-    private const string LibraryScopeInLibrary = "仅入库";
-    private const string LibraryScopeInLibraryAndExternalWatchedOrNotInterested = "入库 + 未入库已看/不想看";
+    private const string LibraryScopeInLibrary = "库内";
+    private const string LibraryScopeExternal = "库外";
     private const string LibraryScopeAll = "全部";
+    private const string SourceFilterAll = "全部来源";
+    private const string SourceFilterLocal = "本地";
+    private const string SourceFilterWebDav = "WebDAV";
+    private const string CollectionStatusFavorite = "喜爱";
+    private const string CollectionStatusWantToWatch = "想看";
+    private const string CollectionStatusNotInterested = "不想看";
+    private const string TagCategoryType = "类型标签";
+    private const string TagCategoryEmotion = "情绪标签";
+    private const string TagCategoryScene = "场景标签";
+    private const string StatusMatched = "自动匹配";
+    private const string StatusNeedsReview = "待人工确认";
+    private const string StatusManualConfirmed = "手动确认";
+    private const string StatusFailed = "识别失败";
+    private const string StatusPending = "未识别";
+    private const string DecadeAll = "全部年代";
+    private static readonly string[] TypeTagLabels =
+    [
+        "动作", "冒险", "动画", "喜剧", "犯罪", "纪录片", "剧情", "家庭", "奇幻", "历史",
+        "恐怖", "音乐", "悬疑", "爱情", "科幻", "电视电影", "惊悚", "战争", "西部", "传记",
+        "运动", "歌舞", "灾难", "武侠", "古装"
+    ];
+
+    private static readonly string[] EmotionTagLabels =
+    [
+        "治愈", "温暖", "感动", "轻松", "欢乐", "浪漫", "热血", "紧张", "悬疑", "压抑",
+        "沉重", "震撼", "孤独", "荒诞", "黑色幽默", "催泪", "励志", "思考向", "爽感", "惊悚",
+        "梦幻", "怀旧", "燃", "克制", "讽刺", "黑暗", "温柔"
+    ];
+
+    private static readonly string[] SceneTagLabels =
+    [
+        "独自观看", "情侣", "朋友", "亲子", "家人", "深夜", "放松", "下饭", "周末", "聚会",
+        "高专注", "背景播放", "二刷", "影院感", "通勤", "短时观看", "长片沉浸", "节日", "雨天", "睡前"
+    ];
 
     private readonly ILibraryQueryService _libraryQueryService;
     private readonly INavigationStateService _navigationStateService;
@@ -34,16 +68,19 @@ public sealed class LibraryViewModel : PageViewModelBase
     private bool _suppressLibraryRefreshFromBatchNotification;
     private string _searchText = string.Empty;
     private string _genreFilterText = string.Empty;
-    private string _yearFilterText = string.Empty;
     private string _selectedSortOption = "最近更新";
     private string _selectedSortDirection = "降序";
     private string _selectedStatusFilter = FilterAll;
     private string _selectedWatchedFilter = FilterAll;
     private string _selectedLibraryScope = LibraryScopeInLibrary;
+    private string _selectedSourceFilter = SourceFilterAll;
+    private string _selectedCollectionStatusFilter = FilterAll;
+    private string _selectedDecadeFilter = DecadeAll;
+    private bool _isUpdatingTagSelection;
     private bool _isPosterView = true;
     private bool _isBatchSelectionMode;
     private bool _isBatchOperationRunning;
-    private string _statusMessage = "资源库会展示已识别的真实影片数据。";
+    private string _statusMessage = "媒体库会展示已识别的真实影片数据。";
     private string _batchResultSummary = string.Empty;
 
     public LibraryViewModel(
@@ -54,7 +91,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         IMovieIdentificationService movieIdentificationService,
         IUserCollectionService userCollectionService,
         IConfirmationDialogService confirmationDialogService)
-        : base("媒体库", "浏览真实影片数据，支持海报墙 / 列表切换、搜索、排序和基础筛选。")
+        : base("媒体库", "浏览真实影片数据，支持搜索、排序、筛选和批量操作。")
     {
         _libraryQueryService = libraryQueryService;
         _navigationStateService = navigationStateService;
@@ -67,12 +104,19 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         SortOptions = ["最近更新", "标题", "年份", "评分"];
         SortDirectionOptions = ["降序", "升序"];
-        StatusOptions = ["全部", "已匹配", "待确认", "人工确认", "识别失败"];
+        StatusOptions = [FilterAll, StatusMatched, StatusNeedsReview, StatusManualConfirmed, StatusFailed, StatusPending];
 
         WatchedFilterOptions = [FilterAll, WatchedFilterWatched, WatchedFilterUnwatched, WatchedFilterNotInterested];
-        LibraryScopeOptions = [LibraryScopeInLibrary, LibraryScopeInLibraryAndExternalWatchedOrNotInterested, LibraryScopeAll];
+        LibraryScopeOptions = [LibraryScopeAll, LibraryScopeInLibrary, LibraryScopeExternal];
+        SourceFilterOptions = [SourceFilterAll, SourceFilterLocal, SourceFilterWebDav];
+        CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested];
         SwitchToPosterViewCommand = new RelayCommand(() => IsPosterView = true);
         SwitchToListViewCommand = new RelayCommand(() => IsPosterView = false);
+        SelectLibraryScopeCommand = new RelayCommand(SelectLibraryScope);
+        SelectSourceFilterCommand = new RelayCommand(SelectSourceFilter);
+        ClearTagFilterCommand = new RelayCommand(ClearTagFilter);
+        SelectCollectionStatusCommand = new RelayCommand(SelectCollectionStatus);
+        ShowLayoutSwitchPlaceholderCommand = new RelayCommand(ShowLayoutSwitchPlaceholder);
         OpenMovieCommand = new RelayCommand(OpenMovie);
         OpenOrToggleSelectionCommand = new RelayCommand(OpenOrToggleSelection);
         ToggleItemSelectionCommand = new RelayCommand(ToggleItemSelection);
@@ -86,9 +130,18 @@ public sealed class LibraryViewModel : PageViewModelBase
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
         ApplySearchCommand = new RelayCommand(ApplyFilters);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
+        RefreshTagOptions();
     }
 
     public ObservableCollection<LibraryMovieItemViewModel> Movies { get; } = [];
+
+    public ObservableCollection<TagFilterOption> TypeTagOptions { get; } = [];
+
+    public ObservableCollection<TagFilterOption> EmotionTagOptions { get; } = [];
+
+    public ObservableCollection<TagFilterOption> SceneTagOptions { get; } = [];
+
+    public ObservableCollection<string> DecadeFilterOptions { get; } = [];
 
     public IReadOnlyList<string> SortOptions { get; }
 
@@ -100,9 +153,23 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public IReadOnlyList<string> LibraryScopeOptions { get; }
 
+    public IReadOnlyList<string> SourceFilterOptions { get; }
+
+    public IReadOnlyList<string> CollectionStatusOptions { get; }
+
     public RelayCommand SwitchToPosterViewCommand { get; }
 
     public RelayCommand SwitchToListViewCommand { get; }
+
+    public RelayCommand SelectLibraryScopeCommand { get; }
+
+    public RelayCommand SelectSourceFilterCommand { get; }
+
+    public RelayCommand ClearTagFilterCommand { get; }
+
+    public RelayCommand SelectCollectionStatusCommand { get; }
+
+    public RelayCommand ShowLayoutSwitchPlaceholderCommand { get; }
 
     public RelayCommand OpenMovieCommand { get; }
 
@@ -148,18 +215,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         set
         {
             if (SetProperty(ref _genreFilterText, value))
-            {
-                ApplyFilters();
-            }
-        }
-    }
-
-    public string YearFilterText
-    {
-        get => _yearFilterText;
-        set
-        {
-            if (SetProperty(ref _yearFilterText, value))
             {
                 ApplyFilters();
             }
@@ -221,10 +276,68 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedLibraryScope, value))
             {
+                OnPropertyChanged(nameof(LibraryScopeMenuHeader));
                 ApplyFilters();
             }
         }
     }
+
+    public string SelectedSourceFilter
+    {
+        get => _selectedSourceFilter;
+        set
+        {
+            if (SetProperty(ref _selectedSourceFilter, value))
+            {
+                OnPropertyChanged(nameof(LibraryScopeMenuHeader));
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string SelectedCollectionStatusFilter
+    {
+        get => _selectedCollectionStatusFilter;
+        set
+        {
+            if (SetProperty(ref _selectedCollectionStatusFilter, value))
+            {
+                OnPropertyChanged(nameof(CollectionStatusMenuHeader));
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string SelectedDecadeFilter
+    {
+        get => _selectedDecadeFilter;
+        set
+        {
+            if (SetProperty(ref _selectedDecadeFilter, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string LibraryScopeMenuHeader => SelectedSourceFilter == SourceFilterAll
+        ? $"范围：{SelectedLibraryScope}"
+        : $"范围：{SelectedLibraryScope} / {SelectedSourceFilter}";
+
+    public string TagFilterMenuHeader
+    {
+        get
+        {
+            var selectedTags = Enumerable.Empty<string>()
+                .Concat(TypeTagOptions.Where(option => option.IsSelected).Select(option => $"类型 {option.Label}"))
+                .Concat(EmotionTagOptions.Where(option => option.IsSelected).Select(option => $"情绪 {option.Label}"))
+                .Concat(SceneTagOptions.Where(option => option.IsSelected).Select(option => $"场景 {option.Label}"))
+                .ToList();
+            return selectedTags.Count == 0 ? "标签：全部" : $"标签：{string.Join(" / ", selectedTags)}";
+        }
+    }
+
+    public string CollectionStatusMenuHeader => $"收藏状态：{SelectedCollectionStatusFilter}";
 
     public bool IsPosterView
     {
@@ -319,6 +432,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             var movies = await _libraryQueryService.GetLibraryMoviesAsync(cancellationToken);
             _allMovies.Clear();
             _allMovies.AddRange(movies);
+            RefreshTagOptions();
+            RefreshDecadeOptions();
             ApplyFilters();
 
             if (_allMovies.Count == 0)
@@ -330,7 +445,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             Movies.Clear();
             OnPropertyChanged(nameof(HasMovies));
-            StatusMessage = $"加载资源库失败：{exception.Message}";
+            StatusMessage = $"加载媒体库失败：{exception.Message}";
         }
     }
 
@@ -351,13 +466,149 @@ public sealed class LibraryViewModel : PageViewModelBase
     {
         SearchText = string.Empty;
         GenreFilterText = string.Empty;
-        YearFilterText = string.Empty;
+        SelectedDecadeFilter = DecadeAll;
         SelectedStatusFilter = FilterAll;
         SelectedWatchedFilter = FilterAll;
         SelectedLibraryScope = LibraryScopeInLibrary;
+        SelectedSourceFilter = SourceFilterAll;
+        SelectedCollectionStatusFilter = FilterAll;
+        ClearTagFilter(applyFilters: false);
         SelectedSortOption = "最近更新";
         SelectedSortDirection = "降序";
         ApplyFilters();
+    }
+
+    private void SelectLibraryScope(object? parameter)
+    {
+        if (parameter is string scope && LibraryScopeOptions.Contains(scope))
+        {
+            SelectedLibraryScope = scope;
+        }
+    }
+
+    private void SelectSourceFilter(object? parameter)
+    {
+        if (parameter is string source && SourceFilterOptions.Contains(source))
+        {
+            SelectedSourceFilter = source;
+        }
+    }
+
+    private void SelectCollectionStatus(object? parameter)
+    {
+        if (parameter is string status && CollectionStatusOptions.Contains(status))
+        {
+            SelectedCollectionStatusFilter = status;
+        }
+    }
+
+    private void ClearTagFilter()
+    {
+        ClearTagFilter(applyFilters: true);
+    }
+
+    private void ClearTagFilter(bool applyFilters)
+    {
+        _isUpdatingTagSelection = true;
+        try
+        {
+            foreach (var option in AllTagOptions())
+            {
+                option.IsSelected = false;
+            }
+        }
+        finally
+        {
+            _isUpdatingTagSelection = false;
+        }
+
+        OnPropertyChanged(nameof(TagFilterMenuHeader));
+        if (applyFilters)
+        {
+            ApplyFilters();
+        }
+    }
+
+    private void ShowLayoutSwitchPlaceholder()
+    {
+        BatchResultSummary = "布局切换将在后续阶段接入。";
+    }
+
+    private void RefreshTagOptions()
+    {
+        if (TypeTagOptions.Count == 0)
+        {
+            ReplaceTagOptions(TypeTagOptions, BuildStaticTagOptions(TagCategoryType, TypeTagLabels));
+        }
+
+        if (EmotionTagOptions.Count == 0)
+        {
+            ReplaceTagOptions(EmotionTagOptions, BuildStaticTagOptions(TagCategoryEmotion, EmotionTagLabels));
+        }
+
+        if (SceneTagOptions.Count == 0)
+        {
+            ReplaceTagOptions(SceneTagOptions, BuildStaticTagOptions(TagCategoryScene, SceneTagLabels));
+        }
+    }
+
+    private IEnumerable<TagFilterOption> AllTagOptions()
+    {
+        return TypeTagOptions.Concat(EmotionTagOptions).Concat(SceneTagOptions);
+    }
+
+    private IReadOnlyList<TagFilterOption> BuildStaticTagOptions(
+        string category,
+        IEnumerable<string> labels)
+    {
+        return labels
+            .Select(label => new TagFilterOption(category, label, OnTagSelectionChanged))
+            .ToList();
+    }
+
+    private void OnTagSelectionChanged(TagFilterOption option)
+    {
+        if (_isUpdatingTagSelection)
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(TagFilterMenuHeader));
+        ApplyFilters();
+    }
+
+    private void RefreshDecadeOptions()
+    {
+        var options = _allMovies
+            .Where(item => item.ReleaseYear is > 0)
+            .Select(item => item.ReleaseYear!.Value / 10 * 10)
+            .Distinct()
+            .OrderByDescending(decade => decade)
+            .Select(decade => $"{decade}年代")
+            .ToList();
+
+        DecadeFilterOptions.Clear();
+        DecadeFilterOptions.Add(DecadeAll);
+        foreach (var option in options)
+        {
+            DecadeFilterOptions.Add(option);
+        }
+
+        if (!DecadeFilterOptions.Contains(SelectedDecadeFilter))
+        {
+            SelectedDecadeFilter = DecadeAll;
+        }
+    }
+
+    private static void ReplaceTagOptions(
+        ObservableCollection<TagFilterOption> target,
+        IEnumerable<TagFilterOption> source)
+    {
+        target.Clear();
+        foreach (var option in source)
+        {
+            target.Add(option);
+        }
     }
 
     private void ApplyFilters()
@@ -378,17 +629,33 @@ public sealed class LibraryViewModel : PageViewModelBase
             query = query.Where(item => item.GenresText.Contains(genreKeyword, StringComparison.OrdinalIgnoreCase));
         }
 
-        if (int.TryParse(YearFilterText, out var year))
+        foreach (var tag in TypeTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
         {
-            query = query.Where(item => item.ReleaseYear == year);
+            query = query.Where(item => HasSelectedTag(item, TagCategoryType, tag));
+        }
+
+        foreach (var tag in EmotionTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
+        {
+            query = query.Where(item => HasSelectedTag(item, TagCategoryEmotion, tag));
+        }
+
+        foreach (var tag in SceneTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
+        {
+            query = query.Where(item => HasSelectedTag(item, TagCategoryScene, tag));
+        }
+
+        if (TryParseDecadeFilter(SelectedDecadeFilter, out var decadeStart))
+        {
+            query = query.Where(item => item.ReleaseYear >= decadeStart && item.ReleaseYear < decadeStart + 10);
         }
 
         query = SelectedStatusFilter switch
         {
-            "已匹配" => query.Where(item => item.IdentificationStatus == IdentificationStatus.Matched),
-            "待确认" => query.Where(item => item.IdentificationStatus == IdentificationStatus.NeedsReview),
-            "人工确认" => query.Where(item => item.IdentificationStatus == IdentificationStatus.ManualConfirmed),
-            "识别失败" => query.Where(item => item.IdentificationStatus == IdentificationStatus.Failed),
+            StatusMatched => query.Where(item => item.IdentificationStatus == IdentificationStatus.Matched),
+            StatusNeedsReview => query.Where(item => item.IdentificationStatus == IdentificationStatus.NeedsReview),
+            StatusManualConfirmed => query.Where(item => item.IdentificationStatus == IdentificationStatus.ManualConfirmed),
+            StatusFailed => query.Where(item => item.IdentificationStatus == IdentificationStatus.Failed),
+            StatusPending => query.Where(item => item.IdentificationStatus == IdentificationStatus.Pending),
             _ => query
         };
 
@@ -400,11 +667,18 @@ public sealed class LibraryViewModel : PageViewModelBase
             _ => query
         };
 
+        query = SelectedCollectionStatusFilter switch
+        {
+            CollectionStatusFavorite => query.Where(item => item.IsFavorite),
+            CollectionStatusWantToWatch => query.Where(item => item.IsWantToWatch),
+            CollectionStatusNotInterested => query.Where(item => item.IsNotInterested),
+            _ => query
+        };
+
         query = SelectedLibraryScope switch
         {
-            LibraryScopeInLibraryAndExternalWatchedOrNotInterested => query.Where(
-                item => item.IsInLibrary || (!item.IsInLibrary && (item.IsWatched || item.IsNotInterested))),
-            LibraryScopeAll => query,
+            LibraryScopeAll => query.Where(item => item.IsInLibrary || IsExternalHistoryOrNotInterested(item)),
+            LibraryScopeExternal => query.Where(IsExternalHistoryOrNotInterested),
             _ => query.Where(item => item.IsInLibrary)
         };
 
@@ -429,7 +703,72 @@ public sealed class LibraryViewModel : PageViewModelBase
         RefreshBatchCommandState();
         StatusMessage = _allMovies.Count == 0
             ? "当前还没有可展示的影片数据。请先到扫描任务页执行扫描。"
-            : $"当前显示 {filtered.Count} / {_allMovies.Count} 部影片。";
+            : BuildResultStatusMessage(filtered.Count);
+    }
+
+    private string BuildResultStatusMessage(int filteredCount)
+    {
+        var message = $"找到 {filteredCount} 部影片";
+        if (SelectedSourceFilter != SourceFilterAll)
+        {
+            message += $"；来源筛选「{SelectedSourceFilter}」暂为占位";
+        }
+
+        if (IsBatchSelectionMode)
+        {
+            message += $"；已选择 {SelectedCount} 部";
+        }
+
+        return message;
+    }
+
+    private static bool IsExternalHistoryOrNotInterested(LibraryMovieListItem item)
+    {
+        return !item.IsInLibrary && (item.IsWatched || item.IsNotInterested);
+    }
+
+    private static bool HasSelectedTag(
+        LibraryMovieListItem item,
+        string category,
+        string selectedTag)
+    {
+        var tags = category switch
+        {
+            TagCategoryType => GetTypeTags(item),
+            TagCategoryEmotion => SplitTags(item.EmotionTagsText),
+            TagCategoryScene => SplitTags(item.SceneTagsText),
+            _ => Array.Empty<string>()
+        };
+
+        return tags.Any(tag => string.Equals(tag, selectedTag, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool TryParseDecadeFilter(string value, out int decadeStart)
+    {
+        decadeStart = 0;
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, DecadeAll, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var normalized = value.Replace("年代", string.Empty, StringComparison.Ordinal).Trim();
+        return int.TryParse(normalized, out decadeStart);
+    }
+
+    private static IReadOnlyList<string> GetTypeTags(LibraryMovieListItem item)
+    {
+        return SplitTags(string.IsNullOrWhiteSpace(item.AiTagsText) ? item.GenresText : item.AiTagsText);
+    }
+
+    private static IReadOnlyList<string> SplitTags(string? text)
+    {
+        return string.IsNullOrWhiteSpace(text)
+            ? []
+            : text
+                .Split(['、', '/', ',', '，', ';', '；', '|', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(tag => tag.Trim())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .ToList();
     }
 
     private IEnumerable<LibraryMovieListItem> ApplySorting(IEnumerable<LibraryMovieListItem> query)
@@ -589,14 +928,14 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         var confirmed = await _confirmationDialogService.ConfirmAsync(
-            "确认移出资源库？",
+            "确认移出媒体库？",
             "移出后将从当前媒体库列表中移除所选资源，但不会删除本地文件、WebDAV 文件或播放历史。后续扫描可能重新发现。",
             "移出",
             "取消");
 
         if (!confirmed)
         {
-            BatchResultSummary = "已取消移出资源库。";
+            BatchResultSummary = "已取消移出媒体库。";
             return;
         }
 
@@ -643,7 +982,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             }
 
             await ActivateAsync();
-            BatchResultSummary = BuildResultSummary("移出资源库", successCount, errors);
+            BatchResultSummary = BuildResultSummary("移出媒体库", successCount, errors);
             NotifyAfterBatchRemoveFromLibrary();
             WriteLibraryBatchEvent(
                 $"event=library-remove-from-library-complete success={successCount} failed={errors.Count}");
@@ -926,6 +1265,11 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(CanBatchDeleteMovieRecords));
         OnPropertyChanged(nameof(CanCancelBatchOperation));
         OnPropertyChanged(nameof(BatchSelectionButtonText));
+        if (_allMovies.Count > 0)
+        {
+            StatusMessage = BuildResultStatusMessage(Movies.Count);
+        }
+
         ToggleBatchSelectionModeCommand.RaiseCanExecuteChanged();
         BatchMarkWatchedCommand.RaiseCanExecuteChanged();
         BatchMarkUnwatchedCommand.RaiseCanExecuteChanged();
@@ -1025,12 +1369,14 @@ public sealed class LibraryViewModel : PageViewModelBase
                     LastUpdatedAt = movie.OmdbLastUpdatedAt ?? DateTime.UtcNow
                 }
                 : null,
-            Tags = movie.GenresText,
+            Tags = string.IsNullOrWhiteSpace(movie.AiTagsText) ? movie.GenresText : movie.AiTagsText,
+            EmotionTagsText = movie.EmotionTagsText,
+            SceneTagsText = movie.SceneTagsText,
             IsInLibrary = movie.IsInLibrary,
             IsWatched = movie.IsWatched,
             IsWantToWatch = movie.IsWantToWatch,
             IsNotInterested = movie.IsNotInterested,
-            ScopeText = "资源库",
+            ScopeText = "媒体库",
             AvailabilityText = movie.IsInLibrary ? "已入库" : "未入库",
             WatchStateText = movie.IsWatched ? "已看" : "未看"
         };
@@ -1159,6 +1505,35 @@ public sealed class LibraryViewModel : PageViewModelBase
     private static string DescribeException(Exception exception)
     {
         return exception.InnerException?.Message ?? exception.Message;
+    }
+
+    public sealed class TagFilterOption : ObservableObject
+    {
+        private readonly Action<TagFilterOption> _selectionChanged;
+        private bool _isSelected;
+
+        public TagFilterOption(string category, string label, Action<TagFilterOption> selectionChanged)
+        {
+            Category = category;
+            Label = label;
+            _selectionChanged = selectionChanged;
+        }
+
+        public string Category { get; }
+
+        public string Label { get; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (SetProperty(ref _isSelected, value))
+                {
+                    _selectionChanged(this);
+                }
+            }
+        }
     }
 
     private sealed record BatchItemError(string SelectionKey, string Title, string Message);

@@ -39,13 +39,16 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _selectedThemeMode = "Light";
     private string _connectionStatusMessage = "请先保存 WebDAV 连接配置。";
     private string _scanPathStatusMessage = "当前还没有扫描路径。";
-    private string _apiStatusMessage = "可在这里保存 TMDB、OMDb 与 AI 配置。";
+    private string _tmdbStatusMessage = "可在这里保存 TMDB 认证信息。";
+    private string _omdbStatusMessage = "可在这里保存 OMDb 认证信息。";
+    private string _apiStatusMessage = "可在这里保存大模型配置。";
     private string _themeStatusMessage = "默认使用浅色主题。";
     private string _videoCacheDirectory = string.Empty;
     private string _videoCacheUsageText = "视频缓存占用尚未加载。";
     private string _videoCacheDownloadingText = string.Empty;
     private string _videoCacheMaxGbText = "50";
     private string _videoCacheStatusMessage = "视频缓存设置尚未加载。";
+    private string _aboutStatusMessage = "XFVerse 影音管理系统";
     private int? _editingScanPathId;
     private string _editingScanPathValue = string.Empty;
     private string _editingScanPathDisplayName = string.Empty;
@@ -57,7 +60,7 @@ public sealed class SettingsViewModel : PageViewModelBase
         IWebDavService webDavService,
         IThemeService themeService,
         IVideoCacheService videoCacheService)
-        : base("设置", "分区管理 WebDAV、扫描路径、元数据 API、AI、主题与播放器偏好。")
+        : base("设置", "管理通用设置与 API 配置。")
     {
         _settingsService = settingsService;
         _webDavService = webDavService;
@@ -67,8 +70,10 @@ public sealed class SettingsViewModel : PageViewModelBase
         ThemeModes = _themeService.ThemeModes;
         SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync);
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync);
-        SaveApiSettingsCommand = new AsyncRelayCommand(SaveApiSettingsAsync);
-        TestApiSettingsCommand = new AsyncRelayCommand(TestApiSettingsAsync);
+        SaveTmdbSettingsCommand = new AsyncRelayCommand(SaveTmdbSettingsAsync);
+        TestTmdbConnectionCommand = new AsyncRelayCommand(TestTmdbConnectionAsync);
+        SaveOmdbSettingsCommand = new AsyncRelayCommand(SaveOmdbSettingsAsync);
+        TestOmdbConnectionCommand = new AsyncRelayCommand(TestOmdbConnectionAsync);
         SaveAiSettingsCommand = new AsyncRelayCommand(SaveAiSettingsAsync);
         SaveThemeSettingsCommand = new AsyncRelayCommand(SaveThemeSettingsAsync);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath);
@@ -80,6 +85,7 @@ public sealed class SettingsViewModel : PageViewModelBase
         SaveVideoCacheSettingsCommand = new AsyncRelayCommand(SaveVideoCacheSettingsAsync);
         ClearVideoCacheCommand = new AsyncRelayCommand(ClearVideoCacheAsync);
         RefreshVideoCacheUsageCommand = new AsyncRelayCommand(RefreshVideoCacheUsageAsync);
+        ToggleAboutDetailsCommand = new RelayCommand(ToggleAboutDetails);
     }
 
     public ObservableCollection<ScanPath> ScanPaths { get; } = [];
@@ -90,9 +96,13 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public AsyncRelayCommand TestConnectionCommand { get; }
 
-    public AsyncRelayCommand SaveApiSettingsCommand { get; }
+    public AsyncRelayCommand SaveTmdbSettingsCommand { get; }
 
-    public AsyncRelayCommand TestApiSettingsCommand { get; }
+    public AsyncRelayCommand TestTmdbConnectionCommand { get; }
+
+    public AsyncRelayCommand SaveOmdbSettingsCommand { get; }
+
+    public AsyncRelayCommand TestOmdbConnectionCommand { get; }
 
     public AsyncRelayCommand SaveAiSettingsCommand { get; }
 
@@ -115,6 +125,8 @@ public sealed class SettingsViewModel : PageViewModelBase
     public AsyncRelayCommand ClearVideoCacheCommand { get; }
 
     public AsyncRelayCommand RefreshVideoCacheUsageCommand { get; }
+
+    public RelayCommand ToggleAboutDetailsCommand { get; }
 
     public int? ConnectionId
     {
@@ -156,6 +168,10 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public string ScanPathStatusMessage { get => _scanPathStatusMessage; set => SetProperty(ref _scanPathStatusMessage, value); }
 
+    public string TmdbStatusMessage { get => _tmdbStatusMessage; set => SetProperty(ref _tmdbStatusMessage, value); }
+
+    public string OmdbStatusMessage { get => _omdbStatusMessage; set => SetProperty(ref _omdbStatusMessage, value); }
+
     public string ApiStatusMessage { get => _apiStatusMessage; set => SetProperty(ref _apiStatusMessage, value); }
 
     public string ThemeStatusMessage { get => _themeStatusMessage; set => SetProperty(ref _themeStatusMessage, value); }
@@ -169,6 +185,10 @@ public sealed class SettingsViewModel : PageViewModelBase
     public string VideoCacheMaxGbText { get => _videoCacheMaxGbText; set => SetProperty(ref _videoCacheMaxGbText, value); }
 
     public string VideoCacheStatusMessage { get => _videoCacheStatusMessage; set => SetProperty(ref _videoCacheStatusMessage, value); }
+
+    public string AboutStatusMessage { get => _aboutStatusMessage; set => SetProperty(ref _aboutStatusMessage, value); }
+
+    public string AppVersionText => $"版本 {GetType().Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
 
     public bool HasSavedConnection => ConnectionId.HasValue;
 
@@ -209,30 +229,19 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         try
         {
-            var connectionTask = _settingsService.GetPrimaryConnectionAsync(cancellationToken);
             var appSettingTask = _settingsService.GetApplicationSettingAsync(cancellationToken);
 
-            await Task.WhenAll(connectionTask, appSettingTask);
-            ApplyConnection(connectionTask.Result);
+            await appSettingTask;
             ApplyApplicationSetting(appSettingTask.Result);
-
-            if (ConnectionId.HasValue)
-            {
-                await LoadScanPathsAsync(ConnectionId.Value, cancellationToken);
-            }
-            else
-            {
-                ScanPaths.Clear();
-                ScanPathStatusMessage = "先保存 WebDAV 连接，再添加扫描路径。";
-            }
 
             await LoadVideoCacheAsync(cancellationToken);
         }
         catch (Exception exception)
         {
             ConnectionStatusMessage = $"加载设置失败：{exception.Message}";
-            ApiStatusMessage = "接口配置尚未加载。";
-            ScanPathStatusMessage = "扫描路径尚未加载。";
+            TmdbStatusMessage = "TMDB 配置尚未加载。";
+            OmdbStatusMessage = "OMDb 配置尚未加载。";
+            ApiStatusMessage = "大模型配置尚未加载。";
             VideoCacheStatusMessage = "视频缓存设置尚未加载。";
         }
     }
@@ -260,7 +269,9 @@ public sealed class SettingsViewModel : PageViewModelBase
         AiApiKey = applicationSetting.AiApiKey;
         AiModel = applicationSetting.AiModel;
         SelectedThemeMode = string.IsNullOrWhiteSpace(applicationSetting.ThemeMode) ? "Light" : applicationSetting.ThemeMode;
-        ApiStatusMessage = "已加载外部接口配置。";
+        TmdbStatusMessage = "已加载 TMDB 配置。";
+        OmdbStatusMessage = "已加载 OMDb 配置。";
+        ApiStatusMessage = "已加载大模型配置。";
         ThemeStatusMessage = $"当前主题：{SelectedThemeMode}";
     }
 
@@ -309,65 +320,82 @@ public sealed class SettingsViewModel : PageViewModelBase
         ConnectionStatusMessage = result.Message;
     }
 
-    private async Task SaveApiSettingsAsync()
+    private async Task SaveTmdbSettingsAsync()
     {
-        await SaveApplicationSettingsAsync();
-        ApiStatusMessage = "TMDB / OMDb 认证信息已保存。";
+        try
+        {
+            var saved = await SaveApplicationSettingsAsync(settings =>
+            {
+                settings.TmdbReadAccessToken = TmdbReadAccessToken;
+                settings.TmdbApiKey = TmdbApiKey;
+            });
+            _applicationSettingId = saved.Id;
+            TmdbStatusMessage = "TMDB 认证信息已保存。";
+        }
+        catch (Exception exception)
+        {
+            TmdbStatusMessage = $"保存 TMDB 配置失败：{exception.Message}";
+        }
     }
 
-    private async Task TestApiSettingsAsync()
+    private async Task TestTmdbConnectionAsync()
     {
         var hasTmdbCredential = !string.IsNullOrWhiteSpace(TmdbReadAccessToken)
                                 || !string.IsNullOrWhiteSpace(TmdbApiKey);
-        var hasOmdbCredential = !string.IsNullOrWhiteSpace(OmdbApiKey);
-        if (!hasTmdbCredential && !hasOmdbCredential)
+        if (!hasTmdbCredential)
         {
-            ApiStatusMessage = "请先填写 TMDB 或 OMDb 的认证信息。";
+            TmdbStatusMessage = "请先填写 TMDB Read Access Token 或 API Key。";
             return;
         }
 
-        ApiStatusMessage = "正在测试元数据接口连接...";
-        var settings = await _settingsService.GetApplicationSettingAsync();
-        var results = new List<string>();
-        var failures = new List<string>();
+        try
+        {
+            TmdbStatusMessage = "正在测试 TMDB 连接...";
+            var settings = await _settingsService.GetApplicationSettingAsync();
+            await TestTmdbAsync(settings.TmdbBaseUrl);
+            TmdbStatusMessage = "TMDB 连接正常。";
+        }
+        catch (Exception exception)
+        {
+            TmdbStatusMessage = $"TMDB 连接失败：{exception.Message}";
+        }
+    }
 
-        if (hasTmdbCredential)
+    private async Task SaveOmdbSettingsAsync()
+    {
+        try
         {
-            try
+            var saved = await SaveApplicationSettingsAsync(settings =>
             {
-                await TestTmdbAsync(settings.TmdbBaseUrl);
-                results.Add("TMDB 正常");
-            }
-            catch (Exception exception)
-            {
-                failures.Add($"TMDB 失败：{exception.Message}");
-            }
+                settings.OmdbApiKey = OmdbApiKey;
+            });
+            _applicationSettingId = saved.Id;
+            OmdbStatusMessage = "OMDb 认证信息已保存。";
         }
-        else
+        catch (Exception exception)
         {
-            results.Add("TMDB 未配置");
+            OmdbStatusMessage = $"保存 OMDb 配置失败：{exception.Message}";
+        }
+    }
+
+    private async Task TestOmdbConnectionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(OmdbApiKey))
+        {
+            OmdbStatusMessage = "请先填写 OMDb API Key。";
+            return;
         }
 
-        if (hasOmdbCredential)
+        try
         {
-            try
-            {
-                await TestOmdbAsync();
-                results.Add("OMDb 正常");
-            }
-            catch (Exception exception)
-            {
-                failures.Add($"OMDb 失败：{exception.Message}");
-            }
+            OmdbStatusMessage = "正在测试 OMDb 连接...";
+            await TestOmdbAsync();
+            OmdbStatusMessage = "OMDb 连接正常。";
         }
-        else
+        catch (Exception exception)
         {
-            results.Add("OMDb 未配置");
+            OmdbStatusMessage = $"OMDb 连接失败：{exception.Message}";
         }
-
-        ApiStatusMessage = failures.Count == 0
-            ? $"测试通过：{string.Join("；", results)}。"
-            : $"测试完成：{string.Join("；", results)}。{string.Join("；", failures)}";
     }
 
     private async Task SaveAiSettingsAsync()
@@ -484,30 +512,51 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         try
         {
-            var existing = await _settingsService.GetApplicationSettingAsync();
-            var saved = await _settingsService.SaveApplicationSettingAsync(
-                new ApplicationSettingModel
-                {
-                    Id = _applicationSettingId,
-                    TmdbReadAccessToken = TmdbReadAccessToken,
-                    TmdbApiKey = TmdbApiKey,
-                    OmdbApiKey = OmdbApiKey,
-                    ThemeMode = SelectedThemeMode,
-                    AiBaseUrl = AiBaseUrl,
-                    AiApiKey = AiApiKey,
-                    AiModel = AiModel,
-                    RecentAiRecommendationsJson = existing.RecentAiRecommendationsJson,
-                    CurrentAiRecommendationsJson = existing.CurrentAiRecommendationsJson,
-                    AiRecommendationLibraryFingerprint = existing.AiRecommendationLibraryFingerprint,
-                    TmdbBaseUrl = existing.TmdbBaseUrl
-                });
-
-            _applicationSettingId = saved.Id;
+            await SaveApplicationSettingsAsync(settings =>
+            {
+                settings.Id = _applicationSettingId;
+                settings.TmdbReadAccessToken = TmdbReadAccessToken;
+                settings.TmdbApiKey = TmdbApiKey;
+                settings.OmdbApiKey = OmdbApiKey;
+                settings.ThemeMode = SelectedThemeMode;
+                settings.AiBaseUrl = AiBaseUrl;
+                settings.AiApiKey = AiApiKey;
+                settings.AiModel = AiModel;
+            });
         }
         catch (Exception exception)
         {
             ApiStatusMessage = $"保存接口配置失败：{exception.Message}";
         }
+    }
+
+    private async Task<ApplicationSettingModel> SaveApplicationSettingsAsync(Action<ApplicationSettingModel> configureSettings)
+    {
+        var existing = await _settingsService.GetApplicationSettingAsync();
+        var settings = CopyApplicationSettings(existing);
+        configureSettings(settings);
+        var saved = await _settingsService.SaveApplicationSettingAsync(settings);
+        _applicationSettingId = saved.Id;
+        return saved;
+    }
+
+    private static ApplicationSettingModel CopyApplicationSettings(ApplicationSettingModel settings)
+    {
+        return new ApplicationSettingModel
+        {
+            Id = settings.Id,
+            TmdbReadAccessToken = settings.TmdbReadAccessToken,
+            TmdbApiKey = settings.TmdbApiKey,
+            OmdbApiKey = settings.OmdbApiKey,
+            ThemeMode = settings.ThemeMode,
+            AiBaseUrl = settings.AiBaseUrl,
+            AiApiKey = settings.AiApiKey,
+            AiModel = settings.AiModel,
+            RecentAiRecommendationsJson = settings.RecentAiRecommendationsJson,
+            CurrentAiRecommendationsJson = settings.CurrentAiRecommendationsJson,
+            AiRecommendationLibraryFingerprint = settings.AiRecommendationLibraryFingerprint,
+            TmdbBaseUrl = settings.TmdbBaseUrl
+        };
     }
 
     private async Task LoadVideoCacheAsync(CancellationToken cancellationToken)
@@ -769,6 +818,11 @@ public sealed class SettingsViewModel : PageViewModelBase
         EditingScanPathDisplayName = string.Empty;
         EditingScanPathEnabled = true;
         EditingScanPathRecursive = true;
+    }
+
+    private void ToggleAboutDetails()
+    {
+        AboutStatusMessage = "关于详情将在后续最终 UI 阶段完善。";
     }
 
     private async Task LoadScanPathsAsync(int sourceConnectionId, CancellationToken cancellationToken)

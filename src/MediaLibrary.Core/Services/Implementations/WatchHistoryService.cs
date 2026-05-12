@@ -1,6 +1,8 @@
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.Enums;
+using MediaLibrary.Core.Models.ReadModels;
 using Microsoft.EntityFrameworkCore;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -9,6 +11,7 @@ namespace MediaLibrary.Core.Services.Implementations;
 public sealed class WatchHistoryService : IWatchHistoryService
 {
     private const double AggregateEvaluationPositionRatio = 0.7d;
+    private const int DefaultHistoryTake = 100;
 
     public async Task<int> StartAsync(
         int movieId,
@@ -150,6 +153,63 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return autoWatchedChanged;
+    }
+
+    public async Task<IReadOnlyList<WatchHistoryListItem>> GetHistoryItemsAsync(
+        WatchHistoryQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var take = query.Take <= 0 ? DefaultHistoryTake : query.Take;
+        var rawTake = Math.Max(take * 5, take);
+
+        var histories = dbContext.WatchHistories
+            .AsNoTracking()
+            .Where(x => x.Movie != null);
+
+        if (query.StartedAtUtc.HasValue)
+        {
+            histories = histories.Where(x => x.StartedAt >= query.StartedAtUtc.Value);
+        }
+
+        if (query.EndedBeforeUtc.HasValue)
+        {
+            histories = histories.Where(x => x.StartedAt < query.EndedBeforeUtc.Value);
+        }
+
+        var rows = await histories
+            .OrderByDescending(x => x.StartedAt)
+            .Take(rawTake)
+            .Select(
+                x => new WatchHistoryProjection
+                {
+                    HistoryId = x.Id,
+                    MovieId = x.MovieId,
+                    MediaFileId = x.MediaFileId,
+                    TmdbId = x.Movie!.TmdbId,
+                    Title = x.Movie.Title,
+                    ReleaseYear = x.Movie.ReleaseYear,
+                    PosterRemoteUrl = x.Movie.PosterRemoteUrl ?? x.Movie.PosterLocalPath ?? string.Empty,
+                    MediaFileName = x.MediaFile == null ? string.Empty : x.MediaFile.FileName,
+                    StartedAt = x.StartedAt,
+                    EndedAt = x.EndedAt,
+                    DurationWatchedSeconds = x.DurationWatchedSeconds,
+                    LastPlayPositionSeconds = x.LastPlayPositionSeconds,
+                    MediaDurationSeconds = x.MediaFile == null ? null : x.MediaFile.DurationSeconds,
+                    RuntimeMinutes = x.Movie.RuntimeMinutes,
+                    IsCompleted = x.IsCompleted,
+                    IsMediaFileDeleted = x.MediaFile != null && x.MediaFile.IsDeleted,
+                    IdentificationStatus = x.Movie.IdentificationStatus
+                })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(ToListItem)
+            .GroupBy(item => BuildSameDayMovieKey(item), StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(item => item.StartedAtLocal).First())
+            .OrderByDescending(item => item.StartedAtLocal)
+            .Take(take)
+            .ToList();
     }
 
     private static async Task<WatchCompletionResult> EvaluateCompletionAsync(
@@ -473,6 +533,76 @@ public sealed class WatchHistoryService : IWatchHistoryService
         return durationSeconds.HasValue ? durationSeconds.Value.ToString() : "null";
     }
 
+    private static WatchHistoryListItem ToListItem(WatchHistoryProjection row)
+    {
+        var totalDurationSeconds = row.MediaDurationSeconds
+                                   ?? (row.RuntimeMinutes is > 0 ? row.RuntimeMinutes.Value * 60 : null);
+        var progressPercent = ResolveProgressPercent(
+            row.LastPlayPositionSeconds,
+            totalDurationSeconds,
+            row.IsCompleted);
+
+        return new WatchHistoryListItem
+        {
+            HistoryId = row.HistoryId,
+            MovieId = row.MovieId,
+            MediaFileId = row.MediaFileId,
+            TmdbId = row.TmdbId,
+            Title = string.IsNullOrWhiteSpace(row.Title) ? row.MediaFileName : row.Title,
+            ReleaseYear = row.ReleaseYear,
+            PosterRemoteUrl = row.PosterRemoteUrl,
+            MediaFileName = row.MediaFileName,
+            StartedAtLocal = ToLocalTime(row.StartedAt),
+            EndedAtLocal = row.EndedAt.HasValue ? ToLocalTime(row.EndedAt.Value) : null,
+            DurationWatchedSeconds = Math.Max(0, row.DurationWatchedSeconds),
+            LastPlayPositionSeconds = Math.Max(0, row.LastPlayPositionSeconds),
+            TotalDurationSeconds = totalDurationSeconds,
+            IsCompleted = row.IsCompleted,
+            IsMediaFileDeleted = row.IsMediaFileDeleted,
+            IdentificationStatus = row.IdentificationStatus,
+            ProgressPercent = progressPercent
+        };
+    }
+
+    private static double? ResolveProgressPercent(
+        int positionSeconds,
+        int? totalDurationSeconds,
+        bool isCompleted)
+    {
+        if (isCompleted)
+        {
+            return 100d;
+        }
+
+        if (!totalDurationSeconds.HasValue || totalDurationSeconds.Value <= 0 || positionSeconds <= 0)
+        {
+            return null;
+        }
+
+        return Math.Clamp(positionSeconds * 100d / totalDurationSeconds.Value, 0d, 100d);
+    }
+
+    private static string BuildSameDayMovieKey(WatchHistoryListItem item)
+    {
+        var movieKey = item.TmdbId.HasValue
+            ? $"tmdb:{item.TmdbId.Value}"
+            : $"movie:{item.MovieId}";
+        return $"{item.StartedAtLocal.Date:yyyyMMdd}:{movieKey}";
+    }
+
+    private static DateTime ToLocalTime(DateTime value)
+    {
+        if (value.Kind == DateTimeKind.Local)
+        {
+            return value;
+        }
+
+        var utc = value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        return utc.ToLocalTime();
+    }
+
     public async Task DiscardAsync(int watchHistoryId, CancellationToken cancellationToken = default)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -510,5 +640,42 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
         dbContext.WatchHistories.Remove(history);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private sealed class WatchHistoryProjection
+    {
+        public int HistoryId { get; init; }
+
+        public int MovieId { get; init; }
+
+        public int MediaFileId { get; init; }
+
+        public int? TmdbId { get; init; }
+
+        public string Title { get; init; } = string.Empty;
+
+        public int? ReleaseYear { get; init; }
+
+        public string PosterRemoteUrl { get; init; } = string.Empty;
+
+        public string MediaFileName { get; init; } = string.Empty;
+
+        public DateTime StartedAt { get; init; }
+
+        public DateTime? EndedAt { get; init; }
+
+        public int DurationWatchedSeconds { get; init; }
+
+        public int LastPlayPositionSeconds { get; init; }
+
+        public int? MediaDurationSeconds { get; init; }
+
+        public int? RuntimeMinutes { get; init; }
+
+        public bool IsCompleted { get; init; }
+
+        public bool IsMediaFileDeleted { get; init; }
+
+        public IdentificationStatus IdentificationStatus { get; init; }
     }
 }

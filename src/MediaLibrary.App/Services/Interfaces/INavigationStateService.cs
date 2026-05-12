@@ -10,9 +10,13 @@ public interface INavigationStateService
 
     AiRecommendationItem? SelectedExternalRecommendation { get; }
 
+    DateTime? SelectedWatchHistoryDate { get; }
+
     event EventHandler<NavigationRequest>? NavigationRequested;
 
-    void RequestNavigation(NavigationPageKey pageKey, int? movieId = null);
+    void RequestNavigation(NavigationPageKey pageKey, int? movieId = null, DateTime? targetDate = null);
 
     void RequestExternalMovieDetail(AiRecommendationItem recommendation);
+
+    DateTime? ConsumeWatchHistoryTargetDate();
 }

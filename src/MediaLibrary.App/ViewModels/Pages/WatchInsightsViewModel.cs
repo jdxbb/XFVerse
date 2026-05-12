@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
+using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
@@ -58,6 +59,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private readonly IWatchStatisticsService _statisticsService;
     private readonly IWatchProfileService _profileService;
     private readonly IDataRefreshService _dataRefreshService;
+    private readonly INavigationStateService _navigationStateService;
     private CancellationTokenSource? _dataChangedRefreshDebounceCts;
     private string _selectedTab = ProfileTabKey;
     private bool _isLoadingStatistics;
@@ -81,12 +83,14 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public WatchInsightsViewModel(
         IWatchStatisticsService statisticsService,
         IWatchProfileService profileService,
-        IDataRefreshService dataRefreshService)
+        IDataRefreshService dataRefreshService,
+        INavigationStateService navigationStateService)
         : base("观影洞察", "让你更懂你")
     {
         _statisticsService = statisticsService;
         _profileService = profileService;
         _dataRefreshService = dataRefreshService;
+        _navigationStateService = navigationStateService;
         _dataRefreshService.DataChanged += OnDataChanged;
 
         ProfileEmptyCards =
@@ -1457,7 +1461,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             return;
         }
 
-        CalendarNoticeMessage = $"观影历史页面将在后续阶段接入：{day.Date:MM月dd日}";
+        CalendarNoticeMessage = string.Empty;
+        _navigationStateService.RequestNavigation(NavigationPageKey.WatchHistory, targetDate: day.Date);
     }
 
     private static List<RankedTagItem> BuildRankingItems(IReadOnlyList<WatchStatisticsTagItem> source)

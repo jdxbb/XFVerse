@@ -1,4 +1,5 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.LibraryPage"
+             x:Name="Root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
@@ -61,130 +62,206 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="16" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2.1*" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="1.2*" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="120" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="140" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="关键词搜索" Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBox Style="{StaticResource FormTextBoxStyle}"
+                        <TextBlock Text="搜索" Style="{StaticResource BodyMutedTextStyle}" />
+                        <TextBox MinWidth="320"
+                                 Style="{StaticResource FormTextBoxStyle}"
                                  ToolTip="按片名或原名搜索"
                                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="类型筛选" Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                 ToolTip="例如：剧情、动作、科幻"
-                                 Text="{Binding GenreFilterText, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Column="2"
+                            VerticalAlignment="Bottom"
+                            Content="清除筛选"
+                            Command="{Binding ClearFiltersCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                </Grid>
+
+                <WrapPanel Grid.Row="2">
+                    <StackPanel Width="132" Margin="0,0,12,12">
+                        <TextBlock Text="排序" Style="{StaticResource BodyMutedTextStyle}" />
+                        <ComboBox SelectedItem="{Binding SelectedSortOption}"
+                                  ItemsSource="{Binding SortOptions}"
+                                  Style="{StaticResource FormComboBoxStyle}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="4">
-                        <TextBlock Text="年份" Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                 ToolTip="例如：2011"
-                                 Text="{Binding YearFilterText, UpdateSourceTrigger=PropertyChanged}" />
+                    <StackPanel Width="112" Margin="0,0,12,12">
+                        <TextBlock Text="顺序" Style="{StaticResource BodyMutedTextStyle}" />
+                        <ComboBox SelectedItem="{Binding SelectedSortDirection}"
+                                  ItemsSource="{Binding SortDirectionOptions}"
+                                  Style="{StaticResource FormComboBoxStyle}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="6">
+                    <StackPanel Width="190" Margin="0,0,12,12">
+                        <TextBlock Text="范围" Style="{StaticResource BodyMutedTextStyle}" />
+                        <Menu>
+                            <MenuItem Header="{Binding LibraryScopeMenuHeader}">
+                                <MenuItem Header="影片范围">
+                                    <MenuItem Header="全部"
+                                              Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
+                                              CommandParameter="全部" />
+                                    <MenuItem Header="库内"
+                                              Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
+                                              CommandParameter="库内" />
+                                    <MenuItem Header="库外"
+                                              Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
+                                              CommandParameter="库外" />
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="影片来源">
+                                    <MenuItem Header="全部来源"
+                                              Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
+                                              CommandParameter="全部来源" />
+                                    <MenuItem Header="本地"
+                                              Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
+                                              CommandParameter="本地" />
+                                    <MenuItem Header="WebDAV"
+                                              Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
+                                              CommandParameter="WebDAV" />
+                                </MenuItem>
+                            </MenuItem>
+                        </Menu>
+                    </StackPanel>
+
+                    <StackPanel Width="210" Margin="0,0,12,12">
+                        <TextBlock Text="标签" Style="{StaticResource BodyMutedTextStyle}" />
+                        <Menu>
+                            <MenuItem Header="{Binding TagFilterMenuHeader}">
+                                <MenuItem Header="清除标签"
+                                          Command="{Binding DataContext.ClearTagFilterCommand, ElementName=Root}" />
+                                <Separator />
+                                <MenuItem StaysOpenOnClick="True">
+                                    <MenuItem.Header>
+                                        <ScrollViewer Width="660" MaxHeight="420" VerticalScrollBarVisibility="Auto">
+                                            <Grid Margin="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="220" />
+                                                    <ColumnDefinition Width="220" />
+                                                    <ColumnDefinition Width="220" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                                    <TextBlock Text="类型标签" Style="{StaticResource BodyMutedTextStyle}" />
+                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding TypeTagOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox MinWidth="82"
+                                                                          Margin="0,0,8,8"
+                                                                          Content="{Binding Label}"
+                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                                                    <TextBlock Text="情绪标签" Style="{StaticResource BodyMutedTextStyle}" />
+                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding EmotionTagOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox MinWidth="82"
+                                                                          Margin="0,0,8,8"
+                                                                          Content="{Binding Label}"
+                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="场景标签" Style="{StaticResource BodyMutedTextStyle}" />
+                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding SceneTagOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox MinWidth="82"
+                                                                          Margin="0,0,8,8"
+                                                                          Content="{Binding Label}"
+                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Grid>
+                                        </ScrollViewer>
+                                    </MenuItem.Header>
+                                </MenuItem>
+                            </MenuItem>
+                        </Menu>
+                    </StackPanel>
+
+                    <StackPanel Width="116" Margin="0,0,12,12">
+                        <TextBlock Text="年代" Style="{StaticResource BodyMutedTextStyle}" />
+                        <ComboBox SelectedItem="{Binding SelectedDecadeFilter}"
+                                  ItemsSource="{Binding DecadeFilterOptions}"
+                                  Style="{StaticResource FormComboBoxStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Width="150" Margin="0,0,12,12">
+                        <TextBlock Text="收藏状态" Style="{StaticResource BodyMutedTextStyle}" />
+                        <Menu>
+                            <MenuItem Header="{Binding CollectionStatusMenuHeader}">
+                                <MenuItem Header="全部"
+                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
+                                          CommandParameter="全部" />
+                                <MenuItem Header="喜爱"
+                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
+                                          CommandParameter="喜爱" />
+                                <MenuItem Header="想看"
+                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
+                                          CommandParameter="想看" />
+                                <MenuItem Header="不想看"
+                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
+                                          CommandParameter="不想看" />
+                            </MenuItem>
+                        </Menu>
+                    </StackPanel>
+
+                    <StackPanel Width="132" Margin="0,0,12,12">
                         <TextBlock Text="识别状态" Style="{StaticResource BodyMutedTextStyle}" />
                         <ComboBox SelectedItem="{Binding SelectedStatusFilter}"
                                   ItemsSource="{Binding StatusOptions}"
                                   Style="{StaticResource FormComboBoxStyle}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="8">
-                        <TextBlock Text="排序字段" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedSortOption}"
-                                  ItemsSource="{Binding SortOptions}"
+                    <StackPanel Width="132" Margin="0,0,12,12">
+                        <TextBlock Text="观看状态" Style="{StaticResource BodyMutedTextStyle}" />
+                        <ComboBox SelectedItem="{Binding SelectedWatchedFilter}"
+                                  ItemsSource="{Binding WatchedFilterOptions}"
                                   Style="{StaticResource FormComboBoxStyle}" />
                     </StackPanel>
-                </Grid>
+                </WrapPanel>
 
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="140" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="140" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock Text="排序方向" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedSortDirection}"
-                                  ItemsSource="{Binding SortDirectionOptions}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
-                    </StackPanel>
-
-                    <Button Grid.Column="2"
-                            VerticalAlignment="Bottom"
-                            Content="应用搜索"
-                            Command="{Binding ApplySearchCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" />
-                    <Button Grid.Column="3"
-                            Margin="12,0,0,0"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Bottom"
-                            Content="清空筛选"
-                            Command="{Binding ClearFiltersCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-
-                    <StackPanel Grid.Column="3"
-                                Margin="150,0,0,0"
-                                Orientation="Horizontal"
-                                VerticalAlignment="Bottom">
-                        <StackPanel>
-                            <TextBlock Text="范围筛选" Style="{StaticResource BodyMutedTextStyle}" />
-                            <ComboBox Width="230"
-                                      SelectedItem="{Binding SelectedLibraryScope}"
-                                      ItemsSource="{Binding LibraryScopeOptions}"
-                                      Style="{StaticResource FormComboBoxStyle}" />
-                        </StackPanel>
-                        <StackPanel Margin="18,0,0,0">
-                            <TextBlock Text="观看状态" Style="{StaticResource BodyMutedTextStyle}" />
-                            <ComboBox Width="120"
-                                      SelectedItem="{Binding SelectedWatchedFilter}"
-                                      ItemsSource="{Binding WatchedFilterOptions}"
-                                      Style="{StaticResource FormComboBoxStyle}" />
-                        </StackPanel>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <Button Content="{Binding BatchSelectionButtonText}"
-                                Command="{Binding ToggleBatchSelectionModeCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                        <Button Margin="10,0,0,0"
-                                Content="海报墙"
-                                Command="{Binding SwitchToPosterViewCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                        <Button Margin="10,0,0,0"
-                                Content="列表"
-                                Command="{Binding SwitchToListViewCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                    </StackPanel>
-                </Grid>
-
-                <StackPanel Grid.Row="4"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
+                <WrapPanel Grid.Row="4" VerticalAlignment="Center">
+                    <WrapPanel.Style>
+                        <Style TargetType="WrapPanel">
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
@@ -192,23 +269,24 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </StackPanel.Style>
-                    <TextBlock VerticalAlignment="Center"
+                    </WrapPanel.Style>
+                    <TextBlock Margin="0,0,18,0"
+                               VerticalAlignment="Center"
                                Text="{Binding SelectedCount, StringFormat=已选 {0} 部}"
                                Style="{StaticResource BodyTextStyle}" />
-                    <Button Margin="18,0,0,0"
+                    <Button Margin="0,0,10,10"
                             Content="标记为已看"
                             Command="{Binding BatchMarkWatchedCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="10,0,0,0"
+                    <Button Margin="0,0,10,10"
                             Content="标记为未看"
                             Command="{Binding BatchMarkUnwatchedCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="10,0,0,0"
+                    <Button Margin="0,0,10,10"
                             Content="AI 辅助识别"
                             Command="{Binding BatchAutoIdentifyCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="10,0,0,0"
+                    <Button Margin="0,0,10,10"
                             Content="取消"
                             Command="{Binding CancelBatchOperationCommand}">
                         <Button.Style>
@@ -222,15 +300,15 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Margin="10,0,0,0"
-                            Content="移出资源库"
+                    <Button Margin="0,0,10,10"
+                            Content="移出媒体库"
                             Command="{Binding BatchRemoveFromLibraryCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="10,0,0,0"
+                    <Button Margin="0,0,10,10"
                             Content="删除影片记录"
                             Command="{Binding BatchDeleteMovieRecordsCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
-                </StackPanel>
+                </WrapPanel>
             </Grid>
         </Border>
 
@@ -242,23 +320,37 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel>
-                        <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBlock Margin="0,8,0,0"
-                                   Text="{Binding BatchResultSummary}"
-                                   TextWrapping="Wrap">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasBatchResultSummary}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Top">
+                            <Button Content="切换布局"
+                                    Command="{Binding ShowLayoutSwitchPlaceholderCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                            <Button Margin="10,0,0,0"
+                                    Content="{Binding BatchSelectionButtonText}"
+                                    Command="{Binding ToggleBatchSelectionModeCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                        </StackPanel>
+
+                        <StackPanel>
+                            <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Text="{Binding BatchResultSummary}"
+                                       TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasBatchResultSummary}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
 
                     <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Movies}">

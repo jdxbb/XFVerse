@@ -18,6 +18,12 @@ public sealed class LibraryMovieListItem
 
     public string GenresText { get; set; } = string.Empty;
 
+    public string AiTagsText { get; set; } = string.Empty;
+
+    public string EmotionTagsText { get; set; } = string.Empty;
+
+    public string SceneTagsText { get; set; } = string.Empty;
+
     public string Overview { get; set; } = string.Empty;
 
     public string Country { get; set; } = string.Empty;

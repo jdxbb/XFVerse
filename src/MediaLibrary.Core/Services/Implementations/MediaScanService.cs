@@ -66,6 +66,7 @@ public sealed class MediaScanService : IMediaScanService
                 x => new ScanTaskLogItem
                 {
                     Id = x.Id,
+                    ScanPathId = x.ScanPathId,
                     ScanPathDisplayName = x.ScanPath != null ? x.ScanPath.DisplayName : string.Empty,
                     ScanPath = x.ScanPath != null ? x.ScanPath.Path : string.Empty,
                     TaskType = x.TaskType,
@@ -126,7 +127,8 @@ public sealed class MediaScanService : IMediaScanService
         }
 
         var seenFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var videoMediaFileIds = new HashSet<int>();
+        var postProcessVideoMediaFileIds = new HashSet<int>();
+        var subtitleBindingVideoMediaFileIds = new HashSet<int>();
         var successfulLogIds = new List<int>();
         var totalResult = new ScanExecutionResult
         {
@@ -139,7 +141,8 @@ public sealed class MediaScanService : IMediaScanService
                 connection,
                 scanPath,
                 seenFilePaths,
-                videoMediaFileIds,
+                postProcessVideoMediaFileIds,
+                subtitleBindingVideoMediaFileIds,
                 cancellationToken);
 
             totalResult.TotalScannedCount += pathResult.TotalScannedCount;
@@ -155,11 +158,15 @@ public sealed class MediaScanService : IMediaScanService
         }
 
         var postStage = new PostScanStageResult();
-        await MarkMissingFilesDeletedAsync(connection.Id.Value, enabledScanPaths, seenFilePaths, cancellationToken);
+        var deletedSubtitleAffectedVideoIds = await MarkMissingFilesDeletedAsync(connection.Id.Value, enabledScanPaths, seenFilePaths, cancellationToken);
+        foreach (var mediaFileId in deletedSubtitleAffectedVideoIds)
+        {
+            subtitleBindingVideoMediaFileIds.Add(mediaFileId);
+        }
 
         try
         {
-            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(videoMediaFileIds.ToArray(), cancellationToken);
+            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(postProcessVideoMediaFileIds.ToArray(), cancellationToken);
             postStage.Absorb(identificationResult);
         }
         catch (Exception exception)
@@ -169,7 +176,7 @@ public sealed class MediaScanService : IMediaScanService
 
         try
         {
-            await ClassifyAffectedMoviesAsync(videoMediaFileIds, cancellationToken);
+            await ClassifyAffectedMoviesAsync(postProcessVideoMediaFileIds, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -178,7 +185,7 @@ public sealed class MediaScanService : IMediaScanService
 
         try
         {
-            await _subtitleBindingService.RebuildBindingsAsync(connection.Id.Value, videoMediaFileIds.ToArray(), cancellationToken);
+            await _subtitleBindingService.RebuildBindingsAsync(connection.Id.Value, subtitleBindingVideoMediaFileIds.ToArray(), cancellationToken);
         }
         catch (Exception exception)
         {
@@ -193,10 +200,12 @@ public sealed class MediaScanService : IMediaScanService
 
         if (successfulLogIds.Count > 0)
         {
-            await UpdateConnectionLastScanAtAsync(connection.Id.Value, cancellationToken);
+            var completedAt = DateTime.UtcNow;
+            await FinalizeSuccessfulLogsAsync(successfulLogIds, completedAt, cancellationToken);
+            await UpdateConnectionLastScanAtAsync(connection.Id.Value, completedAt, cancellationToken);
         }
 
-        QueueMediaProbe(videoMediaFileIds);
+        QueueMediaProbe(postProcessVideoMediaFileIds);
 
         totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
         return totalResult;
@@ -228,7 +237,8 @@ public sealed class MediaScanService : IMediaScanService
         WebDavConnectionModel connection,
         ScanPath scanPath,
         HashSet<string> seenFilePaths,
-        HashSet<int> videoMediaFileIds,
+        HashSet<int> postProcessVideoMediaFileIds,
+        HashSet<int> subtitleBindingVideoMediaFileIds,
         CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -267,6 +277,8 @@ public sealed class MediaScanService : IMediaScanService
         try
         {
             var existingFiles = await LoadExistingFilesForPathAsync(dbContext, connection.Id.Value, scanPath.Path, cancellationToken);
+            var changedVideoFiles = new List<MediaFile>();
+            var changedSubtitleDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var remoteEntry in remoteEntries.OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase))
             {
@@ -285,8 +297,11 @@ public sealed class MediaScanService : IMediaScanService
 
                 result.TotalScannedCount++;
 
+                var isNewFile = false;
+                var hasMaterialChange = false;
                 if (!existingFiles.TryGetValue(remoteEntry.Path, out var mediaFile))
                 {
+                    isNewFile = true;
                     mediaFile = new MediaFile
                     {
                         SourceConnectionId = connection.Id.Value,
@@ -296,8 +311,14 @@ public sealed class MediaScanService : IMediaScanService
                     existingFiles[remoteEntry.Path] = mediaFile;
                     result.NewFileCount++;
                 }
-                else if (HasMaterialChange(mediaFile, remoteEntry, mediaType, scanPath.Id))
+                else
                 {
+                    hasMaterialChange = HasMaterialChange(mediaFile, remoteEntry, mediaType, scanPath.Id);
+                    if (!hasMaterialChange)
+                    {
+                        continue;
+                    }
+
                     result.UpdatedFileCount++;
                 }
 
@@ -313,21 +334,37 @@ public sealed class MediaScanService : IMediaScanService
                 mediaFile.LastSeenAt = DateTime.UtcNow;
                 mediaFile.UpdatedAt = DateTime.UtcNow;
 
-                if (mediaType == MediaType.Video && mediaFile.Id > 0)
+                if (mediaType == MediaType.Video)
                 {
-                    videoMediaFileIds.Add(mediaFile.Id);
+                    changedVideoFiles.Add(mediaFile);
+                }
+                else if (mediaType == MediaType.Subtitle && (isNewFile || hasMaterialChange))
+                {
+                    changedSubtitleDirectories.Add(GetDirectoryPath(remoteEntry.Path));
                 }
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            foreach (var mediaFileId in dbContext.ChangeTracker.Entries<MediaFile>()
-                         .Select(x => x.Entity)
-                         .Where(x => x.MediaType == MediaType.Video)
+            foreach (var mediaFileId in changedVideoFiles
                          .Select(x => x.Id)
                          .Where(x => x > 0))
             {
-                videoMediaFileIds.Add(mediaFileId);
+                postProcessVideoMediaFileIds.Add(mediaFileId);
+                subtitleBindingVideoMediaFileIds.Add(mediaFileId);
+            }
+
+            if (changedSubtitleDirectories.Count > 0)
+            {
+                foreach (var mediaFileId in existingFiles.Values
+                             .Where(x => x.MediaType == MediaType.Video
+                                         && !x.IsDeleted
+                                         && changedSubtitleDirectories.Contains(GetDirectoryPath(x.FilePath)))
+                             .Select(x => x.Id)
+                             .Where(x => x > 0))
+                {
+                    subtitleBindingVideoMediaFileIds.Add(mediaFileId);
+                }
             }
 
             result.IsSuccessful = true;
@@ -410,7 +447,7 @@ public sealed class MediaScanService : IMediaScanService
                || mediaFile.IsDeleted;
     }
 
-    private static async Task MarkMissingFilesDeletedAsync(
+    private static async Task<IReadOnlyCollection<int>> MarkMissingFilesDeletedAsync(
         int sourceConnectionId,
         IReadOnlyCollection<ScanPath> enabledScanPaths,
         HashSet<string> seenFilePaths,
@@ -424,6 +461,7 @@ public sealed class MediaScanService : IMediaScanService
         var candidates = await dbContext.MediaFiles
             .Where(x => x.SourceConnectionId == sourceConnectionId && !x.IsDeleted)
             .ToListAsync(cancellationToken);
+        var deletedSubtitleDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var mediaFile in candidates.Where(mediaFile => IsUnderEnabledPath(mediaFile.FilePath, normalizedPaths)))
         {
@@ -432,11 +470,30 @@ public sealed class MediaScanService : IMediaScanService
                 continue;
             }
 
+            if (mediaFile.MediaType == MediaType.Subtitle)
+            {
+                deletedSubtitleDirectories.Add(GetDirectoryPath(mediaFile.FilePath));
+            }
+
             mediaFile.IsDeleted = true;
             mediaFile.UpdatedAt = DateTime.UtcNow;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (deletedSubtitleDirectories.Count == 0)
+        {
+            return [];
+        }
+
+        return candidates
+            .Where(x => x.MediaType == MediaType.Video
+                        && !x.IsDeleted
+                        && deletedSubtitleDirectories.Contains(GetDirectoryPath(x.FilePath)))
+            .Select(x => x.Id)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
     }
 
     private static bool IsUnderEnabledPath(string filePath, IReadOnlyCollection<string> enabledPaths)
@@ -448,7 +505,14 @@ public sealed class MediaScanService : IMediaScanService
                            || normalizedFilePath.StartsWith(enabledPath + "/", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static async Task UpdateConnectionLastScanAtAsync(int connectionId, CancellationToken cancellationToken)
+    private static string GetDirectoryPath(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        var lastSeparatorIndex = normalized.LastIndexOf('/');
+        return lastSeparatorIndex <= 0 ? "/" : normalized[..lastSeparatorIndex];
+    }
+
+    private static async Task UpdateConnectionLastScanAtAsync(int connectionId, DateTime completedAt, CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         var connection = await dbContext.SourceConnections.FirstOrDefaultAsync(x => x.Id == connectionId, cancellationToken);
@@ -457,8 +521,8 @@ public sealed class MediaScanService : IMediaScanService
             return;
         }
 
-        connection.LastScanAt = DateTime.UtcNow;
-        connection.UpdatedAt = DateTime.UtcNow;
+        connection.LastScanAt = completedAt;
+        connection.UpdatedAt = completedAt;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -541,6 +605,25 @@ public sealed class MediaScanService : IMediaScanService
                 ? summary
                 : $"{log.ErrorMessage}；{summary}";
             log.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task FinalizeSuccessfulLogsAsync(
+        IReadOnlyCollection<int> logIds,
+        DateTime completedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var logs = await dbContext.ScanTaskLogs
+            .Where(x => logIds.Contains(x.Id) && x.EndedAt.HasValue)
+            .ToListAsync(cancellationToken);
+
+        foreach (var log in logs)
+        {
+            log.EndedAt = completedAt;
+            log.UpdatedAt = completedAt;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

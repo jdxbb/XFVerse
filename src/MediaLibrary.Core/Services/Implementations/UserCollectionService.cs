@@ -74,7 +74,7 @@ public sealed class UserCollectionService : IUserCollectionService
 
         var wantItems = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
-            .Where(x => x.IsWantToWatch && !x.IsWatched && !x.IsNotInterested)
+            .Where(x => x.IsWantToWatch && !x.IsNotInterested)
             .Select(
                 x => new CollectionMovieItem
                 {
@@ -891,14 +891,14 @@ public sealed class UserCollectionService : IUserCollectionService
 
     private static string BuildKey(int? movieId, int? tmdbId, string title, int? year)
     {
-        if (movieId.HasValue)
-        {
-            return $"movie:{movieId.Value}";
-        }
-
         if (tmdbId.HasValue)
         {
             return $"tmdb:{tmdbId.Value}";
+        }
+
+        if (movieId.HasValue)
+        {
+            return $"movie:{movieId.Value}";
         }
 
         return $"title:{title.Trim().ToLowerInvariant()}:{year?.ToString() ?? string.Empty}";

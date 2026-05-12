@@ -1,3 +1,5 @@
+using MediaLibrary.Core.Models.ReadModels;
+
 namespace MediaLibrary.Core.Services.Interfaces;
 
 public interface IWatchHistoryService
@@ -16,6 +18,10 @@ public interface IWatchHistoryService
         int durationWatchedSeconds,
         bool isCompleted,
         int? mediaDurationSeconds = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<WatchHistoryListItem>> GetHistoryItemsAsync(
+        WatchHistoryQuery query,
         CancellationToken cancellationToken = default);
 
     Task DiscardAsync(int watchHistoryId, CancellationToken cancellationToken = default);

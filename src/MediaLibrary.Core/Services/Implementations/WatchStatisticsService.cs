@@ -18,7 +18,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
     private const int ValidWatchSecondsThreshold = 60;
     private const int TopTagCount = 10;
     private const int TopSmallTagCount = 3;
-    private const string StatisticsLogicVersion = "wi-6.1-state-history-active-owner-v2";
+    private const string StatisticsLogicVersion = "wi-6.2-month-active-state-v1";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -439,6 +439,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 SceneTagsText = x.SceneTagsText,
                 IsFavorite = x.IsFavorite,
                 IsWatched = x.IsWatched,
+                CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt
             })
             .ToListAsync(cancellationToken);
@@ -477,6 +478,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 IsWantToWatch = x.IsWantToWatch,
                 IsWatched = x.IsWatched,
                 IsNotInterested = x.IsNotInterested,
+                CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt
             })
             .ToListAsync(cancellationToken);
@@ -531,84 +533,169 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
 
         var currentMonthEnd = currentMonthStart.AddMonths(1);
         var previousMonthStart = currentMonthStart.AddMonths(-1);
-        snapshot.WatchedCount = CountMonthlyStateAdds(
+        var watchedActiveStates = movies
+            .Where(x => x.IsWatched)
+            .Select(x => new ActiveStateStatsRow(BuildTmdbKey(x.TmdbId), x.CreatedAt))
+            .Concat(collectionItems
+                .Where(x => x.IsWatched)
+                .Select(x => new ActiveStateStatsRow(BuildTmdbKey(x.TmdbId), x.CreatedAt)))
+            .ToList();
+        var favoriteActiveStates = movies
+            .Where(x => x.IsFavorite)
+            .Select(x => new ActiveStateStatsRow(BuildTmdbKey(x.TmdbId), x.CreatedAt))
+            .ToList();
+        var wantToWatchActiveStates = collectionItems
+            .Where(x => x.IsWantToWatch)
+            .Select(x => new ActiveStateStatsRow(BuildTmdbKey(x.TmdbId), x.CreatedAt))
+            .ToList();
+        var notInterestedActiveStates = collectionItems
+            .Where(x => x.IsNotInterested)
+            .Select(x => new ActiveStateStatsRow(BuildTmdbKey(x.TmdbId), x.CreatedAt))
+            .ToList();
+
+        snapshot.WatchedCount = CountMonthlyActiveStateAdds(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateWatched,
+            watchedActiveStates,
             currentMonthStart,
             currentMonthEnd);
-        snapshot.FavoriteCount = CountMonthlyStateAdds(
+        snapshot.FavoriteCount = CountMonthlyActiveStateAdds(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateFavorite,
+            favoriteActiveStates,
             currentMonthStart,
             currentMonthEnd);
-        snapshot.WantToWatchCount = CountMonthlyStateAdds(
+        snapshot.WantToWatchCount = CountMonthlyActiveStateAdds(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            wantToWatchActiveStates,
             currentMonthStart,
             currentMonthEnd);
-        snapshot.NotInterestedCount = CountMonthlyStateAdds(
+        snapshot.NotInterestedCount = CountMonthlyActiveStateAdds(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            notInterestedActiveStates,
             currentMonthStart,
             currentMonthEnd);
 
-        snapshot.WatchedDeltaFromLastWeek = CalculateMonthlyStateDelta(
+        snapshot.WatchedDeltaFromLastWeek = CalculateMonthlyActiveStateDelta(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateWatched,
+            watchedActiveStates,
             previousMonthStart,
             currentMonthStart,
             currentMonthEnd);
-        snapshot.FavoriteDeltaFromLastWeek = CalculateMonthlyStateDelta(
+        snapshot.FavoriteDeltaFromLastWeek = CalculateMonthlyActiveStateDelta(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateFavorite,
+            favoriteActiveStates,
             previousMonthStart,
             currentMonthStart,
             currentMonthEnd);
-        snapshot.WantToWatchDeltaFromLastWeek = CalculateMonthlyStateDelta(
+        snapshot.WantToWatchDeltaFromLastWeek = CalculateMonthlyActiveStateDelta(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            wantToWatchActiveStates,
             previousMonthStart,
             currentMonthStart,
             currentMonthEnd);
-        snapshot.NotInterestedDeltaFromLastWeek = CalculateMonthlyStateDelta(
+        snapshot.NotInterestedDeltaFromLastWeek = CalculateMonthlyActiveStateDelta(
             stateHistories,
             UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            notInterestedActiveStates,
             previousMonthStart,
             currentMonthStart,
             currentMonthEnd);
     }
 
-    private static int CountMonthlyStateAdds(
-        IEnumerable<StateChangeStatsRow> stateHistories,
+    private static int CountMonthlyActiveStateAdds(
+        IReadOnlyCollection<StateChangeStatsRow> stateHistories,
         string stateType,
+        IEnumerable<ActiveStateStatsRow> activeStates,
         DateTime rangeStart,
         DateTime rangeEnd)
     {
-        return stateHistories
+        var activeStateByKey = activeStates
+            .GroupBy(x => x.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                x => x.Key,
+                x => x
+                    .OrderByDescending(item => item.FallbackChangedAtUtc)
+                    .First(),
+                StringComparer.Ordinal);
+        if (activeStateByKey.Count == 0)
+        {
+            return 0;
+        }
+
+        var latestHistoryByKey = stateHistories
             .Where(x => string.Equals(x.StateType, stateType, StringComparison.Ordinal)
-                && IsWithinLocalRange(x.ChangedAtUtc, rangeStart, rangeEnd))
+                && activeStateByKey.ContainsKey(BuildTmdbKey(x.TmdbId)))
             .GroupBy(x => BuildTmdbKey(x.TmdbId), StringComparer.Ordinal)
-            .Select(x => x
-                .OrderByDescending(item => item.ChangedAtUtc)
-                .ThenByDescending(item => item.Id)
-                .First())
-            .Count(x => x.NewValue);
+            .ToDictionary(
+                x => x.Key,
+                x => x
+                    .OrderByDescending(item => item.ChangedAtUtc)
+                    .ThenByDescending(item => item.Id)
+                    .First(),
+                StringComparer.Ordinal);
+
+        var count = 0;
+        foreach (var activeState in activeStateByKey.Values)
+        {
+            if (latestHistoryByKey.TryGetValue(activeState.Key, out var latestHistory))
+            {
+                if (latestHistory.NewValue
+                    && IsWithinLocalRange(latestHistory.ChangedAtUtc, rangeStart, rangeEnd))
+                {
+                    count++;
+                    continue;
+                }
+
+                if (!latestHistory.NewValue
+                    && activeState.FallbackChangedAtUtc > latestHistory.ChangedAtUtc
+                    && IsWithinLocalRange(activeState.FallbackChangedAtUtc, rangeStart, rangeEnd))
+                {
+                    count++;
+                }
+
+                continue;
+            }
+
+            if (IsWithinLocalRange(activeState.FallbackChangedAtUtc, rangeStart, rangeEnd))
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
-    private static int? CalculateMonthlyStateDelta(
+    private static int? CalculateMonthlyActiveStateDelta(
         IReadOnlyCollection<StateChangeStatsRow> stateHistories,
         string stateType,
+        IReadOnlyCollection<ActiveStateStatsRow> activeStates,
         DateTime previousMonthStart,
         DateTime currentMonthStart,
         DateTime currentMonthEnd)
     {
-        var previousCount = CountMonthlyStateAdds(stateHistories, stateType, previousMonthStart, currentMonthStart);
+        var previousCount = CountMonthlyActiveStateAdds(
+            stateHistories,
+            stateType,
+            activeStates,
+            previousMonthStart,
+            currentMonthStart);
         if (previousCount == 0)
         {
             return null;
         }
 
-        var currentCount = CountMonthlyStateAdds(stateHistories, stateType, currentMonthStart, currentMonthEnd);
+        var currentCount = CountMonthlyActiveStateAdds(
+            stateHistories,
+            stateType,
+            activeStates,
+            currentMonthStart,
+            currentMonthEnd);
         return currentCount - previousCount;
     }
 
@@ -1469,6 +1556,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
 
         public bool IsWatched { get; set; }
 
+        public DateTime CreatedAt { get; set; }
+
         public DateTime UpdatedAt { get; set; }
     }
 
@@ -1508,8 +1597,12 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
 
         public bool IsNotInterested { get; set; }
 
+        public DateTime CreatedAt { get; set; }
+
         public DateTime UpdatedAt { get; set; }
     }
+
+    private sealed record ActiveStateStatsRow(string Key, DateTime FallbackChangedAtUtc);
 
     private sealed class MediaFileStatsRow
     {
