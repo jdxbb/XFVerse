@@ -75,6 +75,25 @@
 - 0 warning
 - 0 error
 
+## FD-2.1 / FD-2.2 Final Log Audit
+
+收尾日志与运行侧检查：
+
+- `dotnet test MediaLibrary.sln --no-build --verbosity normal` 执行成功，VSTest 目标 0 warning / 0 error；当前解决方案未发现独立测试项目输出。
+- 日志落点检查：
+  - 工作区 `logs\` 存在 `ai-perf-debug.log`、`ai-pool-debug.log`、`mpv-playback.log`、`video-cache-debug.log`、`watch-completion.log`。
+  - `%LocalAppData%\MediaLibrary\logs` 不存在。
+  - `src\MediaLibrary.App\bin\Debug\net8.0-windows\logs` 不存在。
+  - `src\MediaLibrary.Core\bin\Debug\net8.0\logs` 不存在。
+- 近窗口日志检查：
+  - `2026-05-13 04:00:00` 后 `ai-pool-debug.log`、`mpv-playback.log`、`video-cache-debug.log`、`watch-completion.log` 未发现 error / exception / failed / fatal / 失败 / 错误 / 异常关键词。
+  - `ai-perf-debug.log` 仅发现两条 AI 推荐 preview `TaskCanceledException` cancellation 记录，属于前台刷新/预览被取消的协调噪声，不属于影片发现搜索或榜单路径。
+- Windows Application 事件日志检查：
+  - 最近 6 小时未发现 `MediaLibrary`、`.NET Runtime` 或 `Application Error` 相关应用崩溃事件。
+- XAML / ViewModel 绑定回查：
+  - 未发现旧的 `LoadMoreSearch`、`LoadMoreRankings`、`IsRankingLoadingMore`、`ScrollChanged` 榜单滚动加载绑定残留。
+  - 新的搜索 / 榜单状态覆盖层绑定均能在 `MovieDiscoveryViewModel` 找到对应属性。
+
 数据库：
 
 - 未新增 DB 字段。
