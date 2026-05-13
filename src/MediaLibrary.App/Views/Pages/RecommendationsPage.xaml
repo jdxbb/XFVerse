@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.RecommendationsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <Border Style="{StaticResource PageCardStyle}">
         <Grid>
             <Grid.RowDefinitions>
@@ -78,7 +79,7 @@
                             <Border Width="310" Margin="0,0,18,18" Style="{StaticResource CompactCardStyle}">
                                 <StackPanel>
                                     <Border Height="220" CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
-                                        <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                     </Border>
                                     <TextBlock Margin="0,14,0,0" Text="{Binding Title}" TextWrapping="Wrap" Style="{StaticResource SectionTitleTextStyle}" />
                                     <WrapPanel Margin="0,8,0,0">

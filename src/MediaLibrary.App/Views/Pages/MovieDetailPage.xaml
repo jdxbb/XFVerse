@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="MediaLibrary.App.Views.Pages.MovieDetailPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -18,7 +19,7 @@
             <Border Style="{StaticResource PageCardStyle}">
                 <Grid Height="360">
                     <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="20">
-                        <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                     </Border>
                 </Grid>
             </Border>

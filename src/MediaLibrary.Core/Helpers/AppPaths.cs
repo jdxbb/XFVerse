@@ -25,4 +25,11 @@ public static class AppPaths
         Directory.CreateDirectory(videoCacheDirectory);
         return videoCacheDirectory;
     }
+
+    public static string GetPosterCacheDirectory()
+    {
+        var posterCacheDirectory = Path.Combine(GetAppDataDirectory(), "PosterCache");
+        Directory.CreateDirectory(posterCacheDirectory);
+        return posterCacheDirectory;
+    }
 }

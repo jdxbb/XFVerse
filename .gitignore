@@ -96,6 +96,10 @@ downloads/
 downloaded-posters/
 downloaded-images/
 
+# Poster cache stage docs
+!docs/poster-cache/
+!docs/poster-cache/*.md
+
 # Large third-party runtime binaries: prefer restore script or Git LFS
 /mpv/
 /native/mpv/

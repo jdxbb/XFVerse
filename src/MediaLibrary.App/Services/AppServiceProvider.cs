@@ -57,6 +57,7 @@ public static class AppServiceProvider
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IPlayerPreferencesService, PlayerPreferencesService>();
         services.AddSingleton<IPlayerWindowService, PlayerWindowService>();
+        services.AddSingleton<IPosterCacheService, PosterCacheService>();
         services.AddSingleton<IPlaybackEngineFactory, MpvPlaybackEngineFactory>();
 
         services.AddSingleton<HomeViewModel>();

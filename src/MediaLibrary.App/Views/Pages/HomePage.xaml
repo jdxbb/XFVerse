@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.HomePage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                   VerticalScrollBarVisibility="Auto">
         <Grid>
@@ -106,7 +107,7 @@
                                                                VerticalAlignment="Center"
                                                                Text="无海报"
                                                                Style="{StaticResource BodyMutedTextStyle}" />
-                                                    <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                 </Grid>
                                             </Border>
                                             <TextBlock Margin="0,10,0,0"
@@ -214,7 +215,7 @@
                                                                VerticalAlignment="Center"
                                                                Text="无海报"
                                                                Style="{StaticResource BodyMutedTextStyle}" />
-                                                    <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                 </Grid>
                                             </Border>
                                             <TextBlock Margin="10,10,10,0"
@@ -300,7 +301,7 @@
                                                                VerticalAlignment="Center"
                                                                Text="无海报"
                                                                Style="{StaticResource BodyMutedTextStyle}" />
-                                                    <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                 </Grid>
                                             </Border>
                                             <StackPanel Grid.Column="2" Margin="0,10,10,10">

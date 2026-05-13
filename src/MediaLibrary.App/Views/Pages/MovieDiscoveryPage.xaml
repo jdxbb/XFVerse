@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.MovieDiscoveryPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <Border Style="{StaticResource PageCardStyle}">
         <Grid>
             <Grid.RowDefinitions>
@@ -234,7 +235,7 @@
                                                                                        VerticalAlignment="Center"
                                                                                        Text="无海报"
                                                                                        Style="{StaticResource BodyMutedTextStyle}" />
-                                                                            <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                         </Grid>
                                                                     </Border>
 
@@ -544,7 +545,7 @@
                                                                        VerticalAlignment="Center"
                                                                        Text="无海报"
                                                                        Style="{StaticResource BodyMutedTextStyle}" />
-                                                            <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                         </Grid>
                                                     </Border>
                                                     <Border HorizontalAlignment="Left"
@@ -642,7 +643,7 @@
                                                                                    VerticalAlignment="Center"
                                                                                    Text="无海报"
                                                                                    Style="{StaticResource BodyMutedTextStyle}" />
-                                                                        <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                     </Grid>
                                                                 </Border>
                                                                 <Border HorizontalAlignment="Left"
@@ -741,7 +742,7 @@
                                                                                    VerticalAlignment="Center"
                                                                                    Text="无海报"
                                                                                    Style="{StaticResource BodyMutedTextStyle}" />
-                                                                        <Image Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                     </Grid>
                                                                 </Border>
                                                                 <Border HorizontalAlignment="Left"
