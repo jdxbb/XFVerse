@@ -10,6 +10,9 @@
 - Real library source filtering.
 - Detail page Local/WebDAV source display refinement.
 - Local source priority in playback.
+- Local direct playback.
+- Local source default playback priority.
+- Missing Local file playback prompt.
 - File system watcher.
 - Automatic background scan.
 - Advanced duplicate source merging.
@@ -21,3 +24,4 @@
 - Phase 3.1 does not add a large-directory warning or confirmation dialog.
 - Phase 3.2 uses simple scan status text rather than per-file progress.
 - Inaccessible Local folders produce a safe failure and keep existing library records.
+- OMDb remains the API configuration name; user-facing rating labels use IMDb for rating-source wording.

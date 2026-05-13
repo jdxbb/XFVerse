@@ -231,16 +231,12 @@
                             <StackPanel>
                                 <TextBlock Text="本地目录配置" Style="{StaticResource CardTitleTextStyle}" />
                                 <TextBlock Margin="0,8,0,0"
-                                           Text="管理本地媒体目录配置，并可手动扫描已启用目录。"
+                                           Text="管理本地媒体目录配置，扫描入口位于扫描进度卡片。"
                                            TextWrapping="Wrap"
                                            Style="{StaticResource BodyMutedTextStyle}" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="{Binding LocalRunScanButtonText}"
-                                        Command="{Binding RunLocalScanCommand}"
-                                        Style="{StaticResource PrimaryButtonStyle}" />
-                                <Button Margin="12,0,0,0"
-                                        Content="添加目录"
+                                <Button Content="添加目录"
                                         Command="{Binding BeginAddLocalScanPathCommand}"
                                         Style="{StaticResource SecondaryButtonStyle}" />
                             </StackPanel>
@@ -317,11 +313,6 @@
                                                                         CommandParameter="{Binding}"
                                                                         Style="{StaticResource SecondaryButtonStyle}" />
                                                                 <Button Margin="8,0,0,0"
-                                                                        Content="扫描"
-                                                                        Command="{Binding DataContext.RunLocalScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Style="{StaticResource SecondaryButtonStyle}" />
-                                                                <Button Margin="8,0,0,0"
                                                                         Content="{Binding ToggleText}"
                                                                         Command="{Binding DataContext.ToggleLocalScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                         CommandParameter="{Binding}"
@@ -366,48 +357,6 @@
                                             Content="{Binding LocalScanPathSubmitButtonText}"
                                             Command="{Binding SaveLocalScanPathCommand}"
                                             Style="{StaticResource PrimaryButtonStyle}" />
-                                    <TextBlock Margin="0,22,0,0" Text="最近本地扫描" Style="{StaticResource SectionTitleTextStyle}" />
-                                    <TextBlock Margin="0,8,0,0"
-                                               Text="还没有本地扫描记录。">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasLocalRecentLogs}" Value="False">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding LocalRecentLogs}">
-                                        <ItemsControl.Style>
-                                            <Style TargetType="ItemsControl">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasLocalRecentLogs}" Value="False">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ItemsControl.Style>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Margin="0,0,0,10" Padding="10" CornerRadius="8" Background="{DynamicResource BrushSurfaceAlt}">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding TargetText}" Style="{StaticResource BodyTextStyle}" />
-                                                        <WrapPanel Margin="0,6,0,0">
-                                                            <TextBlock Margin="0,0,12,0" Text="{Binding StatusText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                            <TextBlock Text="{Binding StartedAtText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                        </WrapPanel>
-                                                        <TextBlock Margin="0,6,0,0"
-                                                                   Text="{Binding ScannedCount, StringFormat=扫描：{0}}"
-                                                                   Style="{StaticResource BodyMutedTextStyle}" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -428,6 +377,10 @@
                                 <Button Content="{Binding RunScanButtonText}"
                                         Command="{Binding RunScanCommand}"
                                         Style="{StaticResource PrimaryButtonStyle}" />
+                                <Button Margin="12,0,0,0"
+                                        Content="{Binding LocalRunScanButtonText}"
+                                        Command="{Binding RunLocalScanCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
                                 <Button Margin="12,0,0,0"
                                         Content="取消扫描"
                                         Command="{Binding CancelScanCommand}"
@@ -541,6 +494,7 @@
                                                        Text="{Binding UsernameText, StringFormat=用户：{0}}"
                                                        Style="{StaticResource BodyMutedTextStyle}" />
                                             <WrapPanel Margin="0,10,0,0">
+                                                <TextBlock Margin="0,0,12,0" Text="{Binding SourceText}" Style="{StaticResource BodyTextStyle}" />
                                                 <TextBlock Margin="0,0,12,0" Text="{Binding StatusText}" Style="{StaticResource BodyTextStyle}" />
                                                 <TextBlock Margin="0,0,12,0" Text="{Binding StartedAtText, StringFormat=开始：{0}}" Style="{StaticResource BodyMutedTextStyle}" />
                                                 <TextBlock Text="{Binding EndedAtText, StringFormat=结束：{0}}" Style="{StaticResource BodyMutedTextStyle}" />

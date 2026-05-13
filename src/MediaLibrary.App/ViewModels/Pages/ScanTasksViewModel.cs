@@ -20,6 +20,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly IWebDavService _webDavService;
     private readonly IDataRefreshService _dataRefreshService;
+    private readonly List<ScanTaskLogViewModel> _webDavRecentLogs = [];
+    private readonly List<ScanTaskLogViewModel> _localRecentLogs = [];
     private CancellationTokenSource? _scanCts;
     private int? _connectionId;
     private bool _hasConnection;
@@ -32,7 +34,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private string _username = string.Empty;
     private string _password = string.Empty;
     private string _lastScanAtText = "尚未扫描";
-    private string _statusMessage = "点击“开始扫描”后，系统会扫描当前已启用的 WebDAV 路径。";
+    private string _statusMessage = "点击“开始扫描网盘”后，系统会扫描当前已启用的 WebDAV 路径。";
     private string _connectionStatusMessage = "请先保存 WebDAV 连接配置。";
     private string _scanPathStatusMessage = "当前还没有扫描路径。";
     private string _localScanPathStatusMessage = "当前还没有本地目录配置。";
@@ -92,8 +94,6 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public ObservableCollection<ScanPathViewModel> LocalScanPaths { get; } = [];
 
     public ObservableCollection<ScanTaskLogViewModel> RecentLogs { get; } = [];
-
-    public ObservableCollection<ScanTaskLogViewModel> LocalRecentLogs { get; } = [];
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -341,8 +341,6 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public bool HasRecentLogs => RecentLogs.Count > 0;
 
-    public bool HasLocalRecentLogs => LocalRecentLogs.Count > 0;
-
     public int EnabledScanPathCount => ScanPaths.Count(x => x.IsEnabled);
 
     public int EnabledLocalScanPathCount => LocalScanPaths.Count(x => x.IsEnabled);
@@ -353,9 +351,9 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public bool IsProgressIndeterminate => IsRunning;
 
-    public string RunScanButtonText => IsRunning ? "扫描中..." : "开始扫描";
+    public string RunScanButtonText => IsRunning ? "扫描中..." : "开始扫描网盘";
 
-    public string LocalRunScanButtonText => IsRunning ? "扫描中..." : "扫描本地目录";
+    public string LocalRunScanButtonText => IsRunning ? "扫描中..." : "开始扫描本地文件";
 
     public string CurrentFileText
     {
@@ -498,33 +496,46 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         await LoadLocalScanPathsAsync(cancellationToken);
 
         var overview = await _localMediaScanService.GetOverviewAsync(cancellationToken);
-        LocalRecentLogs.Clear();
+        _localRecentLogs.Clear();
         foreach (var log in overview.RecentLogs)
         {
-            LocalRecentLogs.Add(new ScanTaskLogViewModel(log, string.Empty, string.Empty, isLocal: true));
+            _localRecentLogs.Add(new ScanTaskLogViewModel(log, string.Empty, string.Empty, "本地", isLocal: true));
         }
 
-        OnPropertyChanged(nameof(HasLocalRecentLogs));
+        RefreshUnifiedRecentLogs();
     }
 
     private async Task LoadOverviewAsync(CancellationToken cancellationToken)
     {
         var overview = await _mediaScanService.GetOverviewAsync(cancellationToken);
-        RecentLogs.Clear();
+        _webDavRecentLogs.Clear();
         foreach (var log in overview.RecentLogs)
         {
-            RecentLogs.Add(new ScanTaskLogViewModel(log, BaseUrl, Username));
+            _webDavRecentLogs.Add(new ScanTaskLogViewModel(log, BaseUrl, Username, "网盘"));
         }
 
         LastScanAtText = overview.LastScanAt.HasValue
             ? overview.LastScanAt.Value.ToString("yyyy-MM-dd HH:mm:ss")
             : LastScanAtText;
-        OnPropertyChanged(nameof(HasRecentLogs));
+        RefreshUnifiedRecentLogs();
 
         if (ConnectionId.HasValue)
         {
             await LoadScanPathsAsync(ConnectionId.Value, cancellationToken);
         }
+    }
+
+    private void RefreshUnifiedRecentLogs()
+    {
+        RecentLogs.Clear();
+        foreach (var log in _webDavRecentLogs
+            .Concat(_localRecentLogs)
+            .OrderByDescending(x => x.StartedAt))
+        {
+            RecentLogs.Add(log);
+        }
+
+        OnPropertyChanged(nameof(HasRecentLogs));
     }
 
     private string BuildReadyStatus()
@@ -1027,9 +1038,12 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             ScanTaskLogItem item,
             string baseUrl,
             string username,
+            string sourceText = "网盘",
             bool isLocal = false)
         {
             Id = item.Id;
+            IsLocal = isLocal;
+            SourceText = sourceText;
             ScanPathId = item.ScanPathId;
             ScanPathDisplayName = string.IsNullOrWhiteSpace(item.ScanPathDisplayName)
                 ? isLocal ? "本地目录" : "扫描路径"
@@ -1052,6 +1066,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         }
 
         public int Id { get; }
+
+        public bool IsLocal { get; }
+
+        public string SourceText { get; }
 
         public int? ScanPathId { get; }
 

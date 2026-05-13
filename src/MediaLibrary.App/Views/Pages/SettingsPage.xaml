@@ -256,7 +256,7 @@
                                 <StackPanel>
                                     <TextBlock Text="OMDb 配置" Style="{StaticResource SectionTitleTextStyle}" />
                                     <TextBlock Margin="0,10,0,0"
-                                               Text="OMDb 用于评分补充。"
+                                               Text="OMDb 用于读取 IMDb 评分字段。"
                                                TextWrapping="Wrap"
                                                Style="{StaticResource BodyTextStyle}" />
                                     <TextBlock Margin="0,18,0,0" Text="OMDb API Key" Style="{StaticResource BodyTextStyle}" />

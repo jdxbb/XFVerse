@@ -388,7 +388,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             Ratings.Clear();
             foreach (var rating in detail.Ratings)
             {
-                Ratings.Add(rating);
+                Ratings.Add(ToDisplayRating(rating));
             }
 
             Sources.Clear();
@@ -498,7 +498,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         if (recommendation.OmdbRating is not null)
         {
-            Ratings.Add(recommendation.OmdbRating);
+            Ratings.Add(ToDisplayRating(recommendation.OmdbRating));
         }
 
         Sources.Clear();
@@ -1209,6 +1209,26 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         return ReferenceEquals(baseException, exception)
             ? exception.Message
             : $"{exception.Message} Inner: {baseException.Message}";
+    }
+
+    private static MovieRatingItem ToDisplayRating(MovieRatingItem rating)
+    {
+        return new MovieRatingItem
+        {
+            SourceName = GetDisplayRatingSourceName(rating.SourceName),
+            ScoreValue = rating.ScoreValue,
+            ScoreScale = rating.ScoreScale,
+            VoteCount = rating.VoteCount,
+            SourceUrl = rating.SourceUrl,
+            LastUpdatedAt = rating.LastUpdatedAt
+        };
+    }
+
+    private static string GetDisplayRatingSourceName(string sourceName)
+    {
+        return string.Equals(sourceName, "OMDb", StringComparison.OrdinalIgnoreCase)
+            ? "IMDb"
+            : sourceName;
     }
 
     private static string DescribeTmdbSearchFailure(Exception exception)

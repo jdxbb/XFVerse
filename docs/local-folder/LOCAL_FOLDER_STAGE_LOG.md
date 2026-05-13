@@ -65,6 +65,97 @@
 - Run `dotnet build MediaLibrary.sln` and confirm 0 warnings and 0 errors.
 - Confirm no migration files were added.
 
+## Phase 3.2 Closeout Fixes
+
+### Modified Files
+
+- `src/MediaLibrary.App/ViewModels/Pages/ScanTasksViewModel.cs`
+- `src/MediaLibrary.App/Views/Pages/ScanTasksPage.xaml`
+- `docs/local-folder/LOCAL_FOLDER_PLAN.md`
+- `docs/local-folder/LOCAL_FOLDER_STAGE_LOG.md`
+- `docs/local-folder/LOCAL_FOLDER_KNOWN_ISSUES.md`
+
+### Added Files
+
+- None.
+
+### Deleted Files
+
+- None.
+
+### Added Migration
+
+- None.
+
+### Completed
+
+- Moved manual scan actions into the scan progress card.
+- Split the scan progress actions into WebDAV and Local file scan buttons.
+- Kept the Local folder area focused on configuration management only.
+- Removed the separate recent Local scan display.
+- Unified WebDAV and Local scan records in the scan records card with source text.
+
+### Not Done In This Stage
+
+- No Local playback.
+- No Local source default playback priority.
+- No missing Local file playback prompt.
+- No media library source filtering.
+- No detail page source display changes.
+
+### Build Result
+
+- Pending validation in this closeout pass.
+
+### Manual Acceptance Matrix
+
+- Open the scan tasks page.
+- Confirm the scan progress card shows separate WebDAV and Local scan actions.
+- Confirm the WebDAV action still runs WebDAV scanning.
+- Confirm the Local action runs Local folder scanning.
+- Confirm the Local folder configuration area still supports add, edit, enable/disable, remove, and recursion changes.
+- Confirm there is no separate recent Local scan area.
+- Confirm WebDAV and Local scan records appear together in the scan records card.
+- Confirm scan records distinguish source as WebDAV or Local.
+- Confirm logs and documentation do not include full local media paths.
+- Confirm no migration files were added.
+
+## Rating UI Copy Fix
+
+### Modified Files
+
+- `src/MediaLibrary.App/ViewModels/Pages/MovieDetailViewModel.cs`
+- `src/MediaLibrary.Core/Services/Implementations/LibraryQueryService.cs`
+- `src/MediaLibrary.App/Views/Pages/SettingsPage.xaml`
+- `DesignDraft/page-spec/movie-detail-page.md`
+- `DesignDraft/DESIGN.md`
+- `docs/local-folder/LOCAL_FOLDER_PLAN.md`
+- `docs/local-folder/LOCAL_FOLDER_STAGE_LOG.md`
+- `docs/local-folder/LOCAL_FOLDER_KNOWN_ISSUES.md`
+
+### Added Files
+
+- None.
+
+### Deleted Files
+
+- None.
+
+### Added Migration
+
+- None.
+
+### Completed
+
+- Changed user-facing rating source labels from `OMDb` to `IMDb` where they describe the rating source.
+- Clarified that OMDb is the API source that returns IMDb rating fields.
+- Kept TMDB rating text unchanged.
+- Kept OMDb service names, settings field names, API calls, and rating calculations unchanged.
+
+### Build Result
+
+- Pending final validation in this closeout pass.
+
 ## Phase 3.2
 
 ### Modified Files

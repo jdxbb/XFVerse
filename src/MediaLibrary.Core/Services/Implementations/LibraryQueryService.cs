@@ -114,7 +114,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         ImdbId = x.ImdbId ?? string.Empty,
                         IdentificationStatus = x.IdentificationStatus,
                         IdentifiedConfidence = x.IdentifiedConfidence,
-                        PrimaryRatingSourceName = primaryRating?.SourceName ?? string.Empty,
+                        PrimaryRatingSourceName = GetDisplayRatingSourceName(primaryRating?.SourceName ?? string.Empty),
                         PrimaryRatingValue = primaryRating?.ScoreValue,
                         PrimaryRatingScale = primaryRating?.ScoreScale,
                         PrimaryRatingVoteCount = primaryRating?.VoteCount,
@@ -166,7 +166,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     RuntimeMinutes = x.RuntimeMinutes,
                     ImdbId = x.ImdbId,
                     IdentificationStatus = IdentificationStatus.Pending,
-                    PrimaryRatingSourceName = x.OmdbScoreValue.HasValue ? "OMDb" : x.TmdbRating.HasValue ? "TMDB" : string.Empty,
+                    PrimaryRatingSourceName = x.OmdbScoreValue.HasValue ? "IMDb" : x.TmdbRating.HasValue ? "TMDB" : string.Empty,
                     PrimaryRatingValue = x.OmdbScoreValue ?? x.TmdbRating,
                     PrimaryRatingScale = x.OmdbScoreScale ?? (x.TmdbRating.HasValue ? 10d : null),
                     PrimaryRatingVoteCount = x.OmdbVoteCount ?? x.TmdbVoteCount,
@@ -236,6 +236,13 @@ public sealed class LibraryQueryService : ILibraryQueryService
     private static string NormalizeImdbId(string imdbId)
     {
         return imdbId.Trim().ToLowerInvariant();
+    }
+
+    private static string GetDisplayRatingSourceName(string sourceName)
+    {
+        return string.Equals(sourceName, "OMDb", StringComparison.OrdinalIgnoreCase)
+            ? "IMDb"
+            : sourceName;
     }
 
     private record LibraryCollectionIdentity(

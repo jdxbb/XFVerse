@@ -94,3 +94,17 @@ Not included:
 ## Phase 3.2 Privacy Notes
 
 UI may display configured Local folder paths. Logs, docs, and stage reports must use folder display names, counts, exception types, or placeholders instead of full local paths.
+
+## Phase 3.2 Closeout UI Alignment
+
+- The scan progress card is the single manual scan entry area.
+- The scan progress card provides separate actions for WebDAV scanning and Local file scanning.
+- Local folder configuration is limited to add, edit, enable/disable, remove, and recursive options.
+- WebDAV and Local scan records are shown together in the scan records card, with source text such as `网盘` or `本地`.
+- Local direct playback, Local source default playback priority, and missing-file playback prompts remain Phase 3.3 work.
+
+## Rating Copy Note
+
+- User-facing rating source labels should show `IMDb` when the value comes from OMDb-returned IMDb fields.
+- `OMDb` remains the API integration and settings concept.
+- This copy-only rule does not change rating calculations, weighting, caching, or API calls.
