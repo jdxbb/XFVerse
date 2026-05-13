@@ -14,7 +14,7 @@ public sealed class WatchProfileService : IWatchProfileService
     private const string ProfileKind = "profile";
     private const string GlobalScopeKey = "global";
     private const int CurrentProfileSchemaVersion = 2;
-    private const string CurrentPromptVersion = "wi-profile-persona-23-parallel-v7";
+    private const string CurrentPromptVersion = "wi-profile-persona-23-parallel-v9-dna-copy";
     private const string FallbackPersonaType = "类型探索家";
     private const string FallbackPersonaTitle = "类型探索家";
     private const string FallbackPersonaDescription = "你的观影口味覆盖多个方向，更愿意主动尝试不同类型与风格，而不是被单一标签固定。";
@@ -903,9 +903,9 @@ public sealed class WatchProfileService : IWatchProfileService
             Log($"watch-profile-text-dedup-applied field=summary.keywords before={originalKeywordCount} after={profile.Summary.Keywords.Count}");
         }
 
-        profile.Summary.Text = NormalizeProfileSentence(profile.Summary.Text, maxLength: 420);
+        profile.Summary.Text = NormalizeProfileSentence(profile.Summary.Text, maxLength: 560);
         profile.Persona.Description = NormalizeProfileSentence(profile.Persona.Description);
-        profile.WatchVsLike.Conclusion = NormalizeProfileSentence(profile.WatchVsLike.Conclusion);
+        profile.WatchVsLike.Conclusion = NormalizeProfileSentence(profile.WatchVsLike.Conclusion, maxLength: 180);
     }
 
     private static List<string> NormalizeSummaryKeywords(IEnumerable<string> keywords)
@@ -992,48 +992,13 @@ public sealed class WatchProfileService : IWatchProfileService
             return string.Empty;
         }
 
-        if (!IsProgressDnaGene(gene.Gene)
-            && DescriptionLooksLikeTagList(gene.Description, gene.Tags))
-        {
-            return BuildTagGeneFallbackDescription(gene.Gene);
-        }
-
-        return NormalizeProfileSentence(gene.Description);
+        return NormalizeProfileSentence(gene.Description, maxLength: 360);
     }
 
     private static bool IsProgressDnaGene(string geneName)
     {
         return string.Equals(geneName, DnaGenes[4], StringComparison.Ordinal)
             || string.Equals(geneName, DnaGenes[5], StringComparison.Ordinal);
-    }
-
-    private static bool DescriptionLooksLikeTagList(string description, IReadOnlyCollection<string> tags)
-    {
-        if (tags.Count == 0)
-        {
-            return false;
-        }
-
-        var hitCount = tags.Count(tag => description.Contains(tag, StringComparison.OrdinalIgnoreCase));
-        if (hitCount >= Math.Min(2, tags.Count))
-        {
-            return true;
-        }
-
-        var separators = description.Count(ch => ch is '、' or ',' or '，' or '/' or '；' or ';');
-        return separators >= 2 && hitCount > 0;
-    }
-
-    private static string BuildTagGeneFallbackDescription(string geneName)
-    {
-        return geneName switch
-        {
-            "类型基因" => "你更容易被有明确结构和稳定期待的题材牵引。",
-            "情绪基因" => "你的选择更看重观影后的情绪余韵，而不只是轻量消遣。",
-            "场景基因" => "这些线索说明你常把电影当作进入特定氛围的方式。",
-            "叙事基因" => "你更容易被叙事结构、人物动机或信息推进带动。",
-            _ => "继续积累标签和观影记录后，这个维度会更清晰。"
-        };
     }
 
     private static IEnumerable<string> SplitTags(string value)
@@ -1095,6 +1060,10 @@ public sealed class WatchProfileService : IWatchProfileService
         profile.WatchVsLike.OftenWatchedTypes = input.StatisticsSummary.OftenWatchedTypes.Select(x => x.Label).ToList();
         profile.WatchVsLike.OftenLikedTypes = input.StatisticsSummary.OftenLikedTypes.Select(x => x.Label).ToList();
         profile.WatchVsLike.OftenWantedTypes = input.StatisticsSummary.OftenWantedTypes.Select(x => x.Label).ToList();
+        if (string.IsNullOrWhiteSpace(profile.WatchVsLike.Conclusion))
+        {
+            profile.WatchVsLike.Conclusion = BuildWatchVsLikeFallbackConclusion(profile.WatchVsLike);
+        }
 
         if (profile.Likes.PreferredGenres.Count == 0)
         {
@@ -1115,9 +1084,34 @@ public sealed class WatchProfileService : IWatchProfileService
         {
             profile.Summary.Keywords = profile.Likes.PreferredGenres
                 .Concat(profile.Likes.PreferredEmotions)
-                .Take(6)
-                .ToList();
+            .Take(6)
+            .ToList();
         }
+    }
+
+    private static string BuildWatchVsLikeFallbackConclusion(WatchProfileWatchVsLike watchVsLike)
+    {
+        var watched = FirstOrFallback(watchVsLike.OftenWatchedTypes, "实际观看");
+        var liked = FirstOrFallback(watchVsLike.OftenLikedTypes, "真实喜爱");
+        var wanted = FirstOrFallback(watchVsLike.OftenWantedTypes, "未来兴趣");
+        if (LooksLikeSameTasteDirection(watched, liked))
+        {
+            return $"你看得多和真正喜欢的方向都集中在{watched}，想看清单里的{wanted}更像是在同一口味上的延伸。";
+        }
+
+        return $"你常看的内容以{watched}为主，喜爱反馈则更多落在{liked}；想看里的{wanted}说明后续兴趣还有继续扩展的空间。";
+    }
+
+    private static string FirstOrFallback(IReadOnlyList<string> values, string fallback)
+    {
+        return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? fallback;
+    }
+
+    private static bool LooksLikeSameTasteDirection(string left, string right)
+    {
+        return string.Equals(left, right, StringComparison.OrdinalIgnoreCase)
+               || left.Contains(right, StringComparison.OrdinalIgnoreCase)
+               || right.Contains(left, StringComparison.OrdinalIgnoreCase);
     }
 
     private static WatchProfileSnapshot CreateInsufficientSnapshot(WatchProfileInputSnapshot input)
@@ -1278,10 +1272,28 @@ public sealed class WatchProfileService : IWatchProfileService
 
     private static WatchProfileWatchVsLike ParseWatchVsLikeCard(string text)
     {
-        var root = ParseCardRoot(text);
-        var target = root.TryGetProperty("watchVsLike", out var watchVsLike) ? watchVsLike : root;
-        return JsonSerializer.Deserialize<WatchProfileWatchVsLike>(target.GetRawText(), JsonOptions)
-               ?? throw new JsonException("AI profile watch-vs-like card could not be parsed.");
+        try
+        {
+            var root = ParseCardRoot(text);
+            var target = TryGetObjectProperty(root, out var watchVsLike, "watchVsLike", "watch_vs_like", "watch-vs-like")
+                ? watchVsLike
+                : root;
+
+            return new WatchProfileWatchVsLike
+            {
+                OftenWatchedTypes = ReadStringListProperty(target, "oftenWatchedTypes", "often_watched_types", "watchedTypes", "watched"),
+                OftenLikedTypes = ReadStringListProperty(target, "oftenLikedTypes", "often_liked_types", "likedTypes", "liked"),
+                OftenWantedTypes = ReadStringListProperty(target, "oftenWantedTypes", "often_wanted_types", "wantedTypes", "wanted"),
+                Conclusion = TryGetStringProperty(target, out var conclusion, "conclusion", "summary", "text")
+                    ? conclusion
+                    : string.Empty
+            };
+        }
+        catch (JsonException)
+        {
+            Log("watch-profile-watch-vs-like-parse-fallback errorType=JsonException");
+            return new WatchProfileWatchVsLike();
+        }
     }
 
     private static JsonElement ParseCardRoot(string text)
@@ -1289,6 +1301,100 @@ public sealed class WatchProfileService : IWatchProfileService
         var json = ExtractJsonObject(text);
         using var document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
+    }
+
+    private static bool TryGetObjectProperty(JsonElement root, out JsonElement value, params string[] propertyNames)
+    {
+        value = default;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        foreach (var property in root.EnumerateObject())
+        {
+            if (propertyNames.Any(name => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetStringProperty(JsonElement root, out string value, params string[] propertyNames)
+    {
+        value = string.Empty;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        foreach (var property in root.EnumerateObject())
+        {
+            if (!propertyNames.Any(name => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            value = ReadStringValue(property.Value);
+            return !string.IsNullOrWhiteSpace(value);
+        }
+
+        return false;
+    }
+
+    private static List<string> ReadStringListProperty(JsonElement root, params string[] propertyNames)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return [];
+        }
+
+        foreach (var property in root.EnumerateObject())
+        {
+            if (!propertyNames.Any(name => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            return ReadStringListValue(property.Value);
+        }
+
+        return [];
+    }
+
+    private static List<string> ReadStringListValue(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            var single = ReadStringValue(value);
+            return string.IsNullOrWhiteSpace(single) ? [] : [single];
+        }
+
+        var result = new List<string>();
+        foreach (var item in value.EnumerateArray())
+        {
+            var text = ReadStringValue(item);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                result.Add(text);
+            }
+        }
+
+        return result;
+    }
+
+    private static string ReadStringValue(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString()?.Trim() ?? string.Empty,
+            JsonValueKind.Number => value.ToString(),
+            JsonValueKind.Object when TryGetStringProperty(value, out var label, "label", "name", "type", "title", "value") => label,
+            _ => string.Empty
+        };
     }
 
     private static string BuildCardSystemPrompt(string cardName)
@@ -1306,15 +1412,17 @@ public sealed class WatchProfileService : IWatchProfileService
     {
         var payload = BuildProfileEvidencePayload(input);
         return $$$"""
-        任务：只生成观影口味总结卡片。
+        任务：只生成“口味总结”卡片。
         输出 JSON：
         {"summary":{"text":"","keywords":[]}}
 
         要求：
-        1. summary.text 写 2-4 句自然语言总结，可以比其他模块更完整；说明总体口味、选择动机和观看投入方式。
-        2. 不要机械复述关键词，不要连续堆砌标签。
-        3. summary.keywords 最多 6 个，可基于画像总结生成，不要求必须来自影片标签。
-        4. 关键词应覆盖题材、情绪、观看方式、审美倾向、探索倾向等不同维度，不要语义高度重复。
+        1. summary.text 写 3-5 句自然中文，整体约 160-260 字；要综合观看、喜爱、想看、不想看和近期观看投入，不要只复述标签。
+        2. 拒绝模板化：不要固定使用“你偏向 A，但也 B”“总体来看”“一方面/另一方面”等套话；句式要像真实分析，不要每句都用同一种结构。
+        3. 可以指出主线口味、稳定偏好、探索边界、情绪需求或审美取向，但每个判断都必须能从输入数据得到支持。
+        4. 如果证据显示口味集中，就明确写集中；如果证据显示分散，再写多元，不要为了显得复杂而强行制造矛盾。
+        5. summary.keywords 最多 6 个，可基于画像总结生成，不要求必须来自影片标签。
+        6. 关键词应覆盖题材、情绪、观看方式、审美倾向、探索倾向等不同维度，不要语义高度重复。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
@@ -1369,12 +1477,13 @@ public sealed class WatchProfileService : IWatchProfileService
 
         要求：
         1. DNA 必须包含六个基因：{{{string.Join("、", DnaGenes)}}}。
-        2. 类型基因、情绪基因、场景基因、叙事基因的 tags 各输出 3 个标签。
+        2. 类型基因、情绪基因、场景基因、叙事基因的 tags 各输出 3 个标签；tags 用来支撑判断，但 description 不要求逐个点名。
         3. 叙事基因 tags 只能从 narrativeTags 集合中选择，不要为每部影片生成叙事标签。
-        4. 类型/情绪/场景/叙事基因的 description 必须解释标签组合背后的偏好，不要把 tags 改写成一句话。
-        5. 节奏基因用 score 表示 0=慢热、100=紧凑；description 必须与 score 方向一致：0-35 慢热，36-64 均衡，65-100 紧凑。
-        6. 探索基因用 score 表示 0=稳定、100=新鲜；description 必须与 score 方向一致：0-35 稳定，36-64 平衡，65-100 新鲜。
-        7. score、confidence 范围 0-100。
+        4. 类型/情绪/场景/叙事基因的 description 写 45-90 字，解释标签组合背后的偏好；可以自然提到关键标签或代表性倾向，但不要机械列标签，也不要为了避免标签而写得空泛。
+        5. 节奏基因用 score 表示 0=慢热、100=紧凑；description 写 35-75 字，必须与 score 方向一致：0-35 慢热，36-64 均衡，65-100 紧凑。
+        6. 探索基因用 score 表示 0=稳定、100=新鲜；description 写 35-75 字，必须与 score 方向一致：0-35 稳定，36-64 平衡，65-100 新鲜。
+        7. 不要使用同一套句式反复套六个基因；每个基因都要从不同角度说明。
+        8. score、confidence 范围 0-100。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
@@ -1429,8 +1538,10 @@ public sealed class WatchProfileService : IWatchProfileService
 
         要求：
         1. oftenWatchedTypes、oftenLikedTypes、oftenWantedTypes 三个排行由本地统计提供，服务层会用 localRankings 覆盖，不要虚构排行。
-        2. 你只需要写 conclusion，一句话解释“经常观看 / 经常喜爱 / 经常想看”之间的行为差异。
-        3. conclusion 不要超过 120 字，不要输出推荐片单。
+        2. 你只需要写 conclusion，判断“经常观看 / 经常喜爱 / 经常想看”之间的关系：可能高度吻合、部分错位、也可能明显反差。不要预设一定有反转或差异。
+        3. 如果看得多和真喜欢一致，就明确写一致；如果只是想看方向更宽，再说明它是延伸或探索；只有数据真的显示不同，才写差异。
+        4. 拒绝固定模板：不要总写成“经常观看偏向 A，真正喜欢更接近 B，想看清单则 C”。用一句自然结论概括，60-140 字。
+        5. 不要输出推荐片单，不要输出内部字段名。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
