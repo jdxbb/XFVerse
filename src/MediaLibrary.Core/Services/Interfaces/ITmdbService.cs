@@ -48,6 +48,43 @@ public interface ITmdbService
         string language = "zh-CN",
         CancellationToken cancellationToken = default);
 
+    Task<TmdbTvSeriesSearchPage> SearchTvSeriesAsync(
+        string query,
+        int page,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeriesDetailResult?> GetTvSeriesDetailsAsync(
+        int seriesId,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeasonDetailResult?> GetTvSeasonDetailsAsync(
+        int seriesId,
+        int seasonNumber,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeriesExternalIdsResult?> GetTvSeriesExternalIdsAsync(
+        int seriesId,
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeriesSearchPage> GetPopularTvSeriesAsync(
+        int page,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeriesSearchPage> GetTopRatedTvSeriesAsync(
+        int page,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeriesSearchPage> GetTrendingTvSeriesAsync(
+        string timeWindow,
+        int page,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
     Task<MetadataSearchCandidate?> GetMovieDetailsAsync(
         int tmdbId,
         CancellationToken cancellationToken = default);

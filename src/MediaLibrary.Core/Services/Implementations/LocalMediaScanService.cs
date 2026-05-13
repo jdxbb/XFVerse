@@ -11,6 +11,7 @@ namespace MediaLibrary.Core.Services.Implementations;
 public sealed class LocalMediaScanService : ILocalMediaScanService
 {
     private readonly ISettingsService _settingsService;
+    private readonly ITvSeasonIdentificationService _tvSeasonIdentificationService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly ISubtitleBindingService _subtitleBindingService;
     private readonly IAiClassificationService _aiClassificationService;
@@ -18,12 +19,14 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
     public LocalMediaScanService(
         ISettingsService settingsService,
+        ITvSeasonIdentificationService tvSeasonIdentificationService,
         IMovieIdentificationService movieIdentificationService,
         ISubtitleBindingService subtitleBindingService,
         IAiClassificationService aiClassificationService,
         IMediaProbeService mediaProbeService)
     {
         _settingsService = settingsService;
+        _tvSeasonIdentificationService = tvSeasonIdentificationService;
         _movieIdentificationService = movieIdentificationService;
         _subtitleBindingService = subtitleBindingService;
         _aiClassificationService = aiClassificationService;
@@ -214,8 +217,16 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         var postStage = new PostScanStageResult();
         try
         {
-            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(
+            var tvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
                 postProcessVideoMediaFileIds.ToArray(),
+                cancellationToken);
+            postStage.Absorb(tvIdentificationResult.Summary);
+
+            var movieMediaFileIds = postProcessVideoMediaFileIds
+                .Except(tvIdentificationResult.HandledMediaFileIds)
+                .ToArray();
+            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(
+                movieMediaFileIds,
                 cancellationToken);
             postStage.Absorb(identificationResult);
         }

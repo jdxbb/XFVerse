@@ -4,7 +4,9 @@ public sealed class WatchHistory
 {
     public int Id { get; set; }
 
-    public int MovieId { get; set; }
+    public int? MovieId { get; set; }
+
+    public int? EpisodeId { get; set; }
 
     public int MediaFileId { get; set; }
 
@@ -21,6 +23,8 @@ public sealed class WatchHistory
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Movie? Movie { get; set; }
+
+    public TvEpisode? Episode { get; set; }
 
     public MediaFile? MediaFile { get; set; }
 }

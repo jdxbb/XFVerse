@@ -67,6 +67,11 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
                 continue;
             }
 
+            if (mediaFile.EpisodeId.HasValue)
+            {
+                continue;
+            }
+
             if (mediaFile.MovieId.HasValue
                 && mediaFile.Movie is not null
                 && mediaFile.Movie.TmdbId.HasValue
@@ -402,6 +407,53 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         return await ApplyManualMatchCoreAsync(dbContext, currentMovie, details, cancellationToken);
     }
 
+    public async Task<int> ApplyManualMediaFileMatchAsync(
+        int mediaFileId,
+        int tmdbId,
+        CancellationToken cancellationToken = default)
+    {
+        if (mediaFileId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(mediaFileId));
+        }
+
+        if (tmdbId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tmdbId));
+        }
+
+        var details = await _tmdbService.GetMovieDetailsAsync(tmdbId, cancellationToken)
+            ?? throw new InvalidOperationException("无法读取 TMDB 影片详情。");
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var mediaFile = await dbContext.MediaFiles
+            .Include(x => x.SourceConnection)
+            .Include(x => x.Movie)
+            .ThenInclude(x => x!.RatingSources)
+            .Include(x => x.Episode)
+            .FirstOrDefaultAsync(
+                x => x.Id == mediaFileId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted,
+                cancellationToken)
+            ?? throw new InvalidOperationException("待修正的播放源不存在。");
+
+        mediaFile.EpisodeId = null;
+        mediaFile.Episode = null;
+        await ApplyCandidateAsync(
+            dbContext,
+            mediaFile,
+            details,
+            IdentificationStatus.ManualConfirmed,
+            new IdentificationRunResult(),
+            cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return mediaFile.MovieId ?? mediaFile.Movie?.Id ?? throw new InvalidOperationException("影片修正结果无效。");
+    }
+
     private async Task<int> ApplyManualMatchCoreAsync(
         AppDbContext dbContext,
         Movie currentMovie,
@@ -648,6 +700,8 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             }
         }
 
+        mediaFile.EpisodeId = null;
+        mediaFile.Episode = null;
         mediaFile.Movie = targetMovie;
         mediaFile.UpdatedAt = DateTime.UtcNow;
 

@@ -13,6 +13,7 @@ public sealed class MediaScanService : IMediaScanService
 {
     private readonly ISettingsService _settingsService;
     private readonly IWebDavService _webDavService;
+    private readonly ITvSeasonIdentificationService _tvSeasonIdentificationService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly ISubtitleBindingService _subtitleBindingService;
     private readonly IAiClassificationService _aiClassificationService;
@@ -21,6 +22,7 @@ public sealed class MediaScanService : IMediaScanService
     public MediaScanService(
         ISettingsService settingsService,
         IWebDavService webDavService,
+        ITvSeasonIdentificationService tvSeasonIdentificationService,
         IMovieIdentificationService movieIdentificationService,
         ISubtitleBindingService subtitleBindingService,
         IAiClassificationService aiClassificationService,
@@ -28,6 +30,7 @@ public sealed class MediaScanService : IMediaScanService
     {
         _settingsService = settingsService;
         _webDavService = webDavService;
+        _tvSeasonIdentificationService = tvSeasonIdentificationService;
         _movieIdentificationService = movieIdentificationService;
         _subtitleBindingService = subtitleBindingService;
         _aiClassificationService = aiClassificationService;
@@ -166,7 +169,15 @@ public sealed class MediaScanService : IMediaScanService
 
         try
         {
-            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(postProcessVideoMediaFileIds.ToArray(), cancellationToken);
+            var tvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
+                postProcessVideoMediaFileIds.ToArray(),
+                cancellationToken);
+            postStage.Absorb(tvIdentificationResult.Summary);
+
+            var movieMediaFileIds = postProcessVideoMediaFileIds
+                .Except(tvIdentificationResult.HandledMediaFileIds)
+                .ToArray();
+            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(movieMediaFileIds, cancellationToken);
             postStage.Absorb(identificationResult);
         }
         catch (Exception exception)

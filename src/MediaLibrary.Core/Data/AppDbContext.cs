@@ -21,6 +21,12 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<Movie> Movies => Set<Movie>();
 
+    public DbSet<TvSeries> TvSeries => Set<TvSeries>();
+
+    public DbSet<TvSeason> TvSeasons => Set<TvSeason>();
+
+    public DbSet<TvEpisode> TvEpisodes => Set<TvEpisode>();
+
     public DbSet<RatingSource> RatingSources => Set<RatingSource>();
 
     public DbSet<SubtitleBinding> SubtitleBindings => Set<SubtitleBinding>();
@@ -31,11 +37,15 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<UserMovieCollectionItem> UserMovieCollectionItems => Set<UserMovieCollectionItem>();
 
+    public DbSet<UserTvSeasonCollectionItem> UserTvSeasonCollectionItems => Set<UserTvSeasonCollectionItem>();
+
     public DbSet<ExternalMetadataCache> ExternalMetadataCaches => Set<ExternalMetadataCache>();
 
     public DbSet<WatchInsightCacheEntry> WatchInsightCacheEntries => Set<WatchInsightCacheEntry>();
 
     public DbSet<UserMovieStateChangeHistory> UserMovieStateChangeHistories => Set<UserMovieStateChangeHistory>();
+
+    public DbSet<UserTvSeasonStateChangeHistory> UserTvSeasonStateChangeHistories => Set<UserTvSeasonStateChangeHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,14 +54,19 @@ public sealed class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new ScanPathConfiguration());
         modelBuilder.ApplyConfiguration(new MediaFileConfiguration());
         modelBuilder.ApplyConfiguration(new MovieConfiguration());
+        modelBuilder.ApplyConfiguration(new TvSeriesConfiguration());
+        modelBuilder.ApplyConfiguration(new TvSeasonConfiguration());
+        modelBuilder.ApplyConfiguration(new TvEpisodeConfiguration());
         modelBuilder.ApplyConfiguration(new RatingSourceConfiguration());
         modelBuilder.ApplyConfiguration(new SubtitleBindingConfiguration());
         modelBuilder.ApplyConfiguration(new WatchHistoryConfiguration());
         modelBuilder.ApplyConfiguration(new ScanTaskLogConfiguration());
         modelBuilder.ApplyConfiguration(new UserMovieCollectionItemConfiguration());
+        modelBuilder.ApplyConfiguration(new UserTvSeasonCollectionItemConfiguration());
         modelBuilder.ApplyConfiguration(new ExternalMetadataCacheConfiguration());
         modelBuilder.ApplyConfiguration(new WatchInsightCacheEntryConfiguration());
         modelBuilder.ApplyConfiguration(new UserMovieStateChangeHistoryConfiguration());
+        modelBuilder.ApplyConfiguration(new UserTvSeasonStateChangeHistoryConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

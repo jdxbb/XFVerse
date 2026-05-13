@@ -12,6 +12,8 @@ public sealed class MediaFile
 
     public int? MovieId { get; set; }
 
+    public int? EpisodeId { get; set; }
+
     public string FileName { get; set; } = string.Empty;
 
     public string FilePath { get; set; } = string.Empty;
@@ -75,6 +77,8 @@ public sealed class MediaFile
     public ScanPath? ScanPath { get; set; }
 
     public Movie? Movie { get; set; }
+
+    public TvEpisode? Episode { get; set; }
 
     public Movie? DefaultForMovie { get; set; }
 

@@ -35,6 +35,10 @@ public sealed class TmdbService : ITmdbService
     private static readonly ConcurrentDictionary<string, CacheEntry<IReadOnlyList<MetadataSearchCandidate>>> SearchCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CacheEntry<MetadataSearchCandidate>> DetailCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CacheEntry<string>> ExternalIdsCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeriesSearchPage>> TvSeriesPageCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeriesDetailResult>> TvSeriesDetailCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeasonDetailResult>> TvSeasonDetailCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeriesExternalIdsResult>> TvSeriesExternalIdsCache = new(StringComparer.Ordinal);
     private static readonly SemaphoreSlim TmdbHttpLimiter = new(HttpConcurrencyLimit, HttpConcurrencyLimit);
     private static int TmdbHttpInFlight;
 
@@ -558,6 +562,406 @@ public sealed class TmdbService : ITmdbService
             cancellationToken);
     }
 
+    public Task<TmdbTvSeriesSearchPage> SearchTvSeriesAsync(
+        string query,
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Task.FromResult(CreateEmptyTvSeriesPage(page));
+        }
+
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        var trimmedQuery = query.Trim();
+        return GetTvSeriesPageAsync(
+            $"search/tv?language={Uri.EscapeDataString(safeLanguage)}&include_adult=false&page={safePage}&query={Uri.EscapeDataString(trimmedQuery)}",
+            safePage,
+            BuildTmdbTvSearchCacheKey(trimmedQuery, safePage, safeLanguage),
+            "tmdb-tv-search",
+            cancellationToken);
+    }
+
+    public async Task<TmdbTvSeriesDetailResult?> GetTvSeriesDetailsAsync(
+        int seriesId,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        if (seriesId <= 0)
+        {
+            return null;
+        }
+
+        var safeLanguage = NormalizeLanguage(language);
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return null;
+        }
+
+        var cacheKey = BuildTmdbTvSeriesDetailCacheKey(seriesId, safeLanguage, options);
+        if (TryGetCacheValue(TvSeriesDetailCache, cacheKey, out var cachedDetails))
+        {
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-series-detail-cache-hit", TimeSpan.Zero, false);
+            return CloneTvSeriesDetail(cachedDetails);
+        }
+
+        var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeriesDetailResult>(
+            TmdbProvider,
+            TmdbDetailCacheType,
+            cacheKey,
+            cancellationToken);
+        if (persistentDetails.IsHit && persistentDetails.Value is not null)
+        {
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-series-detail-persistent-cache-hit", TimeSpan.Zero, false);
+            var cloned = CloneTvSeriesDetail(persistentDetails.Value);
+            SetCacheValue(TvSeriesDetailCache, cacheKey, CloneTvSeriesDetail(cloned), DetailCacheTtl, DetailCacheLimit);
+            return cloned;
+        }
+
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await SendGetAsync(
+                $"tv/{seriesId}?language={Uri.EscapeDataString(safeLanguage)}",
+                options,
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                isError = true;
+                return null;
+            }
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+            var result = BuildTvSeriesDetail(document.RootElement);
+            if (result is not null && !cancellationToken.IsCancellationRequested)
+            {
+                var cacheValue = CloneTvSeriesDetail(result);
+                SetCacheValue(TvSeriesDetailCache, cacheKey, cacheValue, DetailCacheTtl, DetailCacheLimit);
+                await ExternalMetadataPersistentCache.SetAsync(
+                    TmdbProvider,
+                    TmdbDetailCacheType,
+                    cacheKey,
+                    cacheValue,
+                    DetailPersistentCacheTtl,
+                    cancellationToken);
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            isError = true;
+            return null;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-series-detail", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public async Task<TmdbTvSeasonDetailResult?> GetTvSeasonDetailsAsync(
+        int seriesId,
+        int seasonNumber,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        if (seriesId <= 0 || seasonNumber < 0)
+        {
+            return null;
+        }
+
+        var safeLanguage = NormalizeLanguage(language);
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return null;
+        }
+
+        var cacheKey = BuildTmdbTvSeasonDetailCacheKey(seriesId, seasonNumber, safeLanguage, options);
+        if (TryGetCacheValue(TvSeasonDetailCache, cacheKey, out var cachedDetails))
+        {
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail-cache-hit", TimeSpan.Zero, false);
+            return CloneTvSeasonDetail(cachedDetails);
+        }
+
+        var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeasonDetailResult>(
+            TmdbProvider,
+            TmdbDetailCacheType,
+            cacheKey,
+            cancellationToken);
+        if (persistentDetails.IsHit && persistentDetails.Value is not null)
+        {
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail-persistent-cache-hit", TimeSpan.Zero, false);
+            var cloned = CloneTvSeasonDetail(persistentDetails.Value);
+            SetCacheValue(TvSeasonDetailCache, cacheKey, CloneTvSeasonDetail(cloned), DetailCacheTtl, DetailCacheLimit);
+            return cloned;
+        }
+
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await SendGetAsync(
+                $"tv/{seriesId}/season/{seasonNumber}?language={Uri.EscapeDataString(safeLanguage)}",
+                options,
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                isError = true;
+                return null;
+            }
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+            var result = BuildTvSeasonDetail(seriesId, document.RootElement);
+            if (result is not null && !cancellationToken.IsCancellationRequested)
+            {
+                var cacheValue = CloneTvSeasonDetail(result);
+                SetCacheValue(TvSeasonDetailCache, cacheKey, cacheValue, DetailCacheTtl, DetailCacheLimit);
+                await ExternalMetadataPersistentCache.SetAsync(
+                    TmdbProvider,
+                    TmdbDetailCacheType,
+                    cacheKey,
+                    cacheValue,
+                    DetailPersistentCacheTtl,
+                    cancellationToken);
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            isError = true;
+            return null;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public async Task<TmdbTvSeriesExternalIdsResult?> GetTvSeriesExternalIdsAsync(
+        int seriesId,
+        CancellationToken cancellationToken = default)
+    {
+        if (seriesId <= 0)
+        {
+            return null;
+        }
+
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return null;
+        }
+
+        var cacheKey = BuildTmdbTvSeriesExternalIdsCacheKey(seriesId, options);
+        if (TryGetCacheValue(TvSeriesExternalIdsCache, cacheKey, out var cachedExternalIds))
+        {
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-external-ids-cache-hit", TimeSpan.Zero, false);
+            return CloneTvExternalIds(cachedExternalIds);
+        }
+
+        var persistentExternalIds = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeriesExternalIdsResult>(
+            TmdbProvider,
+            TmdbExternalIdsCacheType,
+            cacheKey,
+            cancellationToken);
+        if (persistentExternalIds.IsHit && persistentExternalIds.Value is not null)
+        {
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-external-ids-persistent-cache-hit", TimeSpan.Zero, false);
+            var cloned = CloneTvExternalIds(persistentExternalIds.Value);
+            SetCacheValue(TvSeriesExternalIdsCache, cacheKey, CloneTvExternalIds(cloned), ExternalIdsCacheTtl, ExternalIdsCacheLimit);
+            return cloned;
+        }
+
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await SendGetAsync($"tv/{seriesId}/external_ids", options, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                isError = true;
+                return null;
+            }
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+            var result = BuildTvExternalIds(document.RootElement);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                var cacheValue = CloneTvExternalIds(result);
+                SetCacheValue(TvSeriesExternalIdsCache, cacheKey, cacheValue, ExternalIdsCacheTtl, ExternalIdsCacheLimit);
+                await ExternalMetadataPersistentCache.SetAsync(
+                    TmdbProvider,
+                    TmdbExternalIdsCacheType,
+                    cacheKey,
+                    cacheValue,
+                    ExternalIdsPersistentCacheTtl,
+                    cancellationToken);
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            isError = true;
+            return null;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-external-ids", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public Task<TmdbTvSeriesSearchPage> GetPopularTvSeriesAsync(
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        return GetTvSeriesPageAsync(
+            $"tv/popular?language={Uri.EscapeDataString(safeLanguage)}&page={safePage}",
+            safePage,
+            BuildTmdbTvListCacheKey("popular", safePage, safeLanguage),
+            "tmdb-tv-popular",
+            cancellationToken);
+    }
+
+    public Task<TmdbTvSeriesSearchPage> GetTopRatedTvSeriesAsync(
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        return GetTvSeriesPageAsync(
+            $"tv/top_rated?language={Uri.EscapeDataString(safeLanguage)}&page={safePage}",
+            safePage,
+            BuildTmdbTvListCacheKey("top-rated", safePage, safeLanguage),
+            "tmdb-tv-top-rated",
+            cancellationToken);
+    }
+
+    public Task<TmdbTvSeriesSearchPage> GetTrendingTvSeriesAsync(
+        string timeWindow,
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        var safeWindow = string.Equals(timeWindow, "week", StringComparison.OrdinalIgnoreCase) ? "week" : "day";
+        return GetTvSeriesPageAsync(
+            $"trending/tv/{safeWindow}?language={Uri.EscapeDataString(safeLanguage)}&page={safePage}",
+            safePage,
+            BuildTmdbTvListCacheKey($"trending-{safeWindow}", safePage, safeLanguage),
+            $"tmdb-tv-trending-{safeWindow}",
+            cancellationToken);
+    }
+
+    private async Task<TmdbTvSeriesSearchPage> GetTvSeriesPageAsync(
+        string queryString,
+        int page,
+        string cacheKey,
+        string diagnosticsName,
+        CancellationToken cancellationToken)
+    {
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return CreateEmptyTvSeriesPage(page, "TMDB API is not configured.");
+        }
+
+        var scopedCacheKey = $"{cacheKey}|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}";
+        if (TryGetCacheValue(TvSeriesPageCache, scopedCacheKey, out var cachedPage))
+        {
+            AiPerfDiagnostics.RecordExternalCall($"{diagnosticsName}-cache-hit", TimeSpan.Zero, false);
+            return CloneTvSeriesPage(cachedPage);
+        }
+
+        var persistentPage = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeriesSearchPage>(
+            TmdbProvider,
+            TmdbSearchCacheType,
+            scopedCacheKey,
+            cancellationToken);
+        if (persistentPage.IsHit && persistentPage.Value is not null)
+        {
+            AiPerfDiagnostics.RecordExternalCall($"{diagnosticsName}-persistent-cache-hit", TimeSpan.Zero, false);
+            var cloned = CloneTvSeriesPage(persistentPage.Value);
+            SetCacheValue(TvSeriesPageCache, scopedCacheKey, CloneTvSeriesPage(cloned), SearchCacheTtl, SearchCacheLimit);
+            return cloned;
+        }
+
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await SendGetAsync(queryString, options, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                isError = true;
+                return CreateEmptyTvSeriesPage(page);
+            }
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+            var result = BuildTvSeriesPage(document.RootElement, page);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                var cacheValue = CloneTvSeriesPage(result);
+                SetCacheValue(TvSeriesPageCache, scopedCacheKey, cacheValue, SearchCacheTtl, SearchCacheLimit);
+                await ExternalMetadataPersistentCache.SetAsync(
+                    TmdbProvider,
+                    TmdbSearchCacheType,
+                    scopedCacheKey,
+                    cacheValue,
+                    SearchPersistentCacheTtl,
+                    cancellationToken);
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            isError = true;
+            return CreateEmptyTvSeriesPage(page);
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall(diagnosticsName, requestStopwatch.Elapsed, isError);
+        }
+    }
+
     private async Task<TmdbMovieDiscoveryPage> GetDiscoveryListPageAsync(
         string queryString,
         int page,
@@ -725,6 +1129,31 @@ public sealed class TmdbService : ITmdbService
         return $"external-ids|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|tmdb={tmdbId}";
     }
 
+    private static string BuildTmdbTvSearchCacheKey(string trimmedQuery, int page, string language)
+    {
+        return $"tv-search|language={language}|page={page}|query-hash={HashCachePart(trimmedQuery)}";
+    }
+
+    private static string BuildTmdbTvListCacheKey(string listType, int page, string language)
+    {
+        return $"tv-list|type={listType}|language={language}|page={page}";
+    }
+
+    private static string BuildTmdbTvSeriesDetailCacheKey(int seriesId, string language, TmdbRequestOptions options)
+    {
+        return $"tv-series-detail|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|language={language}|series={seriesId}";
+    }
+
+    private static string BuildTmdbTvSeasonDetailCacheKey(int seriesId, int seasonNumber, string language, TmdbRequestOptions options)
+    {
+        return $"tv-season-detail|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|language={language}|series={seriesId}|season={seasonNumber}";
+    }
+
+    private static string BuildTmdbTvSeriesExternalIdsCacheKey(int seriesId, TmdbRequestOptions options)
+    {
+        return $"tv-external-ids|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|series={seriesId}";
+    }
+
     private static string BuildCredentialFingerprint(string kind, string credential)
     {
         if (string.IsNullOrWhiteSpace(credential))
@@ -734,6 +1163,17 @@ public sealed class TmdbService : ITmdbService
 
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(credential)));
         return $"{kind}:{hash[..16]}";
+    }
+
+    private static string HashCachePart(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "empty";
+        }
+
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value.Trim())));
+        return hash[..16];
     }
 
     private static bool TryGetCachedSearch(
@@ -941,6 +1381,200 @@ public sealed class TmdbService : ITmdbService
         };
     }
 
+    private static TmdbTvSeriesSearchPage CreateEmptyTvSeriesPage(int page, string resultMessage = "")
+    {
+        return new TmdbTvSeriesSearchPage
+        {
+            Results = [],
+            Page = Math.Max(1, page),
+            TotalPages = 0,
+            TotalResults = 0,
+            ResultMessage = resultMessage
+        };
+    }
+
+    private static TmdbTvSeriesSearchPage BuildTvSeriesPage(JsonElement root, int fallbackPage)
+    {
+        var results = new List<TmdbTvSeriesSearchItem>();
+        if (root.TryGetProperty("results", out var resultArray) && resultArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in resultArray.EnumerateArray())
+            {
+                if (BuildTvSeriesSearchItem(item) is { } series)
+                {
+                    results.Add(series);
+                }
+            }
+        }
+
+        return new TmdbTvSeriesSearchPage
+        {
+            Results = results,
+            Page = GetInt(root, "page") ?? fallbackPage,
+            TotalPages = GetInt(root, "total_pages") ?? 0,
+            TotalResults = GetInt(root, "total_results") ?? results.Count
+        };
+    }
+
+    private static TmdbTvSeriesSearchItem? BuildTvSeriesSearchItem(JsonElement item)
+    {
+        var tmdbId = GetInt(item, "id");
+        if (tmdbId is not > 0)
+        {
+            return null;
+        }
+
+        var firstAirDate = GetString(item, "first_air_date");
+        return new TmdbTvSeriesSearchItem
+        {
+            TmdbId = tmdbId.Value,
+            Name = GetString(item, "name"),
+            OriginalName = GetString(item, "original_name"),
+            Overview = GetString(item, "overview"),
+            PosterRemoteUrl = BuildPosterUrl(GetString(item, "poster_path")),
+            BackdropRemoteUrl = BuildImageUrl(GetString(item, "backdrop_path")),
+            FirstAirDate = firstAirDate,
+            FirstAirYear = ParseYear(firstAirDate),
+            GenreIds = EnumerateIntArray(item, "genre_ids").ToList(),
+            OriginalLanguage = GetString(item, "original_language"),
+            OriginCountries = EnumerateStringArray(item, "origin_country").ToList(),
+            TmdbRating = GetDouble(item, "vote_average"),
+            TmdbVoteCount = GetInt(item, "vote_count"),
+            Popularity = GetDouble(item, "popularity")
+        };
+    }
+
+    private static TmdbTvSeriesDetailResult? BuildTvSeriesDetail(JsonElement root)
+    {
+        var tmdbId = GetInt(root, "id");
+        if (tmdbId is not > 0)
+        {
+            return null;
+        }
+
+        var firstAirDate = GetString(root, "first_air_date");
+        return new TmdbTvSeriesDetailResult
+        {
+            TmdbId = tmdbId.Value,
+            Name = GetString(root, "name"),
+            OriginalName = GetString(root, "original_name"),
+            Overview = GetString(root, "overview"),
+            PosterRemoteUrl = BuildPosterUrl(GetString(root, "poster_path")),
+            BackdropRemoteUrl = BuildImageUrl(GetString(root, "backdrop_path")),
+            FirstAirDate = firstAirDate,
+            FirstAirYear = ParseYear(firstAirDate),
+            GenresText = string.Join(" / ", EnumerateArrayStrings(root, "genres", "name")),
+            OriginalLanguage = GetString(root, "original_language"),
+            OriginCountries = EnumerateStringArray(root, "origin_country").ToList(),
+            NumberOfSeasons = GetInt(root, "number_of_seasons"),
+            NumberOfEpisodes = GetInt(root, "number_of_episodes"),
+            TmdbRating = GetDouble(root, "vote_average"),
+            TmdbVoteCount = GetInt(root, "vote_count"),
+            Seasons = BuildTvSeasonSummaries(root)
+        };
+    }
+
+    private static IReadOnlyList<TmdbTvSeasonSummaryItem> BuildTvSeasonSummaries(JsonElement root)
+    {
+        var seasons = new List<TmdbTvSeasonSummaryItem>();
+        if (!root.TryGetProperty("seasons", out var seasonsArray) || seasonsArray.ValueKind != JsonValueKind.Array)
+        {
+            return seasons;
+        }
+
+        foreach (var item in seasonsArray.EnumerateArray())
+        {
+            seasons.Add(
+                new TmdbTvSeasonSummaryItem
+                {
+                    TmdbId = GetInt(item, "id"),
+                    SeasonNumber = GetInt(item, "season_number") ?? 0,
+                    Name = GetString(item, "name"),
+                    Overview = GetString(item, "overview"),
+                    PosterRemoteUrl = BuildPosterUrl(GetString(item, "poster_path")),
+                    AirDate = GetString(item, "air_date"),
+                    EpisodeCount = GetInt(item, "episode_count"),
+                    TmdbRating = GetDouble(item, "vote_average")
+                });
+        }
+
+        return seasons;
+    }
+
+    private static TmdbTvSeasonDetailResult? BuildTvSeasonDetail(int seriesTmdbId, JsonElement root)
+    {
+        var tmdbId = GetInt(root, "id");
+        if (tmdbId is not > 0)
+        {
+            return null;
+        }
+
+        var episodes = BuildTvEpisodeMetadataItems(root);
+        return new TmdbTvSeasonDetailResult
+        {
+            SeriesTmdbId = seriesTmdbId,
+            TmdbId = tmdbId.Value,
+            SeasonNumber = GetInt(root, "season_number") ?? 0,
+            Name = GetString(root, "name"),
+            Overview = GetString(root, "overview"),
+            PosterRemoteUrl = BuildPosterUrl(GetString(root, "poster_path")),
+            AirDate = GetString(root, "air_date"),
+            EpisodeCount = episodes.Count,
+            TmdbRating = GetDouble(root, "vote_average"),
+            TmdbVoteCount = GetInt(root, "vote_count"),
+            Episodes = episodes
+        };
+    }
+
+    private static IReadOnlyList<TmdbTvEpisodeMetadataItem> BuildTvEpisodeMetadataItems(JsonElement root)
+    {
+        var episodes = new List<TmdbTvEpisodeMetadataItem>();
+        if (!root.TryGetProperty("episodes", out var episodesArray) || episodesArray.ValueKind != JsonValueKind.Array)
+        {
+            return episodes;
+        }
+
+        foreach (var item in episodesArray.EnumerateArray())
+        {
+            var tmdbId = GetInt(item, "id");
+            if (tmdbId is not > 0)
+            {
+                continue;
+            }
+
+            episodes.Add(
+                new TmdbTvEpisodeMetadataItem
+                {
+                    TmdbId = tmdbId.Value,
+                    SeasonNumber = GetInt(item, "season_number") ?? 0,
+                    EpisodeNumber = GetInt(item, "episode_number") ?? 0,
+                    Name = GetString(item, "name"),
+                    Overview = GetString(item, "overview"),
+                    StillRemoteUrl = BuildImageUrl(GetString(item, "still_path")),
+                    AirDate = GetString(item, "air_date"),
+                    RuntimeMinutes = GetInt(item, "runtime"),
+                    TmdbRating = GetDouble(item, "vote_average"),
+                    TmdbVoteCount = GetInt(item, "vote_count")
+                });
+        }
+
+        return episodes;
+    }
+
+    private static TmdbTvSeriesExternalIdsResult BuildTvExternalIds(JsonElement root)
+    {
+        return new TmdbTvSeriesExternalIdsResult
+        {
+            TmdbId = GetInt(root, "id") ?? 0,
+            ImdbId = GetString(root, "imdb_id"),
+            TvdbId = GetInt(root, "tvdb_id"),
+            WikidataId = GetString(root, "wikidata_id"),
+            FacebookId = GetString(root, "facebook_id"),
+            InstagramId = GetString(root, "instagram_id"),
+            TwitterId = GetString(root, "twitter_id")
+        };
+    }
+
     private static TmdbMovieDiscoveryItem? BuildDiscoveryItem(JsonElement item)
     {
         var tmdbId = GetInt(item, "id");
@@ -1058,11 +1692,136 @@ public sealed class TmdbService : ITmdbService
         };
     }
 
+    private static TmdbTvSeriesSearchPage CloneTvSeriesPage(TmdbTvSeriesSearchPage page)
+    {
+        return new TmdbTvSeriesSearchPage
+        {
+            Results = page.Results.Select(CloneTvSeriesSearchItem).ToList(),
+            Page = page.Page,
+            TotalPages = page.TotalPages,
+            TotalResults = page.TotalResults,
+            ResultMessage = page.ResultMessage
+        };
+    }
+
+    private static TmdbTvSeriesSearchItem CloneTvSeriesSearchItem(TmdbTvSeriesSearchItem item)
+    {
+        return new TmdbTvSeriesSearchItem
+        {
+            TmdbId = item.TmdbId,
+            Name = item.Name,
+            OriginalName = item.OriginalName,
+            Overview = item.Overview,
+            PosterRemoteUrl = item.PosterRemoteUrl,
+            BackdropRemoteUrl = item.BackdropRemoteUrl,
+            FirstAirDate = item.FirstAirDate,
+            FirstAirYear = item.FirstAirYear,
+            GenreIds = item.GenreIds.ToList(),
+            OriginalLanguage = item.OriginalLanguage,
+            OriginCountries = item.OriginCountries.ToList(),
+            TmdbRating = item.TmdbRating,
+            TmdbVoteCount = item.TmdbVoteCount,
+            Popularity = item.Popularity
+        };
+    }
+
+    private static TmdbTvSeriesDetailResult CloneTvSeriesDetail(TmdbTvSeriesDetailResult detail)
+    {
+        return new TmdbTvSeriesDetailResult
+        {
+            TmdbId = detail.TmdbId,
+            Name = detail.Name,
+            OriginalName = detail.OriginalName,
+            Overview = detail.Overview,
+            PosterRemoteUrl = detail.PosterRemoteUrl,
+            BackdropRemoteUrl = detail.BackdropRemoteUrl,
+            FirstAirDate = detail.FirstAirDate,
+            FirstAirYear = detail.FirstAirYear,
+            GenresText = detail.GenresText,
+            OriginalLanguage = detail.OriginalLanguage,
+            OriginCountries = detail.OriginCountries.ToList(),
+            NumberOfSeasons = detail.NumberOfSeasons,
+            NumberOfEpisodes = detail.NumberOfEpisodes,
+            TmdbRating = detail.TmdbRating,
+            TmdbVoteCount = detail.TmdbVoteCount,
+            Seasons = detail.Seasons.Select(CloneTvSeasonSummary).ToList()
+        };
+    }
+
+    private static TmdbTvSeasonSummaryItem CloneTvSeasonSummary(TmdbTvSeasonSummaryItem item)
+    {
+        return new TmdbTvSeasonSummaryItem
+        {
+            TmdbId = item.TmdbId,
+            SeasonNumber = item.SeasonNumber,
+            Name = item.Name,
+            Overview = item.Overview,
+            PosterRemoteUrl = item.PosterRemoteUrl,
+            AirDate = item.AirDate,
+            EpisodeCount = item.EpisodeCount,
+            TmdbRating = item.TmdbRating
+        };
+    }
+
+    private static TmdbTvSeasonDetailResult CloneTvSeasonDetail(TmdbTvSeasonDetailResult detail)
+    {
+        return new TmdbTvSeasonDetailResult
+        {
+            SeriesTmdbId = detail.SeriesTmdbId,
+            TmdbId = detail.TmdbId,
+            SeasonNumber = detail.SeasonNumber,
+            Name = detail.Name,
+            Overview = detail.Overview,
+            PosterRemoteUrl = detail.PosterRemoteUrl,
+            AirDate = detail.AirDate,
+            EpisodeCount = detail.EpisodeCount,
+            TmdbRating = detail.TmdbRating,
+            TmdbVoteCount = detail.TmdbVoteCount,
+            Episodes = detail.Episodes.Select(CloneTvEpisodeMetadataItem).ToList()
+        };
+    }
+
+    private static TmdbTvEpisodeMetadataItem CloneTvEpisodeMetadataItem(TmdbTvEpisodeMetadataItem item)
+    {
+        return new TmdbTvEpisodeMetadataItem
+        {
+            TmdbId = item.TmdbId,
+            SeasonNumber = item.SeasonNumber,
+            EpisodeNumber = item.EpisodeNumber,
+            Name = item.Name,
+            Overview = item.Overview,
+            StillRemoteUrl = item.StillRemoteUrl,
+            AirDate = item.AirDate,
+            RuntimeMinutes = item.RuntimeMinutes,
+            TmdbRating = item.TmdbRating,
+            TmdbVoteCount = item.TmdbVoteCount
+        };
+    }
+
+    private static TmdbTvSeriesExternalIdsResult CloneTvExternalIds(TmdbTvSeriesExternalIdsResult item)
+    {
+        return new TmdbTvSeriesExternalIdsResult
+        {
+            TmdbId = item.TmdbId,
+            ImdbId = item.ImdbId,
+            TvdbId = item.TvdbId,
+            WikidataId = item.WikidataId,
+            FacebookId = item.FacebookId,
+            InstagramId = item.InstagramId,
+            TwitterId = item.TwitterId
+        };
+    }
+
     private static string BuildPosterUrl(string posterPath)
     {
-        return string.IsNullOrWhiteSpace(posterPath)
+        return BuildImageUrl(posterPath);
+    }
+
+    private static string BuildImageUrl(string imagePath)
+    {
+        return string.IsNullOrWhiteSpace(imagePath)
             ? string.Empty
-            : $"{ImageBaseUrl}{posterPath}";
+            : $"{ImageBaseUrl}{imagePath}";
     }
 
     private static IEnumerable<string> EnumerateArrayStrings(JsonElement element, string arrayPropertyName, string itemPropertyName)

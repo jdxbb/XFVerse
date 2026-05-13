@@ -239,12 +239,13 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
     {
         return await dbContext.WatchHistories
             .AsNoTracking()
-            .Where(x => movieIds.Contains(x.MovieId)
+            .Where(x => x.MovieId.HasValue
+                && movieIds.Contains(x.MovieId.Value)
                 && x.DurationWatchedSeconds > ValidWatchSecondsThreshold)
             .Select(x => new ProfileHistoryRow
             {
                 Id = x.Id,
-                MovieId = x.MovieId,
+                MovieId = x.MovieId!.Value,
                 MediaFileId = x.MediaFileId,
                 StartedAt = x.StartedAt,
                 EndedAt = x.EndedAt,

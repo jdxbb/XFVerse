@@ -9,7 +9,11 @@ public sealed class MediaFileConfiguration : IEntityTypeConfiguration<MediaFile>
 {
     public void Configure(EntityTypeBuilder<MediaFile> builder)
     {
-        builder.ToTable("MediaFiles");
+        builder.ToTable(
+            "MediaFiles",
+            table => table.HasCheckConstraint(
+                "CK_MediaFiles_MovieId_EpisodeId_NotBoth",
+                "MovieId IS NULL OR EpisodeId IS NULL"));
 
         builder.HasKey(x => x.Id);
 
@@ -55,10 +59,16 @@ public sealed class MediaFileConfiguration : IEntityTypeConfiguration<MediaFile>
         builder.HasIndex(x => x.FileName);
         builder.HasIndex(x => x.MediaType);
         builder.HasIndex(x => x.MovieId);
+        builder.HasIndex(x => x.EpisodeId);
 
         builder.HasOne(x => x.Movie)
             .WithMany(x => x.MediaFiles)
             .HasForeignKey(x => x.MovieId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(x => x.Episode)
+            .WithMany(x => x.MediaFiles)
+            .HasForeignKey(x => x.EpisodeId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(x => x.DefaultForMovie)

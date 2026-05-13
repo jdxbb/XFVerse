@@ -176,7 +176,7 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
             .Select(
                 x => new RecentHistoryRow
                 {
-                    MovieId = x.MovieId,
+                    MovieId = x.MovieId!.Value,
                     MediaFileId = x.MediaFileId,
                     Title = x.Movie!.Title,
                     ReleaseYear = x.Movie.ReleaseYear,

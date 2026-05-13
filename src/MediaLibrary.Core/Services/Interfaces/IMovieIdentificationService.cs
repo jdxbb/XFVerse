@@ -21,4 +21,9 @@ public interface IMovieIdentificationService
         int movieId,
         int tmdbId,
         CancellationToken cancellationToken = default);
+
+    Task<int> ApplyManualMediaFileMatchAsync(
+        int mediaFileId,
+        int tmdbId,
+        CancellationToken cancellationToken = default);
 }

@@ -75,6 +75,12 @@ public sealed class WatchHistoryService : IWatchHistoryService
             return false;
         }
 
+        if (!history.MovieId.HasValue)
+        {
+            return false;
+        }
+
+        var movieId = history.MovieId.Value;
         var normalizedPosition = Math.Max(0, positionSeconds);
         var normalizedWatched = Math.Max(0, durationWatchedSeconds);
         var normalizedMediaDuration = mediaDurationSeconds.HasValue
@@ -82,7 +88,7 @@ public sealed class WatchHistoryService : IWatchHistoryService
             : 0;
         var mediaFile = await dbContext.MediaFiles
             .FirstOrDefaultAsync(x => x.Id == history.MediaFileId, cancellationToken);
-        var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == history.MovieId, cancellationToken);
+        var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
 
         if (normalizedMediaDuration > 0 && mediaFile is not null)
         {
@@ -138,7 +144,7 @@ public sealed class WatchHistoryService : IWatchHistoryService
         }
 
         LogCompletionEvaluation(
-            history.MovieId,
+            movieId,
             history.MediaFileId,
             isCompleted,
             normalizedPosition,
@@ -184,7 +190,7 @@ public sealed class WatchHistoryService : IWatchHistoryService
                 x => new WatchHistoryProjection
                 {
                     HistoryId = x.Id,
-                    MovieId = x.MovieId,
+                    MovieId = x.MovieId ?? 0,
                     MediaFileId = x.MediaFileId,
                     TmdbId = x.Movie!.TmdbId,
                     Title = x.Movie.Title,
@@ -225,7 +231,7 @@ public sealed class WatchHistoryService : IWatchHistoryService
         if (!effectiveDurationSeconds.HasValue
             || effectiveDurationSeconds.Value <= WatchCompletionOptions.DefaultMinimumValidDurationSeconds)
         {
-            LogCompletionSkip(history.MovieId, "no-duration");
+            LogCompletionSkip(history.MovieId.GetValueOrDefault(), "no-duration");
             return WatchCompletionResult.NotCompleted("no-duration");
         }
 
@@ -615,6 +621,12 @@ public sealed class WatchHistoryService : IWatchHistoryService
             return;
         }
 
+        if (!history.MovieId.HasValue)
+        {
+            return;
+        }
+
+        var movieId = history.MovieId.Value;
         if (history.LastPlayPositionSeconds > 0
             || history.DurationWatchedSeconds > 0
             || history.IsCompleted)
@@ -626,12 +638,12 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
         var previousLastPlayedAt = await dbContext.WatchHistories
             .AsNoTracking()
-            .Where(x => x.MovieId == history.MovieId && x.Id != watchHistoryId)
+            .Where(x => x.MovieId == movieId && x.Id != watchHistoryId)
             .OrderByDescending(x => x.EndedAt ?? x.StartedAt)
             .Select(x => (DateTime?)(x.EndedAt ?? x.StartedAt))
             .FirstOrDefaultAsync(cancellationToken);
 
-        var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == history.MovieId, cancellationToken);
+        var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
         if (movie is not null)
         {
             movie.LastPlayedAt = previousLastPlayedAt;

@@ -205,23 +205,33 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .Select(x => (DateTime?)x.UpdatedAt)
             .MaxAsync(cancellationToken);
 
-        var mediaFileCount = await dbContext.MediaFiles.AsNoTracking().CountAsync(cancellationToken);
+        var mediaFileCount = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(x => x.MovieId.HasValue)
+            .CountAsync(cancellationToken);
         var mediaFileMaxUpdatedAt = await dbContext.MediaFiles
             .AsNoTracking()
+            .Where(x => x.MovieId.HasValue)
             .Select(x => (DateTime?)x.UpdatedAt)
             .MaxAsync(cancellationToken);
         var mediaFileMaxCreatedAt = await dbContext.MediaFiles
             .AsNoTracking()
+            .Where(x => x.MovieId.HasValue)
             .Select(x => (DateTime?)x.CreatedAt)
             .MaxAsync(cancellationToken);
 
-        var watchHistoryCount = await dbContext.WatchHistories.AsNoTracking().CountAsync(cancellationToken);
+        var watchHistoryCount = await dbContext.WatchHistories
+            .AsNoTracking()
+            .Where(x => x.MovieId.HasValue)
+            .CountAsync(cancellationToken);
         var watchHistoryMaxActivityAt = await dbContext.WatchHistories
             .AsNoTracking()
+            .Where(x => x.MovieId.HasValue)
             .Select(x => (DateTime?)(x.EndedAt ?? x.StartedAt))
             .MaxAsync(cancellationToken);
         var watchHistoryMaxCreatedAt = await dbContext.WatchHistories
             .AsNoTracking()
+            .Where(x => x.MovieId.HasValue)
             .Select(x => (DateTime?)x.CreatedAt)
             .MaxAsync(cancellationToken);
 
@@ -303,15 +313,16 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 })
                 .ToListAsync(cancellationToken);
         var histories = identifiedMovieIds.Count == 0
-            ? []
+            ? new List<WatchHistoryStatsRow>()
             : await dbContext.WatchHistories
                 .AsNoTracking()
-                .Where(x => identifiedMovieIds.Contains(x.MovieId)
+                .Where(x => x.MovieId.HasValue
+                    && identifiedMovieIds.Contains(x.MovieId.Value)
                     && x.DurationWatchedSeconds > ValidWatchSecondsThreshold)
                 .Select(x => new WatchHistoryStatsRow
                 {
                     Id = x.Id,
-                    MovieId = x.MovieId,
+                    MovieId = x.MovieId!.Value,
                     MediaFileId = x.MediaFileId,
                     StartedAt = x.StartedAt,
                     EndedAt = x.EndedAt,
