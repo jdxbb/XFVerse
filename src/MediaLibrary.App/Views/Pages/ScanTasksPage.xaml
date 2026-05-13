@@ -219,6 +219,205 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="18" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="240" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="本地目录配置" Style="{StaticResource CardTitleTextStyle}" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Text="管理本地媒体目录配置，并可手动扫描已启用目录。"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="{Binding LocalRunScanButtonText}"
+                                        Command="{Binding RunLocalScanCommand}"
+                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                <Button Margin="12,0,0,0"
+                                        Content="添加目录"
+                                        Command="{Binding BeginAddLocalScanPathCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="420" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource CompactCardStyle}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="260" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="{Binding LocalScanPathStatusMessage}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+
+                                    <Border Grid.Row="1" Margin="0,14,0,0">
+                                        <Border.Style>
+                                            <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasLocalScanPaths}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="还没有本地目录配置。"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                    </Border>
+
+                                    <ScrollViewer Grid.Row="1"
+                                                  Margin="0,14,0,0"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <ScrollViewer.Style>
+                                            <Style TargetType="ScrollViewer">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasLocalScanPaths}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ScrollViewer.Style>
+                                        <ItemsControl ItemsSource="{Binding LocalScanPaths}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="0,0,0,12" Padding="14" CornerRadius="12" Background="{DynamicResource BrushSurfaceAlt}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding DisplayName}" Style="{StaticResource SectionTitleTextStyle}" />
+                                                                <TextBlock Margin="0,6,0,0"
+                                                                           Text="{Binding Path}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                                <WrapPanel Margin="0,8,0,0">
+                                                                    <TextBlock Margin="0,0,14,0" Text="{Binding EnabledText}" Style="{StaticResource BodyTextStyle}" />
+                                                                    <TextBlock Margin="0,0,14,0" Text="{Binding RecursiveText}" Style="{StaticResource BodyTextStyle}" />
+                                                                </WrapPanel>
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Button Content="编辑"
+                                                                        Command="{Binding DataContext.EditLocalScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                                <Button Margin="8,0,0,0"
+                                                                        Content="扫描"
+                                                                        Command="{Binding DataContext.RunLocalScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                                <Button Margin="8,0,0,0"
+                                                                        Content="{Binding ToggleText}"
+                                                                        Command="{Binding DataContext.ToggleLocalScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                                <Button Margin="8,0,0,0"
+                                                                        Content="移除"
+                                                                        Command="{Binding DataContext.DeleteLocalScanPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource CompactCardStyle}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock Text="{Binding LocalScanPathEditorTitle}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        <Button DockPanel.Dock="Right"
+                                                Content="取消"
+                                                Command="{Binding CancelEditLocalScanPathCommand}"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                    </DockPanel>
+                                    <TextBlock Margin="0,12,0,0" Text="本地目录路径" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding EditingLocalScanPathValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,10,0,0" Text="显示名称" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding EditingLocalScanPathDisplayName, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Content="启用该本地目录"
+                                              IsChecked="{Binding EditingLocalScanPathEnabled}"
+                                              Style="{StaticResource FormCheckBoxStyle}" />
+                                    <CheckBox Content="递归扫描子目录"
+                                              IsChecked="{Binding EditingLocalScanPathRecursive}"
+                                              Style="{StaticResource FormCheckBoxStyle}" />
+                                    <Button Margin="0,14,0,0"
+                                            Content="{Binding LocalScanPathSubmitButtonText}"
+                                            Command="{Binding SaveLocalScanPathCommand}"
+                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                    <TextBlock Margin="0,22,0,0" Text="最近本地扫描" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Text="还没有本地扫描记录。">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasLocalRecentLogs}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding LocalRecentLogs}">
+                                        <ItemsControl.Style>
+                                            <Style TargetType="ItemsControl">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasLocalRecentLogs}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ItemsControl.Style>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,0,10" Padding="10" CornerRadius="8" Background="{DynamicResource BrushSurfaceAlt}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding TargetText}" Style="{StaticResource BodyTextStyle}" />
+                                                        <WrapPanel Margin="0,6,0,0">
+                                                            <TextBlock Margin="0,0,12,0" Text="{Binding StatusText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                            <TextBlock Text="{Binding StartedAtText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                        </WrapPanel>
+                                                        <TextBlock Margin="0,6,0,0"
+                                                                   Text="{Binding ScannedCount, StringFormat=扫描：{0}}"
+                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,20,0,0" Style="{StaticResource PageCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>

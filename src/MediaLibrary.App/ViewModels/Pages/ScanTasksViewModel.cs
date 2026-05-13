@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
@@ -15,6 +16,7 @@ namespace MediaLibrary.App.ViewModels.Pages;
 public sealed class ScanTasksViewModel : PageViewModelBase
 {
     private readonly IMediaScanService _mediaScanService;
+    private readonly ILocalMediaScanService _localMediaScanService;
     private readonly ISettingsService _settingsService;
     private readonly IWebDavService _webDavService;
     private readonly IDataRefreshService _dataRefreshService;
@@ -24,6 +26,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private bool _isRunning;
     private bool _isConnectionEnabled = true;
     private int? _editingScanPathId;
+    private int? _editingLocalScanPathId;
     private string _connectionName = "WebDAV";
     private string _baseUrl = string.Empty;
     private string _username = string.Empty;
@@ -32,10 +35,15 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private string _statusMessage = "点击“开始扫描”后，系统会扫描当前已启用的 WebDAV 路径。";
     private string _connectionStatusMessage = "请先保存 WebDAV 连接配置。";
     private string _scanPathStatusMessage = "当前还没有扫描路径。";
+    private string _localScanPathStatusMessage = "当前还没有本地目录配置。";
     private string _editingScanPathValue = string.Empty;
     private string _editingScanPathDisplayName = string.Empty;
+    private string _editingLocalScanPathValue = string.Empty;
+    private string _editingLocalScanPathDisplayName = string.Empty;
     private bool _editingScanPathEnabled = true;
     private bool _editingScanPathRecursive = true;
+    private bool _editingLocalScanPathEnabled = true;
+    private bool _editingLocalScanPathRecursive = true;
     private int _scannedCount;
     private int _newFileCount;
     private int _updatedFileCount;
@@ -46,12 +54,14 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public ScanTasksViewModel(
         IMediaScanService mediaScanService,
+        ILocalMediaScanService localMediaScanService,
         ISettingsService settingsService,
         IWebDavService webDavService,
         IDataRefreshService dataRefreshService)
         : base("扫描任务", "管理 WebDAV 连接、扫描路径、扫描进度与最近扫描记录。")
     {
         _mediaScanService = mediaScanService;
+        _localMediaScanService = localMediaScanService;
         _settingsService = settingsService;
         _webDavService = webDavService;
         _dataRefreshService = dataRefreshService;
@@ -65,13 +75,25 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         DeleteScanPathCommand = new AsyncRelayCommand(DeleteScanPathAsync, _ => !IsRunning);
         ToggleScanPathCommand = new AsyncRelayCommand(ToggleScanPathAsync, _ => !IsRunning);
         CancelEditScanPathCommand = new RelayCommand(CancelEditScanPath, () => !IsRunning);
+        BeginAddLocalScanPathCommand = new RelayCommand(BeginAddLocalScanPath, () => !IsRunning);
+        SaveLocalScanPathCommand = new AsyncRelayCommand(SaveLocalScanPathAsync, () => !IsRunning);
+        EditLocalScanPathCommand = new RelayCommand(EditLocalScanPath, _ => !IsRunning);
+        DeleteLocalScanPathCommand = new AsyncRelayCommand(DeleteLocalScanPathAsync, _ => !IsRunning);
+        ToggleLocalScanPathCommand = new AsyncRelayCommand(ToggleLocalScanPathAsync, _ => !IsRunning);
+        CancelEditLocalScanPathCommand = new RelayCommand(CancelEditLocalScanPath, () => !IsRunning);
+        RunLocalScanCommand = new AsyncRelayCommand(RunLocalScanAsync, () => CanRunLocalScan);
+        RunLocalScanPathCommand = new AsyncRelayCommand(RunLocalScanPathAsync, _ => !IsRunning);
         RunScanCommand = new AsyncRelayCommand(RunScanAsync, () => CanRunScan);
         CancelScanCommand = new RelayCommand(CancelScan, () => IsRunning);
     }
 
     public ObservableCollection<ScanPathViewModel> ScanPaths { get; } = [];
 
+    public ObservableCollection<ScanPathViewModel> LocalScanPaths { get; } = [];
+
     public ObservableCollection<ScanTaskLogViewModel> RecentLogs { get; } = [];
+
+    public ObservableCollection<ScanTaskLogViewModel> LocalRecentLogs { get; } = [];
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -90,6 +112,22 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public AsyncRelayCommand ToggleScanPathCommand { get; }
 
     public RelayCommand CancelEditScanPathCommand { get; }
+
+    public RelayCommand BeginAddLocalScanPathCommand { get; }
+
+    public AsyncRelayCommand SaveLocalScanPathCommand { get; }
+
+    public RelayCommand EditLocalScanPathCommand { get; }
+
+    public AsyncRelayCommand DeleteLocalScanPathCommand { get; }
+
+    public AsyncRelayCommand ToggleLocalScanPathCommand { get; }
+
+    public RelayCommand CancelEditLocalScanPathCommand { get; }
+
+    public AsyncRelayCommand RunLocalScanCommand { get; }
+
+    public AsyncRelayCommand RunLocalScanPathCommand { get; }
 
     public AsyncRelayCommand RunScanCommand { get; }
 
@@ -133,8 +171,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(IsRefreshing));
                 OnPropertyChanged(nameof(CanRunScan));
+                OnPropertyChanged(nameof(CanRunLocalScan));
                 OnPropertyChanged(nameof(IsProgressIndeterminate));
                 OnPropertyChanged(nameof(RunScanButtonText));
+                OnPropertyChanged(nameof(LocalRunScanButtonText));
                 RaiseCommandStates();
             }
         }
@@ -201,6 +241,12 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         private set => SetProperty(ref _scanPathStatusMessage, value);
     }
 
+    public string LocalScanPathStatusMessage
+    {
+        get => _localScanPathStatusMessage;
+        private set => SetProperty(ref _localScanPathStatusMessage, value);
+    }
+
     public int? EditingScanPathId
     {
         get => _editingScanPathId;
@@ -239,23 +285,77 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         set => SetProperty(ref _editingScanPathRecursive, value);
     }
 
+    public int? EditingLocalScanPathId
+    {
+        get => _editingLocalScanPathId;
+        private set
+        {
+            if (SetProperty(ref _editingLocalScanPathId, value))
+            {
+                OnPropertyChanged(nameof(IsEditingExistingLocalScanPath));
+                OnPropertyChanged(nameof(LocalScanPathEditorTitle));
+                OnPropertyChanged(nameof(LocalScanPathSubmitButtonText));
+            }
+        }
+    }
+
+    public string EditingLocalScanPathValue
+    {
+        get => _editingLocalScanPathValue;
+        set => SetProperty(ref _editingLocalScanPathValue, value);
+    }
+
+    public string EditingLocalScanPathDisplayName
+    {
+        get => _editingLocalScanPathDisplayName;
+        set => SetProperty(ref _editingLocalScanPathDisplayName, value);
+    }
+
+    public bool EditingLocalScanPathEnabled
+    {
+        get => _editingLocalScanPathEnabled;
+        set => SetProperty(ref _editingLocalScanPathEnabled, value);
+    }
+
+    public bool EditingLocalScanPathRecursive
+    {
+        get => _editingLocalScanPathRecursive;
+        set => SetProperty(ref _editingLocalScanPathRecursive, value);
+    }
+
     public bool IsEditingExistingScanPath => EditingScanPathId.HasValue;
 
     public string ScanPathEditorTitle => IsEditingExistingScanPath ? "编辑扫描路径" : "新增扫描路径";
 
     public string ScanPathSubmitButtonText => IsEditingExistingScanPath ? "保存修改" : "新增路径";
 
+    public bool IsEditingExistingLocalScanPath => EditingLocalScanPathId.HasValue;
+
+    public string LocalScanPathEditorTitle => IsEditingExistingLocalScanPath ? "编辑本地目录" : "新增本地目录";
+
+    public string LocalScanPathSubmitButtonText => IsEditingExistingLocalScanPath ? "保存修改" : "添加目录";
+
     public bool HasScanPaths => ScanPaths.Count > 0;
+
+    public bool HasLocalScanPaths => LocalScanPaths.Count > 0;
 
     public bool HasRecentLogs => RecentLogs.Count > 0;
 
+    public bool HasLocalRecentLogs => LocalRecentLogs.Count > 0;
+
     public int EnabledScanPathCount => ScanPaths.Count(x => x.IsEnabled);
 
+    public int EnabledLocalScanPathCount => LocalScanPaths.Count(x => x.IsEnabled);
+
     public bool CanRunScan => HasConnection && IsConnectionEnabled && EnabledScanPathCount > 0 && !IsRunning;
+
+    public bool CanRunLocalScan => EnabledLocalScanPathCount > 0 && !IsRunning;
 
     public bool IsProgressIndeterminate => IsRunning;
 
     public string RunScanButtonText => IsRunning ? "扫描中..." : "开始扫描";
+
+    public string LocalRunScanButtonText => IsRunning ? "扫描中..." : "扫描本地目录";
 
     public string CurrentFileText
     {
@@ -326,6 +426,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 RaiseScanPathStateChanged();
             }
 
+            await LoadLocalOverviewAsync(cancellationToken);
             await LoadOverviewAsync(cancellationToken);
             StatusMessage = BuildReadyStatus();
         }
@@ -374,6 +475,36 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             ? "当前还没有扫描路径。"
             : $"已加载 {ScanPaths.Count} 条扫描路径，启用 {EnabledScanPathCount} 条。";
         RaiseScanPathStateChanged();
+    }
+
+    private async Task LoadLocalScanPathsAsync(CancellationToken cancellationToken)
+    {
+        var paths = await _settingsService.GetLocalScanPathsAsync(cancellationToken);
+
+        LocalScanPaths.Clear();
+        foreach (var path in paths)
+        {
+            LocalScanPaths.Add(new ScanPathViewModel(path, null));
+        }
+
+        LocalScanPathStatusMessage = LocalScanPaths.Count == 0
+            ? "当前还没有本地目录配置。"
+            : $"已加载 {LocalScanPaths.Count} 个本地目录，启用 {EnabledLocalScanPathCount} 个。";
+        RaiseLocalScanPathStateChanged();
+    }
+
+    private async Task LoadLocalOverviewAsync(CancellationToken cancellationToken)
+    {
+        await LoadLocalScanPathsAsync(cancellationToken);
+
+        var overview = await _localMediaScanService.GetOverviewAsync(cancellationToken);
+        LocalRecentLogs.Clear();
+        foreach (var log in overview.RecentLogs)
+        {
+            LocalRecentLogs.Add(new ScanTaskLogViewModel(log, string.Empty, string.Empty, isLocal: true));
+        }
+
+        OnPropertyChanged(nameof(HasLocalRecentLogs));
     }
 
     private async Task LoadOverviewAsync(CancellationToken cancellationToken)
@@ -569,6 +700,158 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         EditingScanPathRecursive = true;
     }
 
+    private void BeginAddLocalScanPath()
+    {
+        EditingLocalScanPathId = null;
+        EditingLocalScanPathValue = string.Empty;
+        EditingLocalScanPathDisplayName = string.Empty;
+        EditingLocalScanPathEnabled = true;
+        EditingLocalScanPathRecursive = true;
+        LocalScanPathStatusMessage = "正在新增本地目录配置。";
+    }
+
+    private void EditLocalScanPath(object? parameter)
+    {
+        if (parameter is not ScanPathViewModel scanPath)
+        {
+            return;
+        }
+
+        EditingLocalScanPathId = scanPath.Id;
+        EditingLocalScanPathValue = scanPath.Path;
+        EditingLocalScanPathDisplayName = scanPath.DisplayName;
+        EditingLocalScanPathEnabled = scanPath.IsEnabled;
+        EditingLocalScanPathRecursive = scanPath.IsRecursive;
+        LocalScanPathStatusMessage = $"正在编辑本地目录：{scanPath.DisplayName}";
+    }
+
+    private async Task SaveLocalScanPathAsync()
+    {
+        var pathExists = Directory.Exists((EditingLocalScanPathValue ?? string.Empty).Trim().Trim('"'));
+        try
+        {
+            var saved = await _settingsService.SaveLocalScanPathAsync(
+                new ScanPath
+                {
+                    Id = EditingLocalScanPathId ?? 0,
+                    Path = EditingLocalScanPathValue ?? string.Empty,
+                    DisplayName = EditingLocalScanPathDisplayName ?? string.Empty,
+                    IsEnabled = EditingLocalScanPathEnabled,
+                    IsRecursive = EditingLocalScanPathRecursive
+                });
+
+            await LoadLocalOverviewAsync(CancellationToken.None);
+            LocalScanPathStatusMessage = pathExists
+                ? $"本地目录配置已保存：{saved.DisplayName}"
+                : $"本地目录配置已保存：{saved.DisplayName}（路径当前不可访问）";
+            CancelEditLocalScanPath();
+        }
+        catch (Exception exception)
+        {
+            LocalScanPathStatusMessage = exception.Message;
+        }
+    }
+
+    private async Task DeleteLocalScanPathAsync(object? parameter)
+    {
+        if (parameter is not ScanPathViewModel scanPath)
+        {
+            return;
+        }
+
+        await _settingsService.DeleteLocalScanPathAsync(scanPath.Id);
+        await LoadLocalOverviewAsync(CancellationToken.None);
+        LocalScanPathStatusMessage = $"已移除本地目录配置：{scanPath.DisplayName}";
+
+        if (EditingLocalScanPathId == scanPath.Id)
+        {
+            CancelEditLocalScanPath();
+        }
+    }
+
+    private async Task ToggleLocalScanPathAsync(object? parameter)
+    {
+        if (parameter is not ScanPathViewModel scanPath)
+        {
+            return;
+        }
+
+        await _settingsService.SetLocalScanPathEnabledAsync(scanPath.Id, !scanPath.IsEnabled);
+        await LoadLocalOverviewAsync(CancellationToken.None);
+        LocalScanPathStatusMessage = scanPath.IsEnabled
+            ? $"已停用本地目录：{scanPath.DisplayName}"
+            : $"已启用本地目录：{scanPath.DisplayName}";
+    }
+
+    private void CancelEditLocalScanPath()
+    {
+        EditingLocalScanPathId = null;
+        EditingLocalScanPathValue = string.Empty;
+        EditingLocalScanPathDisplayName = string.Empty;
+        EditingLocalScanPathEnabled = true;
+        EditingLocalScanPathRecursive = true;
+    }
+
+    private async Task RunLocalScanAsync()
+    {
+        if (!CanRunLocalScan)
+        {
+            return;
+        }
+
+        await RunLocalScanCoreAsync(() => _localMediaScanService.RunScanAsync(_scanCts!.Token));
+    }
+
+    private async Task RunLocalScanPathAsync(object? parameter)
+    {
+        if (parameter is not ScanPathViewModel scanPath || IsRunning)
+        {
+            return;
+        }
+
+        await RunLocalScanCoreAsync(() => _localMediaScanService.RunScanPathAsync(scanPath.Id, _scanCts!.Token));
+    }
+
+    private async Task RunLocalScanCoreAsync(Func<Task<ScanExecutionResult>> scanAction)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _scanCts?.Dispose();
+        _scanCts = new CancellationTokenSource();
+
+        ResetProgress();
+        IsRunning = true;
+        StatusMessage = "正在扫描本地目录，请稍候。";
+        CurrentFileText = "本地扫描进行中，当前文件明细不显示。";
+
+        try
+        {
+            var result = await scanAction();
+            ApplyScanResult(result, stopwatch.Elapsed);
+            StatusMessage = result.StatusMessage;
+            CurrentFileText = "本地扫描完成。";
+            _dataRefreshService.NotifyScanChanged();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "本地扫描已取消。";
+            CurrentFileText = "本地扫描已取消。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"本地扫描失败：{exception.GetType().Name}";
+            CurrentFileText = "本地扫描失败。";
+        }
+        finally
+        {
+            stopwatch.Stop();
+            ElapsedText = FormatElapsed(stopwatch.Elapsed);
+            _scanCts?.Dispose();
+            _scanCts = null;
+            IsRunning = false;
+            await LoadLocalOverviewAsync(CancellationToken.None);
+        }
+    }
+
     private async Task RunScanAsync()
     {
         if (!CanRunScan)
@@ -653,6 +936,14 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         RunScanCommand.RaiseCanExecuteChanged();
     }
 
+    private void RaiseLocalScanPathStateChanged()
+    {
+        OnPropertyChanged(nameof(HasLocalScanPaths));
+        OnPropertyChanged(nameof(EnabledLocalScanPathCount));
+        OnPropertyChanged(nameof(CanRunLocalScan));
+        RunLocalScanCommand.RaiseCanExecuteChanged();
+    }
+
     private void RaiseCommandStates()
     {
         RefreshCommand.RaiseCanExecuteChanged();
@@ -664,6 +955,14 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         DeleteScanPathCommand.RaiseCanExecuteChanged();
         ToggleScanPathCommand.RaiseCanExecuteChanged();
         CancelEditScanPathCommand.RaiseCanExecuteChanged();
+        BeginAddLocalScanPathCommand.RaiseCanExecuteChanged();
+        SaveLocalScanPathCommand.RaiseCanExecuteChanged();
+        EditLocalScanPathCommand.RaiseCanExecuteChanged();
+        DeleteLocalScanPathCommand.RaiseCanExecuteChanged();
+        ToggleLocalScanPathCommand.RaiseCanExecuteChanged();
+        CancelEditLocalScanPathCommand.RaiseCanExecuteChanged();
+        RunLocalScanCommand.RaiseCanExecuteChanged();
+        RunLocalScanPathCommand.RaiseCanExecuteChanged();
         RunScanCommand.RaiseCanExecuteChanged();
         CancelScanCommand.RaiseCanExecuteChanged();
     }
@@ -724,14 +1023,20 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public sealed class ScanTaskLogViewModel
     {
-        public ScanTaskLogViewModel(ScanTaskLogItem item, string baseUrl, string username)
+        public ScanTaskLogViewModel(
+            ScanTaskLogItem item,
+            string baseUrl,
+            string username,
+            bool isLocal = false)
         {
             Id = item.Id;
             ScanPathId = item.ScanPathId;
-            ScanPathDisplayName = string.IsNullOrWhiteSpace(item.ScanPathDisplayName) ? "扫描路径" : item.ScanPathDisplayName;
+            ScanPathDisplayName = string.IsNullOrWhiteSpace(item.ScanPathDisplayName)
+                ? isLocal ? "本地目录" : "扫描路径"
+                : item.ScanPathDisplayName;
             ScanPath = item.ScanPath;
-            TargetText = BuildTargetText(baseUrl, item.ScanPath);
-            UsernameText = string.IsNullOrWhiteSpace(username) ? "未填写用户名" : username;
+            TargetText = isLocal ? $"本地目录：{ScanPathDisplayName}" : BuildTargetText(baseUrl, item.ScanPath);
+            UsernameText = isLocal ? "Local" : string.IsNullOrWhiteSpace(username) ? "未填写用户名" : username;
             StatusText = FormatStatus(item.Status);
             StartedAt = item.StartedAt;
             EndedAt = item.EndedAt;

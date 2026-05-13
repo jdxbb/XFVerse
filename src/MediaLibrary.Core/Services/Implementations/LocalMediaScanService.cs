@@ -1,0 +1,940 @@
+using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Helpers;
+using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.Enums;
+using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace MediaLibrary.Core.Services.Implementations;
+
+public sealed class LocalMediaScanService : ILocalMediaScanService
+{
+    private readonly ISettingsService _settingsService;
+    private readonly IMovieIdentificationService _movieIdentificationService;
+    private readonly ISubtitleBindingService _subtitleBindingService;
+    private readonly IAiClassificationService _aiClassificationService;
+    private readonly IMediaProbeService _mediaProbeService;
+
+    public LocalMediaScanService(
+        ISettingsService settingsService,
+        IMovieIdentificationService movieIdentificationService,
+        ISubtitleBindingService subtitleBindingService,
+        IAiClassificationService aiClassificationService,
+        IMediaProbeService mediaProbeService)
+    {
+        _settingsService = settingsService;
+        _movieIdentificationService = movieIdentificationService;
+        _subtitleBindingService = subtitleBindingService;
+        _aiClassificationService = aiClassificationService;
+        _mediaProbeService = mediaProbeService;
+    }
+
+    public async Task<ScanOverviewModel> GetOverviewAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = await _settingsService.GetLocalConnectionAsync(cancellationToken);
+        if (connection is null)
+        {
+            return new ScanOverviewModel();
+        }
+
+        var enabledScanPaths = (await _settingsService.GetLocalScanPathsAsync(cancellationToken))
+            .Where(x => x.IsEnabled)
+            .OrderByDescending(x => GetLocalPathDepth(x.Path))
+            .ThenBy(x => x.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .Select(
+                x => new ScanPathSummaryItem
+                {
+                    Id = x.Id,
+                    DisplayName = x.DisplayName,
+                    Path = x.Path,
+                    IsRecursive = x.IsRecursive
+                })
+            .ToList();
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var recentLogs = await dbContext.ScanTaskLogs
+            .AsNoTracking()
+            .Where(x => x.SourceConnectionId == connection.Id)
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(20)
+            .Select(
+                x => new ScanTaskLogItem
+                {
+                    Id = x.Id,
+                    ScanPathId = x.ScanPathId,
+                    ScanPathDisplayName = x.ScanPath != null ? x.ScanPath.DisplayName : string.Empty,
+                    ScanPath = x.ScanPath != null ? x.ScanPath.Path : string.Empty,
+                    TaskType = x.TaskType,
+                    Status = x.Status,
+                    StartedAt = ToLocalDisplayTime(x.StartedAt),
+                    EndedAt = x.EndedAt.HasValue ? ToLocalDisplayTime(x.EndedAt.Value) : null,
+                    ScannedCount = x.ScannedCount,
+                    NewFileCount = x.NewFileCount,
+                    UpdatedFileCount = x.UpdatedFileCount,
+                    IgnoredFileCount = x.IgnoredFileCount,
+                    ErrorCount = x.ErrorCount,
+                    ErrorMessage = x.ErrorMessage ?? string.Empty
+                })
+            .ToListAsync(cancellationToken);
+
+        return new ScanOverviewModel
+        {
+            HasConnection = true,
+            ConnectionName = connection.Name,
+            BaseUrl = connection.BaseUrl,
+            LastScanAt = connection.LastScanAt.HasValue ? ToLocalDisplayTime(connection.LastScanAt.Value) : null,
+            EnabledScanPaths = enabledScanPaths,
+            RecentLogs = recentLogs
+        };
+    }
+
+    public async Task<ScanExecutionResult> RunScanAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = await _settingsService.GetLocalConnectionAsync(cancellationToken);
+        if (connection is null)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "请先添加本地目录配置。"
+            };
+        }
+
+        if (!connection.IsEnabled)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "本地媒体来源已停用。"
+            };
+        }
+
+        var enabledScanPaths = (await _settingsService.GetLocalScanPathsAsync(cancellationToken))
+            .Where(x => x.IsEnabled)
+            .OrderByDescending(x => GetLocalPathDepth(x.Path))
+            .ThenBy(x => x.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (enabledScanPaths.Count == 0)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "当前没有启用的本地目录。"
+            };
+        }
+
+        return await RunScanCoreAsync(connection.Id, enabledScanPaths, cancellationToken);
+    }
+
+    public async Task<ScanExecutionResult> RunScanPathAsync(
+        int scanPathId,
+        CancellationToken cancellationToken = default)
+    {
+        var connection = await _settingsService.GetLocalConnectionAsync(cancellationToken);
+        if (connection is null)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "请先添加本地目录配置。"
+            };
+        }
+
+        var scanPath = (await _settingsService.GetLocalScanPathsAsync(cancellationToken))
+            .FirstOrDefault(x => x.Id == scanPathId);
+
+        if (scanPath is null)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "本地目录配置不存在。"
+            };
+        }
+
+        if (!scanPath.IsEnabled)
+        {
+            return new ScanExecutionResult
+            {
+                StatusMessage = "本地目录已停用。"
+            };
+        }
+
+        return await RunScanCoreAsync(connection.Id, [scanPath], cancellationToken);
+    }
+
+    private async Task<ScanExecutionResult> RunScanCoreAsync(
+        int sourceConnectionId,
+        IReadOnlyList<ScanPath> scanPaths,
+        CancellationToken cancellationToken)
+    {
+        var seenFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var postProcessVideoMediaFileIds = new HashSet<int>();
+        var subtitleBindingVideoMediaFileIds = new HashSet<int>();
+        var completedLogIds = new List<int>();
+        var totalResult = new ScanExecutionResult
+        {
+            ProcessedPathCount = scanPaths.Count
+        };
+
+        foreach (var scanPath in scanPaths)
+        {
+            var pathResult = await ScanSinglePathAsync(
+                sourceConnectionId,
+                scanPath,
+                seenFilePaths,
+                postProcessVideoMediaFileIds,
+                subtitleBindingVideoMediaFileIds,
+                cancellationToken);
+
+            totalResult.TotalScannedCount += pathResult.TotalScannedCount;
+            totalResult.NewFileCount += pathResult.NewFileCount;
+            totalResult.UpdatedFileCount += pathResult.UpdatedFileCount;
+            totalResult.IgnoredFileCount += pathResult.IgnoredFileCount;
+            totalResult.ErrorCount += pathResult.ErrorCount;
+
+            if (pathResult.IsCompleted && pathResult.LogId > 0)
+            {
+                completedLogIds.Add(pathResult.LogId);
+            }
+
+            if (pathResult.CanMarkMissing)
+            {
+                var deletedSubtitleAffectedVideoIds = await MarkMissingFilesDeletedAsync(
+                    sourceConnectionId,
+                    scanPath,
+                    seenFilePaths,
+                    cancellationToken);
+                foreach (var mediaFileId in deletedSubtitleAffectedVideoIds)
+                {
+                    subtitleBindingVideoMediaFileIds.Add(mediaFileId);
+                }
+            }
+        }
+
+        var postStage = new PostScanStageResult();
+        try
+        {
+            var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(
+                postProcessVideoMediaFileIds.ToArray(),
+                cancellationToken);
+            postStage.Absorb(identificationResult);
+        }
+        catch (Exception exception)
+        {
+            postStage.AddError("Identify.Stage", FormatExceptionType(exception));
+        }
+
+        try
+        {
+            await ClassifyAffectedMoviesAsync(postProcessVideoMediaFileIds, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            postStage.AddWarning("AI.Classify", FormatExceptionType(exception));
+        }
+
+        try
+        {
+            await _subtitleBindingService.RebuildBindingsAsync(
+                sourceConnectionId,
+                subtitleBindingVideoMediaFileIds.ToArray(),
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            postStage.AddWarning("Subtitle.Binding", FormatExceptionType(exception));
+        }
+
+        if (completedLogIds.Count > 0 && postStage.HasIssues)
+        {
+            await MarkLogsAsPartialSuccessAsync(completedLogIds, postStage, cancellationToken);
+            totalResult.ErrorCount += postStage.IssueCount;
+        }
+
+        if (completedLogIds.Count > 0)
+        {
+            var completedAt = DateTime.UtcNow;
+            await FinalizeCompletedLogsAsync(completedLogIds, completedAt, cancellationToken);
+            await UpdateConnectionLastScanAtAsync(sourceConnectionId, completedAt, cancellationToken);
+        }
+
+        QueueMediaProbe(postProcessVideoMediaFileIds);
+
+        totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
+        return totalResult;
+    }
+
+    private async Task<PathScanExecutionResult> ScanSinglePathAsync(
+        int sourceConnectionId,
+        ScanPath scanPath,
+        HashSet<string> seenFilePaths,
+        HashSet<int> postProcessVideoMediaFileIds,
+        HashSet<int> subtitleBindingVideoMediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var now = DateTime.UtcNow;
+        var log = new ScanTaskLog
+        {
+            SourceConnectionId = sourceConnectionId,
+            ScanPathId = scanPath.Id,
+            TaskType = ScanTaskType.Refresh,
+            Status = ScanTaskStatus.Running,
+            StartedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        dbContext.ScanTaskLogs.Add(log);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var result = new PathScanExecutionResult
+        {
+            LogId = log.Id
+        };
+
+        var localEntries = new List<LocalFileEntry>();
+        try
+        {
+            CollectLocalFiles(scanPath, localEntries, result, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            result.ErrorCount++;
+            await CompletePathLogAsync(
+                log,
+                result,
+                ScanTaskStatus.Failed,
+                "[Local.Directory] 本地目录读取失败",
+                dbContext,
+                cancellationToken);
+            return result;
+        }
+
+        if (!result.RootWasReadable)
+        {
+            await CompletePathLogAsync(
+                log,
+                result,
+                ScanTaskStatus.Failed,
+                "[Local.Directory] 本地目录不可访问",
+                dbContext,
+                cancellationToken);
+            return result;
+        }
+
+        try
+        {
+            var existingFiles = await LoadExistingFilesForPathAsync(
+                dbContext,
+                sourceConnectionId,
+                scanPath.Path,
+                cancellationToken);
+            var changedVideoFiles = new List<MediaFile>();
+            var changedSubtitleDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in localEntries.OrderBy(x => x.FilePath, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!seenFilePaths.Add(entry.FilePath))
+                {
+                    result.IgnoredFileCount++;
+                    continue;
+                }
+
+                var isNewFile = false;
+                var hasMaterialChange = false;
+                if (!existingFiles.TryGetValue(entry.FilePath, out var mediaFile))
+                {
+                    isNewFile = true;
+                    mediaFile = new MediaFile
+                    {
+                        SourceConnectionId = sourceConnectionId,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    dbContext.MediaFiles.Add(mediaFile);
+                    existingFiles[entry.FilePath] = mediaFile;
+                    result.NewFileCount++;
+                }
+                else
+                {
+                    hasMaterialChange = HasMaterialChange(mediaFile, entry, scanPath.Id);
+                    if (!hasMaterialChange)
+                    {
+                        mediaFile.LastSeenAt = DateTime.UtcNow;
+                        continue;
+                    }
+
+                    result.UpdatedFileCount++;
+                }
+
+                mediaFile.ScanPathId = scanPath.Id;
+                mediaFile.FileName = entry.FileName;
+                mediaFile.FilePath = entry.FilePath;
+                mediaFile.RemoteUri = null;
+                mediaFile.Extension = Path.GetExtension(entry.FileName).ToLowerInvariant();
+                mediaFile.FileSize = entry.FileSize;
+                mediaFile.LastModifiedAt = entry.LastModifiedAt;
+                mediaFile.MediaType = entry.MediaType;
+                mediaFile.IsDeleted = false;
+                mediaFile.LastSeenAt = DateTime.UtcNow;
+                mediaFile.UpdatedAt = DateTime.UtcNow;
+
+                if (entry.MediaType == MediaType.Video)
+                {
+                    changedVideoFiles.Add(mediaFile);
+                }
+                else if (entry.MediaType == MediaType.Subtitle && (isNewFile || hasMaterialChange))
+                {
+                    changedSubtitleDirectories.Add(GetDirectoryPath(entry.FilePath));
+                }
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            foreach (var mediaFileId in changedVideoFiles.Select(x => x.Id).Where(x => x > 0))
+            {
+                postProcessVideoMediaFileIds.Add(mediaFileId);
+                subtitleBindingVideoMediaFileIds.Add(mediaFileId);
+            }
+
+            if (changedSubtitleDirectories.Count > 0)
+            {
+                foreach (var mediaFileId in existingFiles.Values
+                             .Where(x => x.MediaType == MediaType.Video
+                                         && !x.IsDeleted
+                                         && changedSubtitleDirectories.Contains(GetDirectoryPath(x.FilePath)))
+                             .Select(x => x.Id)
+                             .Where(x => x > 0))
+                {
+                    subtitleBindingVideoMediaFileIds.Add(mediaFileId);
+                }
+            }
+
+            result.IsCompleted = true;
+            result.CanMarkMissing = result.ErrorCount == 0;
+            await CompletePathLogAsync(
+                log,
+                result,
+                result.ErrorCount == 0 ? ScanTaskStatus.Success : ScanTaskStatus.PartialSuccess,
+                result.ErrorCount == 0 ? string.Empty : "[Local.Directory] 部分本地目录或文件无法访问",
+                dbContext,
+                cancellationToken);
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            result.ErrorCount++;
+            await CompletePathLogAsync(
+                log,
+                result,
+                ScanTaskStatus.Failed,
+                "[Local.MediaFile] 本地文件入库失败",
+                dbContext,
+                cancellationToken);
+            return result;
+        }
+    }
+
+    private static void CollectLocalFiles(
+        ScanPath scanPath,
+        List<LocalFileEntry> entries,
+        PathScanExecutionResult result,
+        CancellationToken cancellationToken)
+    {
+        var root = new DirectoryInfo(scanPath.Path);
+        if (!root.Exists || ShouldSkipDirectory(root))
+        {
+            result.ErrorCount++;
+            return;
+        }
+
+        result.RootWasReadable = true;
+        var pending = new Stack<DirectoryInfo>();
+        pending.Push(root);
+
+        while (pending.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var directory = pending.Pop();
+
+            FileInfo[] files;
+            try
+            {
+                files = directory.GetFiles();
+            }
+            catch
+            {
+                result.ErrorCount++;
+                continue;
+            }
+
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    if (ShouldSkipFile(file))
+                    {
+                        result.IgnoredFileCount++;
+                        continue;
+                    }
+
+                    var mediaType = MediaFileRules.GetMediaType(file.Name);
+                    if (mediaType == MediaType.Other)
+                    {
+                        result.IgnoredFileCount++;
+                        continue;
+                    }
+
+                    result.TotalScannedCount++;
+                    entries.Add(
+                        new LocalFileEntry(
+                            file.Name,
+                            file.FullName,
+                            file.Length,
+                            file.LastWriteTimeUtc,
+                            mediaType));
+                }
+                catch
+                {
+                    result.ErrorCount++;
+                }
+            }
+
+            if (!scanPath.IsRecursive)
+            {
+                continue;
+            }
+
+            DirectoryInfo[] directories;
+            try
+            {
+                directories = directory.GetDirectories();
+            }
+            catch
+            {
+                result.ErrorCount++;
+                continue;
+            }
+
+            foreach (var child in directories)
+            {
+                if (ShouldSkipDirectory(child))
+                {
+                    result.IgnoredFileCount++;
+                    continue;
+                }
+
+                pending.Push(child);
+            }
+        }
+    }
+
+    private static bool ShouldSkipDirectory(DirectoryInfo directory)
+    {
+        try
+        {
+            return directory.Attributes.HasFlag(FileAttributes.Hidden)
+                   || directory.Attributes.HasFlag(FileAttributes.System);
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static bool ShouldSkipFile(FileInfo file)
+    {
+        try
+        {
+            return file.Attributes.HasFlag(FileAttributes.Hidden)
+                   || file.Attributes.HasFlag(FileAttributes.System);
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static async Task<Dictionary<string, MediaFile>> LoadExistingFilesForPathAsync(
+        AppDbContext dbContext,
+        int sourceConnectionId,
+        string scanPath,
+        CancellationToken cancellationToken)
+    {
+        var normalizedScanPath = NormalizeLocalPath(scanPath);
+        var candidates = await dbContext.MediaFiles
+            .Where(x => x.SourceConnectionId == sourceConnectionId)
+            .ToListAsync(cancellationToken);
+
+        return candidates
+            .Where(x => IsUnderLocalPath(x.FilePath, normalizedScanPath))
+            .ToDictionary(x => x.FilePath, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool HasMaterialChange(MediaFile mediaFile, LocalFileEntry entry, int scanPathId)
+    {
+        return mediaFile.ScanPathId != scanPathId
+               || !string.Equals(mediaFile.FileName, entry.FileName, StringComparison.Ordinal)
+               || !string.IsNullOrWhiteSpace(mediaFile.RemoteUri)
+               || mediaFile.FileSize != entry.FileSize
+               || mediaFile.LastModifiedAt != entry.LastModifiedAt
+               || mediaFile.MediaType != entry.MediaType
+               || mediaFile.IsDeleted;
+    }
+
+    private static async Task<IReadOnlyCollection<int>> MarkMissingFilesDeletedAsync(
+        int sourceConnectionId,
+        ScanPath scanPath,
+        HashSet<string> seenFilePaths,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var normalizedScanPath = NormalizeLocalPath(scanPath.Path);
+        var candidates = await dbContext.MediaFiles
+            .Where(x => x.SourceConnectionId == sourceConnectionId && !x.IsDeleted)
+            .ToListAsync(cancellationToken);
+        var deletedSubtitleDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mediaFile in candidates.Where(x => IsUnderLocalPath(x.FilePath, normalizedScanPath)))
+        {
+            if (seenFilePaths.Contains(mediaFile.FilePath))
+            {
+                continue;
+            }
+
+            if (mediaFile.MediaType == MediaType.Subtitle)
+            {
+                deletedSubtitleDirectories.Add(GetDirectoryPath(mediaFile.FilePath));
+            }
+
+            mediaFile.IsDeleted = true;
+            mediaFile.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (deletedSubtitleDirectories.Count == 0)
+        {
+            return [];
+        }
+
+        return candidates
+            .Where(x => x.MediaType == MediaType.Video
+                        && !x.IsDeleted
+                        && deletedSubtitleDirectories.Contains(GetDirectoryPath(x.FilePath)))
+            .Select(x => x.Id)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+    }
+
+    private async Task ClassifyAffectedMoviesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        if (mediaFileIds.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var movieIds = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(x => mediaFileIds.Contains(x.Id) && x.MovieId.HasValue)
+            .Select(x => x.MovieId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var movieId in movieIds)
+        {
+            var needsClassification = await dbContext.Movies
+                .AsNoTracking()
+                .AnyAsync(
+                    x => x.Id == movieId
+                         && (string.IsNullOrWhiteSpace(x.AiTagsText)
+                             || string.IsNullOrWhiteSpace(x.EmotionTagsText)
+                             || string.IsNullOrWhiteSpace(x.SceneTagsText)),
+                    cancellationToken);
+
+            if (needsClassification)
+            {
+                await _aiClassificationService.ClassifyMovieAsync(movieId, cancellationToken);
+            }
+        }
+    }
+
+    private void QueueMediaProbe(IReadOnlyCollection<int> mediaFileIds)
+    {
+        if (mediaFileIds.Count == 0)
+        {
+            return;
+        }
+
+        var ids = mediaFileIds.ToArray();
+        _ = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    await _mediaProbeService.EnqueueMediaFilesAsync(ids);
+                }
+                catch
+                {
+                    // Media probing is best-effort and must not affect scan results.
+                }
+            });
+    }
+
+    private static async Task CompletePathLogAsync(
+        ScanTaskLog log,
+        PathScanExecutionResult result,
+        ScanTaskStatus status,
+        string errorMessage,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        log.Status = status;
+        log.ScannedCount = result.TotalScannedCount;
+        log.NewFileCount = result.NewFileCount;
+        log.UpdatedFileCount = result.UpdatedFileCount;
+        log.IgnoredFileCount = result.IgnoredFileCount;
+        log.ErrorCount = result.ErrorCount;
+        log.ErrorMessage = string.IsNullOrWhiteSpace(errorMessage) ? null : errorMessage;
+        log.EndedAt = DateTime.UtcNow;
+        log.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task MarkLogsAsPartialSuccessAsync(
+        IReadOnlyCollection<int> logIds,
+        PostScanStageResult postStage,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var logs = await dbContext.ScanTaskLogs
+            .Where(x => logIds.Contains(x.Id) && x.Status != ScanTaskStatus.Failed)
+            .ToListAsync(cancellationToken);
+
+        if (logs.Count == 0)
+        {
+            return;
+        }
+
+        var summary = postStage.BuildSummary();
+        foreach (var log in logs)
+        {
+            log.Status = ScanTaskStatus.PartialSuccess;
+            log.ErrorCount += postStage.IssueCount;
+            log.ErrorMessage = string.IsNullOrWhiteSpace(log.ErrorMessage)
+                ? summary
+                : $"{log.ErrorMessage}; {summary}";
+            log.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task FinalizeCompletedLogsAsync(
+        IReadOnlyCollection<int> logIds,
+        DateTime completedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var logs = await dbContext.ScanTaskLogs
+            .Where(x => logIds.Contains(x.Id) && x.EndedAt.HasValue)
+            .ToListAsync(cancellationToken);
+
+        foreach (var log in logs)
+        {
+            log.EndedAt = completedAt;
+            log.UpdatedAt = completedAt;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task UpdateConnectionLastScanAtAsync(
+        int connectionId,
+        DateTime completedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var connection = await dbContext.SourceConnections.FirstOrDefaultAsync(x => x.Id == connectionId, cancellationToken);
+        if (connection is null)
+        {
+            return;
+        }
+
+        connection.LastScanAt = completedAt;
+        connection.UpdatedAt = completedAt;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string BuildStatusMessage(ScanExecutionResult totalResult, PostScanStageResult postStage)
+    {
+        if (totalResult.ErrorCount == 0 && !postStage.HasIssues)
+        {
+            return $"本地扫描完成，共扫描 {totalResult.TotalScannedCount} 个媒体文件。";
+        }
+
+        if (postStage.HasIssues && totalResult.ErrorCount == postStage.IssueCount)
+        {
+            return $"本地文件入库完成，共扫描 {totalResult.TotalScannedCount} 个媒体文件；识别或元数据阶段存在问题。{postStage.BuildSummary()}";
+        }
+
+        return $"本地扫描完成，共扫描 {totalResult.TotalScannedCount} 个媒体文件；存在 {totalResult.ErrorCount} 个问题。{postStage.BuildSummary()}";
+    }
+
+    private static bool IsUnderLocalPath(string filePath, string scanPath)
+    {
+        var normalizedFilePath = NormalizeLocalPath(filePath);
+        return string.Equals(normalizedFilePath, scanPath, StringComparison.OrdinalIgnoreCase)
+               || normalizedFilePath.StartsWith(AppendDirectorySeparator(scanPath), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeLocalPath(string path)
+    {
+        var fullPath = Path.GetFullPath((path ?? string.Empty).Trim().Trim('"'));
+        var root = Path.GetPathRoot(fullPath);
+        return string.Equals(fullPath, root, StringComparison.OrdinalIgnoreCase)
+            ? fullPath
+            : fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private static string AppendDirectorySeparator(string path)
+    {
+        return path.EndsWith(Path.DirectorySeparatorChar)
+               || path.EndsWith(Path.AltDirectorySeparatorChar)
+            ? path
+            : path + Path.DirectorySeparatorChar;
+    }
+
+    private static string GetDirectoryPath(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        var lastSeparatorIndex = normalized.LastIndexOf('/');
+        return lastSeparatorIndex <= 0 ? "/" : normalized[..lastSeparatorIndex];
+    }
+
+    private static int GetLocalPathDepth(string path)
+    {
+        return NormalizeLocalPath(path)
+            .Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Length;
+    }
+
+    private static DateTime ToLocalDisplayTime(DateTime value)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        return utc.ToLocalTime();
+    }
+
+    private static string FormatExceptionType(Exception exception)
+    {
+        return exception.GetType().Name;
+    }
+
+    private sealed record LocalFileEntry(
+        string FileName,
+        string FilePath,
+        long FileSize,
+        DateTime? LastModifiedAt,
+        MediaType MediaType);
+
+    private sealed class PathScanExecutionResult
+    {
+        public int LogId { get; set; }
+
+        public bool RootWasReadable { get; set; }
+
+        public bool IsCompleted { get; set; }
+
+        public bool CanMarkMissing { get; set; }
+
+        public int TotalScannedCount { get; set; }
+
+        public int NewFileCount { get; set; }
+
+        public int UpdatedFileCount { get; set; }
+
+        public int IgnoredFileCount { get; set; }
+
+        public int ErrorCount { get; set; }
+    }
+
+    private sealed class PostScanStageResult
+    {
+        private readonly List<string> _messages = [];
+
+        public int ErrorCount { get; private set; }
+
+        public int WarningCount { get; private set; }
+
+        public bool HasIssues => IssueCount > 0;
+
+        public int IssueCount => ErrorCount + WarningCount;
+
+        public void Absorb(IdentificationRunResult result)
+        {
+            ErrorCount += result.ErrorCount;
+            WarningCount += result.WarningCount;
+            foreach (var message in result.Messages)
+            {
+                AddMessage(message);
+            }
+        }
+
+        public void AddError(string stage, string message)
+        {
+            ErrorCount++;
+            AddMessage($"[{stage}] {message}");
+        }
+
+        public void AddWarning(string stage, string message)
+        {
+            WarningCount++;
+            AddMessage($"[{stage}] {message}");
+        }
+
+        public string BuildSummary()
+        {
+            if (!HasIssues)
+            {
+                return string.Empty;
+            }
+
+            var parts = new List<string>();
+            if (ErrorCount > 0)
+            {
+                parts.Add($"错误 {ErrorCount}");
+            }
+
+            if (WarningCount > 0)
+            {
+                parts.Add($"警告 {WarningCount}");
+            }
+
+            var detail = _messages.Count > 0 ? $"：{string.Join("；", _messages)}" : string.Empty;
+            return $"识别/元数据阶段{string.Join("；", parts)}{detail}";
+        }
+
+        private void AddMessage(string message)
+        {
+            if (_messages.Count >= 5 || _messages.Contains(message, StringComparer.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _messages.Add(message);
+        }
+    }
+}

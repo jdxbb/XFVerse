@@ -2,5 +2,7 @@ namespace MediaLibrary.Core.Models.Enums;
 
 public enum ProtocolType
 {
-    WebDav = 1
+    WebDav = 1,
+
+    Local = 2
 }

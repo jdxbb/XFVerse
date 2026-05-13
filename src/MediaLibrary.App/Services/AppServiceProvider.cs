@@ -34,6 +34,7 @@ public static class AppServiceProvider
         services.AddSingleton<IMovieIdentificationService, MovieIdentificationService>();
         services.AddSingleton<IMediaProbeService, MediaProbeService>();
         services.AddSingleton<IMediaScanService, MediaScanService>();
+        services.AddSingleton<ILocalMediaScanService, LocalMediaScanService>();
         services.AddSingleton<ILibraryQueryService, LibraryQueryService>();
         services.AddSingleton<IMovieDetailQueryService, MovieDetailQueryService>();
         services.AddSingleton<IMovieManagementService, MovieManagementService>();
