@@ -5,11 +5,15 @@ using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using System.IO;
 
 namespace MediaLibrary.Core.Services.Implementations;
 
 public sealed class PlaybackSourceService : IPlaybackSourceService
 {
+    private const int ResumeDurationToleranceSeconds = 300;
+    private const double ResumeDurationToleranceRatio = 0.05d;
+
     public async Task<PlaybackSessionModel?> GetPlaybackSessionAsync(
         int movieId,
         int? preferredMediaFileId = null,
@@ -163,6 +167,7 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                     x.SubtitleMediaFile.FilePath,
                     x.SubtitleMediaFile.RemoteUri,
                     SourceBaseUrl = x.SubtitleMediaFile.SourceConnection!.BaseUrl,
+                    SubtitleProtocolType = x.SubtitleMediaFile.SourceConnection!.ProtocolType,
                     x.MatchType,
                     x.IsAutoLoaded,
                     x.Priority
@@ -183,7 +188,11 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                             SubtitleMediaFileId = x.SubtitleMediaFileId,
                             FileName = x.FileName,
                             FilePath = x.FilePath,
-                            PlaybackUrl = WebDavPathHelper.BuildPlaybackUrl(x.SourceBaseUrl, x.FilePath, x.RemoteUri),
+                            PlaybackUrl = BuildPlaybackInput(
+                                x.SubtitleProtocolType,
+                                x.SourceBaseUrl,
+                                x.FilePath,
+                                x.RemoteUri),
                             MatchType = x.MatchType,
                             IsAuto = x.IsAutoLoaded,
                             IsPreferred = x.IsAutoLoaded,
@@ -207,7 +216,7 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                         FileName = x.FileName,
                         FilePath = x.FilePath,
                         RemoteUri = x.RemoteUri,
-                        PlaybackUrl = WebDavPathHelper.BuildPlaybackUrl(x.BaseUrl, x.FilePath, x.RemoteUri),
+                        PlaybackUrl = BuildPlaybackInput(x.ProtocolType, x.BaseUrl, x.FilePath, x.RemoteUri),
                         Extension = x.Extension,
                         FileSize = x.FileSize,
                         LastModifiedAt = x.LastModifiedAt,
@@ -225,28 +234,40 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                         MediaProbeError = x.MediaProbeError,
                         MediaProbedAt = x.MediaProbedAt,
                         ProtocolType = x.ProtocolType,
-                        Username = x.Username,
-                        Password = SecretProtector.Unprotect(x.PasswordEncrypted),
-                        IsDefault = x.Id == movie.DefaultMediaFileId,
+                        Username = x.ProtocolType == ProtocolType.WebDav ? x.Username : string.Empty,
+                        Password = x.ProtocolType == ProtocolType.WebDav
+                            ? SecretProtector.Unprotect(x.PasswordEncrypted)
+                            : string.Empty,
                         ResumePositionSeconds = resumePosition,
                         LastPlayedAt = lastPlayedAt,
                         LastPlayPositionSeconds = resumePosition,
                         Subtitles = subtitles ?? []
                     };
-                })
+            })
             .ToList();
 
-        var selectedMediaFileId = preferredMediaFileId.HasValue && sources.Any(x => x.MediaFileId == preferredMediaFileId.Value)
-            ? preferredMediaFileId.Value
-            : movie.DefaultMediaFileId.HasValue && sources.Any(x => x.MediaFileId == movie.DefaultMediaFileId.Value)
-                ? movie.DefaultMediaFileId.Value
-                : sources[0].MediaFileId;
+        var selectedMediaFileId = ResolveSelectedMediaFileId(
+            sources,
+            preferredMediaFileId,
+            movie.DefaultMediaFileId);
+        var effectiveDefaultMediaFileId = preferredMediaFileId.HasValue ? movie.DefaultMediaFileId : selectedMediaFileId;
+        foreach (var source in sources)
+        {
+            source.IsDefault = source.MediaFileId == effectiveDefaultMediaFileId;
+        }
+
+        sources = sources
+            .OrderBy(x => x.MediaFileId == selectedMediaFileId ? 0 : 1)
+            .ThenBy(x => x.IsDefault ? 0 : 1)
+            .ThenBy(x => x.ProtocolType == ProtocolType.Local ? 0 : 1)
+            .ThenBy(x => x.FileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         return new PlaybackSessionModel
         {
             MovieId = movie.Id,
             MovieTitle = movie.Title,
-            DefaultMediaFileId = movie.DefaultMediaFileId,
+            DefaultMediaFileId = effectiveDefaultMediaFileId,
             SelectedMediaFileId = selectedMediaFileId,
             Sources = sources
         };
@@ -272,6 +293,79 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static int ResolveSelectedMediaFileId(
+        IReadOnlyList<PlaybackSourceItem> sources,
+        int? preferredMediaFileId,
+        int? movieDefaultMediaFileId)
+    {
+        if (preferredMediaFileId.HasValue && sources.Any(x => x.MediaFileId == preferredMediaFileId.Value))
+        {
+            return preferredMediaFileId.Value;
+        }
+
+        var activeDefault = movieDefaultMediaFileId.HasValue
+            ? sources.FirstOrDefault(x => x.MediaFileId == movieDefaultMediaFileId.Value
+                                          && IsAvailableForAutomaticSelection(x))
+            : null;
+        if (activeDefault?.ProtocolType == ProtocolType.Local)
+        {
+            return activeDefault.MediaFileId;
+        }
+
+        if (activeDefault is not null)
+        {
+            return activeDefault.MediaFileId;
+        }
+
+        var localSource = sources.FirstOrDefault(x => x.ProtocolType == ProtocolType.Local
+                                                      && IsAvailableForAutomaticSelection(x));
+        if (localSource is not null)
+        {
+            return localSource.MediaFileId;
+        }
+
+        return sources.FirstOrDefault(IsAvailableForAutomaticSelection)?.MediaFileId
+               ?? sources[0].MediaFileId;
+    }
+
+    private static bool IsAvailableForAutomaticSelection(PlaybackSourceItem source)
+    {
+        if (source.ProtocolType != ProtocolType.Local)
+        {
+            return true;
+        }
+
+        return IsExistingLocalFile(source.FilePath);
+    }
+
+    private static string BuildPlaybackInput(
+        ProtocolType protocolType,
+        string baseUrl,
+        string filePath,
+        string? remoteUri)
+    {
+        return protocolType == ProtocolType.Local
+            ? filePath
+            : WebDavPathHelper.BuildPlaybackUrl(baseUrl, filePath, remoteUri);
+    }
+
+    private static bool IsExistingLocalFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(filePath);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static int ResolveSourceSpecificResume(IEnumerable<WatchHistoryProjection> histories, int? targetDurationSeconds)
@@ -393,7 +487,8 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
 
         var diffSeconds = Math.Abs(historyDurationSeconds - targetDurationSeconds);
         var diffRatio = diffSeconds / (double)Math.Max(historyDurationSeconds, targetDurationSeconds);
-        return diffSeconds <= 60 || diffRatio <= 0.02d;
+        return diffSeconds <= ResumeDurationToleranceSeconds
+               || diffRatio <= ResumeDurationToleranceRatio;
     }
 
     private static bool IsNearOrPastEnding(int positionSeconds, int durationSeconds)

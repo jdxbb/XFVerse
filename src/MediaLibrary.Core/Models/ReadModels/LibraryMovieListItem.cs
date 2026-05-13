@@ -62,6 +62,29 @@ public sealed class LibraryMovieListItem
 
     public int SourceCount { get; set; }
 
+    public bool HasLocalSource { get; set; }
+
+    public bool HasWebDavSource { get; set; }
+
+    public string SourceSummary
+    {
+        get
+        {
+            if (!IsInLibrary)
+            {
+                return "未入库";
+            }
+
+            return (HasLocalSource, HasWebDavSource) switch
+            {
+                (true, true) => "本地 + 网盘",
+                (true, false) => "本地",
+                (false, true) => "网盘",
+                _ => "无播放源"
+            };
+        }
+    }
+
     public bool IsInLibrary { get; set; }
 
     public bool IsFavorite { get; set; }

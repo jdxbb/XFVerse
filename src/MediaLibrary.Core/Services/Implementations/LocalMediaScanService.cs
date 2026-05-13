@@ -167,6 +167,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
     {
         var seenFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var postProcessVideoMediaFileIds = new HashSet<int>();
+        var localDefaultCandidateMediaFileIds = new HashSet<int>();
         var subtitleBindingVideoMediaFileIds = new HashSet<int>();
         var completedLogIds = new List<int>();
         var totalResult = new ScanExecutionResult
@@ -181,6 +182,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 scanPath,
                 seenFilePaths,
                 postProcessVideoMediaFileIds,
+                localDefaultCandidateMediaFileIds,
                 subtitleBindingVideoMediaFileIds,
                 cancellationToken);
 
@@ -220,6 +222,15 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         catch (Exception exception)
         {
             postStage.AddError("Identify.Stage", FormatExceptionType(exception));
+        }
+
+        try
+        {
+            await PromoteLocalDefaultSourcesAsync(localDefaultCandidateMediaFileIds, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            postStage.AddWarning("Local.DefaultSource", FormatExceptionType(exception));
         }
 
         try
@@ -267,6 +278,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         ScanPath scanPath,
         HashSet<string> seenFilePaths,
         HashSet<int> postProcessVideoMediaFileIds,
+        HashSet<int> localDefaultCandidateMediaFileIds,
         HashSet<int> subtitleBindingVideoMediaFileIds,
         CancellationToken cancellationToken)
     {
@@ -332,6 +344,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 sourceConnectionId,
                 scanPath.Path,
                 cancellationToken);
+            var discoveredVideoFiles = new List<MediaFile>();
             var changedVideoFiles = new List<MediaFile>();
             var changedSubtitleDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -363,6 +376,11 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                     if (!hasMaterialChange)
                     {
                         mediaFile.LastSeenAt = DateTime.UtcNow;
+                        if (entry.MediaType == MediaType.Video)
+                        {
+                            discoveredVideoFiles.Add(mediaFile);
+                        }
+
                         continue;
                     }
 
@@ -383,6 +401,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
                 if (entry.MediaType == MediaType.Video)
                 {
+                    discoveredVideoFiles.Add(mediaFile);
                     changedVideoFiles.Add(mediaFile);
                 }
                 else if (entry.MediaType == MediaType.Subtitle && (isNewFile || hasMaterialChange))
@@ -392,6 +411,11 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            foreach (var mediaFileId in discoveredVideoFiles.Select(x => x.Id).Where(x => x > 0))
+            {
+                localDefaultCandidateMediaFileIds.Add(mediaFileId);
+            }
 
             foreach (var mediaFileId in changedVideoFiles.Select(x => x.Id).Where(x => x > 0))
             {
@@ -775,6 +799,96 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         connection.LastScanAt = completedAt;
         connection.UpdatedAt = completedAt;
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task PromoteLocalDefaultSourcesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        if (mediaFileIds.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var candidates = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(
+                x => mediaFileIds.Contains(x.Id)
+                     && x.MovieId.HasValue
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted
+                     && x.SourceConnection != null
+                     && x.SourceConnection.ProtocolType == ProtocolType.Local)
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    MovieId = x.MovieId!.Value,
+                    x.FilePath,
+                    x.LastSeenAt,
+                    x.UpdatedAt,
+                    x.CreatedAt
+                })
+            .ToListAsync(cancellationToken);
+
+        candidates = candidates
+            .Where(x => IsExistingLocalFile(x.FilePath))
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        var movieIds = candidates.Select(x => x.MovieId).Distinct().ToArray();
+        var movies = await dbContext.Movies
+            .Where(x => movieIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var updated = false;
+        foreach (var group in candidates.GroupBy(x => x.MovieId))
+        {
+            if (!movies.TryGetValue(group.Key, out var movie))
+            {
+                continue;
+            }
+
+            var preferredLocalSource = group
+                .OrderByDescending(x => x.LastSeenAt ?? x.UpdatedAt)
+                .ThenByDescending(x => x.Id)
+                .First();
+
+            if (movie.DefaultMediaFileId == preferredLocalSource.Id)
+            {
+                continue;
+            }
+
+            movie.DefaultMediaFileId = preferredLocalSource.Id;
+            movie.UpdatedAt = DateTime.UtcNow;
+            updated = true;
+        }
+
+        if (updated)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static bool IsExistingLocalFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(filePath);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string BuildStatusMessage(ScanExecutionResult totalResult, PostScanStageResult postStage)

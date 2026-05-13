@@ -3,6 +3,7 @@ using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
 
 namespace MediaLibrary.Core.Services.Implementations;
 
@@ -80,8 +81,6 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
             .Where(mediaFile => mediaFile.MovieId == movieId
                                 && !mediaFile.IsDeleted
                                 && mediaFile.MediaType == MediaType.Video)
-            .OrderBy(mediaFile => mediaFile.Id != movie.DefaultMediaFileId)
-            .ThenBy(mediaFile => mediaFile.FileName)
             .Select(
                 mediaFile => new MovieSourceItem
                 {
@@ -104,10 +103,21 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
                     MediaProbeStatus = mediaFile.MediaProbeStatus,
                     MediaProbeError = mediaFile.MediaProbeError,
                     MediaProbedAt = mediaFile.MediaProbedAt,
-                    ProtocolType = mediaFile.SourceConnection!.ProtocolType,
-                    IsDefault = mediaFile.Id == movie.DefaultMediaFileId
+                    ProtocolType = mediaFile.SourceConnection!.ProtocolType
                 })
             .ToListAsync(cancellationToken);
+
+        var effectiveDefaultMediaFileId = ResolveEffectiveDefaultMediaFileId(sources, movie.DefaultMediaFileId);
+        foreach (var source in sources)
+        {
+            source.IsDefault = source.MediaFileId == effectiveDefaultMediaFileId;
+        }
+
+        sources = sources
+            .OrderBy(source => source.MediaFileId == effectiveDefaultMediaFileId ? 0 : 1)
+            .ThenBy(source => source.ProtocolType == ProtocolType.Local ? 0 : 1)
+            .ThenBy(source => source.FileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var sourceIds = sources.Select(source => source.MediaFileId).ToArray();
         var latestHistoryRows = sourceIds.Length == 0
@@ -193,12 +203,71 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
             ImdbId = movie.ImdbId ?? string.Empty,
             IdentificationStatus = movie.IdentificationStatus,
             IdentifiedConfidence = movie.IdentifiedConfidence,
-            DefaultMediaFileId = movie.DefaultMediaFileId,
+            DefaultMediaFileId = effectiveDefaultMediaFileId,
             IsFavorite = movie.IsFavorite,
             IsWatched = movie.IsWatched,
             IsNotInterested = isNotInterested,
             Ratings = ratings,
             Sources = sources
         };
+    }
+
+    private static int? ResolveEffectiveDefaultMediaFileId(
+        IReadOnlyList<MovieSourceItem> sources,
+        int? storedDefaultMediaFileId)
+    {
+        if (sources.Count == 0)
+        {
+            return storedDefaultMediaFileId;
+        }
+
+        var storedDefault = storedDefaultMediaFileId.HasValue
+            ? sources.FirstOrDefault(x => x.MediaFileId == storedDefaultMediaFileId.Value)
+            : null;
+        if (storedDefault is not null && IsAvailableForAutomaticSelection(storedDefault))
+        {
+            return storedDefault.MediaFileId;
+        }
+
+        var localSource = sources.FirstOrDefault(x => x.ProtocolType == ProtocolType.Local && IsExistingLocalFile(x.FilePath));
+        if (localSource is not null)
+        {
+            return localSource.MediaFileId;
+        }
+
+        if (storedDefault is not null && storedDefault.ProtocolType != ProtocolType.Local)
+        {
+            return storedDefault.MediaFileId;
+        }
+
+        return sources
+            .Where(x => x.ProtocolType != ProtocolType.Local)
+            .OrderBy(x => x.FileName, StringComparer.OrdinalIgnoreCase)
+            .Select(x => (int?)x.MediaFileId)
+            .FirstOrDefault()
+            ?? storedDefault?.MediaFileId
+            ?? sources.OrderBy(x => x.FileName, StringComparer.OrdinalIgnoreCase).First().MediaFileId;
+    }
+
+    private static bool IsExistingLocalFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(filePath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsAvailableForAutomaticSelection(MovieSourceItem source)
+    {
+        return source.ProtocolType != ProtocolType.Local || IsExistingLocalFile(source.FilePath);
     }
 }

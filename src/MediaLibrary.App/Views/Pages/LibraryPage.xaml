@@ -129,9 +129,9 @@
                                     <MenuItem Header="本地"
                                               Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
                                               CommandParameter="本地" />
-                                    <MenuItem Header="WebDAV"
+                                    <MenuItem Header="网盘"
                                               Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
-                                              CommandParameter="WebDAV" />
+                                              CommandParameter="网盘" />
                                 </MenuItem>
                             </MenuItem>
                         </Menu>
@@ -438,6 +438,9 @@
                                                            Text="{Binding SourceCount, StringFormat={}{0} 个播放源}"
                                                            Style="{StaticResource BodyMutedTextStyle}" />
                                             </DockPanel>
+                                            <TextBlock Margin="0,5,0,0"
+                                                       Text="{Binding SourceSummary}"
+                                                       Style="{StaticResource BodyMutedTextStyle}" />
                                             <Button Margin="0,14,0,0"
                                                     Content="查看详情"
                                                     Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -523,6 +526,9 @@
                                         <TextBlock Margin="0,6,0,0" Text="{Binding ReleaseYear}" Style="{StaticResource BodyTextStyle}" />
                                         <TextBlock Margin="0,4,0,0"
                                                    Text="{Binding SourceCount, StringFormat={}{0} 个播放源}"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                        <TextBlock Margin="0,4,0,0"
+                                                   Text="{Binding SourceSummary}"
                                                    Style="{StaticResource BodyMutedTextStyle}" />
                                     </StackPanel>
 

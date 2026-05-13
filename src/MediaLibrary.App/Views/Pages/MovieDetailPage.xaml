@@ -200,7 +200,18 @@
                                             </Grid.ColumnDefinitions>
 
                                             <StackPanel Margin="0,0,18,0">
-                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding FileName}" />
+                                                <WrapPanel>
+                                                    <TextBlock VerticalAlignment="Center"
+                                                               Style="{StaticResource SectionTitleTextStyle}"
+                                                               Text="{Binding FileName}" />
+                                                    <Border Margin="10,0,0,0"
+                                                            Padding="8,4"
+                                                            Background="{DynamicResource BrushSurface}"
+                                                            CornerRadius="999">
+                                                        <TextBlock Style="{StaticResource BodyMutedTextStyle}"
+                                                                   Text="{Binding SourceTypeText}" />
+                                                    </Border>
+                                                </WrapPanel>
                                                 <TextBlock Margin="0,6,0,0"
                                                            Style="{StaticResource BodyMutedTextStyle}"
                                                            Text="{Binding FilePath}"

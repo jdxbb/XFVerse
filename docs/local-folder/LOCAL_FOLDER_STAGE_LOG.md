@@ -232,3 +232,289 @@
 - Confirm logs/docs/stage reports do not contain full local paths.
 - Run `dotnet build MediaLibrary.sln` and confirm 0 warnings and 0 errors.
 - Confirm no migration files were added.
+
+## Phase 3.3
+
+### Modified Files
+
+- `src/MediaLibrary.Core/Services/Implementations/PlaybackSourceService.cs`
+- `src/MediaLibrary.App/ViewModels/Player/PlayerWindowViewModel.cs`
+- `src/MediaLibrary.App/Views/Player/PlayerWindow.xaml.cs`
+- `docs/local-folder/LOCAL_FOLDER_PLAN.md`
+- `docs/local-folder/LOCAL_FOLDER_STAGE_LOG.md`
+- `docs/local-folder/LOCAL_FOLDER_KNOWN_ISSUES.md`
+
+### Added Files
+
+- None.
+
+### Deleted Files
+
+- None.
+
+### Added Migration
+
+- None.
+
+### Completed
+
+- Added Local playback input generation from `MediaFile.FilePath`.
+- Kept Local playback out of WebDAV URL construction.
+- Kept Local playback out of WebDAV credentials and authorization headers.
+- Kept Local playback out of video cache acquisition.
+- Hid WebDAV cache status UI for Local sources.
+- Added Local file existence validation before player load.
+- Added friendly unavailable-file playback state without deleting or marking records.
+- Added playback-time dynamic Local default priority when no explicit source is requested.
+- Preserved explicit `preferredMediaFileId` selection.
+- Preserved watch history, resume, and automatic watched behavior on the existing identifiers.
+
+### Local Default Strategy
+
+- The player dynamically selects an active playable Local video source before WebDAV when no explicit source is requested.
+- `Movie.DefaultMediaFileId` is not updated in this stage.
+- If the stored Local default is missing or unavailable, playback falls back to another active playable source.
+
+### Not Done In This Stage
+
+- No media library source filtering.
+- No detail page Local/WebDAV source display refinement.
+- No complex multi-version playback priority UI.
+- No Local file health-check cleanup beyond manual rescan behavior.
+- No file system watcher.
+
+### Build Result
+
+- `dotnet build MediaLibrary.sln`: passed with 0 warnings and 0 errors.
+
+### Manual Acceptance Matrix
+
+- Start the application.
+- Confirm a Local folder has been scanned into the library.
+- Open a movie with only a Local playback source.
+- Click play and confirm the Local file plays directly.
+- Confirm Local playback does not show WebDAV cache status.
+- Confirm Local playback does not require WebDAV credentials.
+- Pause and close the player, then reopen and confirm resume works.
+- Play enough progress and confirm automatic watched logic still works.
+- Confirm watch history records the expected movie and media source.
+- For a movie with WebDAV and Local sources, confirm default playback chooses Local when no source is specified.
+- If a WebDAV source is explicitly selected, confirm playback honors that selection.
+- Temporarily move or remove a Local file and confirm playback shows an unavailable-file message.
+- Confirm unavailable Local files are not deleted and not automatically marked `IsDeleted`.
+- Confirm WebDAV playback still works.
+- Confirm WebDAV cache playback still works.
+- Confirm this stage does not add media library source filtering.
+- Confirm logs and documentation do not include full local media paths.
+- Run `dotnet build MediaLibrary.sln` and confirm 0 warnings and 0 errors.
+- Confirm no migration files were added.
+
+## Phase 3.3 Closeout Fixes
+
+### Modified Files
+
+- `src/MediaLibrary.Core/Services/Implementations/LocalMediaScanService.cs`
+- `src/MediaLibrary.Core/Services/Implementations/PlaybackSourceService.cs`
+- `src/MediaLibrary.App/ViewModels/Player/PlayerWindowViewModel.cs`
+- `docs/local-folder/LOCAL_FOLDER_PLAN.md`
+- `docs/local-folder/LOCAL_FOLDER_STAGE_LOG.md`
+- `docs/local-folder/LOCAL_FOLDER_KNOWN_ISSUES.md`
+
+### Added Files
+
+- None.
+
+### Deleted Files
+
+- None.
+
+### Added Migration
+
+- None.
+
+### Completed
+
+- Promoted accessible Local video sources to `Movie.DefaultMediaFileId` after Local scan identification.
+- Promoted accessible Local video sources during manual or automatic re-identification.
+- Aligned detail page source-list default display with the playback effective default source.
+- Kept valid stored defaults authoritative, so a user-selected WebDAV default remains selectable as the default.
+- Kept playback-time Local priority as a fallback only when no valid stored default exists.
+- Preserved explicit source selection.
+- Relaxed cross-source resume duration compatibility to 5 minutes or 5%.
+- Reverted Local seek buffering overlay suppression; Local seek uses the normal player buffering state.
+- Ordered playback source menu data so the actual selected/default source appears first.
+- Added source type to the player source button text to disambiguate Local and WebDAV files with the same name.
+- Confirmed Local playback diagnostics use `local-file` mode and do not use the WebDAV video cache path.
+
+### Not Done In This Stage
+
+- No media library source filtering.
+- No detail page source display refinement.
+- No health-check cleanup for Local files missing outside manual rescan.
+- No player core rewrite.
+
+### Build Result
+
+- `dotnet build MediaLibrary.sln`: passed with 0 warnings and 0 errors.
+
+### Manual Acceptance Matrix
+
+- Scan a Local source after a WebDAV source has been matched to the same movie and confirm the Local source becomes the stored default.
+- Reset a Local source to unrecognized, identify it back into an existing WebDAV movie, and confirm the detail page marks Local as default.
+- With both Local and WebDAV sources present, manually set WebDAV as default and confirm detail display and playback default follow WebDAV.
+- Play a movie that has both Local and WebDAV sources and confirm no explicit source selection defaults to Local.
+- Explicitly select a WebDAV source and confirm it is respected.
+- Play progress on one source, switch to the other source with a small duration difference, and confirm resume/progress is shared.
+- Seek repeatedly during Local playback and confirm behavior follows the normal player buffering state.
+- Open the source menu and confirm the actual selected/default Local source appears first and is checked.
+- Confirm startup/opening loading UI can still appear normally.
+- Confirm no full local paths, WebDAV URLs, credentials, or tokens are written to docs or stage reports.
+- Run `dotnet build MediaLibrary.sln` and confirm 0 warnings and 0 errors.
+- Confirm no migration files were added.
+
+## Phase 3.4
+
+### Modified Files
+
+- `src/MediaLibrary.Core/Models/ReadModels/LibraryMovieListItem.cs`
+- `src/MediaLibrary.Core/Models/ReadModels/MediaSourceDisplayText.cs`
+- `src/MediaLibrary.Core/Services/Implementations/LibraryQueryService.cs`
+- `src/MediaLibrary.App/ViewModels/Pages/LibraryMovieItemViewModel.cs`
+- `src/MediaLibrary.App/ViewModels/Pages/LibraryViewModel.cs`
+- `src/MediaLibrary.App/Views/Pages/LibraryPage.xaml`
+- `src/MediaLibrary.App/ViewModels/Pages/MovieDetailViewModel.cs`
+- `src/MediaLibrary.App/Views/Pages/MovieDetailPage.xaml`
+- `docs/local-folder/LOCAL_FOLDER_PLAN.md`
+- `docs/local-folder/LOCAL_FOLDER_STAGE_LOG.md`
+- `docs/local-folder/LOCAL_FOLDER_KNOWN_ISSUES.md`
+
+### Added Files
+
+- None.
+
+### Deleted Files
+
+- None.
+
+### Added Migration
+
+- None.
+
+### Completed
+
+- Added Local/WebDAV source flags and source summary text to media library list items.
+- Made the media library source filter real instead of a placeholder.
+- Kept mixed-source movies merged into one movie card/list row.
+- Made mixed-source movies appear under both `本地` and `网盘` source filters.
+- Added source summary display to media library poster cards and list rows.
+- Displayed movie detail source type as `本地` or `网盘`.
+- Added source type to the detail page default-source text and source-switch status.
+- Kept remove/delete wording explicit that files are not physically deleted.
+
+### Source Filter Semantics
+
+- `全部来源`: all movies with active video sources.
+- `本地`: movies with at least one active Local video source.
+- `网盘`: movies with at least one active WebDAV video source.
+- Mixed Local + WebDAV movies match both source-specific filters.
+
+### Delete / Remove Semantics
+
+- Media library remove marks software records out of the library and does not delete Local physical files or WebDAV files.
+- Movie record deletion removes software records and does not delete Local physical files or WebDAV files.
+
+### Not Done In This Stage
+
+- No playback source priority UI.
+- No playback logic changes.
+- No scanning rule changes.
+- No final UI polish.
+- No file system watcher.
+
+### Build Result
+
+- `dotnet build MediaLibrary.sln`: passed with 0 warnings and 0 errors.
+
+### Manual Acceptance Matrix
+
+- Start the application.
+- Open the media library.
+- Confirm `全部来源` shows WebDAV, Local, and mixed-source movies.
+- Switch to `本地` and confirm movies with at least one active Local source appear.
+- Switch to `网盘` and confirm movies with at least one active WebDAV source appear.
+- Confirm a Local-only movie appears under `全部来源` and `本地`, not `网盘`.
+- Confirm a WebDAV-only movie appears under `全部来源` and `网盘`, not `本地`.
+- Confirm a mixed-source movie appears under all three source filters.
+- Confirm media library cards/list rows show `本地`, `网盘`, or `本地 + 网盘`.
+- Confirm search, sorting, status filters, and batch operations still work.
+- Open a Local-only movie detail page and confirm the source shows `本地`.
+- Open a WebDAV-only movie detail page and confirm the source shows `网盘`.
+- Open a mixed-source movie detail page and confirm both sources are distinguishable.
+- Confirm default playback still follows Phase 3.3 rules.
+- Remove or delete library records and confirm no Local physical files or WebDAV files are physically deleted.
+- Confirm logs/docs/stage reports do not contain full local media paths.
+- Run `dotnet build MediaLibrary.sln` and confirm 0 warnings and 0 errors.
+- Confirm no migration files were added.
+
+## Phase 3.5
+
+### Modified Files
+
+- `docs/local-folder/LOCAL_FOLDER_PLAN.md`
+- `docs/local-folder/LOCAL_FOLDER_STAGE_LOG.md`
+- `docs/local-folder/LOCAL_FOLDER_KNOWN_ISSUES.md`
+
+### Added Files
+
+- None.
+
+### Deleted Files
+
+- None.
+
+### Added Migration
+
+- None.
+
+### Completed
+
+- Reviewed Phase 3 Local source configuration, scanning, playback, library filtering, and detail source display boundaries.
+- Confirmed `ProtocolType.WebDav = 1` and `ProtocolType.Local = 2`.
+- Confirmed Phase 3 reuses `SourceConnection`, `ScanPath`, `MediaFile`, and `ScanTaskLog`.
+- Confirmed Local scanning reuses `MediaFileRules` video/subtitle classification.
+- Confirmed Local scan removal/missing-file handling is software-only and does not delete physical files.
+- Confirmed Local playback uses local paths and avoids WebDAV URL construction, WebDAV credentials, and video cache acquisition.
+- Confirmed library source filtering uses active video sources and mixed-source movies match both Local and WebDAV filters.
+- Confirmed detail page source display uses `本地` / `网盘` source labels.
+- Confirmed docs use placeholders and policy wording rather than real local paths, full WebDAV URLs, credentials, tokens, or API keys.
+
+### Not Done In This Stage
+
+- No new feature implementation.
+- No TV series support.
+- No online subtitle search.
+- No file system watcher.
+- No advanced duplicate source or multi-version priority UI.
+- No final UI visual polish.
+
+### Build Result
+
+- `dotnet build MediaLibrary.sln`: passed with 0 warnings and 0 errors.
+
+### Manual Acceptance Status
+
+- User-confirmed by observation during Phase 3:
+  - Local playback works.
+  - Local source can become the default after Local scan/re-identification.
+  - A manually selected WebDAV default can still be respected.
+  - Source menu/default display issues were corrected.
+  - Local seek uses the normal player buffering state.
+- Pending user confirmation:
+  - Full media library source filter matrix.
+  - Full detail-page source display matrix.
+  - Full Local folder inaccessible/removable-drive matrix.
+  - Full subtitle binding matrix across Local and WebDAV mixed sources.
+
+### Suggested Commit Message
+
+- `feat: add local folder media source support`

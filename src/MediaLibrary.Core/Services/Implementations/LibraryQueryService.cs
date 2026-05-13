@@ -69,6 +69,16 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.UpdatedAt,
                     HasWatchHistory = x.WatchHistories.Any(),
                     SourceCount = x.MediaFiles.Count(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video),
+                    HasLocalSource = x.MediaFiles.Any(
+                        mediaFile => !mediaFile.IsDeleted
+                                     && mediaFile.MediaType == MediaType.Video
+                                     && mediaFile.SourceConnection != null
+                                     && mediaFile.SourceConnection.ProtocolType == ProtocolType.Local),
+                    HasWebDavSource = x.MediaFiles.Any(
+                        mediaFile => !mediaFile.IsDeleted
+                                     && mediaFile.MediaType == MediaType.Video
+                                     && mediaFile.SourceConnection != null
+                                     && mediaFile.SourceConnection.ProtocolType == ProtocolType.WebDav),
                     Ratings = x.RatingSources
                         .Select(
                             rating => new MovieRatingItem
@@ -126,6 +136,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         OmdbSourceUrl = omdbRating?.SourceUrl ?? string.Empty,
                         OmdbLastUpdatedAt = omdbRating?.LastUpdatedAt,
                         SourceCount = x.SourceCount,
+                        HasLocalSource = x.HasLocalSource,
+                        HasWebDavSource = x.HasWebDavSource,
                         IsInLibrary = x.SourceCount > 0,
                         IsFavorite = x.IsFavorite,
                         IsWatched = x.IsWatched || watchedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),

@@ -15,7 +15,8 @@ internal static class MediaSourceDisplayText
     {
         return protocolType switch
         {
-            ProtocolType.WebDav => "WebDAV",
+            ProtocolType.Local => "本地",
+            ProtocolType.WebDav => "网盘",
             _ => protocolType.ToString()
         };
     }

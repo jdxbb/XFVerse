@@ -408,7 +408,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             var defaultSource = detail.Sources.FirstOrDefault(source => source.IsDefault);
             DefaultSourceDisplay = defaultSource is null
                 ? "尚未设置默认播放源"
-                : $"{defaultSource.FileName} ({defaultSource.Extension})";
+                : $"{defaultSource.SourceTypeText} · {defaultSource.FileName} ({defaultSource.Extension})";
 
             StatusMessage = detail.IdentificationStatus switch
             {
@@ -1039,7 +1039,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         try
         {
             await _movieManagementService.SetDefaultMediaFileAsync(_movieId.Value, source.MediaFileId);
-            StatusMessage = $"默认播放源已切换为：{source.FileName}";
+            StatusMessage = $"默认播放源已切换为：{source.SourceTypeText} · {source.FileName}";
             await LoadMovieAsync(_movieId.Value, CancellationToken.None);
         }
         catch (Exception exception)

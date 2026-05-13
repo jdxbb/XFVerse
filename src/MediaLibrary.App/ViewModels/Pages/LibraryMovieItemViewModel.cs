@@ -57,6 +57,12 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public int SourceCount => Movie.SourceCount;
 
+    public bool HasLocalSource => Movie.HasLocalSource;
+
+    public bool HasWebDavSource => Movie.HasWebDavSource;
+
+    public string SourceSummary => Movie.SourceSummary;
+
     public bool IsInLibrary => Movie.IsInLibrary;
 
     public bool IsFavorite => Movie.IsFavorite;

@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using MediaLibrary.App.Helpers;
+using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.App.ViewModels.Player;
 
@@ -460,9 +461,11 @@ public partial class PlayerWindow : Window
         if (viewModel.SelectedSource is not null)
         {
             var selectedSource = viewModel.SelectedSource;
-            menu.Items.Add(CreateVideoCacheStatusItem(selectedSource));
-
-            menu.Items.Add(new Separator());
+            if (selectedSource.ProtocolType == ProtocolType.WebDav)
+            {
+                menu.Items.Add(CreateVideoCacheStatusItem(selectedSource));
+                menu.Items.Add(new Separator());
+            }
         }
 
         foreach (var source in viewModel.Sources)

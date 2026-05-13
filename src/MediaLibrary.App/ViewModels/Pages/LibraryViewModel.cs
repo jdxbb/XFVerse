@@ -22,7 +22,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string LibraryScopeAll = "全部";
     private const string SourceFilterAll = "全部来源";
     private const string SourceFilterLocal = "本地";
-    private const string SourceFilterWebDav = "WebDAV";
+    private const string SourceFilterWebDav = "网盘";
     private const string CollectionStatusFavorite = "喜爱";
     private const string CollectionStatusWantToWatch = "想看";
     private const string CollectionStatusNotInterested = "不想看";
@@ -682,6 +682,13 @@ public sealed class LibraryViewModel : PageViewModelBase
             _ => query.Where(item => item.IsInLibrary)
         };
 
+        query = SelectedSourceFilter switch
+        {
+            SourceFilterLocal => query.Where(item => item.HasLocalSource),
+            SourceFilterWebDav => query.Where(item => item.HasWebDavSource),
+            _ => query
+        };
+
         query = ApplySorting(query);
 
         var filtered = query.ToList();
@@ -711,7 +718,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         var message = $"找到 {filteredCount} 部影片";
         if (SelectedSourceFilter != SourceFilterAll)
         {
-            message += $"；来源筛选「{SelectedSourceFilter}」暂为占位";
+            message += $"；来源筛选「{SelectedSourceFilter}」";
         }
 
         if (IsBatchSelectionMode)

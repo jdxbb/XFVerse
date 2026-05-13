@@ -53,6 +53,7 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             result.AttemptedCount++;
             await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
             var mediaFile = await dbContext.MediaFiles
+                .Include(x => x.SourceConnection)
                 .Include(x => x.Movie)
                 .ThenInclude(x => x!.RatingSources)
                 .FirstOrDefaultAsync(
@@ -413,6 +414,7 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         var canPreserveSourceState = currentMovieHasStableIdentity && currentMovieOriginalTmdbId == details.TmdbId;
         var existingMatchedMovie = await dbContext.Movies
             .Include(x => x.MediaFiles)
+            .ThenInclude(x => x.SourceConnection)
             .Include(x => x.RatingSources)
             .Include(x => x.WatchHistories)
             .FirstOrDefaultAsync(x => x.TmdbId == details.TmdbId && x.Id != currentMovie.Id, cancellationToken);
@@ -457,6 +459,7 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             currentMovie.AutoWatchedBaselineAtUtc = null;
 
             var currentMediaFiles = await dbContext.MediaFiles
+                .Include(x => x.SourceConnection)
                 .Where(x => x.MovieId == currentMovie.Id)
                 .ToListAsync(cancellationToken);
             var currentMediaFileIds = currentMediaFiles.Select(x => x.Id).ToArray();
@@ -512,14 +515,16 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
                 ClearUnidentifiedCollectionState(dbContext, collectionItem, DateTime.UtcNow);
             }
 
-            if (!targetMovie.DefaultMediaFileId.HasValue)
+            if (!PromoteLocalDefaultSource(targetMovie, currentMediaFiles.Concat(targetMovie.MediaFiles))
+                && !targetMovie.DefaultMediaFileId.HasValue)
             {
                 targetMovie.DefaultMediaFileId = currentMovie.DefaultMediaFileId
                     ?? currentMediaFiles.FirstOrDefault(x => x.MediaType == MediaType.Video)?.Id
                     ?? targetMovie.MediaFiles.FirstOrDefault(x => x.MediaType == MediaType.Video)?.Id;
             }
         }
-        else if (!targetMovie.DefaultMediaFileId.HasValue)
+        else if (!PromoteLocalDefaultSource(targetMovie, targetMovie.MediaFiles)
+                 && !targetMovie.DefaultMediaFileId.HasValue)
         {
             targetMovie.DefaultMediaFileId = targetMovie.MediaFiles
                 .Where(x => x.MediaType == MediaType.Video)
@@ -567,6 +572,7 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         var targetMovie = !string.IsNullOrWhiteSpace(candidate.ImdbId) || candidate.TmdbId > 0
             ? await dbContext.Movies
                 .Include(x => x.MediaFiles)
+                .ThenInclude(x => x.SourceConnection)
                 .Include(x => x.RatingSources)
                 .Include(x => x.WatchHistories)
                 .FirstOrDefaultAsync(x => x.TmdbId == candidate.TmdbId, cancellationToken)
@@ -645,7 +651,8 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         mediaFile.Movie = targetMovie;
         mediaFile.UpdatedAt = DateTime.UtcNow;
 
-        if (!targetMovie.DefaultMediaFileId.HasValue)
+        if (!PromoteLocalDefaultSource(targetMovie, [mediaFile])
+            && !targetMovie.DefaultMediaFileId.HasValue)
         {
             targetMovie.DefaultMediaFileId = mediaFile.Id;
         }
@@ -912,7 +919,8 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         mediaFile.Movie = targetMovie;
         mediaFile.UpdatedAt = DateTime.UtcNow;
 
-        if (!targetMovie.DefaultMediaFileId.HasValue)
+        if (!PromoteLocalDefaultSource(targetMovie, [mediaFile])
+            && !targetMovie.DefaultMediaFileId.HasValue)
         {
             targetMovie.DefaultMediaFileId = mediaFile.Id;
         }
@@ -995,9 +1003,57 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
     {
         return await dbContext.Movies
             .Include(x => x.MediaFiles)
+            .ThenInclude(x => x.SourceConnection)
             .Include(x => x.RatingSources)
             .Include(x => x.WatchHistories)
             .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+    }
+
+    private static bool PromoteLocalDefaultSource(Movie movie, IEnumerable<MediaFile> mediaFiles)
+    {
+        var localSource = mediaFiles
+            .Where(IsPlayableLocalVideo)
+            .OrderByDescending(x => x.LastSeenAt ?? x.UpdatedAt)
+            .ThenByDescending(x => x.Id)
+            .FirstOrDefault();
+
+        if (localSource is null)
+        {
+            return false;
+        }
+
+        if (movie.DefaultMediaFileId != localSource.Id)
+        {
+            movie.DefaultMediaFileId = localSource.Id;
+            movie.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return true;
+    }
+
+    private static bool IsPlayableLocalVideo(MediaFile mediaFile)
+    {
+        return mediaFile.MediaType == MediaType.Video
+               && !mediaFile.IsDeleted
+               && mediaFile.SourceConnection?.ProtocolType == ProtocolType.Local
+               && IsExistingLocalFile(mediaFile.FilePath);
+    }
+
+    private static bool IsExistingLocalFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(filePath);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static async Task CleanupMovieIfOrphanedAsync(

@@ -27,6 +27,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     {
         None,
         CompleteFile,
+        LocalFile,
         WebDavDirect
     }
 
@@ -94,6 +95,8 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private static readonly TimeSpan SubtitleTrackDiscoveryMaximumWait = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ShutdownWatchHistorySaveTimeout = TimeSpan.FromMilliseconds(1500);
     private static readonly TimeSpan PlayerPreferencesSaveDebounce = TimeSpan.FromMilliseconds(800);
+    private const int ResumeDurationToleranceSeconds = 300;
+    private const double ResumeDurationToleranceRatio = 0.05d;
 
     private readonly IPlaybackSourceService _playbackSourceService;
     private readonly IWatchHistoryService _watchHistoryService;
@@ -355,7 +358,9 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
     public string AudioTrackButtonToolTip => _selectedAudioTrack?.TooltipText ?? "\u97f3\u8f68\u4e0d\u53ef\u7528";
 
-    public string SourceButtonText => SelectedSource?.FileName ?? "\u64ad\u653e\u6e90";
+    public string SourceButtonText => SelectedSource is null
+        ? "\u64ad\u653e\u6e90"
+        : $"{SelectedSource.SourceTypeText} - {SelectedSource.FileName}";
 
     public PlaybackSourceItem? SelectedSource
     {
@@ -1840,24 +1845,42 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
                 return false;
             }
 
-            var cacheAcquireResult = await TryAcquireVideoCachePlaybackAsync(source);
-            _currentVideoCacheLease = cacheAcquireResult.Lease;
             var playbackUrl = source.PlaybackUrl;
-            var isLocalFile = false;
-            if (cacheAcquireResult.IsHit && !string.IsNullOrWhiteSpace(cacheAcquireResult.LocalFilePath))
+            var isLocalFile = source.ProtocolType == ProtocolType.Local;
+            if (source.ProtocolType == ProtocolType.Local)
             {
-                playbackUrl = cacheAcquireResult.LocalFilePath;
-                isLocalFile = true;
-                _currentPlaybackMode = PlaybackSourceMode.CompleteFile;
+                if (!TryResolveLocalPlaybackPath(source, out playbackUrl))
+                {
+                    ResetPlaybackInitializationFailureState(
+                        source,
+                        "local-file-unavailable",
+                        "本地文件不存在或不可访问。请检查本地目录后重试。");
+                    return false;
+                }
+
+                _currentPlaybackMode = PlaybackSourceMode.LocalFile;
                 TracePlayback(
-                    $"playback-source-mode mediaFileId={source.MediaFileId} mode=complete-file fileSize={source.FileSize}");
-                SetOperationNotice(PlayerOperationNoticeKind.Cache, "\u4f7f\u7528\u672c\u5730\u7f13\u5b58\u64ad\u653e", "complete-cache-hit");
+                    $"playback-source-mode mediaFileId={source.MediaFileId} mode=local-file fileSize={source.FileSize}");
             }
             else
             {
-                _currentPlaybackMode = PlaybackSourceMode.WebDavDirect;
-                TracePlayback(
-                    $"playback-source-mode mediaFileId={source.MediaFileId} mode=webdav-direct fileSize={source.FileSize}");
+                var cacheAcquireResult = await TryAcquireVideoCachePlaybackAsync(source);
+                _currentVideoCacheLease = cacheAcquireResult.Lease;
+                if (cacheAcquireResult.IsHit && !string.IsNullOrWhiteSpace(cacheAcquireResult.LocalFilePath))
+                {
+                    playbackUrl = cacheAcquireResult.LocalFilePath;
+                    isLocalFile = true;
+                    _currentPlaybackMode = PlaybackSourceMode.CompleteFile;
+                    TracePlayback(
+                        $"playback-source-mode mediaFileId={source.MediaFileId} mode=complete-file fileSize={source.FileSize}");
+                    SetOperationNotice(PlayerOperationNoticeKind.Cache, "\u4f7f\u7528\u672c\u5730\u7f13\u5b58\u64ad\u653e", "complete-cache-hit");
+                }
+                else
+                {
+                    _currentPlaybackMode = PlaybackSourceMode.WebDavDirect;
+                    TracePlayback(
+                        $"playback-source-mode mediaFileId={source.MediaFileId} mode=webdav-direct fileSize={source.FileSize}");
+                }
             }
 
             var uriKind = isLocalFile ? "local-file" : "webdav-direct";
@@ -2713,9 +2736,28 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         return mode switch
         {
             PlaybackSourceMode.CompleteFile => "complete-file",
+            PlaybackSourceMode.LocalFile => "local-file",
             PlaybackSourceMode.WebDavDirect => "webdav-direct",
             _ => "none"
         };
+    }
+
+    private static bool TryResolveLocalPlaybackPath(PlaybackSourceItem source, out string playbackPath)
+    {
+        playbackPath = string.IsNullOrWhiteSpace(source.PlaybackUrl) ? source.FilePath : source.PlaybackUrl;
+        if (string.IsNullOrWhiteSpace(playbackPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(playbackPath);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private async Task TryStartAutoVideoCacheAsync(PlaybackSourceItem source)
@@ -3523,7 +3565,8 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
         var diffSeconds = Math.Abs(sourceDurationSeconds - targetDurationSeconds);
         var diffRatio = diffSeconds / (double)Math.Max(sourceDurationSeconds, targetDurationSeconds);
-        return diffSeconds <= 60 || diffRatio <= 0.02d;
+        return diffSeconds <= ResumeDurationToleranceSeconds
+               || diffRatio <= ResumeDurationToleranceRatio;
     }
 
     private static bool IsNearOrPastEnding(int positionSeconds, int durationSeconds)
