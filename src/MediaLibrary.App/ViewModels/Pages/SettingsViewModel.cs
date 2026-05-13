@@ -3,10 +3,11 @@ using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using MediaLibrary.App.Models.Caches;
+using MediaLibrary.App.Services;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
 using MediaLibrary.Core.Models.Entities;
-using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Models.Settings;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -17,12 +18,13 @@ public sealed class SettingsViewModel : PageViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly IWebDavService _webDavService;
     private readonly IThemeService _themeService;
-    private readonly IVideoCacheService _videoCacheService;
+    private readonly ISoftwareCacheManagementService _softwareCacheManagementService;
+    private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly HttpClient _metadataApiHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(8)
     };
-    private const long BytesPerGb = 1024L * 1024L * 1024L;
+    private const long BytesPerMb = 1024L * 1024L;
     private int? _connectionId;
     private int? _applicationSettingId;
     private string _connectionName = string.Empty;
@@ -43,11 +45,15 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _omdbStatusMessage = "可在这里保存 OMDb 认证信息。";
     private string _apiStatusMessage = "可在这里保存大模型配置。";
     private string _themeStatusMessage = "默认使用浅色主题。";
-    private string _videoCacheDirectory = string.Empty;
-    private string _videoCacheUsageText = "视频缓存占用尚未加载。";
-    private string _videoCacheDownloadingText = string.Empty;
-    private string _videoCacheMaxGbText = "50";
-    private string _videoCacheStatusMessage = "视频缓存设置尚未加载。";
+    private string _softwareCacheStatusMessage = "软件缓存状态尚未加载。";
+    private string _posterCacheUsageText = "海报缓存占用尚未加载。";
+    private string _posterCacheFileCountText = string.Empty;
+    private string _posterCacheMaxMbText = "512";
+    private string _posterCacheStatusMessage = "海报缓存状态尚未加载。";
+    private string _otherCacheUsageText = "其他缓存状态尚未加载。";
+    private string _otherCacheDescriptionText = "仅包含可再生成的 TMDB / OMDb 外部元数据缓存。";
+    private string _otherCacheStatusMessage = "其他缓存状态尚未加载。";
+    private bool _isOtherCacheClearAvailable;
     private string _aboutStatusMessage = "XFVerse 影音管理系统";
     private int? _editingScanPathId;
     private string _editingScanPathValue = string.Empty;
@@ -59,13 +65,15 @@ public sealed class SettingsViewModel : PageViewModelBase
         ISettingsService settingsService,
         IWebDavService webDavService,
         IThemeService themeService,
-        IVideoCacheService videoCacheService)
+        ISoftwareCacheManagementService softwareCacheManagementService,
+        IConfirmationDialogService confirmationDialogService)
         : base("设置", "管理通用设置与 API 配置。")
     {
         _settingsService = settingsService;
         _webDavService = webDavService;
         _themeService = themeService;
-        _videoCacheService = videoCacheService;
+        _softwareCacheManagementService = softwareCacheManagementService;
+        _confirmationDialogService = confirmationDialogService;
 
         ThemeModes = _themeService.ThemeModes;
         SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync);
@@ -82,9 +90,10 @@ public sealed class SettingsViewModel : PageViewModelBase
         DeleteScanPathCommand = new AsyncRelayCommand(DeleteScanPathAsync);
         ToggleScanPathCommand = new AsyncRelayCommand(ToggleScanPathAsync);
         CancelEditScanPathCommand = new RelayCommand(CancelEditScanPath);
-        SaveVideoCacheSettingsCommand = new AsyncRelayCommand(SaveVideoCacheSettingsAsync);
-        ClearVideoCacheCommand = new AsyncRelayCommand(ClearVideoCacheAsync);
-        RefreshVideoCacheUsageCommand = new AsyncRelayCommand(RefreshVideoCacheUsageAsync);
+        SavePosterCacheLimitCommand = new AsyncRelayCommand(SavePosterCacheLimitAsync);
+        ClearPosterCacheCommand = new AsyncRelayCommand(ClearPosterCacheAsync);
+        ClearOtherCacheCommand = new AsyncRelayCommand(ClearOtherCacheAsync, () => IsOtherCacheClearAvailable);
+        RefreshSoftwareCacheCommand = new AsyncRelayCommand(RefreshSoftwareCacheAsync);
         ToggleAboutDetailsCommand = new RelayCommand(ToggleAboutDetails);
     }
 
@@ -120,11 +129,13 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public RelayCommand CancelEditScanPathCommand { get; }
 
-    public AsyncRelayCommand SaveVideoCacheSettingsCommand { get; }
+    public AsyncRelayCommand SavePosterCacheLimitCommand { get; }
 
-    public AsyncRelayCommand ClearVideoCacheCommand { get; }
+    public AsyncRelayCommand ClearPosterCacheCommand { get; }
 
-    public AsyncRelayCommand RefreshVideoCacheUsageCommand { get; }
+    public AsyncRelayCommand ClearOtherCacheCommand { get; }
+
+    public AsyncRelayCommand RefreshSoftwareCacheCommand { get; }
 
     public RelayCommand ToggleAboutDetailsCommand { get; }
 
@@ -176,15 +187,33 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public string ThemeStatusMessage { get => _themeStatusMessage; set => SetProperty(ref _themeStatusMessage, value); }
 
-    public string VideoCacheDirectory { get => _videoCacheDirectory; set => SetProperty(ref _videoCacheDirectory, value); }
+    public string SoftwareCacheStatusMessage { get => _softwareCacheStatusMessage; set => SetProperty(ref _softwareCacheStatusMessage, value); }
 
-    public string VideoCacheUsageText { get => _videoCacheUsageText; set => SetProperty(ref _videoCacheUsageText, value); }
+    public string PosterCacheUsageText { get => _posterCacheUsageText; set => SetProperty(ref _posterCacheUsageText, value); }
 
-    public string VideoCacheDownloadingText { get => _videoCacheDownloadingText; set => SetProperty(ref _videoCacheDownloadingText, value); }
+    public string PosterCacheFileCountText { get => _posterCacheFileCountText; set => SetProperty(ref _posterCacheFileCountText, value); }
 
-    public string VideoCacheMaxGbText { get => _videoCacheMaxGbText; set => SetProperty(ref _videoCacheMaxGbText, value); }
+    public string PosterCacheMaxMbText { get => _posterCacheMaxMbText; set => SetProperty(ref _posterCacheMaxMbText, value); }
 
-    public string VideoCacheStatusMessage { get => _videoCacheStatusMessage; set => SetProperty(ref _videoCacheStatusMessage, value); }
+    public string PosterCacheStatusMessage { get => _posterCacheStatusMessage; set => SetProperty(ref _posterCacheStatusMessage, value); }
+
+    public string OtherCacheUsageText { get => _otherCacheUsageText; set => SetProperty(ref _otherCacheUsageText, value); }
+
+    public string OtherCacheDescriptionText { get => _otherCacheDescriptionText; set => SetProperty(ref _otherCacheDescriptionText, value); }
+
+    public string OtherCacheStatusMessage { get => _otherCacheStatusMessage; set => SetProperty(ref _otherCacheStatusMessage, value); }
+
+    public bool IsOtherCacheClearAvailable
+    {
+        get => _isOtherCacheClearAvailable;
+        set
+        {
+            if (SetProperty(ref _isOtherCacheClearAvailable, value))
+            {
+                ClearOtherCacheCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
 
     public string AboutStatusMessage { get => _aboutStatusMessage; set => SetProperty(ref _aboutStatusMessage, value); }
 
@@ -234,7 +263,7 @@ public sealed class SettingsViewModel : PageViewModelBase
             await appSettingTask;
             ApplyApplicationSetting(appSettingTask.Result);
 
-            await LoadVideoCacheAsync(cancellationToken);
+            await LoadSoftwareCacheAsync(cancellationToken);
         }
         catch (Exception exception)
         {
@@ -242,7 +271,7 @@ public sealed class SettingsViewModel : PageViewModelBase
             TmdbStatusMessage = "TMDB 配置尚未加载。";
             OmdbStatusMessage = "OMDb 配置尚未加载。";
             ApiStatusMessage = "大模型配置尚未加载。";
-            VideoCacheStatusMessage = "视频缓存设置尚未加载。";
+            SoftwareCacheStatusMessage = "软件缓存状态尚未加载。";
         }
     }
 
@@ -559,121 +588,122 @@ public sealed class SettingsViewModel : PageViewModelBase
         };
     }
 
-    private async Task LoadVideoCacheAsync(CancellationToken cancellationToken)
+    private async Task LoadSoftwareCacheAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var settingsTask = _videoCacheService.GetSettingsAsync(cancellationToken);
-            var usageTask = _videoCacheService.GetUsageAsync(cancellationToken);
-            await Task.WhenAll(settingsTask, usageTask);
-
-            ApplyVideoCacheSettings(settingsTask.Result);
-            ApplyVideoCacheUsage(usageTask.Result);
-            VideoCacheStatusMessage = "已加载视频缓存设置。";
+            ApplySoftwareCacheOverview(await _softwareCacheManagementService.GetOverviewAsync(cancellationToken));
+            SoftwareCacheStatusMessage = "已加载软件缓存状态。";
         }
         catch (Exception exception)
         {
-            VideoCacheStatusMessage = $"加载视频缓存设置失败：{exception.Message}";
+            SoftwareCacheStatusMessage = $"加载软件缓存状态失败：{FormatCacheError(exception)}";
         }
     }
 
-    private async Task SaveVideoCacheSettingsAsync()
+    private async Task RefreshSoftwareCacheAsync()
     {
         try
         {
-            var maxBytes = ParseGigabytes(VideoCacheMaxGbText, "容量上限");
-            await _videoCacheService.SaveSettingsAsync(
-                new VideoCacheSettingsModel
-                {
-                    MaxBytes = maxBytes
-                });
-
-            await RefreshVideoCacheUsageAsync();
-            VideoCacheStatusMessage = "视频缓存设置已保存。";
+            ApplySoftwareCacheOverview(await _softwareCacheManagementService.GetOverviewAsync());
+            SoftwareCacheStatusMessage = "软件缓存状态已刷新。";
         }
         catch (Exception exception)
         {
-            VideoCacheStatusMessage = $"保存视频缓存设置失败：{exception.Message}";
+            SoftwareCacheStatusMessage = $"刷新软件缓存状态失败：{FormatCacheError(exception)}";
         }
     }
 
-    private async Task ClearVideoCacheAsync()
+    private async Task SavePosterCacheLimitAsync()
     {
         try
         {
-            var result = await _videoCacheService.ClearAllAsync();
-            await RefreshVideoCacheUsageAsync();
-            if (result.BlockedByActiveLease && !result.Succeeded)
-            {
-                VideoCacheStatusMessage = "请先关闭播放器或停止播放后再清空视频缓存。";
-                return;
-            }
-
-            if (result.Succeeded)
-            {
-                var skippedText = result.SkippedActiveCount > 0
-                    ? $" Active cache skipped: {result.SkippedActiveCount}, {FormatFileSize(result.SkippedActiveBytes)}."
-                    : string.Empty;
-                VideoCacheStatusMessage = $"Cleared video cache, freed {FormatFileSize(result.FreedBytes)}. Deleted: full-file {result.DeletedFullFileCount}, mpv-session {result.DeletedMpvSessionCount}, legacy {result.DeletedLegacyCount}.{skippedText}";
-                return;
-            }
-
-            VideoCacheStatusMessage = result.Succeeded
-                ? $"已清空视频缓存，释放 {FormatFileSize(result.FreedBytes)}。"
-                : $"清空视频缓存失败：{result.Error ?? "部分缓存项无法删除。"}";
+            var maxBytes = ParseMegabytes(PosterCacheMaxMbText, "海报缓存容量上限");
+            ApplySoftwareCacheOverview(await _softwareCacheManagementService.SavePosterCacheLimitAsync(maxBytes));
+            PosterCacheStatusMessage = $"海报缓存容量上限已保存为 {FormatFileSize(maxBytes)}，已按上限裁剪旧缓存。";
+            SoftwareCacheStatusMessage = "海报缓存设置已保存。";
         }
         catch (Exception exception)
         {
-            VideoCacheStatusMessage = $"清空视频缓存失败：{exception.Message}";
+            PosterCacheStatusMessage = $"保存海报缓存容量上限失败：{FormatCacheError(exception)}";
         }
     }
 
-    private async Task RefreshVideoCacheUsageAsync()
+    private async Task ClearPosterCacheAsync()
     {
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "清理海报缓存？",
+            "将删除本机海报缓存文件。不会删除影片、用户数据、视频缓存或人格海报；后续打开页面时会重新生成海报缓存。",
+            "清理",
+            "取消");
+
+        if (!confirmed)
+        {
+            PosterCacheStatusMessage = "已取消清理海报缓存。";
+            return;
+        }
+
         try
         {
-            ApplyVideoCacheUsage(await _videoCacheService.GetUsageAsync());
+            var result = await _softwareCacheManagementService.ClearAsync(SoftwareCacheCategoryKind.PosterCache);
+            ApplySoftwareCacheOverview(await _softwareCacheManagementService.GetOverviewAsync());
+            PosterCacheStatusMessage = result.Succeeded
+                ? $"已清理海报缓存，删除 {result.DeletedItemCount} 个文件，释放 {FormatFileSize(result.FreedBytes)}。"
+                : $"清理海报缓存失败：{result.Error ?? "部分缓存文件无法删除。"}";
+            SoftwareCacheStatusMessage = "软件缓存状态已更新。";
         }
         catch (Exception exception)
         {
-            VideoCacheStatusMessage = $"刷新视频缓存占用失败：{exception.Message}";
+            PosterCacheStatusMessage = $"清理海报缓存失败：{FormatCacheError(exception)}";
         }
     }
 
-    private void ApplyVideoCacheSettings(VideoCacheSettingsModel settings)
+    private async Task ClearOtherCacheAsync()
     {
-        VideoCacheMaxGbText = FormatGigabytes(settings.MaxBytes);
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "清理其他缓存？",
+            "将只清理可再生成的 TMDB / OMDb 外部元数据缓存。不会删除影片、收藏、播放进度、观影历史、用户配置或推荐偏好。",
+            "清理",
+            "取消");
+
+        if (!confirmed)
+        {
+            OtherCacheStatusMessage = "已取消清理其他缓存。";
+            return;
+        }
+
+        try
+        {
+            var result = await _softwareCacheManagementService.ClearAsync(SoftwareCacheCategoryKind.OtherCache);
+            ApplySoftwareCacheOverview(await _softwareCacheManagementService.GetOverviewAsync());
+            OtherCacheStatusMessage = result.Succeeded
+                ? $"已清理其他缓存，删除 {result.DeletedItemCount} 条记录，估算释放 {FormatFileSize(result.FreedBytes)}。"
+                : $"清理其他缓存失败：{result.Error ?? "缓存记录无法删除。"}";
+            SoftwareCacheStatusMessage = "软件缓存状态已更新。";
+        }
+        catch (Exception exception)
+        {
+            OtherCacheStatusMessage = $"清理其他缓存失败：{FormatCacheError(exception)}";
+        }
     }
 
-    private void ApplyVideoCacheUsage(VideoCacheUsage usage)
+    private void ApplySoftwareCacheOverview(SoftwareCacheOverview overview)
     {
-        VideoCacheDirectory = usage.CacheDirectory;
-        VideoCacheUsageText = $"{FormatFileSize(usage.UsedBytes)} / {FormatFileSize(usage.MaxBytes)}";
-        VideoCacheDownloadingText = usage.DownloadingBytes > 0
-            ? $"下载中：{FormatFileSize(usage.DownloadingBytes)}"
-            : string.Empty;
+        PosterCacheUsageText = FormatFileSize(overview.PosterCache.UsedBytes);
+        PosterCacheFileCountText = $"{overview.PosterCache.ItemCount} 个文件";
+        PosterCacheMaxMbText = FormatMegabytes(overview.PosterCacheMaxBytes);
 
-        var details = new List<string>
-        {
-            $"Full-file cache: {FormatFileSize(usage.FullFileBytes)} ({usage.FullFileItemCount})",
-            $"mpv 播放期磁盘缓存: {FormatFileSize(usage.MpvSessionBytes)} ({usage.MpvSessionDirectoryCount})",
-            "说明：不含 mpv 内存/demux 缓存"
-        };
-
-        if (usage.LegacyBytes > 0 || usage.LegacyItemCount > 0)
-        {
-            details.Add($"Legacy segment cache: {FormatFileSize(usage.LegacyBytes)} ({usage.LegacyItemCount})");
-        }
-
-        if (usage.DownloadingBytes > 0)
-        {
-            details.Add($"Downloading: {FormatFileSize(usage.DownloadingBytes)}");
-        }
-
-        VideoCacheDownloadingText = string.Join(Environment.NewLine, details);
+        OtherCacheDescriptionText = overview.OtherCache.Description;
+        OtherCacheUsageText = overview.OtherCache.ItemCount > 0
+            ? $"{overview.OtherCache.ItemCount} 条记录，估算 {FormatFileSize(overview.OtherCache.UsedBytes)}"
+            : "当前没有可清理的其他缓存。";
+        IsOtherCacheClearAvailable = overview.OtherCache.IsClearable;
+        OtherCacheStatusMessage = overview.OtherCache.IsClearable
+            ? "可清理 TMDB / OMDb 外部元数据缓存。"
+            : overview.OtherCache.ClearUnavailableReason;
     }
 
-    private static long ParseGigabytes(string value, string fieldName)
+    private static long ParseMegabytes(string value, string fieldName)
     {
         if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var number)
             && !decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out number))
@@ -686,15 +716,15 @@ public sealed class SettingsViewModel : PageViewModelBase
             throw new InvalidOperationException($"{fieldName} 必须大于 0。");
         }
 
-        return (long)Math.Round(number * BytesPerGb, MidpointRounding.AwayFromZero);
+        return (long)Math.Round(number * BytesPerMb, MidpointRounding.AwayFromZero);
     }
 
-    private static string FormatGigabytes(long bytes)
+    private static string FormatMegabytes(long bytes)
     {
-        var gigabytes = (decimal)bytes / BytesPerGb;
-        return gigabytes % 1 == 0
-            ? gigabytes.ToString("0", CultureInfo.CurrentCulture)
-            : gigabytes.ToString("0.##", CultureInfo.CurrentCulture);
+        var megabytes = (decimal)bytes / BytesPerMb;
+        return megabytes % 1 == 0
+            ? megabytes.ToString("0", CultureInfo.CurrentCulture)
+            : megabytes.ToString("0.##", CultureInfo.CurrentCulture);
     }
 
     private static string FormatFileSize(long bytes)
@@ -716,6 +746,13 @@ public sealed class SettingsViewModel : PageViewModelBase
         return unitIndex == 0
             ? $"{value:0} {units[unitIndex]}"
             : $"{value:0.##} {units[unitIndex]}";
+    }
+
+    private static string FormatCacheError(Exception exception)
+    {
+        return exception is InvalidOperationException or FormatException
+            ? exception.Message
+            : exception.GetType().Name;
     }
 
     private void BeginAddScanPath()

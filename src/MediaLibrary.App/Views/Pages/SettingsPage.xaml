@@ -24,73 +24,117 @@
                     <TabItem Header="通用">
                         <StackPanel Margin="0,18,0,0">
                             <Border Style="{StaticResource CompactCardStyle}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="24" />
-                                        <ColumnDefinition Width="320" />
-                                    </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="120" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <StackPanel>
-                                        <TextBlock Text="缓存设置" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,10,0,0"
-                                                   Text="视频缓存用于提升 WebDAV 播放体验。清空缓存不会删除影片库、播放历史、字幕、海报或元数据。"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource BodyTextStyle}" />
-
-                                        <TextBlock Margin="0,18,0,0" Text="缓存目录" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding VideoCacheDirectory, Mode=OneWay}"
-                                                 IsReadOnly="True" />
-
-                                        <TextBlock Margin="0,14,0,0" Text="当前占用" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBlock Margin="0,6,0,0"
-                                                   Text="{Binding VideoCacheUsageText}"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,6,0,0"
-                                                   Text="{Binding VideoCacheDownloadingText}"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource BodyMutedTextStyle}" />
-
-                                        <TextBlock Margin="0,16,0,0" Text="容量上限（GB）" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBox Width="180"
-                                                 HorizontalAlignment="Left"
-                                                 Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding VideoCacheMaxGbText, UpdateSourceTrigger=PropertyChanged}" />
-
-                                        <StackPanel Margin="0,20,0,0" Orientation="Horizontal">
-                                            <Button Content="保存缓存设置"
-                                                    Command="{Binding SaveVideoCacheSettingsCommand}"
-                                                    Style="{StaticResource PrimaryButtonStyle}" />
-                                            <Button Margin="12,0,0,0"
-                                                    Content="刷新占用"
-                                                    Command="{Binding RefreshVideoCacheUsageCommand}"
-                                                    Style="{StaticResource SecondaryButtonStyle}" />
-                                        </StackPanel>
-
-                                        <TextBlock Margin="0,16,0,0"
-                                                   Text="{Binding VideoCacheStatusMessage}"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource BodyMutedTextStyle}" />
-                                    </StackPanel>
-
-                                    <Border Grid.Column="2" Padding="16" CornerRadius="12" Background="{DynamicResource BrushSurfaceAlt}">
                                         <StackPanel>
-                                            <TextBlock Text="清空视频缓存" Style="{StaticResource SectionTitleTextStyle}" />
+                                            <TextBlock Text="软件缓存" Style="{StaticResource SectionTitleTextStyle}" />
                                             <TextBlock Margin="0,10,0,0"
-                                                       Text="清空只删除缓存目录中的缓存项和临时文件。播放器正在使用本地缓存时，请先停止播放。"
+                                                       Text="管理可再生成的软件缓存。这里不清理视频缓存、用户配置、本地媒体、WebDAV 文件或人格海报。"
                                                        TextWrapping="Wrap"
                                                        Style="{StaticResource BodyTextStyle}" />
-                                            <Button Margin="0,18,0,0"
-                                                    Width="150"
-                                                    HorizontalAlignment="Left"
-                                                    Content="清空视频缓存"
-                                                    Command="{Binding ClearVideoCacheCommand}"
-                                                    Style="{StaticResource SecondaryButtonStyle}" />
                                         </StackPanel>
-                                    </Border>
-                                </Grid>
+
+                                        <Button Grid.Column="1"
+                                                Width="100"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Content="刷新状态"
+                                                Command="{Binding RefreshSoftwareCacheCommand}"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                    </Grid>
+
+                                    <TextBlock Margin="0,14,0,0"
+                                               Text="{Binding SoftwareCacheStatusMessage}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+
+                                    <Grid Margin="0,18,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="24" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Padding="16" CornerRadius="12" Background="{DynamicResource BrushSurfaceAlt}">
+                                            <StackPanel>
+                                                <TextBlock Text="海报缓存" Style="{StaticResource SectionTitleTextStyle}" />
+                                                <TextBlock Margin="0,10,0,0"
+                                                           Text="缓存远程影片海报。清理后会按需重新下载，不影响人格海报或影片数据。"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyTextStyle}" />
+
+                                                <TextBlock Margin="0,18,0,0" Text="当前占用" Style="{StaticResource BodyTextStyle}" />
+                                                <TextBlock Margin="0,6,0,0"
+                                                           Text="{Binding PosterCacheUsageText}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource SectionTitleTextStyle}" />
+                                                <TextBlock Margin="0,6,0,0"
+                                                           Text="{Binding PosterCacheFileCountText}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+
+                                                <TextBlock Margin="0,16,0,0" Text="容量上限（MB）" Style="{StaticResource BodyTextStyle}" />
+                                                <TextBox Width="180"
+                                                         HorizontalAlignment="Left"
+                                                         Style="{StaticResource FormTextBoxStyle}"
+                                                         Text="{Binding PosterCacheMaxMbText, UpdateSourceTrigger=PropertyChanged}" />
+
+                                                <StackPanel Margin="0,18,0,0" Orientation="Horizontal">
+                                                    <Button Content="保存上限"
+                                                            Command="{Binding SavePosterCacheLimitCommand}"
+                                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                                    <Button Margin="12,0,0,0"
+                                                            Content="清理海报缓存"
+                                                            Command="{Binding ClearPosterCacheCommand}"
+                                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                                </StackPanel>
+
+                                                <TextBlock Margin="0,14,0,0"
+                                                           Text="{Binding PosterCacheStatusMessage}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="2" Padding="16" CornerRadius="12" Background="{DynamicResource BrushSurfaceAlt}">
+                                            <StackPanel>
+                                                <TextBlock Text="其他缓存" Style="{StaticResource SectionTitleTextStyle}" />
+                                                <TextBlock Margin="0,10,0,0"
+                                                           Text="{Binding OtherCacheDescriptionText}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyTextStyle}" />
+
+                                                <TextBlock Margin="0,18,0,0" Text="当前可清理内容" Style="{StaticResource BodyTextStyle}" />
+                                                <TextBlock Margin="0,6,0,0"
+                                                           Text="{Binding OtherCacheUsageText}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource SectionTitleTextStyle}" />
+                                                <TextBlock Margin="0,8,0,0"
+                                                           Text="不设置容量上限；SQLite 文件大小不一定会随缓存记录删除立即下降。"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+
+                                                <Button Margin="0,18,0,0"
+                                                        Width="150"
+                                                        HorizontalAlignment="Left"
+                                                        Content="清理其他缓存"
+                                                        Command="{Binding ClearOtherCacheCommand}"
+                                                        IsEnabled="{Binding IsOtherCacheClearAvailable}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+
+                                                <TextBlock Margin="0,14,0,0"
+                                                           Text="{Binding OtherCacheStatusMessage}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
                             </Border>
 
                             <Border Margin="0,18,0,0" Style="{StaticResource CompactCardStyle}">

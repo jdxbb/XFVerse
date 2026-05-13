@@ -372,6 +372,7 @@
                                             </Image>
                                             <Image Source="{Binding PersonaPosterFrameUri}"
                                                    Stretch="Fill"
+                                                   Opacity="0.8"
                                                    IsHitTestVisible="False">
                                                 <Image.Style>
                                                     <Style TargetType="Image">

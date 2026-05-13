@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Implementations;
 using MediaLibrary.Core.Services.Interfaces;
@@ -1256,13 +1258,20 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             return;
         }
 
-        await LoadRankingDisplayPageAsync(RankingPageIndex + 1);
+        var targetPage = RankingPageIndex + 1;
+        WriteRankingDiagnostics(
+            "next-click",
+            $"currentDisplayPage={RankingPageIndex} targetDisplayPage={targetPage} totalDisplayPages={RankingTotalDisplayPages} bufferedItems={_rankingMovies.Count} sourceNextPage={_rankingSourceNextPage}");
+        await LoadRankingDisplayPageAsync(targetPage);
     }
 
     private async Task LoadRankingDisplayPageAsync(int displayPage)
     {
         if (displayPage < 1 || displayPage > RankingTotalDisplayPages)
         {
+            WriteRankingDiagnostics(
+                "display-load-rejected",
+                $"displayPage={displayPage} totalDisplayPages={RankingTotalDisplayPages} bufferedItems={_rankingMovies.Count}");
             return;
         }
 
@@ -1275,7 +1284,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         CancellationToken cancellationToken)
     {
         var requestVersion = ++_rankingRequestVersion;
+        var loadStopwatch = Stopwatch.StartNew();
+        var requiredItemCount = GetRankingRequiredItemCount(displayPage);
         IsRankingLoading = true;
+        WriteRankingDiagnostics(
+            "display-load-start",
+            $"displayPage={displayPage} requestVersion={requestVersion} requiredItems={requiredItemCount} bufferedItems={_rankingMovies.Count} sourceNextPage={_rankingSourceNextPage} sourceTotalPages={_rankingSourceTotalPages} sourceExhausted={_rankingSourceExhausted}");
         RankingStatusMessage = displayPage <= 1 ? $"正在加载{SelectedRankingType}..." : $"正在加载第 {displayPage} 页...";
 
         try
@@ -1283,12 +1297,18 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             await EnsureRankingItemsForDisplayPageAsync(displayPage, requestVersion, cancellationToken);
             if (requestVersion != _rankingRequestVersion)
             {
+                WriteRankingDiagnostics(
+                    "display-load-stale",
+                    $"displayPage={displayPage} requestVersion={requestVersion} activeVersion={_rankingRequestVersion} elapsedMs={loadStopwatch.ElapsedMilliseconds}");
                 return;
             }
 
             RankingPageIndex = displayPage;
             UpdateRankingTotalPages();
             var visibleItems = RebuildRankingRows();
+            WriteRankingDiagnostics(
+                "display-load-complete",
+                $"displayPage={displayPage} requestVersion={requestVersion} visibleItems={visibleItems.Count} bufferedItems={_rankingMovies.Count} totalDisplayPages={RankingTotalDisplayPages} canGoNext={CanGoNextRankingPage} elapsedMs={loadStopwatch.ElapsedMilliseconds}");
             RankingStatusMessage = visibleItems.Count == 0
                 ? "榜单暂无结果。"
                 : $"{SelectedRankingType}第 {RankingPageIndex} 页已加载。";
@@ -1296,10 +1316,16 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            WriteRankingDiagnostics(
+                "display-load-canceled",
+                $"displayPage={displayPage} requestVersion={requestVersion} bufferedItems={_rankingMovies.Count} elapsedMs={loadStopwatch.ElapsedMilliseconds}");
         }
         catch (Exception exception)
         {
             RankingStatusMessage = $"榜单加载失败：{DescribeException(exception)}";
+            WriteRankingDiagnostics(
+                "display-load-failed",
+                $"displayPage={displayPage} requestVersion={requestVersion} bufferedItems={_rankingMovies.Count} elapsedMs={loadStopwatch.ElapsedMilliseconds} errorType={exception.GetType().Name}");
             RankingSummaryText = BuildRankingSummaryText(0);
             RebuildRankingRows();
         }
@@ -1316,12 +1342,22 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         CancellationToken cancellationToken)
     {
         var requiredItemCount = GetRankingRequiredItemCount(displayPage);
+        WriteRankingDiagnostics(
+            "ensure-start",
+            $"displayPage={displayPage} requestVersion={requestVersion} requiredItems={requiredItemCount} bufferedItems={_rankingMovies.Count} sourceNextPage={_rankingSourceNextPage} canFetch={CanFetchNextRankingSourcePage()}");
         while (requestVersion == _rankingRequestVersion
                && _rankingMovies.Count < requiredItemCount
                && CanFetchNextRankingSourcePage())
         {
+            WriteRankingDiagnostics(
+                "ensure-fetch-needed",
+                $"displayPage={displayPage} requestVersion={requestVersion} requiredItems={requiredItemCount} bufferedItems={_rankingMovies.Count} sourceNextPage={_rankingSourceNextPage}");
             await FetchNextRankingSourcePageAsync(requestVersion, cancellationToken);
         }
+
+        WriteRankingDiagnostics(
+            "ensure-complete",
+            $"displayPage={displayPage} requestVersion={requestVersion} requiredItems={requiredItemCount} bufferedItems={_rankingMovies.Count} sourceNextPage={_rankingSourceNextPage} canFetch={CanFetchNextRankingSourcePage()} sourceExhausted={_rankingSourceExhausted}");
     }
 
     private bool CanFetchNextRankingSourcePage()
@@ -1344,14 +1380,49 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         CancellationToken cancellationToken)
     {
         var page = _rankingSourceNextPage;
-        if (!_rankingSourcePageCache.TryGetValue(page, out var response))
+        var bufferedBefore = _rankingMovies.Count;
+        var fetchStopwatch = Stopwatch.StartNew();
+        var fromCache = _rankingSourcePageCache.TryGetValue(page, out var response);
+        WriteRankingDiagnostics(
+            "source-fetch-start",
+            $"requestVersion={requestVersion} sourcePage={page} fromCache={fromCache} bufferedItems={bufferedBefore} sourceTotalPages={_rankingSourceTotalPages}");
+
+        try
         {
-            response = await LoadRankingPageFromTmdbAsync(page, cancellationToken);
-            _rankingSourcePageCache[page] = response;
+            if (!fromCache)
+            {
+                response = await LoadRankingPageFromTmdbAsync(page, cancellationToken);
+                _rankingSourcePageCache[page] = response;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            WriteRankingDiagnostics(
+                "source-fetch-canceled",
+                $"requestVersion={requestVersion} sourcePage={page} elapsedMs={fetchStopwatch.ElapsedMilliseconds}");
+            throw;
+        }
+        catch (Exception exception)
+        {
+            WriteRankingDiagnostics(
+                "source-fetch-failed",
+                $"requestVersion={requestVersion} sourcePage={page} elapsedMs={fetchStopwatch.ElapsedMilliseconds} errorType={exception.GetType().Name}");
+            throw;
+        }
+
+        if (response is null)
+        {
+            WriteRankingDiagnostics(
+                "source-fetch-missing-response",
+                $"requestVersion={requestVersion} sourcePage={page} fromCache={fromCache} elapsedMs={fetchStopwatch.ElapsedMilliseconds}");
+            return;
         }
 
         if (requestVersion != _rankingRequestVersion)
         {
+            WriteRankingDiagnostics(
+                "source-fetch-stale",
+                $"requestVersion={requestVersion} activeVersion={_rankingRequestVersion} sourcePage={page} elapsedMs={fetchStopwatch.ElapsedMilliseconds}");
             return;
         }
 
@@ -1366,10 +1437,17 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         var pageItems = BuildRankingPageItems(response.Results);
         if (pageItems.Count == 0)
         {
+            WriteRankingDiagnostics(
+                "source-fetch-no-items",
+                $"requestVersion={requestVersion} sourcePage={page} fromCache={fromCache} tmdbResults={response.Results.Count} bufferedItems={_rankingMovies.Count} nextSourcePage={_rankingSourceNextPage} sourceExhausted={_rankingSourceExhausted} elapsedMs={fetchStopwatch.ElapsedMilliseconds}");
             return;
         }
 
+        var statusStopwatch = Stopwatch.StartNew();
         var statuses = await _statusResolver.ResolveAsync(pageItems.Select(item => item.TmdbId), cancellationToken);
+        WriteRankingDiagnostics(
+            "status-resolve-complete",
+            $"requestVersion={requestVersion} sourcePage={page} itemCount={pageItems.Count} statusCount={statuses.Count} elapsedMs={statusStopwatch.ElapsedMilliseconds}");
         foreach (var item in pageItems)
         {
             if (statuses.TryGetValue(item.TmdbId, out var status))
@@ -1380,6 +1458,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
         _rankingMovies.AddRange(pageItems);
         UpdateRankingTotalPages();
+        WriteRankingDiagnostics(
+            "source-fetch-complete",
+            $"requestVersion={requestVersion} sourcePage={page} fromCache={fromCache} tmdbResults={response.Results.Count} addedItems={pageItems.Count} bufferedBefore={bufferedBefore} bufferedAfter={_rankingMovies.Count} nextSourcePage={_rankingSourceNextPage} sourceTotalPages={_rankingSourceTotalPages} totalResults={_rankingTotalResults} sourceExhausted={_rankingSourceExhausted} elapsedMs={fetchStopwatch.ElapsedMilliseconds}");
     }
 
     private Task<TmdbMovieDiscoveryPage> LoadRankingPageFromTmdbAsync(
@@ -1583,6 +1664,26 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         return string.Equals(SelectedTrendingTime, TrendingTimeWeek, StringComparison.Ordinal)
             ? TrendingWindowWeek
             : TrendingWindowDay;
+    }
+
+    private void WriteRankingDiagnostics(string eventName, string details)
+    {
+        AiPerfDiagnostics.WriteEvent($"event=ranking-{eventName} rankingType={GetRankingDiagnosticsType()} {details}");
+    }
+
+    private string GetRankingDiagnosticsType()
+    {
+        if (string.Equals(SelectedRankingType, RankingTypeTopRated, StringComparison.Ordinal))
+        {
+            return "top-rated";
+        }
+
+        if (string.Equals(SelectedRankingType, RankingTypeTrending, StringComparison.Ordinal))
+        {
+            return $"trending-{GetSelectedTrendingWindow()}";
+        }
+
+        return "popular";
     }
 
     private async Task EnsureAiRecommendationsActivatedAsync()

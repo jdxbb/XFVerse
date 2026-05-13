@@ -470,6 +470,32 @@ Out of scope kept:
 - No profile switch or settings entry.
 - No database field or migration.
 
+### WI-8.2: Persona Poster Asset Replacement And Color Frames
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Replaced the placeholder persona posters with real assets from `C:\Users\32184\Desktop\人格海报`.
+- Preserved the formal resource naming convention:
+  - `Assets/WatchPersonas/{key}/{key}_male.png`
+  - `Assets/WatchPersonas/{key}/{key}_female.png`
+- Added four color frame resources under `Assets/WatchPersonas/Frames/`.
+- Persona card frame selection now follows the user-provided matching rule instead of always using the single default frame.
+- Existing default frame remains as fallback.
+
+Frame matching:
+- Blue: 1, 2, 3, 7, 8, 9, 12, 13, 15, 22.
+- Gold: 4, 6, 16, 17, 19, 20, 23.
+- Pink: 5, 14, 18, 21.
+- Green: 10, 11.
+
+Out of scope kept:
+- No profile AI prompt/cache change.
+- No recommendation logic change.
+- No database field or migration.
+- No runtime image cache.
+
 ## Stage Acceptance Criteria
 
 - Watch Insights remains independent from player, Library Batch Ops, and Recommendation Feedback stages.

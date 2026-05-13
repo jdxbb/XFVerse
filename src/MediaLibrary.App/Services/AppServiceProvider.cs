@@ -50,6 +50,7 @@ public static class AppServiceProvider
         services.AddSingleton<IWatchStatisticsService, WatchStatisticsService>();
         services.AddSingleton<IWatchProfileInputService, WatchProfileInputService>();
         services.AddSingleton<IWatchProfileService, WatchProfileService>();
+        services.AddSingleton<IExternalMetadataCacheMaintenanceService, ExternalMetadataCacheMaintenanceService>();
 
         services.AddSingleton<INavigationStateService, NavigationStateService>();
         services.AddSingleton<IDataRefreshService, DataRefreshService>();
@@ -58,6 +59,7 @@ public static class AppServiceProvider
         services.AddSingleton<IPlayerPreferencesService, PlayerPreferencesService>();
         services.AddSingleton<IPlayerWindowService, PlayerWindowService>();
         services.AddSingleton<IPosterCacheService, PosterCacheService>();
+        services.AddSingleton<ISoftwareCacheManagementService, SoftwareCacheManagementService>();
         services.AddSingleton<IPlaybackEngineFactory, MpvPlaybackEngineFactory>();
 
         services.AddSingleton<HomeViewModel>();

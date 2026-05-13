@@ -825,15 +825,13 @@
                                                 <DataTrigger Binding="{Binding HasRankingMovies}" Value="False">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsRankingLoading}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
                                     <Button MinWidth="88"
                                             Content="上一页"
                                             Command="{Binding GoPreviousRankingPageCommand}"
+                                            IsEnabled="{Binding CanGoPreviousRankingPage}"
                                             Style="{StaticResource SecondaryButtonStyle}" />
                                     <TextBlock Margin="14,0"
                                                VerticalAlignment="Center"
@@ -842,6 +840,7 @@
                                     <Button MinWidth="88"
                                             Content="下一页"
                                             Command="{Binding GoNextRankingPageCommand}"
+                                            IsEnabled="{Binding CanGoNextRankingPage}"
                                             Style="{StaticResource SecondaryButtonStyle}" />
                                 </StackPanel>
                             </Grid>

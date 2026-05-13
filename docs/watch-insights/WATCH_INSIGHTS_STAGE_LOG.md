@@ -220,6 +220,36 @@ Validation:
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
 
+## WI-8.2 Persona Poster Asset Replacement And Color Frame Mapping
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Imported the real persona poster assets from `C:\Users\32184\Desktop\人格海报`.
+- Replaced the 23 formal persona key folders with real `male` / `female` poster images.
+- Kept the original desktop assets and legacy repo resources such as `1男.png`, `1女.png`, and `eclectic_omnivore` untouched.
+- Added four color frame resources:
+  - `persona_card_frame_blue.png`
+  - `persona_card_frame_gold.png`
+  - `persona_card_frame_pink.png`
+  - `persona_card_frame_green.png`
+- Updated the persona card frame selection logic to use the user-provided number-to-color matching rule.
+- Kept the existing `persona_card_frame_default.png` as a fallback when a color-specific frame is unavailable.
+- No XAML layout change was needed; the existing overlay image layer now receives the persona-specific frame URI.
+
+Color mapping:
+- Blue: 1, 2, 3, 7, 8, 9, 12, 13, 15, 22.
+- Gold: 4, 6, 16, 17, 19, 20, 23.
+- Pink: 5, 14, 18, 21.
+- Green: 10, 11.
+
+Boundaries kept:
+- No AI/profile generation logic change.
+- No recommendation logic change.
+- No database field or migration.
+- No runtime image cache.
+
 ## WI-8.1 Completed
 
 Goal: update the Watch Profile persona taxonomy from 20 to 23 formal persona types and keep profile validation, prompt rules, poster mapping, and docs aligned.

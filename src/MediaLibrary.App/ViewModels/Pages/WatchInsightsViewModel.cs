@@ -25,7 +25,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private const double TasteGraphNodeSpacingY = 44d;
     private const string PersonaPosterDefaultGender = "female";
     private const string PersonaPosterFallbackKey = "genre_explorer";
-    private const string PersonaFrameUri = "pack://application:,,,/Assets/WatchPersonas/Frames/persona_card_frame_default.png";
+    private const string PersonaFrameDefaultColor = "gold";
+    private const string PersonaFrameDefaultUri = "pack://application:,,,/Assets/WatchPersonas/Frames/persona_card_frame_default.png";
     private static readonly string[] PersonaPosterExtensions = [".png", ".jpg", ".jpeg", ".webp"];
     private static readonly IReadOnlyDictionary<string, string> PersonaTypeKeys =
         new Dictionary<string, string>(StringComparer.Ordinal)
@@ -54,6 +55,33 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ["动画叙事派"] = "animation_narrative_fan",
             ["纪录求真者"] = "documentary_truth_seeker",
             ["童心奇想家"] = "animation_narrative_fan"
+        };
+    private static readonly IReadOnlyDictionary<string, string> PersonaFrameColors =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["emotion_immersive"] = "blue",
+            ["mystery_solver"] = "blue",
+            ["genre_explorer"] = "blue",
+            ["classic_collector"] = "gold",
+            ["healing_companion"] = "pink",
+            ["rating_curator"] = "gold",
+            ["auteur_follower"] = "blue",
+            ["sci_fantasy_traveler"] = "blue",
+            ["realism_observer"] = "blue",
+            ["action_player"] = "green",
+            ["arthouse_aesthete"] = "green",
+            ["thriller_atmosphere_fan"] = "blue",
+            ["dark_humorist"] = "blue",
+            ["romantic_dreamer"] = "pink",
+            ["dark_curiosity_seeker"] = "blue",
+            ["epic_worldbuilder"] = "gold",
+            ["easy_entertainment_fan"] = "gold",
+            ["human_nature_analyst"] = "pink",
+            ["nostalgia_time_traveler"] = "gold",
+            ["niche_treasure_hunter"] = "gold",
+            ["comedy_relief_fan"] = "pink",
+            ["animation_narrative_fan"] = "blue",
+            ["documentary_truth_seeker"] = "gold"
         };
     private static readonly TimeSpan DataChangedRefreshDebounce = TimeSpan.FromMilliseconds(600);
     private readonly IWatchStatisticsService _statisticsService;
@@ -374,7 +402,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public string PersonaPosterImageUri { get; private set; } = string.Empty;
 
-    public string PersonaPosterFrameUri { get; private set; } = ResourceExists(PersonaFrameUri) ? PersonaFrameUri : string.Empty;
+    public string PersonaPosterFrameUri { get; private set; } = ResolvePersonaFrameUri(PersonaPosterFallbackKey);
 
     public bool HasPersonaPoster => !string.IsNullOrWhiteSpace(PersonaPosterImageUri);
 
@@ -836,7 +864,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         PersonaPosterGender = PersonaPosterDefaultGender;
         var personaKey = ResolvePersonaKey(personaType);
         PersonaPosterImageUri = ResolvePersonaPosterUri(personaKey, PersonaPosterGender);
-        PersonaPosterFrameUri = ResourceExists(PersonaFrameUri) ? PersonaFrameUri : string.Empty;
+        PersonaPosterFrameUri = ResolvePersonaFrameUri(personaKey);
     }
 
     private static string ResolvePersonaKey(string personaType)
@@ -894,6 +922,43 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private static string BuildPersonaPosterUri(string personaKey, string gender, string extension)
     {
         return $"pack://application:,,,/Assets/WatchPersonas/{personaKey}/{personaKey}_{gender}{extension}";
+    }
+
+    private static string ResolvePersonaFrameUri(string personaKey)
+    {
+        foreach (var candidate in EnumeratePersonaFrameCandidates(personaKey))
+        {
+            if (ResourceExists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static IEnumerable<string> EnumeratePersonaFrameCandidates(string personaKey)
+    {
+        if (PersonaFrameColors.TryGetValue(personaKey, out var color))
+        {
+            yield return BuildPersonaFrameUri(color);
+
+            if (!string.Equals(color, PersonaFrameDefaultColor, StringComparison.OrdinalIgnoreCase))
+            {
+                yield return BuildPersonaFrameUri(PersonaFrameDefaultColor);
+            }
+        }
+        else
+        {
+            yield return BuildPersonaFrameUri(PersonaFrameDefaultColor);
+        }
+
+        yield return PersonaFrameDefaultUri;
+    }
+
+    private static string BuildPersonaFrameUri(string color)
+    {
+        return $"pack://application:,,,/Assets/WatchPersonas/Frames/persona_card_frame_{color}.png";
     }
 
     private static bool ResourceExists(string uri)
