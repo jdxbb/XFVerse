@@ -50,6 +50,7 @@ public static class AppServiceProvider
         services.AddSingleton<IUserCollectionService, UserCollectionService>();
         services.AddSingleton<ITvSeasonCollectionService, TvSeasonCollectionService>();
         services.AddSingleton<IDiscoveryMovieStatusResolver, DiscoveryMovieStatusResolver>();
+        services.AddSingleton<IDiscoveryTvSeriesStatusResolver, DiscoveryTvSeriesStatusResolver>();
         services.AddSingleton<IWatchInsightCacheService, WatchInsightCacheService>();
         services.AddSingleton<IWatchStatisticsService, WatchStatisticsService>();
         services.AddSingleton<IWatchProfileInputService, WatchProfileInputService>();

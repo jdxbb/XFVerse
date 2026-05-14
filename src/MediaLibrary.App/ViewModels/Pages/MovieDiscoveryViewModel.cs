@@ -16,6 +16,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const int SearchTabIndex = 0;
     private const int RankingTabIndex = 1;
     private const int AiRecommendationTabIndex = 2;
+    private const string DiscoveryMediaTypeMovie = "电影";
+    private const string DiscoveryMediaTypeTv = "电视剧";
     private const string SearchTypeMovie = "按影片搜";
     private const string SearchTypePerson = "按人物搜";
     private const string RankingTypePopular = "热门榜";
@@ -32,11 +34,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const string SortPopularity = "热度";
     private const string SortReleaseDate = "上映时间";
     private const string SortTitle = "片名";
+    private const string SortFirstAirYear = "首播年份";
+    private const string SortSeriesName = "剧名";
     private const string DirectionDescending = "降序";
     private const string DirectionAscending = "升序";
     private const string DecadeAll = "全部";
     private const string DecadeEarlier = "更早";
     private const int OmdbResolveConcurrency = 2;
+    private const int TvDetailResolveConcurrency = 3;
     private const int SearchTmdbPageSize = 20;
     private const int SearchDisplayPageSize = 30;
     private const int SearchFilteredInitialSourcePages = 10;
@@ -94,15 +99,23 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private readonly ITmdbService _tmdbService;
     private readonly IOmdbService _omdbService;
     private readonly IDiscoveryMovieStatusResolver _statusResolver;
+    private readonly IDiscoveryTvSeriesStatusResolver _tvStatusResolver;
     private readonly IUserCollectionService _userCollectionService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
+    private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly List<DiscoveryMovieCardViewModel> _searchResultPool = [];
     private readonly HashSet<int> _searchTmdbIds = [];
     private readonly Dictionary<int, TmdbMovieDiscoveryPage> _searchSourcePageCache = [];
+    private readonly List<DiscoveryTvSeriesCardViewModel> _tvSearchResultPool = [];
+    private readonly HashSet<int> _tvSearchTmdbIds = [];
+    private readonly Dictionary<int, TmdbTvSeriesSearchPage> _tvSearchSourcePageCache = [];
     private readonly List<DiscoveryMovieCardViewModel> _rankingMovies = [];
     private readonly HashSet<int> _rankingTmdbIds = [];
     private readonly Dictionary<int, TmdbMovieDiscoveryPage> _rankingSourcePageCache = [];
+    private readonly List<DiscoveryTvSeriesCardViewModel> _rankingTvSeries = [];
+    private readonly HashSet<int> _rankingTvSeriesTmdbIds = [];
+    private readonly Dictionary<int, TmdbTvSeriesSearchPage> _rankingTvSeriesSourcePageCache = [];
 
     private CancellationTokenSource? _searchCancellationTokenSource;
     private CancellationTokenSource? _rankingCancellationTokenSource;
@@ -110,6 +123,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool _hasActivatedRankings;
     private bool _hasActivatedAiRecommendations;
     private string _searchText = string.Empty;
+    private string _selectedSearchMediaType = DiscoveryMediaTypeMovie;
     private string _selectedSearchType = SearchTypeMovie;
     private string _selectedGenreFilter = FilterAll;
     private string _selectedRegionFilter = FilterAll;
@@ -131,8 +145,31 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private int _nextSearchOrder;
     private bool _searchSourceExhausted;
     private bool _canGoToNextSearchPage;
+    private string _tvSearchStatusMessage = "请输入关键词搜索 TMDB 电视剧。";
+    private string _tvSearchSummaryText = string.Empty;
+    private bool _isTvSearchLoading;
+    private bool _suppressTvFilterApply;
+    private string _selectedTvGenreFilter = FilterAll;
+    private string _selectedTvRegionFilter = FilterAll;
+    private string _selectedTvWatchStatusFilter = FilterAll;
+    private string _selectedTvSortOption = SortRelevance;
+    private string _selectedTvSortDirection = DirectionDescending;
+    private string _selectedTvDecadeFilter = DecadeAll;
+    private string _selectedTvLanguageFilter = FilterAll;
+    private int _tvSearchPageIndex = 1;
+    private int _tvSearchTotalPages;
+    private int _tvSearchTotalResults;
+    private int _tvSearchSourceNextPage = 1;
+    private int _tvSearchSourceTotalPages;
+    private int _tvSearchRequestVersion;
+    private int _nextTvSearchOrder;
+    private bool _tvSearchSourceExhausted;
+    private bool _canGoToNextTvSearchPage;
+    private string _selectedRankingMediaType = DiscoveryMediaTypeMovie;
     private string _selectedRankingType = RankingTypePopular;
+    private string _selectedTvRankingType = RankingTypePopular;
     private string _selectedTrendingTime = TrendingTimeDay;
+    private string _selectedTvTrendingTime = TrendingTimeDay;
     private string _rankingStatusMessage = "打开榜单后将加载 TMDB 热门榜。";
     private string _rankingSummaryText = string.Empty;
     private bool _isRankingLoading;
@@ -146,25 +183,43 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool _rankingSourceExhausted;
     private bool _canGoToNextRankingPage;
     private DiscoveryMovieCardViewModel? _topRankingMovie;
+    private DiscoveryTvSeriesCardViewModel? _topRankingTvSeries;
+    private string _tvRankingStatusMessage = "切换到电视剧榜单后将加载 TMDB TV 热门榜。";
+    private string _tvRankingSummaryText = string.Empty;
+    private bool _isTvRankingLoading;
+    private int _tvRankingPageIndex = 1;
+    private int _tvRankingTotalDisplayPages = 1;
+    private int _tvRankingTotalResults;
+    private int _tvRankingSourceNextPage = 1;
+    private int _tvRankingSourceTotalPages;
+    private int _tvRankingRequestVersion;
+    private int _nextTvRankingRank;
+    private bool _tvRankingSourceExhausted;
+    private bool _canGoToNextTvRankingPage;
 
     public MovieDiscoveryViewModel(
         RecommendationsViewModel aiRecommendationViewModel,
         ITmdbService tmdbService,
         IOmdbService omdbService,
         IDiscoveryMovieStatusResolver statusResolver,
+        IDiscoveryTvSeriesStatusResolver tvStatusResolver,
         IUserCollectionService userCollectionService,
         INavigationStateService navigationStateService,
-        IDataRefreshService dataRefreshService)
+        IDataRefreshService dataRefreshService,
+        IConfirmationDialogService confirmationDialogService)
         : base("影片发现", "搜索、榜单和 AI 推荐集中在这里。")
     {
         _aiRecommendationViewModel = aiRecommendationViewModel;
         _tmdbService = tmdbService;
         _omdbService = omdbService;
         _statusResolver = statusResolver;
+        _tvStatusResolver = tvStatusResolver;
         _userCollectionService = userCollectionService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
+        _confirmationDialogService = confirmationDialogService;
 
+        SearchMediaTypeOptions = [DiscoveryMediaTypeMovie, DiscoveryMediaTypeTv];
         SearchTypeOptions = [SearchTypeMovie, SearchTypePerson];
         GenreFilterOptions = TmdbGenreMapper.GenreLabels;
         RegionFilterOptions = [FilterAll, "中国大陆", "香港", "台湾", "美国", "日本", "韩国", "英国", "法国", "德国", "印度", "泰国", FilterOther];
@@ -173,29 +228,42 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         SortDirectionOptions = [DirectionDescending, DirectionAscending];
         DecadeFilterOptions = [DecadeAll, "2020s", "2010s", "2000s", "1990s", "1980s", "1970s", "1960s", DecadeEarlier];
         LanguageFilterOptions = [FilterAll, "中文", "英语", "日语", "韩语", "法语", "德语", "西班牙语", "印地语", "泰语", FilterOther];
+        TvGenreFilterOptions = TmdbTvGenreMapper.GenreLabels;
+        TvWatchStatusFilterOptions = [FilterAll, "已入库", "未入库", "有想看 Season", "有喜爱 Season", "有不想看 Season"];
+        TvSortOptions = [SortRelevance, SortRating, SortPopularity, SortFirstAirYear, SortSeriesName];
+        RankingMediaTypeOptions = [DiscoveryMediaTypeMovie, DiscoveryMediaTypeTv];
         RankingTypeOptions = [RankingTypePopular, RankingTypeTopRated, RankingTypeTrending];
         TrendingTimeOptions = [TrendingTimeDay, TrendingTimeWeek];
 
-        SearchCommand = new AsyncRelayCommand(SearchAsync, () => !IsSearchLoading);
-        GoPreviousSearchPageCommand = new AsyncRelayCommand(GoPreviousSearchPageAsync, () => CanGoPreviousSearchPage);
-        GoNextSearchPageCommand = new AsyncRelayCommand(GoNextSearchPageAsync, () => CanGoNextSearchPage);
+        SearchCommand = new AsyncRelayCommand(SearchAsync, () => !IsActiveSearchLoading);
+        GoPreviousSearchPageCommand = new AsyncRelayCommand(GoPreviousSearchPageAsync, () => CanGoPreviousActiveSearchPage);
+        GoNextSearchPageCommand = new AsyncRelayCommand(GoNextSearchPageAsync, () => CanGoNextActiveSearchPage);
         ClearSearchFiltersCommand = new RelayCommand(ClearSearchFilters);
         ShowLayoutSwitchPlaceholderCommand = new RelayCommand(() => SearchStatusMessage = "切布局将在后续视觉阶段接入。");
         OpenSearchMovieCommand = new RelayCommand(OpenSearchMovie);
         ToggleSearchWantToWatchCommand = new AsyncRelayCommand(ToggleSearchWantToWatchAsync);
         SelectRankingTypeCommand = new RelayCommand(SelectRankingType);
-        SelectTrendingTimeCommand = new RelayCommand(SelectTrendingTime, _ => IsTrendingRanking);
-        GoPreviousRankingPageCommand = new AsyncRelayCommand(GoPreviousRankingPageAsync, () => CanGoPreviousRankingPage);
-        GoNextRankingPageCommand = new AsyncRelayCommand(GoNextRankingPageAsync, () => CanGoNextRankingPage);
+        SelectTrendingTimeCommand = new RelayCommand(SelectTrendingTime, _ => IsActiveTrendingRanking);
+        GoPreviousRankingPageCommand = new AsyncRelayCommand(GoPreviousRankingPageAsync, () => CanGoPreviousActiveRankingPage);
+        GoNextRankingPageCommand = new AsyncRelayCommand(GoNextRankingPageAsync, () => CanGoNextActiveRankingPage);
         OpenRankingMovieCommand = new RelayCommand(OpenRankingMovie);
         ToggleRankingWantToWatchCommand = new AsyncRelayCommand(ToggleRankingWantToWatchAsync);
+        OpenTvSeriesCommand = new RelayCommand(OpenTvSeries);
     }
 
     public RecommendationsViewModel AiRecommendationViewModel => _aiRecommendationViewModel;
 
     public ObservableCollection<DiscoveryMovieCardViewModel> SearchMovies { get; } = [];
 
+    public ObservableCollection<DiscoveryTvSeriesCardViewModel> SearchTvSeries { get; } = [];
+
     public ObservableCollection<DiscoveryRankingRowViewModel> RankingRows { get; } = [];
+
+    public ObservableCollection<DiscoveryTvSeriesCardViewModel> RankingTvSeries { get; } = [];
+
+    public ObservableCollection<DiscoveryTvRankingRowViewModel> RankingTvRows { get; } = [];
+
+    public IReadOnlyList<string> SearchMediaTypeOptions { get; }
 
     public IReadOnlyList<string> SearchTypeOptions { get; }
 
@@ -212,6 +280,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public IReadOnlyList<string> DecadeFilterOptions { get; }
 
     public IReadOnlyList<string> LanguageFilterOptions { get; }
+
+    public IReadOnlyList<string> TvGenreFilterOptions { get; }
+
+    public IReadOnlyList<string> TvWatchStatusFilterOptions { get; }
+
+    public IReadOnlyList<string> TvSortOptions { get; }
+
+    public IReadOnlyList<string> RankingMediaTypeOptions { get; }
 
     public IReadOnlyList<string> RankingTypeOptions { get; }
 
@@ -243,6 +319,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public AsyncRelayCommand ToggleRankingWantToWatchCommand { get; }
 
+    public RelayCommand OpenTvSeriesCommand { get; }
+
     public int SelectedTabIndex
     {
         get => _selectedTabIndex;
@@ -269,6 +347,106 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         get => _searchText;
         set => SetProperty(ref _searchText, value);
+    }
+
+    public string SelectedSearchMediaType
+    {
+        get => _selectedSearchMediaType;
+        set
+        {
+            if (SetProperty(ref _selectedSearchMediaType, value))
+            {
+                RefreshSearchModeProperties();
+            }
+        }
+    }
+
+    public bool IsMovieSearchSelected => string.Equals(SelectedSearchMediaType, DiscoveryMediaTypeMovie, StringComparison.Ordinal);
+
+    public bool IsTvSearchSelected => string.Equals(SelectedSearchMediaType, DiscoveryMediaTypeTv, StringComparison.Ordinal);
+
+    public string SelectedTvGenreFilter
+    {
+        get => _selectedTvGenreFilter;
+        set
+        {
+            if (SetProperty(ref _selectedTvGenreFilter, value))
+            {
+                ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvRegionFilter
+    {
+        get => _selectedTvRegionFilter;
+        set
+        {
+            if (SetProperty(ref _selectedTvRegionFilter, value))
+            {
+                ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvWatchStatusFilter
+    {
+        get => _selectedTvWatchStatusFilter;
+        set
+        {
+            if (SetProperty(ref _selectedTvWatchStatusFilter, value))
+            {
+                ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvSortOption
+    {
+        get => _selectedTvSortOption;
+        set
+        {
+            if (SetProperty(ref _selectedTvSortOption, value))
+            {
+                ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvSortDirection
+    {
+        get => _selectedTvSortDirection;
+        set
+        {
+            if (SetProperty(ref _selectedTvSortDirection, value))
+            {
+                ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvDecadeFilter
+    {
+        get => _selectedTvDecadeFilter;
+        set
+        {
+            if (SetProperty(ref _selectedTvDecadeFilter, value))
+            {
+                ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvLanguageFilter
+    {
+        get => _selectedTvLanguageFilter;
+        set
+        {
+            if (SetProperty(ref _selectedTvLanguageFilter, value))
+            {
+                ResetTvSearchFromFilterChange();
+            }
+        }
     }
 
     public string SelectedSearchType
@@ -375,6 +553,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _searchStatusMessage, value))
             {
                 OnPropertyChanged(nameof(SearchStatusOverlayText));
+                OnPropertyChanged(nameof(ActiveSearchStatusMessage));
+                OnPropertyChanged(nameof(ActiveSearchStatusOverlayText));
             }
         }
     }
@@ -382,7 +562,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public string SearchSummaryText
     {
         get => _searchSummaryText;
-        private set => SetProperty(ref _searchSummaryText, value);
+        private set
+        {
+            if (SetProperty(ref _searchSummaryText, value))
+            {
+                OnPropertyChanged(nameof(ActiveSearchSummaryText));
+            }
+        }
     }
 
     public bool IsSearchLoading
@@ -394,6 +580,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             {
                 RefreshSearchVisibility();
                 RefreshSearchCommandState();
+                OnPropertyChanged(nameof(IsActiveSearchLoading));
             }
         }
     }
@@ -406,7 +593,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _searchPageIndex, value))
             {
                 OnPropertyChanged(nameof(SearchPageStatusText));
+                OnPropertyChanged(nameof(ActiveSearchPageStatusText));
                 OnPropertyChanged(nameof(CanGoPreviousSearchPage));
+                OnPropertyChanged(nameof(CanGoPreviousActiveSearchPage));
             }
         }
     }
@@ -419,6 +608,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _searchTotalPages, value))
             {
                 OnPropertyChanged(nameof(SearchPageStatusText));
+                OnPropertyChanged(nameof(ActiveSearchPageStatusText));
             }
         }
     }
@@ -439,6 +629,138 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         ? "第 0 / 0 页"
         : $"第 {SearchPageIndex} / {SearchTotalPages} 页";
 
+    public string TvSearchStatusMessage
+    {
+        get => _tvSearchStatusMessage;
+        private set
+        {
+            if (SetProperty(ref _tvSearchStatusMessage, value))
+            {
+                OnPropertyChanged(nameof(ActiveSearchStatusMessage));
+                OnPropertyChanged(nameof(ActiveSearchStatusOverlayText));
+            }
+        }
+    }
+
+    public string TvSearchSummaryText
+    {
+        get => _tvSearchSummaryText;
+        private set
+        {
+            if (SetProperty(ref _tvSearchSummaryText, value))
+            {
+                OnPropertyChanged(nameof(ActiveSearchSummaryText));
+            }
+        }
+    }
+
+    public bool IsTvSearchLoading
+    {
+        get => _isTvSearchLoading;
+        private set
+        {
+            if (SetProperty(ref _isTvSearchLoading, value))
+            {
+                RefreshTvSearchVisibility();
+                RefreshSearchCommandState();
+                OnPropertyChanged(nameof(IsActiveSearchLoading));
+            }
+        }
+    }
+
+    public int TvSearchPageIndex
+    {
+        get => _tvSearchPageIndex;
+        private set
+        {
+            if (SetProperty(ref _tvSearchPageIndex, value))
+            {
+                OnPropertyChanged(nameof(TvSearchPageStatusText));
+                OnPropertyChanged(nameof(ActiveSearchPageStatusText));
+                OnPropertyChanged(nameof(CanGoPreviousTvSearchPage));
+                OnPropertyChanged(nameof(CanGoPreviousActiveSearchPage));
+            }
+        }
+    }
+
+    public int TvSearchTotalPages
+    {
+        get => _tvSearchTotalPages;
+        private set
+        {
+            if (SetProperty(ref _tvSearchTotalPages, value))
+            {
+                OnPropertyChanged(nameof(TvSearchPageStatusText));
+                OnPropertyChanged(nameof(ActiveSearchPageStatusText));
+            }
+        }
+    }
+
+    public bool HasSearchTvSeries => SearchTvSeries.Count > 0;
+
+    public bool ShowTvSearchEmptyState => !HasSearchTvSeries && !IsTvSearchLoading;
+
+    public bool ShowTvSearchStatusOverlay => IsTvSearchLoading || ShowTvSearchEmptyState;
+
+    public bool IsActiveSearchLoading => IsTvSearchSelected ? IsTvSearchLoading : IsSearchLoading;
+
+    public string ActiveSearchStatusMessage => IsTvSearchSelected ? TvSearchStatusMessage : SearchStatusMessage;
+
+    public string ActiveSearchSummaryText => IsTvSearchSelected ? TvSearchSummaryText : SearchSummaryText;
+
+    public bool ShowActiveSearchStatusOverlay => IsTvSearchSelected ? ShowTvSearchStatusOverlay : ShowSearchStatusOverlay;
+
+    public string ActiveSearchStatusOverlayText => ActiveSearchStatusMessage;
+
+    public bool CanGoPreviousTvSearchPage => !IsTvSearchLoading && TvSearchPageIndex > 1;
+
+    public bool CanGoNextTvSearchPage => !IsTvSearchLoading && _canGoToNextTvSearchPage;
+
+    public bool CanGoPreviousActiveSearchPage => IsTvSearchSelected ? CanGoPreviousTvSearchPage : CanGoPreviousSearchPage;
+
+    public bool CanGoNextActiveSearchPage => IsTvSearchSelected ? CanGoNextTvSearchPage : CanGoNextSearchPage;
+
+    public string TvSearchPageStatusText => TvSearchTotalPages <= 0
+        ? "第 0 / 0 页"
+        : $"第 {TvSearchPageIndex} / {TvSearchTotalPages} 页";
+
+    public string ActiveSearchPageStatusText => IsTvSearchSelected ? TvSearchPageStatusText : SearchPageStatusText;
+
+    public string SelectedRankingMediaType
+    {
+        get => _selectedRankingMediaType;
+        set
+        {
+            if (SetProperty(ref _selectedRankingMediaType, value))
+            {
+                RefreshRankingModeProperties();
+                if (SelectedTabIndex == RankingTabIndex && _hasActivatedRankings)
+                {
+                    _ = ResetAndLoadRankingsAsync();
+                }
+            }
+        }
+    }
+
+    public bool IsMovieRankingSelected => string.Equals(SelectedRankingMediaType, DiscoveryMediaTypeMovie, StringComparison.Ordinal);
+
+    public bool IsTvRankingSelected => string.Equals(SelectedRankingMediaType, DiscoveryMediaTypeTv, StringComparison.Ordinal);
+
+    public DiscoveryTvSeriesCardViewModel? TopRankingTvSeries
+    {
+        get => _topRankingTvSeries;
+        private set
+        {
+            if (SetProperty(ref _topRankingTvSeries, value))
+            {
+                OnPropertyChanged(nameof(ShowTopRankingTvSeries));
+                OnPropertyChanged(nameof(HasRankingTvSeries));
+            }
+        }
+    }
+
+    public bool ShowTopRankingTvSeries => TopRankingTvSeries is not null;
+
     public string SelectedRankingType
     {
         get => _selectedRankingType;
@@ -450,6 +772,10 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(RankingTimeText));
                 OnPropertyChanged(nameof(IsTrendingRanking));
                 OnPropertyChanged(nameof(IsRankingTimeSelectable));
+                OnPropertyChanged(nameof(ActiveRankingTitle));
+                OnPropertyChanged(nameof(ActiveRankingTimeText));
+                OnPropertyChanged(nameof(IsActiveTrendingRanking));
+                OnPropertyChanged(nameof(IsActiveRankingTimeSelectable));
                 SelectTrendingTimeCommand.RaiseCanExecuteChanged();
             }
         }
@@ -463,6 +789,40 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _selectedTrendingTime, value))
             {
                 OnPropertyChanged(nameof(RankingTimeText));
+                OnPropertyChanged(nameof(ActiveRankingTimeText));
+            }
+        }
+    }
+
+    public string SelectedTvRankingType
+    {
+        get => _selectedTvRankingType;
+        private set
+        {
+            if (SetProperty(ref _selectedTvRankingType, value))
+            {
+                OnPropertyChanged(nameof(TvRankingTitle));
+                OnPropertyChanged(nameof(TvRankingTimeText));
+                OnPropertyChanged(nameof(IsTvTrendingRanking));
+                OnPropertyChanged(nameof(IsTvRankingTimeSelectable));
+                OnPropertyChanged(nameof(ActiveRankingTitle));
+                OnPropertyChanged(nameof(ActiveRankingTimeText));
+                OnPropertyChanged(nameof(IsActiveTrendingRanking));
+                OnPropertyChanged(nameof(IsActiveRankingTimeSelectable));
+                SelectTrendingTimeCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string SelectedTvTrendingTime
+    {
+        get => _selectedTvTrendingTime;
+        private set
+        {
+            if (SetProperty(ref _selectedTvTrendingTime, value))
+            {
+                OnPropertyChanged(nameof(TvRankingTimeText));
+                OnPropertyChanged(nameof(ActiveRankingTimeText));
             }
         }
     }
@@ -479,6 +839,27 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public bool IsTrendingRanking => string.Equals(SelectedRankingType, RankingTypeTrending, StringComparison.Ordinal);
 
     public bool IsRankingTimeSelectable => IsTrendingRanking && !IsRankingLoading;
+
+    public string TvRankingTitle => SelectedTvRankingType;
+
+    public string TvRankingTimeText => SelectedTvRankingType switch
+    {
+        RankingTypePopular => "当前热门",
+        RankingTypeTopRated => "历史高分",
+        _ => SelectedTvTrendingTime
+    };
+
+    public bool IsTvTrendingRanking => string.Equals(SelectedTvRankingType, RankingTypeTrending, StringComparison.Ordinal);
+
+    public bool IsTvRankingTimeSelectable => IsTvTrendingRanking && !IsTvRankingLoading;
+
+    public string ActiveRankingTitle => IsTvRankingSelected ? TvRankingTitle : RankingTitle;
+
+    public string ActiveRankingTimeText => IsTvRankingSelected ? TvRankingTimeText : RankingTimeText;
+
+    public bool IsActiveTrendingRanking => IsTvRankingSelected ? IsTvTrendingRanking : IsTrendingRanking;
+
+    public bool IsActiveRankingTimeSelectable => IsTvRankingSelected ? IsTvRankingTimeSelectable : IsRankingTimeSelectable;
 
     public DiscoveryMovieCardViewModel? TopRankingMovie
     {
@@ -502,6 +883,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _rankingStatusMessage, value))
             {
                 OnPropertyChanged(nameof(RankingStatusOverlayText));
+                OnPropertyChanged(nameof(ActiveRankingStatusMessage));
+                OnPropertyChanged(nameof(ActiveRankingStatusOverlayText));
             }
         }
     }
@@ -509,7 +892,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public string RankingSummaryText
     {
         get => _rankingSummaryText;
-        private set => SetProperty(ref _rankingSummaryText, value);
+        private set
+        {
+            if (SetProperty(ref _rankingSummaryText, value))
+            {
+                OnPropertyChanged(nameof(ActiveRankingSummaryText));
+            }
+        }
     }
 
     public bool IsRankingLoading
@@ -521,6 +910,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             {
                 RefreshRankingVisibility();
                 RefreshRankingCommandState();
+                OnPropertyChanged(nameof(IsActiveRankingLoading));
             }
         }
     }
@@ -533,7 +923,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _rankingPageIndex, value))
             {
                 OnPropertyChanged(nameof(RankingPageStatusText));
+                OnPropertyChanged(nameof(ActiveRankingPageStatusText));
                 OnPropertyChanged(nameof(CanGoPreviousRankingPage));
+                OnPropertyChanged(nameof(CanGoPreviousActiveRankingPage));
             }
         }
     }
@@ -546,6 +938,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _rankingTotalDisplayPages, Math.Max(1, value)))
             {
                 OnPropertyChanged(nameof(RankingPageStatusText));
+                OnPropertyChanged(nameof(ActiveRankingPageStatusText));
             }
         }
     }
@@ -564,6 +957,101 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public string RankingPageStatusText => $"第 {RankingPageIndex} / {RankingTotalDisplayPages} 页";
 
+    public string TvRankingStatusMessage
+    {
+        get => _tvRankingStatusMessage;
+        private set
+        {
+            if (SetProperty(ref _tvRankingStatusMessage, value))
+            {
+                OnPropertyChanged(nameof(ActiveRankingStatusMessage));
+                OnPropertyChanged(nameof(ActiveRankingStatusOverlayText));
+            }
+        }
+    }
+
+    public string TvRankingSummaryText
+    {
+        get => _tvRankingSummaryText;
+        private set
+        {
+            if (SetProperty(ref _tvRankingSummaryText, value))
+            {
+                OnPropertyChanged(nameof(ActiveRankingSummaryText));
+            }
+        }
+    }
+
+    public bool IsTvRankingLoading
+    {
+        get => _isTvRankingLoading;
+        private set
+        {
+            if (SetProperty(ref _isTvRankingLoading, value))
+            {
+                RefreshTvRankingVisibility();
+                RefreshRankingCommandState();
+                OnPropertyChanged(nameof(IsActiveRankingLoading));
+            }
+        }
+    }
+
+    public int TvRankingPageIndex
+    {
+        get => _tvRankingPageIndex;
+        private set
+        {
+            if (SetProperty(ref _tvRankingPageIndex, value))
+            {
+                OnPropertyChanged(nameof(TvRankingPageStatusText));
+                OnPropertyChanged(nameof(ActiveRankingPageStatusText));
+                OnPropertyChanged(nameof(CanGoPreviousTvRankingPage));
+                OnPropertyChanged(nameof(CanGoPreviousActiveRankingPage));
+            }
+        }
+    }
+
+    public int TvRankingTotalDisplayPages
+    {
+        get => _tvRankingTotalDisplayPages;
+        private set
+        {
+            if (SetProperty(ref _tvRankingTotalDisplayPages, Math.Max(1, value)))
+            {
+                OnPropertyChanged(nameof(TvRankingPageStatusText));
+                OnPropertyChanged(nameof(ActiveRankingPageStatusText));
+            }
+        }
+    }
+
+    public bool HasRankingTvSeries => TopRankingTvSeries is not null || RankingTvRows.Count > 0;
+
+    public bool ShowTvRankingEmptyState => !HasRankingTvSeries && !IsTvRankingLoading;
+
+    public bool ShowTvRankingStatusOverlay => IsTvRankingLoading || ShowTvRankingEmptyState;
+
+    public bool IsActiveRankingLoading => IsTvRankingSelected ? IsTvRankingLoading : IsRankingLoading;
+
+    public string ActiveRankingStatusMessage => IsTvRankingSelected ? TvRankingStatusMessage : RankingStatusMessage;
+
+    public string ActiveRankingSummaryText => IsTvRankingSelected ? TvRankingSummaryText : RankingSummaryText;
+
+    public bool ShowActiveRankingStatusOverlay => IsTvRankingSelected ? ShowTvRankingStatusOverlay : ShowRankingStatusOverlay;
+
+    public string ActiveRankingStatusOverlayText => ActiveRankingStatusMessage;
+
+    public bool CanGoPreviousTvRankingPage => !IsTvRankingLoading && TvRankingPageIndex > 1;
+
+    public bool CanGoNextTvRankingPage => !IsTvRankingLoading && _canGoToNextTvRankingPage;
+
+    public bool CanGoPreviousActiveRankingPage => IsTvRankingSelected ? CanGoPreviousTvRankingPage : CanGoPreviousRankingPage;
+
+    public bool CanGoNextActiveRankingPage => IsTvRankingSelected ? CanGoNextTvRankingPage : CanGoNextRankingPage;
+
+    public string TvRankingPageStatusText => $"第 {TvRankingPageIndex} / {TvRankingTotalDisplayPages} 页";
+
+    public string ActiveRankingPageStatusText => IsTvRankingSelected ? TvRankingPageStatusText : RankingPageStatusText;
+
     public override Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         SelectedTabIndex = SearchTabIndex;
@@ -578,6 +1066,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task SearchAsync()
     {
+        if (IsTvSearchSelected)
+        {
+            await SearchTvSeriesAsync();
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(SearchText))
         {
             ResetSearchBuffers();
@@ -597,6 +1091,17 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task GoPreviousSearchPageAsync()
     {
+        if (IsTvSearchSelected)
+        {
+            if (!CanGoPreviousTvSearchPage)
+            {
+                return;
+            }
+
+            await LoadTvSearchDisplayPageAsync(TvSearchPageIndex - 1);
+            return;
+        }
+
         if (!CanGoPreviousSearchPage)
         {
             return;
@@ -607,12 +1112,367 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task GoNextSearchPageAsync()
     {
+        if (IsTvSearchSelected)
+        {
+            if (!CanGoNextTvSearchPage)
+            {
+                return;
+            }
+
+            await LoadTvSearchDisplayPageAsync(TvSearchPageIndex + 1);
+            return;
+        }
+
         if (!CanGoNextSearchPage)
         {
             return;
         }
 
         await LoadSearchDisplayPageAsync(SearchPageIndex + 1);
+    }
+
+    private async Task SearchTvSeriesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            ResetTvSearchBuffers();
+            SearchTvSeries.Clear();
+            TvSearchPageIndex = 1;
+            TvSearchTotalPages = 0;
+            _canGoToNextTvSearchPage = false;
+            TvSearchStatusMessage = "请输入关键词。";
+            TvSearchSummaryText = string.Empty;
+            RefreshTvSearchVisibility();
+            RefreshSearchCommandState();
+            return;
+        }
+
+        await ResetAndLoadTvSearchDisplayPageAsync(1);
+    }
+
+    private async Task ResetAndLoadTvSearchDisplayPageAsync(int displayPage)
+    {
+        _searchCancellationTokenSource?.Cancel();
+        _searchCancellationTokenSource = new CancellationTokenSource();
+        ResetTvSearchBuffers();
+        TvSearchPageIndex = 1;
+        TvSearchTotalPages = 0;
+        SearchTvSeries.Clear();
+        RefreshTvSearchVisibility();
+
+        await LoadTvSearchDisplayPageCoreAsync(displayPage, _searchCancellationTokenSource.Token);
+    }
+
+    private async Task LoadTvSearchDisplayPageAsync(int displayPage)
+    {
+        if (displayPage < 1 || string.IsNullOrWhiteSpace(SearchText))
+        {
+            return;
+        }
+
+        _searchCancellationTokenSource ??= new CancellationTokenSource();
+        await LoadTvSearchDisplayPageCoreAsync(displayPage, _searchCancellationTokenSource.Token);
+    }
+
+    private async Task LoadTvSearchDisplayPageCoreAsync(
+        int displayPage,
+        CancellationToken cancellationToken)
+    {
+        var requestVersion = ++_tvSearchRequestVersion;
+        IsTvSearchLoading = true;
+        TvSearchStatusMessage = displayPage <= 1 ? "正在搜索电视剧..." : $"正在加载第 {displayPage} 页...";
+
+        try
+        {
+            await EnsureTvSearchPoolForDisplayPageAsync(displayPage, requestVersion, cancellationToken);
+            if (requestVersion != _tvSearchRequestVersion)
+            {
+                return;
+            }
+
+            if (displayPage > 1
+                && BuildFilteredTvSearchSeries().Count <= (displayPage - 1) * SearchDisplayPageSize
+                && !CanFetchNextTvSearchSourcePage(GetTvSearchSourcePageLimit(displayPage + 1)))
+            {
+                displayPage = Math.Max(1, (int)Math.Ceiling(BuildFilteredTvSearchSeries().Count / (double)SearchDisplayPageSize));
+            }
+
+            TvSearchPageIndex = displayPage;
+            var visibleItems = RebuildTvSearchDisplay();
+            if (SearchTvSeries.Count == 0)
+            {
+                TvSearchStatusMessage = _tvSearchResultPool.Count == 0
+                    ? "未找到相关电视剧。"
+                    : "当前筛选条件下无电视剧结果。";
+            }
+            else
+            {
+                TvSearchStatusMessage = "电视剧搜索结果已加载。";
+                _ = EnrichTvSeriesDetailsAsync(visibleItems, requestVersion, isRankingRequest: false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            TvSearchStatusMessage = $"电视剧搜索失败：{DescribeException(exception)}";
+            RebuildTvSearchDisplay();
+        }
+        finally
+        {
+            IsTvSearchLoading = false;
+            RefreshTvSearchVisibility();
+            RefreshSearchCommandState();
+        }
+    }
+
+    private async Task EnsureTvSearchPoolForDisplayPageAsync(
+        int displayPage,
+        int requestVersion,
+        CancellationToken cancellationToken)
+    {
+        var sourcePageLimit = GetTvSearchSourcePageLimit(displayPage);
+        while (requestVersion == _tvSearchRequestVersion
+               && !HasEnoughTvSearchResultsForDisplayPage(displayPage)
+               && CanFetchNextTvSearchSourcePage(sourcePageLimit))
+        {
+            await FetchNextTvSearchSourcePageAsync(requestVersion, cancellationToken);
+        }
+    }
+
+    private bool HasEnoughTvSearchResultsForDisplayPage(int displayPage)
+    {
+        var required = displayPage * SearchDisplayPageSize;
+        if (!HasExpandedTvSearchCriteria())
+        {
+            return _tvSearchResultPool.Count >= required || _tvSearchSourceExhausted;
+        }
+
+        return BuildFilteredTvSearchSeries().Count >= required || _tvSearchSourceExhausted;
+    }
+
+    private bool CanFetchNextTvSearchSourcePage(int sourcePageLimit)
+    {
+        if (_tvSearchSourceExhausted)
+        {
+            return false;
+        }
+
+        if (_tvSearchSourceTotalPages > 0 && _tvSearchSourceNextPage > _tvSearchSourceTotalPages)
+        {
+            return false;
+        }
+
+        return _tvSearchSourceNextPage <= Math.Max(1, sourcePageLimit);
+    }
+
+    private int GetTvSearchSourcePageLimit(int displayPage)
+    {
+        if (!HasExpandedTvSearchCriteria())
+        {
+            return (int)Math.Ceiling(displayPage * SearchDisplayPageSize / (double)SearchTmdbPageSize);
+        }
+
+        var pageDrivenLimit = Math.Max(
+            SearchFilteredInitialSourcePages,
+            displayPage * SearchFilteredSourcePagesPerDisplayPage);
+        return Math.Min(SearchFilteredMaxSourcePages, pageDrivenLimit);
+    }
+
+    private async Task FetchNextTvSearchSourcePageAsync(
+        int requestVersion,
+        CancellationToken cancellationToken)
+    {
+        var page = _tvSearchSourceNextPage;
+        if (!_tvSearchSourcePageCache.TryGetValue(page, out var response))
+        {
+            response = await _tmdbService.SearchTvSeriesAsync(SearchText, page, cancellationToken: cancellationToken);
+            _tvSearchSourcePageCache[page] = response;
+        }
+
+        if (requestVersion != _tvSearchRequestVersion)
+        {
+            return;
+        }
+
+        _tvSearchSourceNextPage = page + 1;
+        _tvSearchSourceTotalPages = response.TotalPages;
+        _tvSearchTotalResults = response.TotalResults;
+        if (response.TotalPages <= 0 || page >= response.TotalPages || response.Results.Count == 0)
+        {
+            _tvSearchSourceExhausted = true;
+        }
+
+        var pageItems = response.Results
+            .Where(item => item.TmdbId > 0 && _tvSearchTmdbIds.Add(item.TmdbId))
+            .Select(item => new DiscoveryTvSeriesCardViewModel(item, ++_nextTvSearchOrder))
+            .ToList();
+
+        if (pageItems.Count == 0)
+        {
+            return;
+        }
+
+        var statuses = await _tvStatusResolver.ResolveAsync(pageItems.Select(item => item.TmdbSeriesId), cancellationToken);
+        foreach (var item in pageItems)
+        {
+            if (statuses.TryGetValue(item.TmdbSeriesId, out var status))
+            {
+                item.ApplyStatus(status);
+            }
+        }
+
+        _tvSearchResultPool.AddRange(pageItems);
+    }
+
+    private IReadOnlyList<DiscoveryTvSeriesCardViewModel> RebuildTvSearchDisplay()
+    {
+        var filtered = BuildFilteredTvSearchSeries();
+        var pageItems = filtered
+            .Skip((TvSearchPageIndex - 1) * SearchDisplayPageSize)
+            .Take(SearchDisplayPageSize)
+            .ToList();
+
+        SearchTvSeries.Clear();
+        foreach (var item in pageItems)
+        {
+            SearchTvSeries.Add(item);
+        }
+
+        UpdateTvSearchPagination(filtered.Count);
+        TvSearchSummaryText = BuildTvSearchSummaryText(filtered.Count);
+        RefreshTvSearchVisibility();
+        RefreshSearchCommandState();
+        return pageItems;
+    }
+
+    private void UpdateTvSearchPagination(int filteredCount)
+    {
+        var currentPageHasFullResult = filteredCount > TvSearchPageIndex * SearchDisplayPageSize;
+        var canFetchMore = CanFetchNextTvSearchSourcePage(GetTvSearchSourcePageLimit(TvSearchPageIndex + 1));
+        _canGoToNextTvSearchPage = currentPageHasFullResult || canFetchMore;
+
+        var loadedPages = filteredCount == 0
+            ? 0
+            : (int)Math.Ceiling(filteredCount / (double)SearchDisplayPageSize);
+        if (!HasExpandedTvSearchCriteria() && _tvSearchTotalResults > 0)
+        {
+            TvSearchTotalPages = Math.Max(1, (int)Math.Ceiling(_tvSearchTotalResults / (double)SearchDisplayPageSize));
+        }
+        else if (_canGoToNextTvSearchPage)
+        {
+            TvSearchTotalPages = Math.Max(TvSearchPageIndex + 1, loadedPages);
+        }
+        else
+        {
+            TvSearchTotalPages = loadedPages;
+        }
+
+        OnPropertyChanged(nameof(CanGoNextTvSearchPage));
+        OnPropertyChanged(nameof(CanGoNextActiveSearchPage));
+        OnPropertyChanged(nameof(TvSearchPageStatusText));
+        OnPropertyChanged(nameof(ActiveSearchPageStatusText));
+    }
+
+    private string BuildTvSearchSummaryText(int filteredCount)
+    {
+        if (_tvSearchResultPool.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var scopeText = HasExpandedTvSearchCriteria()
+            ? $"已扫描 {_tvSearchResultPool.Count} / {FormatTotalResults(_tvSearchTotalResults)}，当前筛选匹配 {filteredCount} 部剧集"
+            : $"已缓存 {_tvSearchResultPool.Count} / {FormatTotalResults(_tvSearchTotalResults)}";
+        return $"{scopeText}，每页最多 {SearchDisplayPageSize} 部剧集。";
+    }
+
+    private List<DiscoveryTvSeriesCardViewModel> BuildFilteredTvSearchSeries()
+    {
+        var query = _tvSearchResultPool.AsEnumerable();
+
+        if (!string.Equals(SelectedTvGenreFilter, FilterAll, StringComparison.Ordinal))
+        {
+            query = query.Where(item => SplitTags(item.GenresText).Contains(SelectedTvGenreFilter, StringComparer.OrdinalIgnoreCase));
+        }
+
+        if (!string.Equals(SelectedTvRegionFilter, FilterAll, StringComparison.Ordinal))
+        {
+            query = query.Where(item => MatchesRegion(item, SelectedTvRegionFilter));
+        }
+
+        if (!string.Equals(SelectedTvLanguageFilter, FilterAll, StringComparison.Ordinal))
+        {
+            query = query.Where(item => MatchesLanguage(item, SelectedTvLanguageFilter));
+        }
+
+        if (!string.Equals(SelectedTvDecadeFilter, DecadeAll, StringComparison.Ordinal))
+        {
+            query = query.Where(item => MatchesDecade(item, SelectedTvDecadeFilter));
+        }
+
+        query = SelectedTvWatchStatusFilter switch
+        {
+            "已入库" => query.Where(item => item.IsInLibrary),
+            "未入库" => query.Where(item => !item.IsInLibrary),
+            "有想看 Season" => query.Where(item => item.HasWantToWatchSeason),
+            "有喜爱 Season" => query.Where(item => item.HasFavoriteSeason),
+            "有不想看 Season" => query.Where(item => item.HasNotInterestedSeason),
+            _ => query
+        };
+
+        return ApplyTvSearchSorting(query).ToList();
+    }
+
+    private IEnumerable<DiscoveryTvSeriesCardViewModel> ApplyTvSearchSorting(IEnumerable<DiscoveryTvSeriesCardViewModel> query)
+    {
+        var descending = string.Equals(SelectedTvSortDirection, DirectionDescending, StringComparison.Ordinal);
+        return SelectedTvSortOption switch
+        {
+            SortRating => descending
+                ? query.OrderByDescending(item => item.TmdbRating ?? -1d).ThenBy(item => item.SearchOrder)
+                : query.OrderBy(item => item.TmdbRating ?? -1d).ThenBy(item => item.SearchOrder),
+            SortPopularity => descending
+                ? query.OrderByDescending(item => item.Popularity ?? -1d).ThenBy(item => item.SearchOrder)
+                : query.OrderBy(item => item.Popularity ?? -1d).ThenBy(item => item.SearchOrder),
+            SortFirstAirYear => descending
+                ? query.OrderByDescending(item => item.FirstAirYear ?? 0).ThenBy(item => item.SearchOrder)
+                : query.OrderBy(item => item.FirstAirYear ?? 0).ThenBy(item => item.SearchOrder),
+            SortSeriesName => descending
+                ? query.OrderByDescending(item => item.Title, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.SearchOrder)
+                : query.OrderBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.SearchOrder),
+            _ => descending
+                ? query.OrderBy(item => item.SearchOrder)
+                : query.OrderByDescending(item => item.SearchOrder)
+        };
+    }
+
+    private bool HasExpandedTvSearchCriteria()
+    {
+        return !string.Equals(SelectedTvGenreFilter, FilterAll, StringComparison.Ordinal)
+               || !string.Equals(SelectedTvRegionFilter, FilterAll, StringComparison.Ordinal)
+               || !string.Equals(SelectedTvLanguageFilter, FilterAll, StringComparison.Ordinal)
+               || !string.Equals(SelectedTvDecadeFilter, DecadeAll, StringComparison.Ordinal)
+               || !string.Equals(SelectedTvWatchStatusFilter, FilterAll, StringComparison.Ordinal)
+               || !string.Equals(SelectedTvSortOption, SortRelevance, StringComparison.Ordinal)
+               || !string.Equals(SelectedTvSortDirection, DirectionDescending, StringComparison.Ordinal);
+    }
+
+    private void ResetTvSearchFromFilterChange()
+    {
+        if (_suppressTvFilterApply)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            RebuildTvSearchDisplay();
+            return;
+        }
+
+        _ = ResetAndLoadTvSearchDisplayPageAsync(1);
     }
 
     private void ResetSearchFromFilterChange()
@@ -898,6 +1758,77 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         await Task.WhenAll(tasks);
     }
 
+    private async Task EnrichTvSeriesDetailsAsync(
+        IReadOnlyList<DiscoveryTvSeriesCardViewModel> items,
+        int requestVersion,
+        bool isRankingRequest)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        using var limiter = new SemaphoreSlim(TvDetailResolveConcurrency, TvDetailResolveConcurrency);
+        var tasks = items.Select(
+            async item =>
+            {
+                await limiter.WaitAsync();
+                try
+                {
+                    if (item.HasLoadedSeasonCount || !IsCurrentTvDetailRequest(requestVersion, isRankingRequest))
+                    {
+                        return;
+                    }
+
+                    TmdbTvSeriesDetailResult? details;
+                    try
+                    {
+                        details = await _tmdbService.GetTvSeriesDetailsAsync(item.TmdbSeriesId, cancellationToken: CancellationToken.None);
+                    }
+                    catch
+                    {
+                        if (IsCurrentTvDetailRequest(requestVersion, isRankingRequest))
+                        {
+                            await DispatchAsync(item.MarkSeasonCountUnavailable);
+                        }
+
+                        return;
+                    }
+
+                    if (!IsCurrentTvDetailRequest(requestVersion, isRankingRequest))
+                    {
+                        return;
+                    }
+
+                    await DispatchAsync(
+                        () =>
+                        {
+                            if (details is null)
+                            {
+                                item.MarkSeasonCountUnavailable();
+                            }
+                            else
+                            {
+                                item.ApplyDetails(details);
+                            }
+                        });
+                }
+                finally
+                {
+                    limiter.Release();
+                }
+            });
+
+        await Task.WhenAll(tasks);
+    }
+
+    private bool IsCurrentTvDetailRequest(int requestVersion, bool isRankingRequest)
+    {
+        return isRankingRequest
+            ? requestVersion == _tvRankingRequestVersion
+            : requestVersion == _tvSearchRequestVersion;
+    }
+
     private IReadOnlyList<DiscoveryMovieCardViewModel> RebuildSearchDisplay()
     {
         var filtered = BuildFilteredSearchMovies();
@@ -1033,6 +1964,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private void ClearSearchFilters()
     {
+        if (IsTvSearchSelected)
+        {
+            ClearTvSearchFilters();
+            return;
+        }
+
         _suppressFilterApply = true;
         SelectedGenreFilter = FilterAll;
         SelectedRegionFilter = FilterAll;
@@ -1052,6 +1989,29 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
         SearchStatusMessage = "筛选已清除。";
         _ = ResetAndLoadSearchDisplayPageAsync(1);
+    }
+
+    private void ClearTvSearchFilters()
+    {
+        _suppressTvFilterApply = true;
+        SelectedTvGenreFilter = FilterAll;
+        SelectedTvRegionFilter = FilterAll;
+        SelectedTvWatchStatusFilter = FilterAll;
+        SelectedTvSortOption = SortRelevance;
+        SelectedTvSortDirection = DirectionDescending;
+        SelectedTvDecadeFilter = DecadeAll;
+        SelectedTvLanguageFilter = FilterAll;
+        _suppressTvFilterApply = false;
+
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            RebuildTvSearchDisplay();
+            TvSearchStatusMessage = "筛选已清除。请输入关键词搜索 TMDB 电视剧。";
+            return;
+        }
+
+        TvSearchStatusMessage = "筛选已清除。";
+        _ = ResetAndLoadTvSearchDisplayPageAsync(1);
     }
 
     private void OpenSearchMovie(object? parameter)
@@ -1087,6 +2047,16 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         OpenDiscoveryMovie(item, message => RankingStatusMessage = message);
     }
 
+    private void OpenTvSeries(object? parameter)
+    {
+        if (parameter is not DiscoveryTvSeriesCardViewModel item)
+        {
+            return;
+        }
+
+        _ = OpenTvSeriesAsync(item);
+    }
+
     private async Task ToggleRankingWantToWatchAsync(object? parameter)
     {
         if (parameter is not DiscoveryMovieCardViewModel item)
@@ -1117,6 +2087,32 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
 
         _navigationStateService.RequestExternalMovieDetail(DiscoveryExternalMovieAdapter.ToRecommendation(item));
+    }
+
+    private async Task OpenTvSeriesAsync(DiscoveryTvSeriesCardViewModel item)
+    {
+        if (item.IsInLibrary && item.TvSeriesId is > 0)
+        {
+            _navigationStateService.RequestTvSeriesOverview(item.TvSeriesId.Value);
+            return;
+        }
+
+        var message = $"《{item.Title}》尚未入库，TV 外部详情将在后续阶段完善。";
+        if (IsTvSearchSelected)
+        {
+            TvSearchStatusMessage = message;
+        }
+
+        if (IsTvRankingSelected)
+        {
+            TvRankingStatusMessage = message;
+        }
+
+        await _confirmationDialogService.ConfirmAsync(
+            "电视剧尚未入库",
+            message,
+            "知道了",
+            "关闭");
     }
 
     private async Task ToggleDiscoveryWantToWatchAsync(
@@ -1200,33 +2196,74 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private void SelectRankingType(object? parameter)
     {
-        if (parameter is not string rankingType
-            || string.IsNullOrWhiteSpace(rankingType)
-            || string.Equals(rankingType, SelectedRankingType, StringComparison.Ordinal))
+        if (IsActiveRankingLoading)
         {
             return;
         }
 
-        SelectedRankingType = rankingType;
+        if (parameter is not string rankingType
+            || string.IsNullOrWhiteSpace(rankingType)
+            || string.Equals(rankingType, IsTvRankingSelected ? SelectedTvRankingType : SelectedRankingType, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (IsTvRankingSelected)
+        {
+            SelectedTvRankingType = rankingType;
+        }
+        else
+        {
+            SelectedRankingType = rankingType;
+        }
+
         _ = ResetAndLoadRankingsAsync();
     }
 
     private void SelectTrendingTime(object? parameter)
     {
-        if (!IsTrendingRanking
-            || parameter is not string trendingTime
-            || string.IsNullOrWhiteSpace(trendingTime)
-            || string.Equals(trendingTime, SelectedTrendingTime, StringComparison.Ordinal))
+        if (IsActiveRankingLoading)
         {
             return;
         }
 
-        SelectedTrendingTime = trendingTime;
+        if (parameter is not string trendingTime
+            || string.IsNullOrWhiteSpace(trendingTime)
+            || !IsActiveTrendingRanking)
+        {
+            return;
+        }
+
+        if (IsTvRankingSelected)
+        {
+            if (string.Equals(trendingTime, SelectedTvTrendingTime, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            SelectedTvTrendingTime = trendingTime;
+        }
+        else
+        {
+            if (string.Equals(trendingTime, SelectedTrendingTime, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            SelectedTrendingTime = trendingTime;
+        }
+
         _ = ResetAndLoadRankingsAsync();
     }
 
     private async Task ResetAndLoadRankingsAsync()
     {
+        if (IsTvRankingSelected)
+        {
+            await ResetAndLoadTvRankingsAsync();
+            return;
+        }
+
         _rankingCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource = new CancellationTokenSource();
         ResetRankingBuffers();
@@ -1243,6 +2280,17 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task GoPreviousRankingPageAsync()
     {
+        if (IsTvRankingSelected)
+        {
+            if (!CanGoPreviousTvRankingPage)
+            {
+                return;
+            }
+
+            await LoadTvRankingDisplayPageAsync(TvRankingPageIndex - 1);
+            return;
+        }
+
         if (!CanGoPreviousRankingPage)
         {
             return;
@@ -1253,6 +2301,17 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task GoNextRankingPageAsync()
     {
+        if (IsTvRankingSelected)
+        {
+            if (!CanGoNextTvRankingPage)
+            {
+                return;
+            }
+
+            await LoadTvRankingDisplayPageAsync(TvRankingPageIndex + 1);
+            return;
+        }
+
         if (!CanGoNextRankingPage)
         {
             return;
@@ -1373,6 +2432,275 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
 
         return _rankingSourceNextPage <= (int)Math.Ceiling(MaxRankingMovies / (double)RankingTmdbPageSize);
+    }
+
+    private async Task ResetAndLoadTvRankingsAsync()
+    {
+        _rankingCancellationTokenSource?.Cancel();
+        _rankingCancellationTokenSource = new CancellationTokenSource();
+        ResetTvRankingBuffers();
+        TvRankingPageIndex = 1;
+        TvRankingTotalDisplayPages = 1;
+        TopRankingTvSeries = null;
+        RankingTvSeries.Clear();
+        RankingTvRows.Clear();
+        TvRankingSummaryText = string.Empty;
+        TvRankingStatusMessage = $"正在加载{SelectedTvRankingType}...";
+        RefreshTvRankingVisibility();
+
+        await LoadTvRankingDisplayPageCoreAsync(1, _rankingCancellationTokenSource.Token);
+    }
+
+    private async Task LoadTvRankingDisplayPageAsync(int displayPage)
+    {
+        if (IsTvRankingLoading || displayPage < 1 || displayPage > TvRankingTotalDisplayPages)
+        {
+            return;
+        }
+
+        _rankingCancellationTokenSource ??= new CancellationTokenSource();
+        await LoadTvRankingDisplayPageCoreAsync(displayPage, _rankingCancellationTokenSource.Token);
+    }
+
+    private async Task LoadTvRankingDisplayPageCoreAsync(
+        int displayPage,
+        CancellationToken cancellationToken)
+    {
+        var requestVersion = ++_tvRankingRequestVersion;
+        IsTvRankingLoading = true;
+        TvRankingStatusMessage = displayPage <= 1 ? $"正在加载{SelectedTvRankingType}..." : $"正在加载第 {displayPage} 页...";
+
+        try
+        {
+            await EnsureTvRankingItemsForDisplayPageAsync(displayPage, requestVersion, cancellationToken);
+            if (requestVersion != _tvRankingRequestVersion)
+            {
+                return;
+            }
+
+            TvRankingPageIndex = displayPage;
+            UpdateTvRankingTotalPages();
+            var visibleItems = RebuildTvRankingDisplay();
+            TvRankingStatusMessage = visibleItems.Count == 0
+                ? "电视剧榜单暂无结果。"
+                : $"{SelectedTvRankingType}第 {TvRankingPageIndex} 页已加载。";
+            _ = EnrichTvSeriesDetailsAsync(visibleItems, requestVersion, isRankingRequest: true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            TvRankingStatusMessage = $"电视剧榜单加载失败：{DescribeException(exception)}";
+            TvRankingSummaryText = BuildTvRankingSummaryText(0);
+            RebuildTvRankingDisplay();
+        }
+        finally
+        {
+            IsTvRankingLoading = false;
+            RefreshRankingCommandState();
+        }
+    }
+
+    private async Task EnsureTvRankingItemsForDisplayPageAsync(
+        int displayPage,
+        int requestVersion,
+        CancellationToken cancellationToken)
+    {
+        var requiredItemCount = GetTvRankingRequiredItemCount(displayPage);
+        while (requestVersion == _tvRankingRequestVersion
+               && _rankingTvSeries.Count < requiredItemCount
+               && CanFetchNextTvRankingSourcePage())
+        {
+            await FetchNextTvRankingSourcePageAsync(requestVersion, cancellationToken);
+        }
+    }
+
+    private bool CanFetchNextTvRankingSourcePage()
+    {
+        if (_tvRankingSourceExhausted || _rankingTvSeries.Count >= MaxRankingMovies)
+        {
+            return false;
+        }
+
+        if (_tvRankingSourceTotalPages > 0 && _tvRankingSourceNextPage > _tvRankingSourceTotalPages)
+        {
+            return false;
+        }
+
+        return _tvRankingSourceNextPage <= (int)Math.Ceiling(MaxRankingMovies / (double)RankingTmdbPageSize);
+    }
+
+    private async Task FetchNextTvRankingSourcePageAsync(
+        int requestVersion,
+        CancellationToken cancellationToken)
+    {
+        var page = _tvRankingSourceNextPage;
+        if (!_rankingTvSeriesSourcePageCache.TryGetValue(page, out var response))
+        {
+            response = await LoadTvRankingPageFromTmdbAsync(page, cancellationToken);
+            _rankingTvSeriesSourcePageCache[page] = response;
+        }
+
+        if (requestVersion != _tvRankingRequestVersion)
+        {
+            return;
+        }
+
+        _tvRankingSourceNextPage = page + 1;
+        _tvRankingSourceTotalPages = response.TotalPages;
+        _tvRankingTotalResults = response.TotalResults;
+        if (response.TotalPages <= 0 || page >= response.TotalPages || response.Results.Count == 0)
+        {
+            _tvRankingSourceExhausted = true;
+        }
+
+        var pageItems = BuildTvRankingPageItems(response.Results);
+        if (pageItems.Count == 0)
+        {
+            return;
+        }
+
+        var statuses = await _tvStatusResolver.ResolveAsync(pageItems.Select(item => item.TmdbSeriesId), cancellationToken);
+        foreach (var item in pageItems)
+        {
+            if (statuses.TryGetValue(item.TmdbSeriesId, out var status))
+            {
+                item.ApplyStatus(status);
+            }
+        }
+
+        _rankingTvSeries.AddRange(pageItems);
+        UpdateTvRankingTotalPages();
+    }
+
+    private Task<TmdbTvSeriesSearchPage> LoadTvRankingPageFromTmdbAsync(
+        int page,
+        CancellationToken cancellationToken)
+    {
+        return SelectedTvRankingType switch
+        {
+            RankingTypeTopRated => _tmdbService.GetTopRatedTvSeriesAsync(page, cancellationToken: cancellationToken),
+            RankingTypeTrending => _tmdbService.GetTrendingTvSeriesAsync(GetSelectedTvTrendingWindow(), page, cancellationToken: cancellationToken),
+            _ => _tmdbService.GetPopularTvSeriesAsync(page, cancellationToken: cancellationToken)
+        };
+    }
+
+    private List<DiscoveryTvSeriesCardViewModel> BuildTvRankingPageItems(IReadOnlyList<TmdbTvSeriesSearchItem> sourceItems)
+    {
+        var remainingSlots = MaxRankingMovies - _rankingTvSeries.Count;
+        if (remainingSlots <= 0)
+        {
+            return [];
+        }
+
+        var pageItems = new List<DiscoveryTvSeriesCardViewModel>();
+        foreach (var sourceItem in sourceItems)
+        {
+            if (sourceItem.TmdbId <= 0
+                || !_rankingTvSeriesTmdbIds.Add(sourceItem.TmdbId)
+                || pageItems.Count >= remainingSlots)
+            {
+                continue;
+            }
+
+            pageItems.Add(new DiscoveryTvSeriesCardViewModel(sourceItem, ++_nextTvRankingRank, showRank: true));
+        }
+
+        return pageItems;
+    }
+
+    private IReadOnlyList<DiscoveryTvSeriesCardViewModel> RebuildTvRankingDisplay()
+    {
+        var visibleItems = GetTvRankingDisplayItems(TvRankingPageIndex);
+        TopRankingTvSeries = TvRankingPageIndex == 1 ? visibleItems.FirstOrDefault() : null;
+        var rowItems = TvRankingPageIndex == 1
+            ? visibleItems.Skip(1).ToList()
+            : visibleItems;
+
+        RankingTvSeries.Clear();
+        foreach (var item in visibleItems)
+        {
+            RankingTvSeries.Add(item);
+        }
+
+        RankingTvRows.Clear();
+        for (var index = 0; index < rowItems.Count; index += 2)
+        {
+            var left = rowItems[index];
+            var right = index + 1 < rowItems.Count ? rowItems[index + 1] : null;
+            RankingTvRows.Add(new DiscoveryTvRankingRowViewModel(left, right));
+        }
+
+        TvRankingSummaryText = BuildTvRankingSummaryText(visibleItems.Count);
+        _canGoToNextTvRankingPage = TvRankingPageIndex < TvRankingTotalDisplayPages
+                                    && GetTvRankingPageStartIndex(TvRankingPageIndex + 1) < Math.Min(MaxRankingMovies, GetTvRankingDisplayLimit());
+        RefreshTvRankingVisibility();
+        RefreshRankingCommandState();
+        return visibleItems;
+    }
+
+    private List<DiscoveryTvSeriesCardViewModel> GetTvRankingDisplayItems(int displayPage)
+    {
+        var startIndex = GetTvRankingPageStartIndex(displayPage);
+        var pageSize = displayPage == 1 ? RankingFirstDisplayPageSize : RankingRegularDisplayPageSize;
+        return _rankingTvSeries
+            .Skip(startIndex)
+            .Take(pageSize)
+            .ToList();
+    }
+
+    private static int GetTvRankingPageStartIndex(int displayPage)
+    {
+        return displayPage <= 1
+            ? 0
+            : RankingFirstDisplayPageSize + (displayPage - 2) * RankingRegularDisplayPageSize;
+    }
+
+    private static int GetTvRankingRequiredItemCount(int displayPage)
+    {
+        if (displayPage <= 1)
+        {
+            return RankingFirstDisplayPageSize;
+        }
+
+        return Math.Min(
+            MaxRankingMovies,
+            RankingFirstDisplayPageSize + (displayPage - 1) * RankingRegularDisplayPageSize);
+    }
+
+    private void UpdateTvRankingTotalPages()
+    {
+        var displayLimit = GetTvRankingDisplayLimit();
+        TvRankingTotalDisplayPages = displayLimit <= RankingFirstDisplayPageSize
+            ? 1
+            : 1 + (int)Math.Ceiling((displayLimit - RankingFirstDisplayPageSize) / (double)RankingRegularDisplayPageSize);
+        _canGoToNextTvRankingPage = TvRankingPageIndex < TvRankingTotalDisplayPages;
+        OnPropertyChanged(nameof(CanGoNextTvRankingPage));
+        OnPropertyChanged(nameof(CanGoNextActiveRankingPage));
+    }
+
+    private int GetTvRankingDisplayLimit()
+    {
+        if (_tvRankingTotalResults <= 0)
+        {
+            return MaxRankingMovies;
+        }
+
+        return Math.Min(MaxRankingMovies, _tvRankingTotalResults);
+    }
+
+    private string BuildTvRankingSummaryText(int visibleCount)
+    {
+        if (_rankingTvSeries.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var startRank = GetTvRankingPageStartIndex(TvRankingPageIndex) + 1;
+        var endRank = Math.Min(startRank + Math.Max(0, visibleCount) - 1, GetTvRankingDisplayLimit());
+        var totalText = _tvRankingTotalResults > 0 ? _tvRankingTotalResults.ToString() : "未知总数";
+        return $"当前页显示第 {startRank}-{endRank} 名，已缓存 {_rankingTvSeries.Count} / {totalText}，最多展示前 {MaxRankingMovies} 名";
     }
 
     private async Task FetchNextRankingSourcePageAsync(
@@ -1666,6 +2994,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             : TrendingWindowDay;
     }
 
+    private string GetSelectedTvTrendingWindow()
+    {
+        return string.Equals(SelectedTvTrendingTime, TrendingTimeWeek, StringComparison.Ordinal)
+            ? TrendingWindowWeek
+            : TrendingWindowDay;
+    }
+
     private void WriteRankingDiagnostics(string eventName, string details)
     {
         AiPerfDiagnostics.WriteEvent($"event=ranking-{eventName} rankingType={GetRankingDiagnosticsType()} {details}");
@@ -1717,6 +3052,19 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _canGoToNextSearchPage = false;
     }
 
+    private void ResetTvSearchBuffers()
+    {
+        _tvSearchResultPool.Clear();
+        _tvSearchTmdbIds.Clear();
+        _tvSearchSourcePageCache.Clear();
+        _tvSearchSourceNextPage = 1;
+        _tvSearchSourceTotalPages = 0;
+        _tvSearchTotalResults = 0;
+        _nextTvSearchOrder = 0;
+        _tvSearchSourceExhausted = false;
+        _canGoToNextTvSearchPage = false;
+    }
+
     private void ResetRankingBuffers()
     {
         _rankingMovies.Clear();
@@ -1730,18 +3078,46 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _canGoToNextRankingPage = false;
     }
 
+    private void ResetTvRankingBuffers()
+    {
+        _rankingTvSeries.Clear();
+        _rankingTvSeriesTmdbIds.Clear();
+        _rankingTvSeriesSourcePageCache.Clear();
+        _tvRankingSourceNextPage = 1;
+        _tvRankingSourceTotalPages = 0;
+        _tvRankingTotalResults = 0;
+        _nextTvRankingRank = 0;
+        _tvRankingSourceExhausted = false;
+        _canGoToNextTvRankingPage = false;
+    }
+
     private void RefreshSearchVisibility()
     {
         OnPropertyChanged(nameof(HasSearchMovies));
         OnPropertyChanged(nameof(ShowSearchEmptyState));
         OnPropertyChanged(nameof(ShowSearchStatusOverlay));
         OnPropertyChanged(nameof(SearchStatusOverlayText));
+        OnPropertyChanged(nameof(ShowActiveSearchStatusOverlay));
+        OnPropertyChanged(nameof(ActiveSearchStatusOverlayText));
+    }
+
+    private void RefreshTvSearchVisibility()
+    {
+        OnPropertyChanged(nameof(HasSearchTvSeries));
+        OnPropertyChanged(nameof(ShowTvSearchEmptyState));
+        OnPropertyChanged(nameof(ShowTvSearchStatusOverlay));
+        OnPropertyChanged(nameof(ShowActiveSearchStatusOverlay));
+        OnPropertyChanged(nameof(ActiveSearchStatusOverlayText));
     }
 
     private void RefreshSearchCommandState()
     {
         OnPropertyChanged(nameof(CanGoPreviousSearchPage));
         OnPropertyChanged(nameof(CanGoNextSearchPage));
+        OnPropertyChanged(nameof(CanGoPreviousTvSearchPage));
+        OnPropertyChanged(nameof(CanGoNextTvSearchPage));
+        OnPropertyChanged(nameof(CanGoPreviousActiveSearchPage));
+        OnPropertyChanged(nameof(CanGoNextActiveSearchPage));
         SearchCommand.RaiseCanExecuteChanged();
         GoPreviousSearchPageCommand.RaiseCanExecuteChanged();
         GoNextSearchPageCommand.RaiseCanExecuteChanged();
@@ -1754,16 +3130,68 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(ShowRankingStatusOverlay));
         OnPropertyChanged(nameof(RankingStatusOverlayText));
         OnPropertyChanged(nameof(ShowTopRankingMovie));
+        OnPropertyChanged(nameof(ShowActiveRankingStatusOverlay));
+        OnPropertyChanged(nameof(ActiveRankingStatusOverlayText));
+    }
+
+    private void RefreshTvRankingVisibility()
+    {
+        OnPropertyChanged(nameof(HasRankingTvSeries));
+        OnPropertyChanged(nameof(ShowTvRankingEmptyState));
+        OnPropertyChanged(nameof(ShowTvRankingStatusOverlay));
+        OnPropertyChanged(nameof(ShowTopRankingTvSeries));
+        OnPropertyChanged(nameof(ShowActiveRankingStatusOverlay));
+        OnPropertyChanged(nameof(ActiveRankingStatusOverlayText));
     }
 
     private void RefreshRankingCommandState()
     {
         OnPropertyChanged(nameof(CanGoPreviousRankingPage));
         OnPropertyChanged(nameof(CanGoNextRankingPage));
+        OnPropertyChanged(nameof(CanGoPreviousTvRankingPage));
+        OnPropertyChanged(nameof(CanGoNextTvRankingPage));
+        OnPropertyChanged(nameof(CanGoPreviousActiveRankingPage));
+        OnPropertyChanged(nameof(CanGoNextActiveRankingPage));
         OnPropertyChanged(nameof(IsRankingTimeSelectable));
+        OnPropertyChanged(nameof(IsTvRankingTimeSelectable));
+        OnPropertyChanged(nameof(IsActiveRankingTimeSelectable));
         SelectTrendingTimeCommand.RaiseCanExecuteChanged();
         GoPreviousRankingPageCommand.RaiseCanExecuteChanged();
         GoNextRankingPageCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshSearchModeProperties()
+    {
+        OnPropertyChanged(nameof(IsMovieSearchSelected));
+        OnPropertyChanged(nameof(IsTvSearchSelected));
+        OnPropertyChanged(nameof(IsActiveSearchLoading));
+        OnPropertyChanged(nameof(ActiveSearchStatusMessage));
+        OnPropertyChanged(nameof(ActiveSearchSummaryText));
+        OnPropertyChanged(nameof(ShowActiveSearchStatusOverlay));
+        OnPropertyChanged(nameof(ActiveSearchStatusOverlayText));
+        OnPropertyChanged(nameof(CanGoPreviousActiveSearchPage));
+        OnPropertyChanged(nameof(CanGoNextActiveSearchPage));
+        OnPropertyChanged(nameof(ActiveSearchPageStatusText));
+        RefreshSearchCommandState();
+    }
+
+    private void RefreshRankingModeProperties()
+    {
+        OnPropertyChanged(nameof(IsMovieRankingSelected));
+        OnPropertyChanged(nameof(IsTvRankingSelected));
+        OnPropertyChanged(nameof(ActiveRankingTitle));
+        OnPropertyChanged(nameof(ActiveRankingTimeText));
+        OnPropertyChanged(nameof(IsActiveTrendingRanking));
+        OnPropertyChanged(nameof(IsActiveRankingTimeSelectable));
+        OnPropertyChanged(nameof(IsActiveRankingLoading));
+        OnPropertyChanged(nameof(ActiveRankingStatusMessage));
+        OnPropertyChanged(nameof(ActiveRankingSummaryText));
+        OnPropertyChanged(nameof(ShowActiveRankingStatusOverlay));
+        OnPropertyChanged(nameof(ActiveRankingStatusOverlayText));
+        OnPropertyChanged(nameof(CanGoPreviousActiveRankingPage));
+        OnPropertyChanged(nameof(CanGoNextActiveRankingPage));
+        OnPropertyChanged(nameof(ActiveRankingPageStatusText));
+        RefreshRankingCommandState();
     }
 
     private string GetSearchRegionParameter()
@@ -1774,6 +3202,35 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     }
 
     private static bool MatchesRegion(DiscoveryMovieCardViewModel item, string selectedRegion)
+    {
+        var knownCodes = RegionCountryCodes.Values.SelectMany(x => x).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (string.Equals(selectedRegion, FilterOther, StringComparison.Ordinal))
+        {
+            if (item.OriginCountries.Count > 0)
+            {
+                return item.OriginCountries.All(code => !knownCodes.Contains(code));
+            }
+
+            var knownLanguages = RegionLanguageFallbacks.Values.SelectMany(x => x).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return !string.IsNullOrWhiteSpace(item.OriginalLanguage)
+                   && !knownLanguages.Contains(item.OriginalLanguage);
+        }
+
+        if (!RegionCountryCodes.TryGetValue(selectedRegion, out var codes))
+        {
+            return true;
+        }
+
+        if (item.OriginCountries.Count > 0)
+        {
+            return item.OriginCountries.Any(code => codes.Contains(code, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return RegionLanguageFallbacks.TryGetValue(selectedRegion, out var languageCodes)
+               && languageCodes.Contains(item.OriginalLanguage, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesRegion(DiscoveryTvSeriesCardViewModel item, string selectedRegion)
     {
         var knownCodes = RegionCountryCodes.Values.SelectMany(x => x).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (string.Equals(selectedRegion, FilterOther, StringComparison.Ordinal))
@@ -1815,6 +3272,19 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                && string.Equals(item.OriginalLanguage, code, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool MatchesLanguage(DiscoveryTvSeriesCardViewModel item, string selectedLanguage)
+    {
+        if (string.Equals(selectedLanguage, FilterOther, StringComparison.Ordinal))
+        {
+            var knownLanguageCodes = LanguageCodes.Values.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return !string.IsNullOrWhiteSpace(item.OriginalLanguage)
+                   && !knownLanguageCodes.Contains(item.OriginalLanguage);
+        }
+
+        return LanguageCodes.TryGetValue(selectedLanguage, out var code)
+               && string.Equals(item.OriginalLanguage, code, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool MatchesDecade(DiscoveryMovieCardViewModel item, string selectedDecade)
     {
         if (!item.ReleaseYear.HasValue)
@@ -1834,6 +3304,27 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
 
         return item.ReleaseYear.Value >= decadeStart && item.ReleaseYear.Value < decadeStart + 10;
+    }
+
+    private static bool MatchesDecade(DiscoveryTvSeriesCardViewModel item, string selectedDecade)
+    {
+        if (!item.FirstAirYear.HasValue)
+        {
+            return false;
+        }
+
+        if (string.Equals(selectedDecade, DecadeEarlier, StringComparison.Ordinal))
+        {
+            return item.FirstAirYear.Value < 1960;
+        }
+
+        if (!selectedDecade.EndsWith("s", StringComparison.Ordinal)
+            || !int.TryParse(selectedDecade.TrimEnd('s'), out var decadeStart))
+        {
+            return true;
+        }
+
+        return item.FirstAirYear.Value >= decadeStart && item.FirstAirYear.Value < decadeStart + 10;
     }
 
     private static IReadOnlyList<string> SplitTags(string? text)

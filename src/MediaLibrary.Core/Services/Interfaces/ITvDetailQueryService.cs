@@ -11,4 +11,12 @@ public interface ITvDetailQueryService
     Task<TvSeasonDetailModel?> GetSeasonDetailAsync(
         int seasonId,
         CancellationToken cancellationToken = default);
+
+    Task<string> GetSeasonTmdbRatingDisplayAsync(
+        int seasonId,
+        CancellationToken cancellationToken = default);
+
+    Task<string> GetSeasonImdbSeriesRatingDisplayAsync(
+        int seasonId,
+        CancellationToken cancellationToken = default);
 }

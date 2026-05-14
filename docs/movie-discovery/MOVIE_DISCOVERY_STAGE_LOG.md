@@ -75,6 +75,32 @@
 - 0 warning
 - 0 error
 
+## Phase 4.8 TV Discovery Extension
+
+- 影片发现页仍保持三个顶层 Tab：影片搜索、榜单、AI 推荐。
+- 影片搜索 Tab 增加 Movie / TV 二级切换；默认仍是 Movie。
+- Movie 搜索和人物搜索路径保持原逻辑。
+- TV 搜索调用 TMDB TV search，并显示独立 TV Series 卡片。
+- 榜单 Tab 增加 Movie / TV 二级切换；默认仍是 Movie。
+- Movie 榜单路径保持原逻辑。
+- TV 榜单接入 TMDB TV popular、top-rated、trending day、trending week。
+- TV 榜单显示 Series 级排名，不伪造 Season 榜单。
+- TV Series 卡片海报使用现有海报缓存行为。
+- 已入库 Series 跳转 `SeriesOverviewPage`；未入库 Series 仅显示 TV 外部详情后置提示。
+- TV 不进入 AI 推荐、Watch Insights、画像、观影人格或推荐 fingerprint。
+- 未新增 DB 字段，未新增 migration。
+
+## Phase 4.8 Bugfix TV Discovery Parity
+
+- TV 榜单 UI 对齐电影榜单：第一页第 1 名为一行大卡，第 2-21 名为两列；后续页每页 20 部两列展示。
+- TV 榜单上一页 / 下一页在加载中禁用，失败后恢复可用并保留错误提示。
+- TV 搜索增加基础筛选区：TV 类型、地区、入库 / Season 状态、顺序、排序、年代和语言。
+- TV 类型筛选使用 `TmdbTvGenreMapper`，不复用电影类型表。
+- TV 搜索 / 榜单卡片通过 TMDB Series detail 显示 `共 N 季`，加载中显示季数加载状态，失败显示季数未知。
+- TV Discovery 页面文案已补充电视剧搜索语义，人物搜索仍限定在 Movie 模式。
+- 未入库 TV 详情页、Series 全季 metadata 补全、无播放源 Season 展示、TV 修正入口和 TV 功能缺口大审查仅记录为后续事项。
+- 未新增 DB 字段，未新增 migration。
+
 ## FD-2.1 / FD-2.2 Final Log Audit
 
 收尾日志与运行侧检查：

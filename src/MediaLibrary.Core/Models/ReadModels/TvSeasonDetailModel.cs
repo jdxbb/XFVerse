@@ -30,7 +30,7 @@ public sealed class TvSeasonDetailModel
 
     public string GenreDisplay { get; set; } = string.Empty;
 
-    public string RatingDisplay { get; set; } = "评分将在后续阶段接入";
+    public string RatingDisplay { get; set; } = "暂无评分";
 
     public string SourceSummary { get; set; } = string.Empty;
 

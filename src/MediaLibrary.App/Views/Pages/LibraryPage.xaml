@@ -280,7 +280,7 @@
                     </WrapPanel.Style>
                     <TextBlock Margin="0,0,18,0"
                                VerticalAlignment="Center"
-                               Text="{Binding SelectedCount, StringFormat=已选 {0} 部}"
+                               Text="{Binding SelectedCount, StringFormat=已选 {0} 项}"
                                Style="{StaticResource BodyTextStyle}" />
                     <Button Margin="0,0,10,10"
                             Content="标记为已看"
@@ -309,7 +309,7 @@
                             Command="{Binding BatchRemoveFromLibraryCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
                     <Button Margin="0,0,10,10"
-                            Content="删除影片记录"
+                            Content="删除记录"
                             Command="{Binding BatchDeleteMovieRecordsCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
                 </WrapPanel>

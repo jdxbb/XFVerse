@@ -2,7 +2,7 @@
 
 ## 范围
 
-影片发现页包含三个 Tab：影片搜索、榜单、AI 推荐。本阶段只维护影片搜索和榜单，AI 推荐 Tab 继续复用现有 `RecommendationsViewModel` 与推荐流程。
+影片发现页包含三个 Tab：影片搜索、榜单、AI 推荐。AI 推荐 Tab 继续复用现有 `RecommendationsViewModel` 与推荐流程。Phase 4.8 在搜索和榜单 Tab 内增加 Movie / TV 二级切换，但不新增顶层 TV Tab。
 
 ## FD-2.1 影片搜索
 
@@ -38,6 +38,27 @@
 - 榜单严格保持 TMDB 返回顺序，不按评分、热度、名称或本地状态重排。
 - 本地状态合并和 OMDb 补充分数不得改变榜单顺序。
 - 去重只删除重复 TMDB ID，不做重排。
+
+## Phase 4.8 TV Discovery
+
+- TV 搜索调用 TMDB `search/tv`，结果显示 Series 卡片。
+- TV 榜单调用 TMDB `tv/popular`、`tv/top_rated`、`trending/tv/day`、`trending/tv/week`。
+- TV 结果使用独立 `DiscoveryTvSeriesCardViewModel`，不复用电影卡片 ViewModel，也不转换为 `AiRecommendationItem`。
+- 已入库 Series 点击进入 `SeriesOverviewPage`。
+- 未入库 Series 显示 TV 外部详情后置提示，不跳转 Movie detail。
+- TV 评分文案使用 TMDB Series 口径，不显示 OMDb / IMDb 季评分。
+- TV 搜索和榜单海报使用现有海报缓存行为。
+- TV 不进入 AI 推荐、Watch Insights、画像、观影人格或推荐 fingerprint。
+
+## Phase 4.8 Bugfix TV Parity
+
+- TV 榜单布局与电影榜单一致：第 1 名为大卡，第 2 名后为两列。
+- TV 榜单分页与电影榜单一致：第一页 21 部，后续每页 20 部，最多前 200 名。
+- TV 榜单加载中禁用上一页 / 下一页，失败后恢复可用并显示错误状态。
+- TV 搜索筛选区仿照电影搜索布局，提供类型、地区、入库 / Season 状态、排序、顺序、年代和语言。
+- TV 类型筛选使用 TMDB TV 类型映射，不使用电影类型表。
+- TV 搜索和榜单卡片按需读取 TMDB Series detail 显示总季数，不在发现页写库或补全 Season metadata。
+- 未入库 TV 详情、全季 metadata 补全、无播放源 Season 展示和 TV 修正入口仍不属于本阶段。
 
 ## 榜单分页
 

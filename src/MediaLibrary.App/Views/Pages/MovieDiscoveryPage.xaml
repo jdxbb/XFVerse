@@ -1,7 +1,130 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.MovieDiscoveryPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
+             xmlns:viewModels="clr-namespace:MediaLibrary.App.ViewModels.Pages">
+    <UserControl.Resources>
+        <DataTemplate DataType="{x:Type viewModels:DiscoveryTvSeriesCardViewModel}">
+            <Border Width="232"
+                    Margin="0,0,18,18"
+                    Style="{StaticResource CompactCardStyle}">
+                <Border.InputBindings>
+                    <MouseBinding MouseAction="LeftClick"
+                                  Command="{Binding DataContext.OpenTvSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  CommandParameter="{Binding}" />
+                </Border.InputBindings>
+                <StackPanel>
+                    <Grid Height="300">
+                        <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
+                            <Grid>
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="无海报"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                            </Grid>
+                        </Border>
+                        <Border HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Margin="10"
+                                Padding="9,5"
+                                CornerRadius="999"
+                                Background="{DynamicResource BrushAccent}">
+                            <TextBlock Text="{Binding AvailabilityText}"
+                                       Foreground="{DynamicResource BrushOnAccent}"
+                                       FontWeight="SemiBold" />
+                        </Border>
+                        <Border HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="10"
+                                Padding="9,5"
+                                CornerRadius="999"
+                                Background="{DynamicResource BrushSurfaceAlt}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRank}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding RankText}" Style="{StaticResource BodyTextStyle}" />
+                        </Border>
+                    </Grid>
+
+                    <TextBlock Margin="0,14,0,0"
+                               Text="{Binding Title}"
+                               TextWrapping="Wrap"
+                               TextTrimming="CharacterEllipsis"
+                               Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock Margin="0,4,0,0"
+                               Text="{Binding OriginalTitleText}"
+                               TextWrapping="Wrap">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding OriginalTitleText}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <DockPanel Margin="0,8,0,0">
+                        <TextBlock Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{Binding RatingText}"
+                                   FontWeight="SemiBold"
+                                   Style="{StaticResource BodyTextStyle}" />
+                    </DockPanel>
+
+                    <TextBlock Margin="0,8,0,0"
+                               Text="{Binding DisplayTags}"
+                               TextWrapping="Wrap"
+                               Style="{StaticResource BodyTextStyle}" />
+                    <TextBlock Margin="0,6,0,0"
+                               Text="{Binding OverviewText}"
+                               TextWrapping="Wrap"
+                               MaxHeight="72"
+                               Style="{StaticResource BodyMutedTextStyle}" />
+
+                    <WrapPanel Margin="0,10,0,0">
+                        <Border Margin="0,0,8,8"
+                                Padding="8,4"
+                                CornerRadius="999"
+                                Background="{DynamicResource BrushSurfaceAlt}">
+                            <TextBlock Text="{Binding SeasonCountText}" Style="{StaticResource BodyMutedTextStyle}" />
+                        </Border>
+                        <Border Margin="0,0,8,8"
+                                Padding="8,4"
+                                CornerRadius="999"
+                                Background="{DynamicResource BrushSurfaceAlt}">
+                            <TextBlock Text="{Binding LibraryStatusText}" Style="{StaticResource BodyMutedTextStyle}" />
+                        </Border>
+                        <Border Margin="0,0,8,8"
+                                Padding="8,4"
+                                CornerRadius="999"
+                                Background="{DynamicResource BrushAccentSoft}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasSeasonStateSummary}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding SeasonStateSummaryText}" Style="{StaticResource BodyMutedTextStyle}" />
+                        </Border>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
     <Border Style="{StaticResource PageCardStyle}">
         <Grid>
             <Grid.RowDefinitions>
@@ -12,7 +135,7 @@
             <StackPanel>
                 <TextBlock Text="影片发现" Style="{StaticResource CardTitleTextStyle}" />
                 <TextBlock Margin="0,8,0,0"
-                           Text="通过 TMDB 搜索影片和人物作品；AI 推荐继续使用现有推荐流程。"
+                           Text="通过 TMDB 搜索影片、电视剧和电影人物作品；AI 推荐继续使用现有推荐流程。"
                            Style="{StaticResource BodyMutedTextStyle}" />
             </StackPanel>
 
@@ -31,6 +154,8 @@
                         <StackPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="132" />
+                                    <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="150" />
                                     <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="*" />
@@ -39,16 +164,33 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel>
+                                    <TextBlock Text="媒介" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding SearchMediaTypeOptions}"
+                                              SelectedItem="{Binding SelectedSearchMediaType}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMovieSearchSelected}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
                                     <TextBlock Text="搜索类型" Style="{StaticResource BodyMutedTextStyle}" />
                                     <ComboBox ItemsSource="{Binding SearchTypeOptions}"
                                               SelectedItem="{Binding SelectedSearchType}"
                                               Style="{StaticResource FormComboBoxStyle}" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="2">
+                                <StackPanel Grid.Column="4">
                                     <TextBlock Text="关键词" Style="{StaticResource BodyMutedTextStyle}" />
                                     <TextBox MinWidth="320"
-                                             ToolTip="输入影片名、原名或人物名"
+                                             ToolTip="输入影片名、剧名或原名；电影模式支持人物名"
                                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource FormTextBoxStyle}">
                                         <TextBox.InputBindings>
@@ -57,7 +199,7 @@
                                     </TextBox>
                                 </StackPanel>
 
-                                <Button Grid.Column="4"
+                                <Button Grid.Column="6"
                                         MinWidth="96"
                                         VerticalAlignment="Bottom"
                                         Content="搜索"
@@ -66,6 +208,16 @@
                             </Grid>
 
                             <WrapPanel Margin="0,14,0,0">
+                                <WrapPanel.Style>
+                                    <Style TargetType="WrapPanel">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMovieSearchSelected}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </WrapPanel.Style>
                                 <StackPanel Width="132" Margin="0,0,12,12">
                                     <TextBlock Text="类型" Style="{StaticResource BodyMutedTextStyle}" />
                                     <ComboBox ItemsSource="{Binding GenreFilterOptions}"
@@ -147,6 +299,73 @@
                                         Command="{Binding ShowLayoutSwitchPlaceholderCommand}"
                                         Style="{StaticResource SecondaryButtonStyle}" />
                             </WrapPanel>
+
+                            <WrapPanel Margin="0,14,0,0">
+                                <WrapPanel.Style>
+                                    <Style TargetType="WrapPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsTvSearchSelected}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </WrapPanel.Style>
+                                <StackPanel Width="132" Margin="0,0,12,12">
+                                    <TextBlock Text="类型" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding TvGenreFilterOptions}"
+                                              SelectedItem="{Binding SelectedTvGenreFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="132" Margin="0,0,12,12">
+                                    <TextBlock Text="地区" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding RegionFilterOptions}"
+                                              SelectedItem="{Binding SelectedTvRegionFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="150" Margin="0,0,12,12">
+                                    <TextBlock Text="入库状态" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding TvWatchStatusFilterOptions}"
+                                              SelectedItem="{Binding SelectedTvWatchStatusFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="116" Margin="0,0,12,12">
+                                    <TextBlock Text="顺序" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding SortDirectionOptions}"
+                                              SelectedItem="{Binding SelectedTvSortDirection}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="132" Margin="0,0,12,12">
+                                    <TextBlock Text="排序" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding TvSortOptions}"
+                                              SelectedItem="{Binding SelectedTvSortOption}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="116" Margin="0,0,12,12">
+                                    <TextBlock Text="年代" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding DecadeFilterOptions}"
+                                              SelectedItem="{Binding SelectedTvDecadeFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Width="116" Margin="0,0,12,12">
+                                    <TextBlock Text="语言" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding LanguageFilterOptions}"
+                                              SelectedItem="{Binding SelectedTvLanguageFilter}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+                                </StackPanel>
+
+                                <Button MinWidth="96"
+                                        Margin="0,20,12,12"
+                                        Content="清除筛选"
+                                        Command="{Binding ClearSearchFiltersCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                            </WrapPanel>
                         </StackPanel>
 
                         <Border Grid.Row="2" Style="{StaticResource CompactCardStyle}">
@@ -158,11 +377,11 @@
 
                                 <DockPanel>
                                     <StackPanel>
-                                        <TextBlock Text="{Binding SearchStatusMessage}"
+                                        <TextBlock Text="{Binding ActiveSearchStatusMessage}"
                                                    TextWrapping="Wrap"
                                                    Style="{StaticResource BodyMutedTextStyle}" />
                                         <TextBlock Margin="0,6,0,0"
-                                                   Text="{Binding SearchSummaryText}"
+                                                   Text="{Binding ActiveSearchSummaryText}"
                                                    TextWrapping="Wrap"
                                                    Style="{StaticResource BodyTextStyle}" />
                                     </StackPanel>
@@ -172,13 +391,13 @@
                                     <TextBlock HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
                                                Panel.ZIndex="1"
-                                               Text="{Binding SearchStatusOverlayText}"
+                                               Text="{Binding ActiveSearchStatusOverlayText}"
                                                TextWrapping="Wrap">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ShowSearchStatusOverlay}" Value="True">
+                                                    <DataTrigger Binding="{Binding ShowActiveSearchStatusOverlay}" Value="True">
                                                         <Setter Property="Visibility" Value="Visible" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -194,12 +413,15 @@
                                                     <DataTrigger Binding="{Binding HasSearchMovies}" Value="False">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsSearchLoading}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ScrollViewer.Style>
+                                                <DataTrigger Binding="{Binding IsSearchLoading}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsMovieSearchSelected}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ScrollViewer.Style>
                                         <StackPanel>
                                             <ItemsControl ItemsSource="{Binding SearchMovies}">
                                                 <ItemsControl.Style>
@@ -404,6 +626,53 @@
                                             </StackPanel>
                                         </StackPanel>
                                     </ScrollViewer>
+
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ScrollViewer.Style>
+                                            <Style TargetType="ScrollViewer">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsTvSearchSelected}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding HasSearchTvSeries}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsTvSearchLoading}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ScrollViewer.Style>
+                                        <StackPanel>
+                                            <ItemsControl ItemsSource="{Binding SearchTvSeries}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                            </ItemsControl>
+
+                                            <StackPanel Margin="0,4,0,0"
+                                                        HorizontalAlignment="Center"
+                                                        Orientation="Horizontal">
+                                                <Button MinWidth="88"
+                                                        Content="上一页"
+                                                        Command="{Binding GoPreviousSearchPageCommand}"
+                                                        IsEnabled="{Binding CanGoPreviousTvSearchPage}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                <TextBlock Margin="14,0"
+                                                           VerticalAlignment="Center"
+                                                           Text="{Binding TvSearchPageStatusText}"
+                                                           Style="{StaticResource BodyTextStyle}" />
+                                                <Button MinWidth="88"
+                                                        Content="下一页"
+                                                        Command="{Binding GoNextSearchPageCommand}"
+                                                        IsEnabled="{Binding CanGoNextTvSearchPage}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </ScrollViewer>
                                 </Grid>
                             </Grid>
                         </Border>
@@ -420,9 +689,14 @@
                         <Border Style="{StaticResource CompactCardStyle}">
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <ComboBox Width="112"
+                                              Margin="0,0,12,0"
+                                              ItemsSource="{Binding RankingMediaTypeOptions}"
+                                              SelectedItem="{Binding SelectedRankingMediaType}"
+                                              Style="{StaticResource FormComboBoxStyle}" />
                                     <Menu VerticalAlignment="Center">
-                                        <MenuItem Header="{Binding RankingTimeText}"
-                                                  IsEnabled="{Binding IsRankingTimeSelectable}">
+                                        <MenuItem Header="{Binding ActiveRankingTimeText}"
+                                                  IsEnabled="{Binding IsActiveRankingTimeSelectable}">
                                             <MenuItem Header="今日趋势"
                                                       Command="{Binding SelectTrendingTimeCommand}"
                                                       CommandParameter="今日趋势" />
@@ -434,7 +708,7 @@
                                 </StackPanel>
 
                                 <StackPanel>
-                                    <TextBlock Text="{Binding RankingTitle}" Style="{StaticResource CardTitleTextStyle}" />
+                                    <TextBlock Text="{Binding ActiveRankingTitle}" Style="{StaticResource CardTitleTextStyle}" />
                                     <WrapPanel Margin="0,10,0,0">
                                         <Menu Margin="0,0,12,0">
                                             <MenuItem Header="选择榜单">
@@ -450,12 +724,12 @@
                                             </MenuItem>
                                         </Menu>
                                         <TextBlock VerticalAlignment="Center"
-                                                   Text="{Binding RankingStatusMessage}"
+                                                   Text="{Binding ActiveRankingStatusMessage}"
                                                    TextWrapping="Wrap"
                                                    Style="{StaticResource BodyMutedTextStyle}" />
                                     </WrapPanel>
                                     <TextBlock Margin="0,8,0,0"
-                                               Text="{Binding RankingSummaryText}"
+                                               Text="{Binding ActiveRankingSummaryText}"
                                                TextWrapping="Wrap"
                                                Style="{StaticResource BodyTextStyle}" />
                                 </StackPanel>
@@ -472,13 +746,13 @@
                                            Grid.Row="0"
                                            VerticalAlignment="Center"
                                            Panel.ZIndex="1"
-                                           Text="{Binding RankingStatusOverlayText}"
+                                           Text="{Binding ActiveRankingStatusOverlayText}"
                                            TextWrapping="Wrap">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
                                             <Setter Property="Visibility" Value="Collapsed" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ShowRankingStatusOverlay}" Value="True">
+                                                <DataTrigger Binding="{Binding ShowActiveRankingStatusOverlay}" Value="True">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -497,6 +771,9 @@
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsRankingLoading}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsMovieRankingSelected}" Value="False">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -814,6 +1091,269 @@
 
                                     </StackPanel>
                                 </ScrollViewer>
+                                <ScrollViewer Grid.Row="0"
+                                              VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer.Style>
+                                        <Style TargetType="ScrollViewer">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsTvRankingSelected}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasRankingTvSeries}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsTvRankingLoading}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ScrollViewer.Style>
+                                    <StackPanel>
+                                        <Border Margin="0,0,0,18"
+                                                DataContext="{Binding TopRankingTvSeries}">
+                                            <Border.Style>
+                                                <Style TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding DataContext.ShowTopRankingTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Border.InputBindings>
+                                                <MouseBinding MouseAction="LeftClick"
+                                                              Command="{Binding DataContext.OpenTvSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              CommandParameter="{Binding}" />
+                                            </Border.InputBindings>
+                                            <Grid MinHeight="360">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="250" />
+                                                    <ColumnDefinition Width="18" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Grid Height="340">
+                                                    <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
+                                                        <Grid>
+                                                            <TextBlock HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       Text="无海报"
+                                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <Border HorizontalAlignment="Left"
+                                                            VerticalAlignment="Top"
+                                                            Margin="12"
+                                                            Padding="10,6"
+                                                            CornerRadius="999"
+                                                            Background="{DynamicResource BrushAccent}">
+                                                        <TextBlock Text="{Binding RankText}"
+                                                                   Foreground="{DynamicResource BrushOnAccent}"
+                                                                   FontWeight="SemiBold" />
+                                                    </Border>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="2" Margin="0,16,0,10">
+                                                    <TextBlock Text="{Binding RatingText}" Style="{StaticResource MetricTextStyle}" />
+                                                    <TextBlock Margin="0,8,0,0"
+                                                               Text="{Binding TitleWithOriginalText}"
+                                                               TextWrapping="Wrap"
+                                                               Style="{StaticResource CardTitleTextStyle}" />
+                                                    <WrapPanel Margin="0,8,0,0">
+                                                        <TextBlock Margin="0,0,14,0"
+                                                                   Text="{Binding YearText}"
+                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                        <TextBlock Margin="0,0,14,0"
+                                                                   Text="{Binding SeasonCountText}"
+                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                        <TextBlock Text="{Binding LibraryStatusText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                    </WrapPanel>
+                                                    <TextBlock Margin="0,8,0,0"
+                                                               Text="{Binding DisplayTags}"
+                                                               TextWrapping="Wrap"
+                                                               Style="{StaticResource BodyTextStyle}" />
+                                                    <TextBlock Margin="0,6,0,0"
+                                                               Text="{Binding SeasonStateSummaryText}"
+                                                               TextWrapping="Wrap">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasSeasonStateSummary}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <ScrollViewer Margin="0,12,0,0"
+                                                                  Height="128"
+                                                                  VerticalScrollBarVisibility="Auto">
+                                                        <TextBlock Text="{Binding OverviewText}"
+                                                                   TextWrapping="Wrap"
+                                                                   Style="{StaticResource BodyTextStyle}" />
+                                                    </ScrollViewer>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <ItemsControl ItemsSource="{Binding RankingTvRows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,14" MinHeight="210">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="1" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Grid DataContext="{Binding LeftItem}" Margin="0,0,14,0">
+                                                            <Grid.InputBindings>
+                                                                <MouseBinding MouseAction="LeftClick"
+                                                                              Command="{Binding DataContext.OpenTvSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                              CommandParameter="{Binding}" />
+                                                            </Grid.InputBindings>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="136" />
+                                                                <ColumnDefinition Width="12" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Grid Height="196">
+                                                                <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
+                                                                    <Grid>
+                                                                        <TextBlock HorizontalAlignment="Center"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Text="无海报"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                    </Grid>
+                                                                </Border>
+                                                                <Border HorizontalAlignment="Left"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="8"
+                                                                        Padding="8,4"
+                                                                        CornerRadius="999"
+                                                                        Background="{DynamicResource BrushAccent}">
+                                                                    <TextBlock Text="{Binding RankText}"
+                                                                               Foreground="{DynamicResource BrushOnAccent}"
+                                                                               FontWeight="SemiBold" />
+                                                                </Border>
+                                                            </Grid>
+
+                                                            <StackPanel Grid.Column="2" Margin="0,10,0,6">
+                                                                <DockPanel>
+                                                                    <TextBlock Text="{Binding RatingText}" FontWeight="SemiBold" Style="{StaticResource BodyTextStyle}" />
+                                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </DockPanel>
+                                                                <TextBlock Margin="0,8,0,0"
+                                                                           Text="{Binding TitleWithOriginalText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource SectionTitleTextStyle}" />
+                                                                <TextBlock Margin="0,6,0,0"
+                                                                           Text="{Binding DisplayTags}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding SeasonCountText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding LibraryStatusText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                                <ScrollViewer Margin="0,8,0,0" Height="70" VerticalScrollBarVisibility="Auto">
+                                                                    <TextBlock Text="{Binding OverviewText}"
+                                                                               TextWrapping="Wrap"
+                                                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </ScrollViewer>
+                                                            </StackPanel>
+                                                        </Grid>
+
+                                                        <Border Grid.Column="1" Background="{DynamicResource BrushBorder}" />
+
+                                                        <Grid Grid.Column="2"
+                                                              DataContext="{Binding RightItem}"
+                                                              Margin="14,0,0,0">
+                                                            <Grid.Style>
+                                                                <Style TargetType="Grid">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding DataContext.HasRightItem, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Grid.Style>
+                                                            <Grid.InputBindings>
+                                                                <MouseBinding MouseAction="LeftClick"
+                                                                              Command="{Binding DataContext.OpenTvSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                              CommandParameter="{Binding}" />
+                                                            </Grid.InputBindings>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="136" />
+                                                                <ColumnDefinition Width="12" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Grid Height="196">
+                                                                <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
+                                                                    <Grid>
+                                                                        <TextBlock HorizontalAlignment="Center"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Text="无海报"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                                    </Grid>
+                                                                </Border>
+                                                                <Border HorizontalAlignment="Left"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="8"
+                                                                        Padding="8,4"
+                                                                        CornerRadius="999"
+                                                                        Background="{DynamicResource BrushAccent}">
+                                                                    <TextBlock Text="{Binding RankText}"
+                                                                               Foreground="{DynamicResource BrushOnAccent}"
+                                                                               FontWeight="SemiBold" />
+                                                                </Border>
+                                                            </Grid>
+
+                                                            <StackPanel Grid.Column="2" Margin="0,10,0,6">
+                                                                <DockPanel>
+                                                                    <TextBlock Text="{Binding RatingText}" FontWeight="SemiBold" Style="{StaticResource BodyTextStyle}" />
+                                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </DockPanel>
+                                                                <TextBlock Margin="0,8,0,0"
+                                                                           Text="{Binding TitleWithOriginalText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource SectionTitleTextStyle}" />
+                                                                <TextBlock Margin="0,6,0,0"
+                                                                           Text="{Binding DisplayTags}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding SeasonCountText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding LibraryStatusText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                                <ScrollViewer Margin="0,8,0,0" Height="70" VerticalScrollBarVisibility="Auto">
+                                                                    <TextBlock Text="{Binding OverviewText}"
+                                                                               TextWrapping="Wrap"
+                                                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </ScrollViewer>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </ScrollViewer>
                                 <StackPanel Grid.Row="1"
                                             Margin="0,14,0,0"
                                             HorizontalAlignment="Center"
@@ -823,6 +1363,9 @@
                                             <Setter Property="Visibility" Value="Visible" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding HasRankingMovies}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsMovieRankingSelected}" Value="False">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -841,6 +1384,38 @@
                                             Content="下一页"
                                             Command="{Binding GoNextRankingPageCommand}"
                                             IsEnabled="{Binding CanGoNextRankingPage}"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1"
+                                            Margin="0,14,0,0"
+                                            HorizontalAlignment="Center"
+                                            Orientation="Horizontal">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasRankingTvSeries}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsTvRankingSelected}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Button MinWidth="88"
+                                            Content="上一页"
+                                            Command="{Binding GoPreviousRankingPageCommand}"
+                                            IsEnabled="{Binding CanGoPreviousTvRankingPage}"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                    <TextBlock Margin="14,0"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding TvRankingPageStatusText}"
+                                               Style="{StaticResource BodyTextStyle}" />
+                                    <Button MinWidth="88"
+                                            Content="下一页"
+                                            Command="{Binding GoNextRankingPageCommand}"
+                                            IsEnabled="{Binding CanGoNextTvRankingPage}"
                                             Style="{StaticResource SecondaryButtonStyle}" />
                                 </StackPanel>
                             </Grid>

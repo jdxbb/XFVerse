@@ -914,16 +914,11 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (selectedItems.Count == 0)
         {
             ClearSelection();
-            BatchResultSummary = "没有可处理的已选影片。";
+            BatchResultSummary = "没有可处理的已选项目。";
             return;
         }
 
         var operationName = isWatched ? "批量标记已看" : "批量标记未看";
-        if (HasMixedMovieAndSeasonSelection(selectedItems))
-        {
-            BatchResultSummary = "电影和电视剧季请分开批量操作。";
-            return;
-        }
         var successCount = 0;
         var errors = new List<BatchItemError>();
         IsBatchOperationRunning = true;
@@ -938,13 +933,18 @@ public sealed class LibraryViewModel : PageViewModelBase
                     {
                         await _tvSeasonCollectionService.SetWatchedAsync(item.Movie.SeasonId, isWatched, changeSource: "Batch");
                     }
-                    else if (item.IsInLibrary && item.MovieId > 0)
+                    else if (item.Movie.IsMovie && item.IsInLibrary && item.MovieId > 0)
                     {
                         await _movieManagementService.SetWatchedAsync(item.MovieId, isWatched, changeSource: "Batch");
                     }
-                    else
+                    else if (item.Movie.IsMovie)
                     {
                         await _userCollectionService.SetWatchedAsync(BuildRecommendationItem(item.Movie), isWatched, changeSource: "Batch");
+                    }
+                    else
+                    {
+                        errors.Add(new BatchItemError(item.SelectionKey, item.Title, "电视剧总览不参与批量操作。"));
+                        continue;
                     }
 
                     successCount++;
@@ -985,19 +985,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (selectedItems.Count == 0)
         {
             ClearSelection();
-            BatchResultSummary = "没有可移出的已选影片。";
-            return;
-        }
-
-        if (HasMixedMovieAndSeasonSelection(selectedItems))
-        {
-            BatchResultSummary = "电影和电视剧季请分开批量操作。";
-            return;
-        }
-
-        if (HasMixedMovieAndSeasonSelection(selectedItems))
-        {
-            BatchResultSummary = "电影和电视剧季请分开批量操作。";
+            BatchResultSummary = "没有可移出的已选项目。";
             return;
         }
 
@@ -1028,13 +1016,18 @@ public sealed class LibraryViewModel : PageViewModelBase
                     {
                         await _tvSeasonCollectionService.RemoveFromLibraryAsync(item.Movie.SeasonId);
                     }
-                    else if (item.IsInLibrary && item.MovieId > 0)
+                    else if (item.Movie.IsMovie && item.IsInLibrary && item.MovieId > 0)
                     {
                         await _movieManagementService.RemoveFromLibraryAsync(item.MovieId);
                     }
-                    else
+                    else if (item.Movie.IsMovie)
                     {
                         await _userCollectionService.RemoveCollectionRecordAsync(BuildRecommendationItem(item.Movie));
+                    }
+                    else
+                    {
+                        errors.Add(new BatchItemError(item.SelectionKey, item.Title, "电视剧总览不参与批量操作。"));
+                        continue;
                     }
 
                     successCount++;
@@ -1077,25 +1070,19 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (selectedItems.Count == 0)
         {
             ClearSelection();
-            BatchResultSummary = "没有可删除记录的已选影片。";
-            return;
-        }
-
-        if (HasMixedMovieAndSeasonSelection(selectedItems))
-        {
-            BatchResultSummary = "电影和电视剧季请分开批量操作。";
+            BatchResultSummary = "没有可删除记录的已选项目。";
             return;
         }
 
         var confirmed = await _confirmationDialogService.ConfirmAsync(
-            "确认删除影片记录？",
-            "删除后将移除所选影片在软件中的信息、播放历史、收藏状态和播放源记录，但不会删除本地文件或 WebDAV 文件。后续扫描可能重新发现。",
+            "确认删除记录？",
+            "删除后将移除所选电影或电视剧季在软件中的信息、播放历史、收藏状态和播放源记录，但不会删除本地文件或 WebDAV 文件。后续扫描可能重新发现。",
             "删除记录",
             "取消");
 
         if (!confirmed)
         {
-            BatchResultSummary = "已取消删除影片记录。";
+            BatchResultSummary = "已取消删除记录。";
             return;
         }
 
@@ -1114,13 +1101,18 @@ public sealed class LibraryViewModel : PageViewModelBase
                     {
                         await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.Movie.SeasonId);
                     }
-                    else if (item.MovieId > 0)
+                    else if (item.Movie.IsMovie && item.MovieId > 0)
                     {
                         await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
                     }
-                    else
+                    else if (item.Movie.IsMovie)
                     {
                         await _userCollectionService.DeleteCollectionRecordAsync(BuildRecommendationItem(item.Movie));
+                    }
+                    else
+                    {
+                        errors.Add(new BatchItemError(item.SelectionKey, item.Title, "电视剧总览不参与批量操作。"));
+                        continue;
                     }
 
                     successCount++;
@@ -1151,7 +1143,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             }
 
             await ActivateAsync();
-            BatchResultSummary = BuildResultSummary("删除影片记录", successCount, errors);
+            BatchResultSummary = BuildResultSummary("删除记录", successCount, errors);
             NotifyAfterBatchMovieRecordDelete();
             WriteLibraryBatchEvent(
                 $"event=library-delete-movie-records-complete success={successCount} failed={errors.Count}");
@@ -1304,11 +1296,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         return Movies
             .Where(item => item.IsSelected && _selectedItemKeys.Contains(item.SelectionKey))
             .ToList();
-    }
-
-    private static bool HasMixedMovieAndSeasonSelection(IReadOnlyCollection<LibraryMovieItemViewModel> items)
-    {
-        return items.Any(x => x.Movie.IsMovie) && items.Any(x => x.Movie.IsSeason);
     }
 
     private void SetSelectionToFailures(IEnumerable<BatchItemError> errors)

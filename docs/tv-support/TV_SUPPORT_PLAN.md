@@ -250,7 +250,7 @@ Phase 4.6 still does not add TV discovery search / rankings, AI recommendations,
 - Series items are not disguised as Movies and navigate to `SeriesOverviewPage`.
 - Episode items do not appear as first-level library cards.
 - Entering batch mode reloads TV cards as Season items.
-- Batch operations act on Movie or Season items. Mixed Movie + Season selections are rejected in the MVP to avoid unclear cross-type semantics.
+- Batch operations act on Movie or Season items. Phase 4.7 supports mixed Movie + Season selections for the four unified actions: watched, unwatched, remove from library, and delete record.
 - Content type filtering supports all, Movie, and TV.
 - Source filtering for Series / Season aggregates active Episode `MediaFile` sources.
 
@@ -308,7 +308,7 @@ Phase 4.6 Bugfix 2 keeps the project inside the TV library integration scope and
 
 ## Phase 4.6 Out Of Scope
 
-- TV discovery search / ranking UI
+- TV discovery search / ranking UI, moved to Phase 4.8
 - AI recommendations for TV
 - Watch Insights TV statistics
 - Final UI polish
@@ -319,3 +319,74 @@ Phase 4.6 Bugfix 2 keeps the project inside the TV library integration scope and
 - `EpisodeMediaFile`
 - Unified Unknown / UnidentifiedMedia table
 - `TvSeasonRatingSources`
+
+## Phase 4.7 Goal
+
+Phase 4.7 closes the main TV experience before discovery work. The original TV search / ranking phase moves to Phase 4.8, and the full Phase 4 regression and documentation closeout moves to Phase 4.9.
+
+- `TvSeasonDetailPage` displays Season ratings without adding a migration.
+- Season detail metadata is not blocked by rating requests; only the rating area shows loading / unavailable text.
+- TMDB Season detail is already requested during TV scan / identification, and detail rating display reads TMDB Season rating through that metadata cache path.
+- TMDB Season `vote_average` / `vote_count` is shown as `TMDB 季评分` when available.
+- Series-level IMDb data from OMDb loads after opening Season detail and is shown only as `IMDb 剧集评分`.
+- OMDb Season audit responses are not treated as stable Season-level IMDb ratings; Season-level IMDb is not shown unless it becomes stable and unambiguous in a later phase.
+- Missing rating data shows an empty / `暂无评分` state and does not block Season state actions.
+- `TvSeasonRatingSources` remains deferred.
+
+## Phase 4.7 Mixed Batch Rules
+
+- Media-library batch mode may select Movie and Season cards together.
+- Mixed batch watched keeps Movie behavior on Movies and uses Season whole-season watched on Seasons.
+- Mixed batch unwatched keeps Movie behavior on Movies and uses Season whole-season unwatched on Seasons.
+- Mixed batch remove marks records / media sources removed in software only and never deletes physical files.
+- Mixed batch delete record removes software records only and never deletes physical files.
+- Series and Episode are not batch-operation units.
+- Batch favorite, want-to-watch, and not-interested remain unsupported.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.7 Deferred
+
+- TV search / ranking UI is now Phase 4.8.
+- Full Phase 4 regression and documentation closeout is now Phase 4.9.
+- Persistent Season rating source tables, including `TvSeasonRatingSources`, remain deferred.
+- Final TV visual polish remains deferred.
+
+## Phase 4.8 Goal
+
+Phase 4.8 adds TV discovery search and TV rankings inside the existing movie discovery page. The page still has exactly three top-level tabs: movie search, rankings, and AI recommendations.
+
+- Search tab adds a second-level Movie / TV switch.
+- Movie search keeps the existing movie and person-search paths.
+- TV search calls TMDB TV search and displays Series cards through a dedicated TV view model.
+- Ranking tab adds a second-level Movie / TV switch.
+- Movie rankings keep the existing popular, top-rated, and trending paths.
+- TV rankings call TMDB TV popular, top-rated, trending day, and trending week.
+- TV ranking results are Series-level results only; Season rankings are not fabricated.
+- TV discovery cards show Series title, original name, first-air year, genres, overview, TMDB Series rating, poster, library state, and Season state summary when available.
+- TV discovery poster bindings use the existing poster cache behavior.
+- In-library Series navigate to `SeriesOverviewPage`.
+- Not-in-library Series show a low-risk TV external-detail placeholder instead of navigating to Movie detail or becoming `AiRecommendationItem`.
+- TV discovery remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.8 Bugfix Goal
+
+Phase 4.8 Bugfix aligns TV discovery with the Movie discovery experience without expanding into later TV feature-gap work.
+
+- TV ranking layout mirrors Movie ranking: rank 1 is a full-width large card, rank 2 onward uses two-column rows.
+- TV ranking pagination mirrors Movie ranking: page 1 displays 21 entries, later pages display 20 entries, with the 200-entry cap preserved.
+- TV ranking navigation is disabled while TV ranking requests are loading and restored after success or failure.
+- TV search has basic filters for TV genre, region, library / Season state summary, sort direction, sort key, first-air decade, and language.
+- TV genre filtering uses TMDB TV genre labels rather than Movie genre labels.
+- TV search and ranking cards show total Season count from TMDB Series detail when available, with loading and unknown states.
+- TV discovery copy distinguishes shared Movie / TV search from Movie-only person search.
+- TV discovery remains Series-level and read-only; it does not create Season metadata, write database state, show Episodes, or fabricate Season rankings.
+- TV discovery remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.8 Deferred
+
+- Full not-in-library TV external detail page remains deferred.
+- TV search filters remain MVP-level; Phase 4.8 Bugfix adds basic client-side filters, while fuller TV-specific filtering remains deferred.
+- TV rankings remain Series-level because TMDB returns Series for TV ranking endpoints.
+- Full TV feature-gap audit and stage reorder remains deferred to the next phase.
+- Full Phase 4 regression and documentation closeout remains Phase 4.9.
+- Final TV visual polish remains deferred.

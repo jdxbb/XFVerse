@@ -8,6 +8,10 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class TvSeasonDetailViewModel : PageViewModelBase
 {
+    private const string TmdbRatingLoadingText = "TMDB 季评分加载中...";
+    private const string ImdbRatingLoadingText = "IMDb 剧集评分加载中...";
+    private const string RatingUnavailableText = "暂无评分";
+    private const string SeasonRatingUnavailableText = "暂无季评分";
     private readonly INavigationStateService _navigationStateService;
     private readonly ITvDetailQueryService _tvDetailQueryService;
     private readonly IPlayerWindowService _playerWindowService;
@@ -22,7 +26,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private string _seasonNumberText = "-";
     private string _airDateText = "-";
     private string _genreDisplay = "未提供";
-    private string _ratingDisplay = "评分将在后续阶段接入";
+    private string _ratingDisplay = RatingUnavailableText;
     private string _sourceSummary = "暂无播放源";
     private string _progressText = "已看 0 / 0";
     private string _inLibraryText = "已入库 0 集";
@@ -36,6 +40,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private bool _isNotInterested;
     private bool _isSeasonWatched;
     private bool _isSeasonUnwatched;
+    private string _tmdbRatingDisplay = SeasonRatingUnavailableText;
+    private string _imdbRatingDisplay = string.Empty;
 
     public TvSeasonDetailViewModel(
         INavigationStateService navigationStateService,
@@ -235,7 +241,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             SeasonNumberText = model.SeasonNumberText;
             AirDateText = model.AirDateText;
             GenreDisplay = string.IsNullOrWhiteSpace(model.GenreDisplay) ? "未提供" : model.GenreDisplay;
-            RatingDisplay = model.RatingDisplay;
+            SetRatingDisplayParts(TmdbRatingLoadingText, ImdbRatingLoadingText);
             SourceSummary = model.SourceSummary;
             ProgressText = model.ProgressText;
             InLibraryText = model.InLibraryText;
@@ -263,11 +269,66 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 : Episodes.Count == 0
                     ? "该季暂无已解析集。"
                     : $"已加载 {Episodes.Count} 集。";
+            _ = LoadRatingDisplayAsync(model.SeasonId, cancellationToken);
         }
         catch (Exception exception)
         {
             Clear($"加载电视剧季详情失败：{DescribeException(exception)}");
         }
+    }
+
+    private async Task LoadRatingDisplayAsync(int seasonId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tmdbRatingDisplay = await _tvDetailQueryService.GetSeasonTmdbRatingDisplayAsync(seasonId, cancellationToken);
+            if (_seasonId == seasonId)
+            {
+                SetRatingDisplayParts(
+                    string.IsNullOrWhiteSpace(tmdbRatingDisplay) ? SeasonRatingUnavailableText : tmdbRatingDisplay,
+                    ImdbRatingLoadingText);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch
+        {
+            if (_seasonId == seasonId)
+            {
+                SetRatingDisplayParts(SeasonRatingUnavailableText, ImdbRatingLoadingText);
+            }
+        }
+
+        try
+        {
+            var imdbRatingDisplay = await _tvDetailQueryService.GetSeasonImdbSeriesRatingDisplayAsync(seasonId, cancellationToken);
+            if (_seasonId == seasonId)
+            {
+                SetRatingDisplayParts(_tmdbRatingDisplay, imdbRatingDisplay);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            if (_seasonId == seasonId)
+            {
+                SetRatingDisplayParts(_tmdbRatingDisplay, string.Empty);
+            }
+        }
+    }
+
+    private void SetRatingDisplayParts(string tmdbRatingDisplay, string imdbRatingDisplay)
+    {
+        _tmdbRatingDisplay = tmdbRatingDisplay;
+        _imdbRatingDisplay = imdbRatingDisplay;
+        var parts = new[] { _tmdbRatingDisplay, _imdbRatingDisplay }
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToArray();
+        RatingDisplay = parts.Length == 0 ? RatingUnavailableText : string.Join(" · ", parts);
     }
 
     private void NavigateBackToSeries()
@@ -415,7 +476,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         SeasonNumberText = "-";
         AirDateText = "-";
         GenreDisplay = "未提供";
-        RatingDisplay = "评分将在后续阶段接入";
+        _tmdbRatingDisplay = SeasonRatingUnavailableText;
+        _imdbRatingDisplay = string.Empty;
+        RatingDisplay = RatingUnavailableText;
         SourceSummary = "暂无播放源";
         ProgressText = "已看 0 / 0";
         InLibraryText = "已入库 0 集";

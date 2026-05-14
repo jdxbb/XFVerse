@@ -254,3 +254,160 @@ Validation fixes applied before Phase 4.7:
 17. Watch Insights and recommendation fingerprint do not include TV data.
 18. Existing Movie state and Movie batch behavior remain separate.
 19. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.7 - TV Main Experience Closeout
+
+Phase adjustment:
+
+- Original TV search / ranking work moves from Phase 4.7 to Phase 4.8.
+- Original full Phase 4 regression and documentation closeout moves from Phase 4.8 to Phase 4.9.
+
+Implemented scope:
+
+- `TvSeasonDetailPage` now displays rating text from non-persistent metadata reads.
+- Season detail metadata renders first; rating uses an independent loading path so only the rating area shows loading / unavailable text.
+- TMDB Season rating uses the TV scan / identification Season detail metadata cache path.
+- TMDB Season rating is labeled `TMDB 季评分` and includes vote count when TMDB supplies it.
+- Series-level IMDb rating is requested after opening Season detail and labeled `IMDb 剧集评分`; no Season-level IMDb rating is fabricated from OMDb Season audit responses.
+- Missing Season rating data displays `暂无评分` / `暂无季评分` without blocking Season state buttons.
+- Media-library mixed Movie + Season batch selection now supports watched, unwatched, remove from library, and delete record.
+- Mixed batch watched / unwatched dispatches Movie items through existing Movie services and Season items through Season whole-season state services.
+- Mixed batch remove / delete record dispatches Movie and Season items through their own service branches and never deletes physical local or WebDAV files.
+- The batch toolbar still excludes favorite, want-to-watch, and not-interested.
+- Series and Episode remain outside batch-operation semantics.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.7 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. `TvSeasonDetailPage` shows `TMDB 季评分` when TMDB Season rating data is available.
+4. Series-level IMDb data is labeled `IMDb 剧集评分`, not Season IMDb.
+5. Missing rating data shows `暂无评分` or `暂无季评分` and does not crash.
+6. Rating display does not affect Season state buttons.
+7. Media-library batch mode can select Movie and Season items together.
+8. Mixed batch watched succeeds.
+9. Mixed batch unwatched succeeds.
+10. Mixed batch remove from library succeeds.
+11. Mixed batch delete record succeeds.
+12. Movie items keep existing Movie rules.
+13. Season items keep Season rules and use TMDB total Episode count.
+14. Season batch watched / unwatched does not create `WatchHistory`.
+15. Batch toolbar still excludes favorite, want-to-watch, and not-interested.
+16. Series and Episode do not participate as batch units.
+17. Movie-only batch and Season-only batch remain valid.
+18. Watch Insights and recommendation fingerprint do not include TV data.
+19. TV does not enter AI recommendations.
+20. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.8 - TV Discovery Search And Rankings
+
+Phase adjustment:
+
+- Original TV search / ranking work is now Phase 4.8.
+- Full Phase 4 regression and documentation closeout remains Phase 4.9.
+
+Implemented scope:
+
+- Movie discovery still exposes three top-level tabs only: movie search, rankings, and AI recommendations.
+- Search tab now has a Movie / TV second-level selector.
+- Movie search keeps the existing movie search and person search behavior.
+- TV search calls TMDB TV search and uses dedicated `DiscoveryTvSeriesCardViewModel` data, not `DiscoveryMovieCardViewModel`.
+- TV search results display Series cards with title, original name, first-air year, TV genres, overview, TMDB Series rating, poster, library state, and Season state summary when available.
+- Ranking tab now has a Movie / TV second-level selector.
+- Movie ranking behavior is unchanged.
+- TV rankings call TMDB TV popular, top-rated, trending day, and trending week and keep the 200-item display cap.
+- TV ranking results display Series cards with rank and do not fabricate Season rankings.
+- TV status merge is read-only and resolves `TvSeries` / Season collection summary by TMDB Series ID.
+- In-library TV Series navigate to `SeriesOverviewPage`.
+- Not-in-library TV Series show a placeholder message for future TV external details and do not navigate to Movie detail or convert to `AiRecommendationItem`.
+- TV discovery posters use the existing poster cache image behavior.
+- TV discovery remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.8 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. Movie discovery still has exactly three top-level tabs.
+4. Search tab has Movie / TV second-level switching.
+5. Default movie search remains unchanged.
+6. Movie title search remains unchanged.
+7. Movie person search remains unchanged.
+8. TV search can query Series such as Breaking Bad / 绝命毒师.
+9. TV search results display Series cards.
+10. TV search posters use the existing poster cache behavior.
+11. In-library Series clicks navigate to `SeriesOverviewPage`.
+12. Not-in-library Series do not navigate to Movie detail and are not converted to `AiRecommendationItem`.
+13. Ranking tab has Movie / TV second-level switching.
+14. Default movie rankings remain unchanged.
+15. TV popular ranking can load.
+16. TV top-rated ranking can load.
+17. TV trending day can load.
+18. TV trending week can load.
+19. TV ranking cards show Series and rank.
+20. TV ranking does not fabricate Season rankings.
+21. TV rating copy is TMDB Series-oriented and never says OMDb rating.
+22. AI recommendation tab does not include TV.
+23. Watch Insights remains Movie-only.
+24. Recommendation fingerprint remains Movie-only.
+25. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.8 Bugfix - TV Discovery Parity Fixes
+
+Scope:
+
+- Kept the work inside the Movie Discovery page and did not start the later TV feature-gap audit.
+- TV ranking layout now mirrors Movie ranking: page 1 shows rank 1 as a full-width large card and ranks 2-21 as two-column rows; later pages show 20 two-column entries.
+- TV ranking page commands are disabled while loading, and request failures restore page command state with a user-facing status message.
+- TV search now has a Movie-style basic filter panel for TV genre, region, library / Season state summary, sort direction, sort key, first-air decade, and language.
+- TV genre filtering uses the TV genre mapper, not the Movie genre list.
+- TV search and TV ranking cards load total Season count from TMDB Series detail with limited concurrency and display `共 N 季`, `季数加载中`, or `季数未知`.
+- TV discovery copy now mentions TV search while keeping Movie person search scoped to Movie mode.
+- TV search / ranking posters continue to use the existing poster cache image behavior.
+- TV ranking remains Series-level; no Season ranking or Episode result is fabricated.
+- Not-in-library TV Series still show the deferred TV external-detail prompt and never navigate to Movie detail.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+- Did not add a migration.
+- Did not execute database update.
+
+Phase-outside items recorded only:
+
+- Not-in-library TV detail page.
+- Full Series / Season metadata completion for all Seasons.
+- Showing source-less Seasons in library entry points.
+- TV correction entry points and cross-type correction UI.
+- Full TV feature-gap audit and stage reorder.
+
+## Phase 4.8 Bugfix Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. Movie discovery still has exactly three top-level tabs.
+4. Movie search remains unchanged.
+5. Movie person search remains unchanged.
+6. Movie search filters remain unchanged.
+7. TV search has a basic filter panel.
+8. TV type filtering uses TV genres, not Movie genres.
+9. TV search can query Series such as Breaking Bad / 绝命毒师.
+10. TV search cards show total Season count when TMDB detail is available.
+11. TV search cards show in-library Season count when local status is available.
+12. TV search filters update the result pool and pagination.
+13. Movie rankings remain unchanged.
+14. TV popular ranking uses the large rank-1 card and two-column rows.
+15. TV top-rated ranking uses the large rank-1 card and two-column rows.
+16. TV trending day uses the large rank-1 card and two-column rows.
+17. TV trending week uses the large rank-1 card and two-column rows.
+18. TV ranking page 1 displays 21 entries and later pages display 20 entries.
+19. TV ranking page buttons are disabled while loading.
+20. TV ranking failure restores page command state and shows an error message.
+21. TV rankings do not display Episodes.
+22. TV rankings do not fabricate Season rankings.
+23. TV search / ranking posters use the existing poster cache behavior.
+24. Not-in-library TV Series still use the deferred-detail prompt.
+25. AI recommendation tab does not include TV.
+26. Watch Insights remains Movie-only.
+27. Documents and reports do not include secrets or private media locations.

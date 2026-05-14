@@ -3,11 +3,21 @@ using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace MediaLibrary.Core.Services.Implementations;
 
 public sealed class TvDetailQueryService : ITvDetailQueryService
 {
+    private readonly ITmdbService _tmdbService;
+    private readonly IOmdbService _omdbService;
+
+    public TvDetailQueryService(ITmdbService tmdbService, IOmdbService omdbService)
+    {
+        _tmdbService = tmdbService;
+        _omdbService = omdbService;
+    }
+
     public async Task<TvSeriesOverviewModel?> GetSeriesOverviewAsync(
         int seriesId,
         CancellationToken cancellationToken = default)
@@ -289,6 +299,56 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         };
     }
 
+    public async Task<string> GetSeasonTmdbRatingDisplayAsync(
+        int seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        var season = await LoadSeasonRatingKeyAsync(seasonId, cancellationToken);
+
+        if (season is null)
+        {
+            return "暂无季评分";
+        }
+
+        try
+        {
+            return await BuildSeasonTmdbRatingDisplayAsync(season.SeriesTmdbId, season.SeasonNumber, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return "暂无季评分";
+        }
+    }
+
+    public async Task<string> GetSeasonImdbSeriesRatingDisplayAsync(
+        int seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        var season = await LoadSeasonRatingKeyAsync(seasonId, cancellationToken);
+
+        if (season is null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return await BuildSeriesImdbRatingDisplayAsync(season.SeriesTmdbId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     private static async Task<IReadOnlyList<SourceRow>> LoadSourceRowsAsync(
         AppDbContext dbContext,
         IReadOnlyCollection<int> episodeIds,
@@ -320,10 +380,78 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
     }
 
+    private static async Task<SeasonRatingKey?> LoadSeasonRatingKeyAsync(
+        int seasonId,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        return await dbContext.TvSeasons
+            .AsNoTracking()
+            .Where(x => x.Id == seasonId)
+            .Select(x => new SeasonRatingKey(x.Series!.TmdbSeriesId, x.SeasonNumber))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<string> BuildSeasonTmdbRatingDisplayAsync(
+        int? seriesTmdbId,
+        int seasonNumber,
+        CancellationToken cancellationToken)
+    {
+        if (seriesTmdbId is not > 0 || seasonNumber < 0)
+        {
+            return "暂无季评分";
+        }
+
+        var seasonDetails = await _tmdbService.GetTvSeasonDetailsAsync(
+            seriesTmdbId.Value,
+            seasonNumber,
+            cancellationToken: cancellationToken);
+        if (seasonDetails?.TmdbRating is > 0)
+        {
+            return FormatRating("TMDB 季评分", seasonDetails.TmdbRating.Value, 10d, seasonDetails.TmdbVoteCount);
+        }
+
+        return "暂无季评分";
+    }
+
+    private async Task<string> BuildSeriesImdbRatingDisplayAsync(
+        int? seriesTmdbId,
+        CancellationToken cancellationToken)
+    {
+        if (seriesTmdbId is not > 0)
+        {
+            return string.Empty;
+        }
+
+        var externalIds = await _tmdbService.GetTvSeriesExternalIdsAsync(seriesTmdbId.Value, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(externalIds?.ImdbId))
+        {
+            var seriesRating = await _omdbService.GetSeriesRatingAsync(externalIds.ImdbId, cancellationToken);
+            if (seriesRating is not null && seriesRating.ScoreValue > 0)
+            {
+                return FormatRating("IMDb 剧集评分", seriesRating.ScoreValue, seriesRating.ScoreScale, seriesRating.VoteCount);
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static string FormatRating(string label, double scoreValue, double scoreScale, int? voteCount)
+    {
+        var safeScale = scoreScale > 0 ? scoreScale : 10d;
+        var text = $"{label} {scoreValue:0.0} / {safeScale:0.#}";
+        return voteCount is > 0
+            ? $"{text}（{voteCount.Value.ToString("N0", CultureInfo.CurrentCulture)} 票）"
+            : text;
+    }
+
     private sealed class SourceRow
     {
         public int EpisodeId { get; set; }
 
         public ProtocolType ProtocolType { get; set; }
     }
+
+    private sealed record SeasonRatingKey(int? SeriesTmdbId, int SeasonNumber);
 }
