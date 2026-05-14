@@ -1,0 +1,239 @@
+<UserControl x:Class="MediaLibrary.App.Views.Pages.TvSeasonDetailPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource PageCardStyle}">
+                <Grid Height="320">
+                    <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="18">
+                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}" Stretch="UniformToFill" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource HeroCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="180" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeriesName}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   FontSize="32"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource BrushForegroundPrimary}"
+                                   Text="{Binding Name}" />
+
+                        <WrapPanel Margin="0,18,0,0">
+                            <Border Margin="0,0,10,10"
+                                    Padding="10,6"
+                                    Background="{DynamicResource BrushAccent}"
+                                    CornerRadius="999">
+                                <TextBlock FontWeight="SemiBold"
+                                           Foreground="{DynamicResource BrushOnAccent}"
+                                           Text="{Binding SeasonNumberText}" />
+                            </Border>
+                            <Border Margin="0,0,10,10"
+                                    Padding="10,6"
+                                    Background="{DynamicResource BrushSurface}"
+                                    CornerRadius="999">
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding IdentificationStatusText}" />
+                            </Border>
+                            <Border Margin="0,0,10,10"
+                                    Padding="10,6"
+                                    Background="{DynamicResource BrushSurface}"
+                                    CornerRadius="999">
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding AirDateText}" />
+                            </Border>
+                            <Border Margin="0,0,10,10"
+                                    Padding="10,6"
+                                    Background="{DynamicResource BrushSurface}"
+                                    CornerRadius="999">
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding SourceSummary}" />
+                            </Border>
+                        </WrapPanel>
+
+                        <TextBlock Margin="0,6,0,0"
+                                   Style="{StaticResource BodyTextStyle}"
+                                   Text="{Binding GenreDisplay}" />
+                        <TextBlock Margin="0,14,0,0"
+                                   MaxHeight="105"
+                                   Style="{StaticResource BodyTextStyle}"
+                                   Text="{Binding Overview}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Margin="0,14,0,0"
+                                   Style="{StaticResource BodyMutedTextStyle}"
+                                   Text="{Binding StatusMessage}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <Button Command="{Binding NavigateBackToSeriesCommand}"
+                                Content="返回剧页"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+
+                        <Border Margin="0,14,0,0" Style="{StaticResource CompactCardStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding ProgressText}" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Style="{StaticResource BodyMutedTextStyle}"
+                                           Text="{Binding InLibraryText}" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Style="{StaticResource BodyMutedTextStyle}"
+                                           Text="{Binding RatingDisplay}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource PageCardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border Padding="14"
+                        Background="{DynamicResource BrushSurfaceAlt}"
+                        CornerRadius="16">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsUnidentified}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="未识别电视剧季" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Style="{StaticResource BodyTextStyle}"
+                                   Text="{Binding UnidentifiedSummary}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Style="{StaticResource BodyMutedTextStyle}"
+                                   Text="修正入口后续接入。" />
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer Grid.Row="2"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ListBox ItemsSource="{Binding Episodes}"
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                             Style="{StaticResource SectionListBoxStyle}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="170" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Width="52"
+                                            Height="52"
+                                            Background="{DynamicResource BrushSurfaceAlt}"
+                                            CornerRadius="14">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource BrushForegroundPrimary}"
+                                                   Text="{Binding EpisodeNumberText}" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" Margin="0,0,18,0">
+                                        <WrapPanel>
+                                            <TextBlock VerticalAlignment="Center"
+                                                       Style="{StaticResource SectionTitleTextStyle}"
+                                                       Text="{Binding Name}" />
+                                            <Border Margin="10,0,0,0"
+                                                    Padding="8,4"
+                                                    Background="{DynamicResource BrushSurface}"
+                                                    CornerRadius="999">
+                                                <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding WatchedText}" />
+                                            </Border>
+                                            <Border Margin="10,0,0,0"
+                                                    Padding="8,4"
+                                                    Background="{DynamicResource BrushSurface}"
+                                                    CornerRadius="999">
+                                                <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SourceSummary}" />
+                                            </Border>
+                                        </WrapPanel>
+                                        <TextBlock Margin="0,7,0,0"
+                                                   MaxHeight="56"
+                                                   Style="{StaticResource BodyTextStyle}"
+                                                   Text="{Binding Overview}"
+                                                   TextWrapping="Wrap" />
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <TextBlock Margin="0,0,16,0"
+                                                       Style="{StaticResource BodyMutedTextStyle}"
+                                                       Text="{Binding RuntimeText, StringFormat=时长：{0}}" />
+                                            <TextBlock Margin="0,0,16,0"
+                                                       Style="{StaticResource BodyMutedTextStyle}"
+                                                       Text="{Binding ProgressText}" />
+                                            <TextBlock Margin="0,0,16,0"
+                                                       Style="{StaticResource BodyMutedTextStyle}"
+                                                       Text="{Binding LastPlayedText, StringFormat=最近播放：{0}}" />
+                                            <TextBlock Margin="0,0,16,0"
+                                                       Style="{StaticResource BodyMutedTextStyle}"
+                                                       Text="{Binding ActiveSourceCount, StringFormat=播放源：{0}}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Command="{Binding DataContext.PlayEpisodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Content="{Binding PlayButtonText}"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </ScrollViewer>
+
+                <Border Grid.Row="2"
+                        Padding="16"
+                        Background="{DynamicResource BrushSurfaceAlt}"
+                        CornerRadius="16">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasNoEpisodes}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Style="{StaticResource BodyTextStyle}"
+                               Text="暂无已解析集。"
+                               TextWrapping="Wrap" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

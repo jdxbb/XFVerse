@@ -168,7 +168,7 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
     public async Task<IReadOnlyList<HomeMovieItem>> GetRecentlyPlayedAsync(CancellationToken cancellationToken = default)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
-        var recentHistoryRows = await dbContext.WatchHistories
+        var movieHistoryRows = await dbContext.WatchHistories
             .AsNoTracking()
             .Where(x => x.Movie != null && x.MediaFile != null)
             .OrderByDescending(x => x.EndedAt ?? x.StartedAt)
@@ -190,9 +190,44 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
                     IsDeleted = x.MediaFile.IsDeleted
                 })
             .ToListAsync(cancellationToken);
+        var episodeHistoryRows = await dbContext.WatchHistories
+            .AsNoTracking()
+            .Where(x => x.Episode != null && x.MediaFile != null)
+            .OrderByDescending(x => x.EndedAt ?? x.StartedAt)
+            .Take(30)
+            .Select(
+                x => new RecentHistoryRow
+                {
+                    MovieId = 0,
+                    EpisodeId = x.EpisodeId,
+                    TvSeasonId = x.Episode!.TvSeasonId,
+                    TvSeriesId = x.Episode.Season!.TvSeriesId,
+                    SeasonNumber = x.Episode.Season.SeasonNumber,
+                    EpisodeNumber = x.Episode.EpisodeNumber,
+                    MediaFileId = x.MediaFileId,
+                    Title = x.Episode.Season.Series!.Name + " S" + x.Episode.Season.SeasonNumber.ToString("D2")
+                            + "E" + x.Episode.EpisodeNumber.ToString("D2")
+                            + (string.IsNullOrWhiteSpace(x.Episode.Title) ? string.Empty : " " + x.Episode.Title),
+                    ReleaseYear = x.Episode.AirDate.HasValue
+                        ? x.Episode.AirDate.Value.Year
+                        : x.Episode.Season.AirDate.HasValue
+                            ? x.Episode.Season.AirDate.Value.Year
+                            : x.Episode.Season.Series.FirstAirYear,
+                    PosterRemoteUrl = x.Episode.Season.PosterRemoteUrl ?? x.Episode.Season.Series.PosterRemoteUrl ?? string.Empty,
+                    GenresText = x.Episode.Season.Series.GenresText ?? string.Empty,
+                    Time = x.EndedAt ?? x.StartedAt,
+                    LastPlayPositionSeconds = x.LastPlayPositionSeconds,
+                    DurationSeconds = x.MediaFile!.DurationSeconds,
+                    RuntimeMinutes = x.Episode.RuntimeMinutes,
+                    IsCompleted = x.IsCompleted,
+                    IsDeleted = x.MediaFile.IsDeleted
+                })
+            .ToListAsync(cancellationToken);
 
-        return recentHistoryRows
-            .GroupBy(x => x.MovieId)
+        return movieHistoryRows
+            .Concat(episodeHistoryRows)
+            .OrderByDescending(x => x.Time)
+            .GroupBy(x => x.EpisodeId.HasValue ? $"episode:{x.EpisodeId.Value}" : $"movie:{x.MovieId}", StringComparer.OrdinalIgnoreCase)
             .Take(6)
             .Select(BuildRecentlyPlayedItem)
             .ToList();
@@ -294,7 +329,7 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
     }
 
     private static HomeMovieItem BuildRecentlyPlayedItem(
-        IGrouping<int, RecentHistoryRow> group)
+        IGrouping<string, RecentHistoryRow> group)
     {
         var latest = group.First();
         int? runtimeDurationSeconds = latest.RuntimeMinutes.HasValue
@@ -320,6 +355,11 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
             new HomeMovieItem
             {
                 MovieId = latest.MovieId,
+                EpisodeId = latest.EpisodeId,
+                TvSeasonId = latest.TvSeasonId,
+                TvSeriesId = latest.TvSeriesId,
+                SeasonNumber = latest.SeasonNumber,
+                EpisodeNumber = latest.EpisodeNumber,
                 MediaFileId = latest.MediaFileId,
                 Title = latest.Title,
                 ReleaseYear = latest.ReleaseYear,
@@ -447,6 +487,16 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
     private sealed class RecentHistoryRow
     {
         public int MovieId { get; set; }
+
+        public int? EpisodeId { get; set; }
+
+        public int? TvSeasonId { get; set; }
+
+        public int? TvSeriesId { get; set; }
+
+        public int SeasonNumber { get; set; }
+
+        public int EpisodeNumber { get; set; }
 
         public int MediaFileId { get; set; }
 

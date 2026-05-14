@@ -8,6 +8,16 @@ public sealed class WatchHistoryListItem
 
     public int MovieId { get; set; }
 
+    public int? EpisodeId { get; set; }
+
+    public int? TvSeasonId { get; set; }
+
+    public int? TvSeriesId { get; set; }
+
+    public int SeasonNumber { get; set; }
+
+    public int EpisodeNumber { get; set; }
+
     public int MediaFileId { get; set; }
 
     public int? TmdbId { get; set; }
@@ -37,4 +47,6 @@ public sealed class WatchHistoryListItem
     public IdentificationStatus IdentificationStatus { get; set; }
 
     public double? ProgressPercent { get; set; }
+
+    public bool IsEpisode => EpisodeId.HasValue;
 }

@@ -135,3 +135,157 @@ Correction moves only the selected media source. It does not migrate watched sta
 - `EpisodeMediaFile`
 - Unified Unknown / UnidentifiedMedia table
 - `TvSeasonRatingSources`
+
+## Phase 4.4 Goal
+
+Phase 4.4 adds hidden TV detail routes and visible pages for data already created by TV scanning:
+
+- `SeriesOverviewPage` for Series packaging and Season list display.
+- `TvSeasonDetailPage` for Season metadata, aggregate progress, source summary, and Episode list display.
+
+Series remains a packaging layer and does not expose favorite, want-to-watch, not-interested, or watched actions. Season remains the core management unit, but Phase 4.4 does not add Season collection actions yet. Episode remains the playback unit, but Phase 4.4 only shows play placeholders; real Episode playback is deferred to Phase 4.5.
+
+## Phase 4.4 Navigation
+
+The app adds hidden routes:
+
+- `SeriesOverview`
+- `TvSeasonDetail`
+
+These routes do not appear in the fixed main navigation. They are activated through navigation state IDs and will get natural media-library entry points in Phase 4.6.
+
+## Phase 4.4 Query Rules
+
+- Series poster fallback uses Series poster first, then the latest Season poster.
+- Season total episode count uses TMDB total first and falls back to known `TvEpisode` count.
+- Watched progress counts `TvEpisode.IsWatched`.
+- In-library count requires at least one active Episode `MediaFile`.
+- Source summary is aggregated from active Episode sources as local, cloud, local + cloud, or no source.
+- Unidentified seasons display `未识别电视剧季` and do not pretend to have TMDB metadata.
+
+## Phase 4.4 Out Of Scope
+
+- Episode playback
+- Previous / next episode controls
+- Auto-next
+- Home continue watching Episode UI
+- Watch history Episode UI
+- Full media-library Series cards
+- Batch mode Season expansion
+- Favorites Season integration
+- TV discovery UI
+- AI recommendations
+- Watch Insights
+- Database migrations
+
+## Phase 4.5 Goal
+
+Phase 4.5 connects `TvEpisode` to the existing player. Episode playback reuses the same player window, playback engine, WebDAV handling, local-file handling, subtitles, video cache, and `MediaFile` source model as movie playback.
+
+Phase 4.5 still does not add media-library Series cards, home continue-watching Episode UI, watch-history Episode UI, Season favorites, TV discovery UI, recommendations, Watch Insights, user profiles, fingerprints, or database migrations.
+
+## Phase 4.5 Playback Rules
+
+- Movie playback keeps the existing `OpenAsync(movieId, mediaFileId)` path.
+- Episode playback uses a dedicated Episode entry point and never pretends an Episode is a Movie.
+- If a media file is explicitly selected, it is used only when it belongs to the target Episode and is active.
+- Without an explicit source, active Local sources are selected before active WebDAV sources.
+- Local Episode sources play directly from the local file and do not enter the WebDAV video cache.
+- WebDAV Episode sources reuse the existing WebDAV playback and video-cache path.
+- Subtitle binding remains `MediaFile` based.
+
+## Phase 4.5 Previous / Next And Auto-Next
+
+- Movie sessions disable previous / next Episode controls.
+- Episode sessions calculate previous / next only inside the same `TvSeason`.
+- Navigation uses adjacent `EpisodeNumber - 1` and `EpisodeNumber + 1`.
+- The first Episode disables previous.
+- The last Episode disables next.
+- Auto-next runs only after the current Episode progress and history have been saved.
+- Auto-next never crosses Season boundaries.
+- If the next Episode is missing or has no active source, playback stops and shows a friendly notice.
+
+## Phase 4.5 Watch History And Episode Summary
+
+- Episode playback writes `WatchHistory.EpisodeId` with `MovieId` left empty.
+- Movie playback continues to write `WatchHistory.MovieId`.
+- `TvEpisode` stores the lightweight playback summary:
+  - `IsWatched`
+  - `LastPlayedAt`
+  - `LastPlayPositionSeconds`
+  - `DurationWatchedSeconds`
+- Season progress remains derived from Episode rows.
+- Watch Insights, AI recommendation inputs, profile inputs, personality inputs, and recommendation fingerprints remain Movie-only.
+
+## Phase 4.5 Out Of Scope
+
+- Media-library Series cards
+- Batch mode Season expansion
+- Season collection and favorites integration
+- Home continue-watching Episode UI
+- Watch-history Episode UI
+- TV discovery UI
+- Cross-season auto-next
+- Online subtitle search
+- Database migrations
+- `EpisodeMediaFile`
+- Unified Unknown / UnidentifiedMedia table
+- `TvSeasonRatingSources`
+
+## Phase 4.6 Goal
+
+Phase 4.6 exposes TV Seasons in the main user experience while keeping Series, Season, and Episode responsibilities separate.
+
+- Normal media-library mode shows Series aggregate cards.
+- Batch media-library mode expands Series into Season cards.
+- Season is the stateful collection and batch-operation unit.
+- Episode appears in continue watching and watch history as the playback unit.
+- Favorites show Season cards only, not Series or Episode cards.
+
+Phase 4.6 still does not add TV discovery search / rankings, AI recommendations, Watch Insights TV statistics, user profile inputs, personality inputs, recommendation fingerprints, database migrations, `EpisodeMediaFile`, Unknown tables, or `TvSeasonRatingSources`.
+
+## Phase 4.6 Library Rules
+
+- Movie items remain Movie items.
+- Series items are not disguised as Movies and navigate to `SeriesOverviewPage`.
+- Episode items do not appear as first-level library cards.
+- Entering batch mode reloads TV cards as Season items.
+- Batch operations act on Movie or Season items. Mixed Movie + Season selections are rejected in the MVP to avoid unclear cross-type semantics.
+- Content type filtering supports all, Movie, and TV.
+- Source filtering for Series / Season aggregates active Episode `MediaFile` sources.
+
+## Phase 4.6 Season State Rules
+
+- Season favorite, want-to-watch, and not-interested state is stored in `UserTvSeasonCollectionItem`.
+- State changes are recorded in `UserTvSeasonStateChangeHistory`.
+- Batch watched / unwatched updates only Episodes with active in-library sources.
+- Batch watched / unwatched does not create `WatchHistory`.
+- Season progress stays derived from Episode rows.
+
+## Phase 4.6 Home, History And Favorites
+
+- Home continue watching can show Episode entries with Series / Season / Episode text and resume playback through `OpenEpisodeAsync`.
+- Watch history includes Episode entries with `WatchHistory.EpisodeId` and navigates to `TvSeasonDetailPage`.
+- Favorites merge Movie cards with Season cards in favorite and want-to-watch tabs.
+- Favorites do not display Series cards or Episode cards.
+- TV remains excluded from AI, Watch Insights, profiles, personalities, and recommendation fingerprints.
+
+## Phase 4.6 Delete / Remove Policy
+
+- Remove Season marks Episode media files as removed in software only.
+- Delete Season record removes software records only and mirrors the existing Movie record deletion class of behavior.
+- Local files and WebDAV files are never deleted.
+
+## Phase 4.6 Out Of Scope
+
+- TV discovery search / ranking UI
+- AI recommendations for TV
+- Watch Insights TV statistics
+- Final UI polish
+- Complex anime season models
+- Multi-episode file expansion
+- Online subtitle search
+- Database migrations
+- `EpisodeMediaFile`
+- Unified Unknown / UnidentifiedMedia table
+- `TvSeasonRatingSources`

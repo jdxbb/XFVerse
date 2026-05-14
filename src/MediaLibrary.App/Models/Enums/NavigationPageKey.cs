@@ -11,5 +11,7 @@ public enum NavigationPageKey
     Favorites = 8,
     Settings = 9,
     MovieDiscovery = 10,
-    WatchHistory = 11
+    WatchHistory = 11,
+    SeriesOverview = 12,
+    TvSeasonDetail = 13
 }

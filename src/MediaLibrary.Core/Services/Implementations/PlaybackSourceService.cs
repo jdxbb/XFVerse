@@ -73,6 +73,7 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
         {
             return new PlaybackSessionModel
             {
+                ContentType = PlaybackContentType.Movie,
                 MovieId = movie.Id,
                 MovieTitle = movie.Title,
                 DefaultMediaFileId = movie.DefaultMediaFileId
@@ -104,7 +105,7 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
             x => ResolveSourceSpecificResume(
                 historyRows.Where(history => history.MediaFileId == x.Id),
                 x.DurationSeconds));
-        var unifiedResume = ResolveUnifiedResume(movieId, historyRows, sourceDurations);
+        var unifiedResume = ResolveUnifiedResume("movieId", movieId, historyRows, sourceDurations);
         var projectedResumePositions = new Dictionary<int, int>();
         var projectedLastPlayedAt = new Dictionary<int, DateTime?>();
         foreach (var sourceRow in sourceRows)
@@ -265,12 +266,335 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
 
         return new PlaybackSessionModel
         {
+            ContentType = PlaybackContentType.Movie,
             MovieId = movie.Id,
             MovieTitle = movie.Title,
             DefaultMediaFileId = effectiveDefaultMediaFileId,
             SelectedMediaFileId = selectedMediaFileId,
             Sources = sources
         };
+    }
+
+    public async Task<PlaybackSessionModel?> GetEpisodePlaybackSessionAsync(
+        int episodeId,
+        int? preferredMediaFileId = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var episode = await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => x.Id == episodeId)
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.TvSeasonId,
+                    x.EpisodeNumber,
+                    x.Title,
+                    SeasonNumber = x.Season!.SeasonNumber,
+                    SeasonTitle = x.Season.Name,
+                    SeriesId = x.Season.Series!.Id,
+                    SeriesTitle = x.Season.Series.Name
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (episode is null)
+        {
+            return null;
+        }
+
+        var previousEpisode = await LoadAdjacentEpisodeAsync(
+            dbContext,
+            episode.TvSeasonId,
+            episode.EpisodeNumber - 1,
+            cancellationToken);
+        var nextEpisode = await LoadAdjacentEpisodeAsync(
+            dbContext,
+            episode.TvSeasonId,
+            episode.EpisodeNumber + 1,
+            cancellationToken);
+
+        var sourceRows = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Include(x => x.SourceConnection)
+            .Where(x => x.EpisodeId == episodeId && x.MediaType == MediaType.Video && !x.IsDeleted)
+            .OrderBy(x => x.SourceConnection!.ProtocolType == ProtocolType.Local ? 0 : 1)
+            .ThenBy(x => x.FileName)
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.SourceConnectionId,
+                    x.FileName,
+                    x.FilePath,
+                    x.RemoteUri,
+                    x.Extension,
+                    x.FileSize,
+                    x.LastModifiedAt,
+                    x.DurationSeconds,
+                    x.ResolutionWidth,
+                    x.ResolutionHeight,
+                    x.VideoCodec,
+                    x.AudioCodec,
+                    x.AudioChannels,
+                    x.AudioSampleRate,
+                    x.OverallBitrateKbps,
+                    x.VideoBitrateKbps,
+                    x.AudioBitrateKbps,
+                    x.MediaProbeStatus,
+                    x.MediaProbeError,
+                    x.MediaProbedAt,
+                    x.SourceConnection!.BaseUrl,
+                    x.SourceConnection.Username,
+                    x.SourceConnection.PasswordEncrypted,
+                    x.SourceConnection.ProtocolType
+                })
+            .ToListAsync(cancellationToken);
+
+        if (sourceRows.Count == 0)
+        {
+            return new PlaybackSessionModel
+            {
+                ContentType = PlaybackContentType.Episode,
+                EpisodeId = episode.Id,
+                TvSeasonId = episode.TvSeasonId,
+                TvSeriesId = episode.SeriesId,
+                SeasonNumber = episode.SeasonNumber,
+                EpisodeNumber = episode.EpisodeNumber,
+                SeriesTitle = episode.SeriesTitle,
+                SeasonTitle = episode.SeasonTitle,
+                EpisodeTitle = episode.Title,
+                PreviousEpisode = previousEpisode,
+                NextEpisode = nextEpisode
+            };
+        }
+
+        var sourceIds = sourceRows.Select(x => x.Id).ToArray();
+        var historyRows = await dbContext.WatchHistories
+            .AsNoTracking()
+            .Where(x => x.EpisodeId == episodeId && sourceIds.Contains(x.MediaFileId))
+            .OrderByDescending(x => x.EndedAt ?? x.StartedAt)
+            .Select(
+                x => new WatchHistoryProjection
+                {
+                    MediaFileId = x.MediaFileId,
+                    LastPlayPositionSeconds = x.LastPlayPositionSeconds,
+                    IsCompleted = x.IsCompleted,
+                    StartedAt = x.StartedAt,
+                    EndedAt = x.EndedAt
+                })
+            .ToListAsync(cancellationToken);
+
+        var latestHistory = historyRows
+            .GroupBy(x => x.MediaFileId)
+            .ToDictionary(x => x.Key, x => x.First());
+        var sourceDurations = sourceRows.ToDictionary(x => x.Id, x => x.DurationSeconds);
+        var sourceSpecificResumePositions = sourceRows.ToDictionary(
+            x => x.Id,
+            x => ResolveSourceSpecificResume(
+                historyRows.Where(history => history.MediaFileId == x.Id),
+                x.DurationSeconds));
+        var unifiedResume = ResolveUnifiedResume("episodeId", episodeId, historyRows, sourceDurations);
+        var projectedResumePositions = new Dictionary<int, int>();
+        var projectedLastPlayedAt = new Dictionary<int, DateTime?>();
+        foreach (var sourceRow in sourceRows)
+        {
+            latestHistory.TryGetValue(sourceRow.Id, out var latest);
+            var sourceSpecificResume = sourceSpecificResumePositions.TryGetValue(sourceRow.Id, out var specificResume)
+                ? specificResume
+                : 0;
+            var projectedResume = sourceSpecificResume;
+            var projectedLastPlayed = latest?.LastPlayedAt;
+
+            if (unifiedResume.IsCompleted)
+            {
+                projectedResume = 0;
+                projectedLastPlayed = unifiedResume.LastPlayedAt ?? projectedLastPlayed;
+                LogWatchHistory(
+                    $"watch-history-unified-resume-completed episodeId={episodeId} fromMediaFileId={unifiedResume.MediaFileId} reason=latest-completed");
+            }
+            else if (unifiedResume.PositionSeconds > 0)
+            {
+                var skipReason = ResolveUnifiedResumeSkipReason(unifiedResume, sourceRow.Id, sourceRow.DurationSeconds);
+                if (skipReason is null)
+                {
+                    projectedResume = unifiedResume.PositionSeconds;
+                    projectedLastPlayed = unifiedResume.LastPlayedAt ?? projectedLastPlayed;
+                    LogWatchHistory(
+                        $"watch-history-unified-resume-applied targetMediaFileId={sourceRow.Id} resume={projectedResume}");
+                }
+                else
+                {
+                    LogWatchHistory(
+                        $"watch-history-unified-resume-skipped episodeId={episodeId} mediaFileId={sourceRow.Id} reason={skipReason}");
+                }
+            }
+            else if (sourceSpecificResume <= 0)
+            {
+                LogWatchHistory(
+                    $"watch-history-unified-resume-skipped episodeId={episodeId} mediaFileId={sourceRow.Id} reason=no-valid-history");
+            }
+
+            projectedResumePositions[sourceRow.Id] = projectedResume;
+            projectedLastPlayedAt[sourceRow.Id] = projectedLastPlayed;
+        }
+
+        var subtitleRows = await dbContext.SubtitleBindings
+            .AsNoTracking()
+            .Include(x => x.SubtitleMediaFile)
+            .ThenInclude(x => x!.SourceConnection)
+            .Where(x => sourceIds.Contains(x.MediaFileId)
+                        && x.SubtitleMediaFile != null
+                        && !x.SubtitleMediaFile.IsDeleted)
+            .OrderBy(x => x.Priority)
+            .Select(
+                x => new
+                {
+                    BindingId = x.Id,
+                    x.MediaFileId,
+                    x.SubtitleMediaFileId,
+                    x.SubtitleMediaFile!.FileName,
+                    x.SubtitleMediaFile.FilePath,
+                    x.SubtitleMediaFile.RemoteUri,
+                    SourceBaseUrl = x.SubtitleMediaFile.SourceConnection!.BaseUrl,
+                    SubtitleProtocolType = x.SubtitleMediaFile.SourceConnection!.ProtocolType,
+                    x.MatchType,
+                    x.IsAutoLoaded,
+                    x.Priority
+                })
+            .ToListAsync(cancellationToken);
+
+        var subtitlesBySource = subtitleRows
+            .GroupBy(x => x.MediaFileId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<PlaybackSubtitleItem>)group.Select(
+                        x => new PlaybackSubtitleItem
+                        {
+                            DisplayName = $"External: {x.FileName}",
+                            Type = PlaybackSubtitleType.ExternalFile,
+                            BindingId = x.BindingId,
+                            MediaFileId = x.SubtitleMediaFileId,
+                            SubtitleMediaFileId = x.SubtitleMediaFileId,
+                            FileName = x.FileName,
+                            FilePath = x.FilePath,
+                            PlaybackUrl = BuildPlaybackInput(
+                                x.SubtitleProtocolType,
+                                x.SourceBaseUrl,
+                                x.FilePath,
+                                x.RemoteUri),
+                            MatchType = x.MatchType,
+                            IsAuto = x.IsAutoLoaded,
+                            IsPreferred = x.IsAutoLoaded,
+                            IsAutoLoaded = x.IsAutoLoaded,
+                            Priority = x.Priority
+                        })
+                    .ToList());
+
+        var sources = sourceRows
+            .Select(
+                x =>
+                {
+                    projectedResumePositions.TryGetValue(x.Id, out var resumePosition);
+                    projectedLastPlayedAt.TryGetValue(x.Id, out var lastPlayedAt);
+                    subtitlesBySource.TryGetValue(x.Id, out var subtitles);
+
+                    return new PlaybackSourceItem
+                    {
+                        MediaFileId = x.Id,
+                        SourceConnectionId = x.SourceConnectionId,
+                        FileName = x.FileName,
+                        FilePath = x.FilePath,
+                        RemoteUri = x.RemoteUri,
+                        PlaybackUrl = BuildPlaybackInput(x.ProtocolType, x.BaseUrl, x.FilePath, x.RemoteUri),
+                        Extension = x.Extension,
+                        FileSize = x.FileSize,
+                        LastModifiedAt = x.LastModifiedAt,
+                        DurationSeconds = x.DurationSeconds,
+                        ResolutionWidth = x.ResolutionWidth,
+                        ResolutionHeight = x.ResolutionHeight,
+                        VideoCodec = x.VideoCodec,
+                        AudioCodec = x.AudioCodec,
+                        AudioChannels = x.AudioChannels,
+                        AudioSampleRate = x.AudioSampleRate,
+                        OverallBitrateKbps = x.OverallBitrateKbps,
+                        VideoBitrateKbps = x.VideoBitrateKbps,
+                        AudioBitrateKbps = x.AudioBitrateKbps,
+                        MediaProbeStatus = x.MediaProbeStatus,
+                        MediaProbeError = x.MediaProbeError,
+                        MediaProbedAt = x.MediaProbedAt,
+                        ProtocolType = x.ProtocolType,
+                        Username = x.ProtocolType == ProtocolType.WebDav ? x.Username : string.Empty,
+                        Password = x.ProtocolType == ProtocolType.WebDav
+                            ? SecretProtector.Unprotect(x.PasswordEncrypted)
+                            : string.Empty,
+                        ResumePositionSeconds = resumePosition,
+                        LastPlayedAt = lastPlayedAt,
+                        LastPlayPositionSeconds = resumePosition,
+                        Subtitles = subtitles ?? []
+                    };
+                })
+            .ToList();
+
+        var selectedMediaFileId = ResolveSelectedMediaFileId(
+            sources,
+            preferredMediaFileId,
+            movieDefaultMediaFileId: null);
+        foreach (var source in sources)
+        {
+            source.IsDefault = source.MediaFileId == selectedMediaFileId;
+        }
+
+        sources = sources
+            .OrderBy(x => x.MediaFileId == selectedMediaFileId ? 0 : 1)
+            .ThenBy(x => x.ProtocolType == ProtocolType.Local ? 0 : 1)
+            .ThenBy(x => x.FileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new PlaybackSessionModel
+        {
+            ContentType = PlaybackContentType.Episode,
+            EpisodeId = episode.Id,
+            TvSeasonId = episode.TvSeasonId,
+            TvSeriesId = episode.SeriesId,
+            SeasonNumber = episode.SeasonNumber,
+            EpisodeNumber = episode.EpisodeNumber,
+            SeriesTitle = episode.SeriesTitle,
+            SeasonTitle = episode.SeasonTitle,
+            EpisodeTitle = episode.Title,
+            DefaultMediaFileId = selectedMediaFileId,
+            SelectedMediaFileId = selectedMediaFileId,
+            Sources = sources,
+            PreviousEpisode = previousEpisode,
+            NextEpisode = nextEpisode
+        };
+    }
+
+    private static async Task<PlaybackEpisodeNavigationItem?> LoadAdjacentEpisodeAsync(
+        AppDbContext dbContext,
+        int seasonId,
+        int episodeNumber,
+        CancellationToken cancellationToken)
+    {
+        if (episodeNumber <= 0)
+        {
+            return null;
+        }
+
+        return await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => x.TvSeasonId == seasonId && x.EpisodeNumber == episodeNumber)
+            .Select(
+                x => new PlaybackEpisodeNavigationItem
+                {
+                    EpisodeId = x.Id,
+                    EpisodeNumber = x.EpisodeNumber,
+                    Title = x.Title,
+                    HasPlayableSource = x.MediaFiles.Any(
+                        mediaFile => mediaFile.MediaType == MediaType.Video && !mediaFile.IsDeleted)
+                })
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task SetPreferredSubtitleAsync(
@@ -403,7 +727,8 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
     }
 
     private static UnifiedResumeProjection ResolveUnifiedResume(
-        int movieId,
+        string contentLogKey,
+        int contentId,
         IReadOnlyCollection<WatchHistoryProjection> histories,
         IReadOnlyDictionary<int, int?> sourceDurations)
     {
@@ -427,19 +752,19 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                 || !historyDurationSeconds.HasValue)
             {
                 LogWatchHistory(
-                    $"watch-history-unified-resume-skipped movieId={movieId} mediaFileId={history.MediaFileId} reason=missing-duration");
+                    $"watch-history-unified-resume-skipped {contentLogKey}={contentId} mediaFileId={history.MediaFileId} reason=missing-duration");
                 continue;
             }
 
             if (IsNearOrPastEnding(history.LastPlayPositionSeconds, historyDurationSeconds.Value))
             {
                 LogWatchHistory(
-                    $"watch-history-unified-resume-skipped movieId={movieId} mediaFileId={history.MediaFileId} reason=invalid-position");
+                    $"watch-history-unified-resume-skipped {contentLogKey}={contentId} mediaFileId={history.MediaFileId} reason=invalid-position");
                 continue;
             }
 
             LogWatchHistory(
-                $"watch-history-unified-resume-selected movieId={movieId} resume={history.LastPlayPositionSeconds} fromMediaFileId={history.MediaFileId} reason=latest-compatible");
+                $"watch-history-unified-resume-selected {contentLogKey}={contentId} resume={history.LastPlayPositionSeconds} fromMediaFileId={history.MediaFileId} reason=latest-compatible");
             return UnifiedResumeProjection.Active(
                 history.MediaFileId,
                 history.LastPlayPositionSeconds,

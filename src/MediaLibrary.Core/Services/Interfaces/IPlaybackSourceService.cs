@@ -9,6 +9,11 @@ public interface IPlaybackSourceService
         int? preferredMediaFileId = null,
         CancellationToken cancellationToken = default);
 
+    Task<PlaybackSessionModel?> GetEpisodePlaybackSessionAsync(
+        int episodeId,
+        int? preferredMediaFileId = null,
+        CancellationToken cancellationToken = default);
+
     Task SetPreferredSubtitleAsync(
         int mediaFileId,
         int? subtitleMediaFileId,

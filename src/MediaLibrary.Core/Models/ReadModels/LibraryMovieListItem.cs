@@ -4,7 +4,23 @@ namespace MediaLibrary.Core.Models.ReadModels;
 
 public sealed class LibraryMovieListItem
 {
+    public LibraryMediaItemKind ItemKind { get; set; } = LibraryMediaItemKind.Movie;
+
     public int MovieId { get; set; }
+
+    public int SeriesId { get; set; }
+
+    public int SeasonId { get; set; }
+
+    public int SeasonNumber { get; set; }
+
+    public int SeasonCount { get; set; }
+
+    public int InLibraryEpisodeCount { get; set; }
+
+    public int WatchedEpisodeCount { get; set; }
+
+    public int TotalEpisodeCount { get; set; }
 
     public int? TmdbId { get; set; }
 
@@ -98,4 +114,26 @@ public sealed class LibraryMovieListItem
     public bool HasWatchHistory { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    public bool IsMovie => ItemKind == LibraryMediaItemKind.Movie;
+
+    public bool IsSeries => ItemKind == LibraryMediaItemKind.Series;
+
+    public bool IsSeason => ItemKind == LibraryMediaItemKind.Season;
+
+    public string MediaKindText => ItemKind switch
+    {
+        LibraryMediaItemKind.Series => "电视剧",
+        LibraryMediaItemKind.Season => "电视剧季",
+        _ => "电影"
+    };
+
+    public string ProgressSummary => ItemKind switch
+    {
+        LibraryMediaItemKind.Series => SeasonCount > 0
+            ? $"{SeasonCount} 季 · 已入库 {InLibraryEpisodeCount} 集"
+            : $"已入库 {InLibraryEpisodeCount} 集",
+        LibraryMediaItemKind.Season => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 已入库 {InLibraryEpisodeCount} 集",
+        _ => SourceSummary
+    };
 }

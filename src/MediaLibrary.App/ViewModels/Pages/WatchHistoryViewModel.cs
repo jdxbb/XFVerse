@@ -306,7 +306,18 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
 
     private void OpenMovie(object? parameter)
     {
-        if (parameter is WatchHistoryItemViewModel item && item.MovieId > 0)
+        if (parameter is not WatchHistoryItemViewModel item)
+        {
+            return;
+        }
+
+        if (item.EpisodeId.HasValue && item.TvSeasonId.HasValue)
+        {
+            _navigationStateService.RequestTvSeasonDetail(item.TvSeasonId.Value, item.EpisodeId);
+            return;
+        }
+
+        if (item.MovieId > 0)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, item.MovieId);
         }
@@ -340,6 +351,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         {
             HistoryId = item.HistoryId;
             MovieId = item.MovieId;
+            EpisodeId = item.EpisodeId;
+            TvSeasonId = item.TvSeasonId;
             Title = string.IsNullOrWhiteSpace(item.Title) ? "未知影片" : item.Title;
             ReleaseYearText = item.ReleaseYear.HasValue ? item.ReleaseYear.Value.ToString() : "年份未知";
             PosterRemoteUrl = item.PosterRemoteUrl;
@@ -351,12 +364,16 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             ProgressText = BuildProgressText(item);
             MediaFileName = item.MediaFileName;
             SourceStatusText = item.IsMediaFileDeleted ? "播放源已移出" : string.Empty;
-            CanOpenDetail = item.MovieId > 0;
+            CanOpenDetail = item.MovieId > 0 || (item.EpisodeId.HasValue && item.TvSeasonId.HasValue);
         }
 
         public int HistoryId { get; }
 
         public int MovieId { get; }
+
+        public int? EpisodeId { get; }
+
+        public int? TvSeasonId { get; }
 
         public string Title { get; }
 

@@ -27,6 +27,20 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public int MovieId => Movie.MovieId;
 
+    public int SeriesId => Movie.SeriesId;
+
+    public int SeasonId => Movie.SeasonId;
+
+    public bool IsMovie => Movie.IsMovie;
+
+    public bool IsSeries => Movie.IsSeries;
+
+    public bool IsSeason => Movie.IsSeason;
+
+    public string MediaKindText => Movie.MediaKindText;
+
+    public string ProgressSummary => Movie.ProgressSummary;
+
     public int? TmdbId => Movie.TmdbId;
 
     public string Title => Movie.Title;

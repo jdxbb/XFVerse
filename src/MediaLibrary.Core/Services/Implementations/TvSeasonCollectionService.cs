@@ -1,0 +1,575 @@
+using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.Enums;
+using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace MediaLibrary.Core.Services.Implementations;
+
+public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
+{
+    public async Task<IReadOnlyList<CollectionMovieItem>> GetCollectionItemsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var items = await dbContext.UserTvSeasonCollectionItems
+            .AsNoTracking()
+            .Where(x => x.IsFavorite || x.IsWantToWatch || x.IsNotInterested)
+            .OrderByDescending(x => x.UpdatedAt)
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.TvSeasonId,
+                    x.TvSeriesId,
+                    x.TmdbSeriesId,
+                    x.SeasonNumber,
+                    x.SeriesTitle,
+                    x.OriginalSeriesTitle,
+                    x.SeasonTitle,
+                    x.FirstAirYear,
+                    x.AirDate,
+                    x.PosterRemoteUrl,
+                    x.Overview,
+                    x.GenresText,
+                    x.Country,
+                    x.Language,
+                    x.IsFavorite,
+                    x.IsWantToWatch,
+                    x.IsNotInterested,
+                    x.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+
+        var seasonIds = items
+            .Where(x => x.TvSeasonId.HasValue)
+            .Select(x => x.TvSeasonId!.Value)
+            .Distinct()
+            .ToArray();
+        var seasonRows = seasonIds.Length == 0
+            ? []
+            : await LoadSeasonRowsAsync(dbContext, seasonIds, cancellationToken);
+        var seasonIndex = seasonRows.ToDictionary(x => x.SeasonId);
+
+        return items
+            .Select(
+                item =>
+                {
+                    seasonIndex.TryGetValue(item.TvSeasonId ?? 0, out var season);
+                    var title = BuildSeasonTitle(
+                        season?.SeriesName ?? item.SeriesTitle,
+                        season?.SeasonName ?? item.SeasonTitle,
+                        season?.SeasonNumber ?? item.SeasonNumber);
+                    var totalEpisodeCount = season?.TotalEpisodeCount
+                                            ?? Math.Max(0, season?.EpisodeCount ?? 0);
+                    return new CollectionMovieItem
+                    {
+                        IsTvSeason = true,
+                        MovieId = null,
+                        TvSeasonId = item.TvSeasonId,
+                        TvSeriesId = season?.SeriesId ?? item.TvSeriesId,
+                        TmdbId = item.TmdbSeriesId,
+                        SeasonNumber = season?.SeasonNumber ?? item.SeasonNumber,
+                        Title = title,
+                        OriginalTitle = season?.OriginalSeriesName ?? item.OriginalSeriesTitle,
+                        ReleaseYear = season?.AirYear ?? item.FirstAirYear,
+                        PosterRemoteUrl = FirstNonEmpty(season?.SeasonPosterRemoteUrl, item.PosterRemoteUrl, season?.SeriesPosterRemoteUrl),
+                        Overview = FirstNonEmpty(season?.SeasonOverview, item.Overview),
+                        GenresText = FirstNonEmpty(season?.GenresText, item.GenresText),
+                        Country = item.Country,
+                        Language = item.Language,
+                        IsLiked = item.IsFavorite,
+                        IsWantToWatch = item.IsWantToWatch,
+                        IsWatched = season is not null && season.InLibraryEpisodeCount > 0 && season.WatchedEpisodeCount >= season.InLibraryEpisodeCount,
+                        IsNotInterested = item.IsNotInterested,
+                        IsInLibrary = season?.InLibraryEpisodeCount > 0,
+                        WatchedEpisodeCount = season?.WatchedEpisodeCount ?? 0,
+                        TotalEpisodeCount = totalEpisodeCount,
+                        InLibraryEpisodeCount = season?.InLibraryEpisodeCount ?? 0,
+                        SourceSummary = FormatSourceSummary(season?.HasLocalSource == true, season?.HasWebDavSource == true),
+                        UpdatedAt = item.UpdatedAt
+                    };
+                })
+            .ToList();
+    }
+
+    public async Task SetFavoriteAsync(
+        int tvSeasonId,
+        bool isFavorite,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await SetStateAsync(tvSeasonId, StateFavorite, isFavorite, cancellationToken, changeSource);
+    }
+
+    public async Task SetWantToWatchAsync(
+        int tvSeasonId,
+        bool isWantToWatch,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await SetStateAsync(tvSeasonId, StateWantToWatch, isWantToWatch, cancellationToken, changeSource);
+    }
+
+    public async Task SetNotInterestedAsync(
+        int tvSeasonId,
+        bool isNotInterested,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await SetStateAsync(tvSeasonId, StateNotInterested, isNotInterested, cancellationToken, changeSource);
+    }
+
+    public async Task SetWatchedAsync(
+        int tvSeasonId,
+        bool isWatched,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var season = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
+            ?? throw new InvalidOperationException("电视剧季不存在。");
+
+        var now = DateTime.UtcNow;
+        var episodes = await dbContext.TvEpisodes
+            .Include(x => x.MediaFiles)
+            .Where(x => x.TvSeasonId == tvSeasonId)
+            .ToListAsync(cancellationToken);
+        var inLibraryEpisodes = episodes
+            .Where(x => x.MediaFiles.Any(media => !media.IsDeleted && media.MediaType == MediaType.Video))
+            .ToList();
+        var oldAggregateWatched = inLibraryEpisodes.Count > 0 && inLibraryEpisodes.All(x => x.IsWatched);
+
+        foreach (var episode in inLibraryEpisodes)
+        {
+            episode.IsWatched = isWatched;
+            episode.UpdatedAt = now;
+            if (isWatched)
+            {
+                episode.LastPlayedAt ??= now;
+                var durationSeconds = ResolveEpisodeDurationSeconds(episode);
+                if (durationSeconds > 0)
+                {
+                    episode.LastPlayPositionSeconds = durationSeconds;
+                    episode.DurationWatchedSeconds = Math.Max(episode.DurationWatchedSeconds, durationSeconds);
+                }
+
+                continue;
+            }
+
+            episode.LastPlayedAt = null;
+            episode.LastPlayPositionSeconds = 0;
+            episode.DurationWatchedSeconds = 0;
+        }
+
+        season.UpdatedAt = now;
+        RecordStateChange(
+            dbContext,
+            season,
+            collectionItem: null,
+            StateWatched,
+            oldAggregateWatched,
+            isWatched && inLibraryEpisodes.Count > 0,
+            changeSource,
+            now);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveFromLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var season = await dbContext.TvSeasons.FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
+            ?? throw new InvalidOperationException("电视剧季不存在。");
+        var now = DateTime.UtcNow;
+        var mediaFiles = await dbContext.MediaFiles
+            .Where(
+                x => x.EpisodeId.HasValue
+                     && x.Episode != null
+                     && x.Episode.TvSeasonId == tvSeasonId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        foreach (var mediaFile in mediaFiles)
+        {
+            mediaFile.IsDeleted = true;
+            mediaFile.UpdatedAt = now;
+        }
+
+        season.UpdatedAt = now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteSeasonRecordAsync(int tvSeasonId, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var season = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
+            ?? throw new InvalidOperationException("电视剧季不存在。");
+        var seriesId = season.TvSeriesId;
+
+        var episodeIds = await dbContext.TvEpisodes
+            .Where(x => x.TvSeasonId == tvSeasonId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        var mediaFileIds = await dbContext.MediaFiles
+            .Where(x => x.EpisodeId.HasValue && episodeIds.Contains(x.EpisodeId.Value))
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        var mediaFileIdSet = mediaFileIds.ToHashSet();
+
+        var collectionItems = await dbContext.UserTvSeasonCollectionItems
+            .Where(x => x.TvSeasonId == tvSeasonId)
+            .ToListAsync(cancellationToken);
+        var collectionItemIds = collectionItems.Select(x => x.Id).ToHashSet();
+
+        var stateHistories = await dbContext.UserTvSeasonStateChangeHistories
+            .Where(
+                x => x.TvSeasonId == tvSeasonId
+                     || (x.UserTvSeasonCollectionItemId.HasValue
+                         && collectionItemIds.Contains(x.UserTvSeasonCollectionItemId.Value)))
+            .ToListAsync(cancellationToken);
+        dbContext.UserTvSeasonStateChangeHistories.RemoveRange(stateHistories);
+        dbContext.UserTvSeasonCollectionItems.RemoveRange(collectionItems);
+
+        if (episodeIds.Count > 0)
+        {
+            var watchHistories = await dbContext.WatchHistories
+                .Where(x => x.EpisodeId.HasValue && episodeIds.Contains(x.EpisodeId.Value))
+                .ToListAsync(cancellationToken);
+            dbContext.WatchHistories.RemoveRange(watchHistories);
+        }
+
+        if (mediaFileIdSet.Count > 0)
+        {
+            var subtitleBindings = await dbContext.SubtitleBindings
+                .Where(x => mediaFileIdSet.Contains(x.MediaFileId) || mediaFileIdSet.Contains(x.SubtitleMediaFileId))
+                .ToListAsync(cancellationToken);
+            dbContext.SubtitleBindings.RemoveRange(subtitleBindings);
+
+            var mediaFiles = await dbContext.MediaFiles
+                .Where(x => mediaFileIdSet.Contains(x.Id))
+                .ToListAsync(cancellationToken);
+            dbContext.MediaFiles.RemoveRange(mediaFiles);
+        }
+
+        var episodes = await dbContext.TvEpisodes
+            .Where(x => x.TvSeasonId == tvSeasonId)
+            .ToListAsync(cancellationToken);
+        dbContext.TvEpisodes.RemoveRange(episodes);
+        dbContext.TvSeasons.Remove(season);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var seriesHasSeasons = await dbContext.TvSeasons
+            .AnyAsync(x => x.TvSeriesId == seriesId, cancellationToken);
+        if (!seriesHasSeasons)
+        {
+            var series = await dbContext.TvSeries.FirstOrDefaultAsync(x => x.Id == seriesId, cancellationToken);
+            if (series is not null)
+            {
+                dbContext.TvSeries.Remove(series);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private async Task SetStateAsync(
+        int tvSeasonId,
+        string stateType,
+        bool newValue,
+        CancellationToken cancellationToken,
+        string changeSource)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var season = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
+            ?? throw new InvalidOperationException("电视剧季不存在。");
+        var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+        var now = DateTime.UtcNow;
+        item ??= new UserTvSeasonCollectionItem { CreatedAt = now };
+        if (item.Id == 0)
+        {
+            dbContext.UserTvSeasonCollectionItems.Add(item);
+        }
+
+        ApplySeasonSnapshot(item, season);
+        var oldFavorite = item.IsFavorite;
+        var oldWantToWatch = item.IsWantToWatch;
+        var oldNotInterested = item.IsNotInterested;
+
+        switch (stateType)
+        {
+            case StateFavorite:
+                item.IsFavorite = newValue;
+                if (newValue)
+                {
+                    item.IsNotInterested = false;
+                }
+
+                break;
+            case StateWantToWatch:
+                item.IsWantToWatch = newValue;
+                if (newValue)
+                {
+                    item.IsNotInterested = false;
+                }
+
+                break;
+            case StateNotInterested:
+                item.IsNotInterested = newValue;
+                if (newValue)
+                {
+                    item.IsFavorite = false;
+                    item.IsWantToWatch = false;
+                }
+
+                break;
+        }
+
+        item.UpdatedAt = now;
+        RecordStateChange(dbContext, season, item, StateFavorite, oldFavorite, item.IsFavorite, changeSource, now);
+        RecordStateChange(dbContext, season, item, StateWantToWatch, oldWantToWatch, item.IsWantToWatch, changeSource, now);
+        RecordStateChange(dbContext, season, item, StateNotInterested, oldNotInterested, item.IsNotInterested, changeSource, now);
+        CleanupCollectionEntityIfEmpty(dbContext, item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task<UserTvSeasonCollectionItem?> FindCollectionItemAsync(
+        AppDbContext dbContext,
+        TvSeason season,
+        CancellationToken cancellationToken)
+    {
+        var item = await dbContext.UserTvSeasonCollectionItems
+            .FirstOrDefaultAsync(x => x.TvSeasonId == season.Id, cancellationToken);
+        if (item is not null)
+        {
+            return item;
+        }
+
+        if (season.Series?.TmdbSeriesId is > 0)
+        {
+            item = await dbContext.UserTvSeasonCollectionItems
+                .FirstOrDefaultAsync(
+                    x => x.TmdbSeriesId == season.Series.TmdbSeriesId
+                         && x.SeasonNumber == season.SeasonNumber,
+                    cancellationToken);
+        }
+
+        return item;
+    }
+
+    private static void ApplySeasonSnapshot(UserTvSeasonCollectionItem item, TvSeason season)
+    {
+        item.TvSeasonId = season.Id;
+        item.TvSeriesId = season.TvSeriesId;
+        item.TmdbSeriesId = season.Series?.TmdbSeriesId;
+        item.TmdbSeasonId = season.TmdbSeasonId;
+        item.SeasonNumber = season.SeasonNumber;
+        item.SeriesTitle = season.Series?.Name ?? string.Empty;
+        item.OriginalSeriesTitle = season.Series?.OriginalName ?? string.Empty;
+        item.SeasonTitle = season.Name;
+        item.FirstAirYear = season.AirDate?.Year ?? season.Series?.FirstAirYear;
+        item.AirDate = season.AirDate;
+        item.PosterRemoteUrl = FirstNonEmpty(season.PosterRemoteUrl, season.Series?.PosterRemoteUrl);
+        item.Overview = FirstNonEmpty(season.Overview, season.Series?.Overview);
+        item.GenresText = season.Series?.GenresText ?? string.Empty;
+        item.Country = season.Series?.Country ?? string.Empty;
+        item.Language = season.Series?.Language ?? string.Empty;
+    }
+
+    private static void RecordStateChange(
+        AppDbContext dbContext,
+        TvSeason season,
+        UserTvSeasonCollectionItem? collectionItem,
+        string stateType,
+        bool oldValue,
+        bool newValue,
+        string? source,
+        DateTime now)
+    {
+        if (oldValue == newValue)
+        {
+            return;
+        }
+
+        dbContext.UserTvSeasonStateChangeHistories.Add(
+            new UserTvSeasonStateChangeHistory
+            {
+                TmdbSeriesId = collectionItem?.TmdbSeriesId ?? season.Series?.TmdbSeriesId,
+                TmdbSeasonId = collectionItem?.TmdbSeasonId ?? season.TmdbSeasonId,
+                TvSeriesId = season.TvSeriesId,
+                TvSeasonId = season.Id,
+                UserTvSeasonCollectionItemId = collectionItem?.Id > 0 ? collectionItem.Id : null,
+                SeasonNumber = season.SeasonNumber,
+                SeriesTitle = collectionItem?.SeriesTitle ?? season.Series?.Name,
+                SeasonTitle = collectionItem?.SeasonTitle ?? season.Name,
+                StateType = stateType,
+                OldValue = oldValue,
+                NewValue = newValue,
+                Source = NormalizeSource(source),
+                ChangedAtUtc = now,
+                CreatedAtUtc = now
+            });
+    }
+
+    private static void CleanupCollectionEntityIfEmpty(AppDbContext dbContext, UserTvSeasonCollectionItem entity)
+    {
+        if (!entity.IsFavorite && !entity.IsWantToWatch && !entity.IsNotInterested)
+        {
+            dbContext.UserTvSeasonCollectionItems.Remove(entity);
+        }
+    }
+
+    private static int ResolveEpisodeDurationSeconds(TvEpisode episode)
+    {
+        var mediaDuration = episode.MediaFiles
+            .Where(x => !x.IsDeleted && x.MediaType == MediaType.Video)
+            .Select(x => x.DurationSeconds)
+            .FirstOrDefault(x => x is > 0);
+        if (mediaDuration is > 0)
+        {
+            return mediaDuration.Value;
+        }
+
+        return episode.RuntimeMinutes is > 0 ? episode.RuntimeMinutes.Value * 60 : 0;
+    }
+
+    private static async Task<IReadOnlyList<SeasonCollectionRow>> LoadSeasonRowsAsync(
+        AppDbContext dbContext,
+        IReadOnlyCollection<int> seasonIds,
+        CancellationToken cancellationToken)
+    {
+        var rows = await dbContext.TvSeasons
+            .AsNoTracking()
+            .Where(x => seasonIds.Contains(x.Id))
+            .Select(
+                x => new SeasonCollectionRow
+                {
+                    SeasonId = x.Id,
+                    SeriesId = x.TvSeriesId,
+                    SeriesName = x.Series!.Name,
+                    OriginalSeriesName = x.Series.OriginalName ?? string.Empty,
+                    SeasonName = x.Name,
+                    SeasonNumber = x.SeasonNumber,
+                    SeasonPosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
+                    SeriesPosterRemoteUrl = x.Series.PosterRemoteUrl ?? string.Empty,
+                    SeasonOverview = x.Overview ?? string.Empty,
+                    GenresText = x.Series.GenresText ?? string.Empty,
+                    AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
+                    TotalEpisodeCount = x.TmdbEpisodeCount,
+                    EpisodeCount = x.Episodes.Count,
+                    WatchedEpisodeCount = x.Episodes.Count(episode => episode.IsWatched),
+                    InLibraryEpisodeCount = x.Episodes.Count(
+                        episode => episode.MediaFiles.Any(media => !media.IsDeleted && media.MediaType == MediaType.Video)),
+                    HasLocalSource = x.Episodes.Any(
+                        episode => episode.MediaFiles.Any(
+                            media => !media.IsDeleted
+                                     && media.MediaType == MediaType.Video
+                                     && media.SourceConnection != null
+                                     && media.SourceConnection.ProtocolType == ProtocolType.Local)),
+                    HasWebDavSource = x.Episodes.Any(
+                        episode => episode.MediaFiles.Any(
+                            media => !media.IsDeleted
+                                     && media.MediaType == MediaType.Video
+                                     && media.SourceConnection != null
+                                     && media.SourceConnection.ProtocolType == ProtocolType.WebDav))
+                })
+            .ToListAsync(cancellationToken);
+
+        foreach (var row in rows)
+        {
+            row.TotalEpisodeCount = row.TotalEpisodeCount.GetValueOrDefault() > 0
+                ? row.TotalEpisodeCount
+                : row.EpisodeCount;
+        }
+
+        return rows;
+    }
+
+    private static string BuildSeasonTitle(string seriesTitle, string seasonTitle, int seasonNumber)
+    {
+        var normalizedSeries = string.IsNullOrWhiteSpace(seriesTitle) ? "未命名电视剧" : seriesTitle.Trim();
+        var normalizedSeason = string.IsNullOrWhiteSpace(seasonTitle) ? $"S{seasonNumber:D2}" : seasonTitle.Trim();
+        return normalizedSeason.Contains(normalizedSeries, StringComparison.OrdinalIgnoreCase)
+            ? normalizedSeason
+            : $"{normalizedSeries} {normalizedSeason}";
+    }
+
+    private static string FormatSourceSummary(bool hasLocal, bool hasWebDav)
+    {
+        return (hasLocal, hasWebDav) switch
+        {
+            (true, true) => "本地 + 网盘",
+            (true, false) => "本地",
+            (false, true) => "网盘",
+            _ => "暂无播放源"
+        };
+    }
+
+    private static string NormalizeSource(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return UserMovieStateChangeHistoryRecorder.SourceUnknown;
+        }
+
+        var trimmed = source.Trim();
+        return trimmed.Length <= 40 ? trimmed : trimmed[..40];
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
+    private const string StateWatched = "Watched";
+    private const string StateFavorite = "Favorite";
+    private const string StateWantToWatch = "WantToWatch";
+    private const string StateNotInterested = "NotInterested";
+
+    private sealed class SeasonCollectionRow
+    {
+        public int SeasonId { get; set; }
+
+        public int SeriesId { get; set; }
+
+        public string SeriesName { get; set; } = string.Empty;
+
+        public string OriginalSeriesName { get; set; } = string.Empty;
+
+        public string SeasonName { get; set; } = string.Empty;
+
+        public int SeasonNumber { get; set; }
+
+        public string SeasonPosterRemoteUrl { get; set; } = string.Empty;
+
+        public string SeriesPosterRemoteUrl { get; set; } = string.Empty;
+
+        public string SeasonOverview { get; set; } = string.Empty;
+
+        public string GenresText { get; set; } = string.Empty;
+
+        public int? AirYear { get; set; }
+
+        public int? TotalEpisodeCount { get; set; }
+
+        public int EpisodeCount { get; set; }
+
+        public int WatchedEpisodeCount { get; set; }
+
+        public int InLibraryEpisodeCount { get; set; }
+
+        public bool HasLocalSource { get; set; }
+
+        public bool HasWebDavSource { get; set; }
+    }
+}

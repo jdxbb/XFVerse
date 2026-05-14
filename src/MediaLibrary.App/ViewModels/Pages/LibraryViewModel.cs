@@ -61,6 +61,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly IMovieManagementService _movieManagementService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly IUserCollectionService _userCollectionService;
+    private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly List<LibraryMovieListItem> _allMovies = [];
     private readonly HashSet<string> _selectedItemKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -75,6 +76,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private string _selectedLibraryScope = LibraryScopeInLibrary;
     private string _selectedSourceFilter = SourceFilterAll;
     private string _selectedCollectionStatusFilter = FilterAll;
+    private string _selectedContentTypeFilter = "全部";
     private string _selectedDecadeFilter = DecadeAll;
     private bool _isUpdatingTagSelection;
     private bool _isPosterView = true;
@@ -90,6 +92,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         IMovieManagementService movieManagementService,
         IMovieIdentificationService movieIdentificationService,
         IUserCollectionService userCollectionService,
+        ITvSeasonCollectionService tvSeasonCollectionService,
         IConfirmationDialogService confirmationDialogService)
         : base("媒体库", "浏览真实影片数据，支持搜索、排序、筛选和批量操作。")
     {
@@ -99,6 +102,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         _movieManagementService = movieManagementService;
         _movieIdentificationService = movieIdentificationService;
         _userCollectionService = userCollectionService;
+        _tvSeasonCollectionService = tvSeasonCollectionService;
         _confirmationDialogService = confirmationDialogService;
         _dataRefreshService.DataChanged += OnDataChanged;
 
@@ -110,10 +114,12 @@ public sealed class LibraryViewModel : PageViewModelBase
         LibraryScopeOptions = [LibraryScopeAll, LibraryScopeInLibrary, LibraryScopeExternal];
         SourceFilterOptions = [SourceFilterAll, SourceFilterLocal, SourceFilterWebDav];
         CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested];
+        ContentTypeOptions = ["全部", "电影", "电视剧"];
         SwitchToPosterViewCommand = new RelayCommand(() => IsPosterView = true);
         SwitchToListViewCommand = new RelayCommand(() => IsPosterView = false);
         SelectLibraryScopeCommand = new RelayCommand(SelectLibraryScope);
         SelectSourceFilterCommand = new RelayCommand(SelectSourceFilter);
+        SelectContentTypeCommand = new RelayCommand(SelectContentType);
         ClearTagFilterCommand = new RelayCommand(ClearTagFilter);
         SelectCollectionStatusCommand = new RelayCommand(SelectCollectionStatus);
         ShowLayoutSwitchPlaceholderCommand = new RelayCommand(ShowLayoutSwitchPlaceholder);
@@ -123,6 +129,12 @@ public sealed class LibraryViewModel : PageViewModelBase
         ToggleBatchSelectionModeCommand = new RelayCommand(ToggleBatchSelectionMode, () => !IsBatchOperationRunning);
         BatchMarkWatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(true), () => CanBatchMarkWatched);
         BatchMarkUnwatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(false), () => CanBatchMarkUnwatched);
+        BatchMarkFavoriteCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.Favorite, true), () => CanBatchSetCollectionState);
+        BatchUnmarkFavoriteCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.Favorite, false), () => CanBatchSetCollectionState);
+        BatchMarkWantToWatchCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.WantToWatch, true), () => CanBatchSetCollectionState);
+        BatchUnmarkWantToWatchCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.WantToWatch, false), () => CanBatchSetCollectionState);
+        BatchMarkNotInterestedCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.NotInterested, true), () => CanBatchSetCollectionState);
+        BatchUnmarkNotInterestedCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.NotInterested, false), () => CanBatchSetCollectionState);
         BatchAutoIdentifyCommand = new AsyncRelayCommand(BatchAutoIdentifyAsync, () => CanBatchAutoIdentify);
         CancelBatchOperationCommand = new RelayCommand(CancelBatchOperation, () => CanCancelBatchOperation);
         BatchRemoveFromLibraryCommand = new AsyncRelayCommand(BatchRemoveFromLibraryAsync, () => CanBatchRemoveFromLibrary);
@@ -157,6 +169,8 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public IReadOnlyList<string> CollectionStatusOptions { get; }
 
+    public IReadOnlyList<string> ContentTypeOptions { get; }
+
     public RelayCommand SwitchToPosterViewCommand { get; }
 
     public RelayCommand SwitchToListViewCommand { get; }
@@ -164,6 +178,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     public RelayCommand SelectLibraryScopeCommand { get; }
 
     public RelayCommand SelectSourceFilterCommand { get; }
+
+    public RelayCommand SelectContentTypeCommand { get; }
 
     public RelayCommand ClearTagFilterCommand { get; }
 
@@ -182,6 +198,18 @@ public sealed class LibraryViewModel : PageViewModelBase
     public AsyncRelayCommand BatchMarkWatchedCommand { get; }
 
     public AsyncRelayCommand BatchMarkUnwatchedCommand { get; }
+
+    public AsyncRelayCommand BatchMarkFavoriteCommand { get; }
+
+    public AsyncRelayCommand BatchUnmarkFavoriteCommand { get; }
+
+    public AsyncRelayCommand BatchMarkWantToWatchCommand { get; }
+
+    public AsyncRelayCommand BatchUnmarkWantToWatchCommand { get; }
+
+    public AsyncRelayCommand BatchMarkNotInterestedCommand { get; }
+
+    public AsyncRelayCommand BatchUnmarkNotInterestedCommand { get; }
 
     public AsyncRelayCommand BatchAutoIdentifyCommand { get; }
 
@@ -308,6 +336,23 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
+    public string SelectedContentTypeFilter
+    {
+        get => _selectedContentTypeFilter;
+        set
+        {
+            if (!ContentTypeOptions.Contains(value))
+            {
+                return;
+            }
+
+            if (SetProperty(ref _selectedContentTypeFilter, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
     public string SelectedDecadeFilter
     {
         get => _selectedDecadeFilter;
@@ -415,6 +460,8 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public bool CanBatchMarkUnwatched => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
+    public bool CanBatchSetCollectionState => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
+
     public bool CanBatchAutoIdentify => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
     public bool CanBatchRemoveFromLibrary => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
@@ -429,7 +476,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     {
         try
         {
-            var movies = await _libraryQueryService.GetLibraryMoviesAsync(cancellationToken);
+            var movies = await _libraryQueryService.GetLibraryItemsAsync(IsBatchSelectionMode, cancellationToken);
             _allMovies.Clear();
             _allMovies.AddRange(movies);
             RefreshTagOptions();
@@ -472,6 +519,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         SelectedLibraryScope = LibraryScopeInLibrary;
         SelectedSourceFilter = SourceFilterAll;
         SelectedCollectionStatusFilter = FilterAll;
+        SelectedContentTypeFilter = "全部";
         ClearTagFilter(applyFilters: false);
         SelectedSortOption = "最近更新";
         SelectedSortDirection = "降序";
@@ -491,6 +539,14 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (parameter is string source && SourceFilterOptions.Contains(source))
         {
             SelectedSourceFilter = source;
+        }
+    }
+
+    private void SelectContentType(object? parameter)
+    {
+        if (parameter is string contentType && ContentTypeOptions.Contains(contentType))
+        {
+            SelectedContentTypeFilter = contentType;
         }
     }
 
@@ -628,6 +684,13 @@ public sealed class LibraryViewModel : PageViewModelBase
             var genreKeyword = GenreFilterText.Trim();
             query = query.Where(item => item.GenresText.Contains(genreKeyword, StringComparison.OrdinalIgnoreCase));
         }
+
+        query = SelectedContentTypeFilter switch
+        {
+            "电影" => query.Where(item => item.IsMovie),
+            "电视剧" => query.Where(item => item.IsSeries || item.IsSeason),
+            _ => query
+        };
 
         foreach (var tag in TypeTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
         {
@@ -811,11 +874,14 @@ public sealed class LibraryViewModel : PageViewModelBase
             ClearSelection();
             IsBatchSelectionMode = false;
             BatchResultSummary = string.Empty;
+            _ = ActivateAsync();
             return;
         }
 
         IsBatchSelectionMode = true;
         BatchResultSummary = string.Empty;
+        ClearSelection();
+        _ = ActivateAsync();
     }
 
     private void OpenOrToggleSelection(object? parameter)
@@ -873,6 +939,11 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         var operationName = isWatched ? "批量标记已看" : "批量标记未看";
+        if (HasMixedMovieAndSeasonSelection(selectedItems))
+        {
+            BatchResultSummary = "电影和电视剧季请分开批量操作。";
+            return;
+        }
         var successCount = 0;
         var errors = new List<BatchItemError>();
         IsBatchOperationRunning = true;
@@ -883,7 +954,11 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 try
                 {
-                    if (item.IsInLibrary && item.MovieId > 0)
+                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
+                    {
+                        await _tvSeasonCollectionService.SetWatchedAsync(item.Movie.SeasonId, isWatched, changeSource: "Batch");
+                    }
+                    else if (item.IsInLibrary && item.MovieId > 0)
                     {
                         await _movieManagementService.SetWatchedAsync(item.MovieId, isWatched, changeSource: "Batch");
                     }
@@ -934,6 +1009,18 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        if (HasMixedMovieAndSeasonSelection(selectedItems))
+        {
+            BatchResultSummary = "电影和电视剧季请分开批量操作。";
+            return;
+        }
+
+        if (HasMixedMovieAndSeasonSelection(selectedItems))
+        {
+            BatchResultSummary = "电影和电视剧季请分开批量操作。";
+            return;
+        }
+
         var confirmed = await _confirmationDialogService.ConfirmAsync(
             "确认移出媒体库？",
             "移出后将从当前媒体库列表中移除所选资源，但不会删除本地文件、WebDAV 文件或播放历史。后续扫描可能重新发现。",
@@ -957,7 +1044,11 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 try
                 {
-                    if (item.IsInLibrary && item.MovieId > 0)
+                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
+                    {
+                        await _tvSeasonCollectionService.RemoveFromLibraryAsync(item.Movie.SeasonId);
+                    }
+                    else if (item.IsInLibrary && item.MovieId > 0)
                     {
                         await _movieManagementService.RemoveFromLibraryAsync(item.MovieId);
                     }
@@ -1010,6 +1101,12 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        if (HasMixedMovieAndSeasonSelection(selectedItems))
+        {
+            BatchResultSummary = "电影和电视剧季请分开批量操作。";
+            return;
+        }
+
         var confirmed = await _confirmationDialogService.ConfirmAsync(
             "确认删除影片记录？",
             "删除后将移除所选影片在软件中的信息、播放历史、收藏状态和播放源记录，但不会删除本地文件或 WebDAV 文件。后续扫描可能重新发现。",
@@ -1033,7 +1130,11 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 try
                 {
-                    if (item.MovieId > 0)
+                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
+                    {
+                        await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.Movie.SeasonId);
+                    }
+                    else if (item.MovieId > 0)
                     {
                         await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
                     }
@@ -1081,6 +1182,107 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
+    private async Task BatchSetCollectionStateAsync(BatchCollectionState state, bool value)
+    {
+        var selectedItems = GetSelectedVisibleItems();
+        if (selectedItems.Count == 0)
+        {
+            ClearSelection();
+            BatchResultSummary = "没有可处理的已选条目。";
+            return;
+        }
+
+        if (HasMixedMovieAndSeasonSelection(selectedItems))
+        {
+            BatchResultSummary = "电影和电视剧季请分开批量操作。";
+            return;
+        }
+
+        var operationName = BuildCollectionStateOperationName(state, value);
+        var successCount = 0;
+        var errors = new List<BatchItemError>();
+        IsBatchOperationRunning = true;
+        try
+        {
+            foreach (var item in selectedItems)
+            {
+                try
+                {
+                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
+                    {
+                        await SetSeasonCollectionStateAsync(item.Movie.SeasonId, state, value);
+                    }
+                    else
+                    {
+                        await SetMovieCollectionStateAsync(item.Movie, state, value);
+                    }
+
+                    successCount++;
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(new BatchItemError(item.SelectionKey, item.Title, DescribeException(exception)));
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                SetSelectionToFailures(errors);
+            }
+            else if (successCount > 0)
+            {
+                ClearSelection();
+                IsBatchSelectionMode = false;
+            }
+
+            await ActivateAsync();
+            BatchResultSummary = BuildResultSummary(operationName, successCount, errors);
+            NotifyAfterBatchStatusChange();
+        }
+        finally
+        {
+            IsBatchOperationRunning = false;
+        }
+    }
+
+    private Task SetSeasonCollectionStateAsync(int seasonId, BatchCollectionState state, bool value)
+    {
+        return state switch
+        {
+            BatchCollectionState.Favorite => _tvSeasonCollectionService.SetFavoriteAsync(seasonId, value, changeSource: "Batch"),
+            BatchCollectionState.WantToWatch => _tvSeasonCollectionService.SetWantToWatchAsync(seasonId, value, changeSource: "Batch"),
+            BatchCollectionState.NotInterested => _tvSeasonCollectionService.SetNotInterestedAsync(seasonId, value, changeSource: "Batch"),
+            _ => Task.CompletedTask
+        };
+    }
+
+    private Task SetMovieCollectionStateAsync(LibraryMovieListItem movie, BatchCollectionState state, bool value)
+    {
+        return state switch
+        {
+            BatchCollectionState.Favorite when movie.MovieId > 0 => _movieManagementService.SetFavoriteAsync(movie.MovieId, value, changeSource: "Batch"),
+            BatchCollectionState.WantToWatch when value => _userCollectionService.AddWantToWatchAsync(BuildRecommendationItem(movie), changeSource: "Batch"),
+            BatchCollectionState.WantToWatch => _userCollectionService.RemoveWantToWatchAsync(BuildRecommendationItem(movie), changeSource: "Batch"),
+            BatchCollectionState.NotInterested when movie.MovieId > 0 => _userCollectionService.SetNotInterestedAsync(movie.MovieId, value, changeSource: "Batch"),
+            BatchCollectionState.NotInterested => _userCollectionService.SetNotInterestedAsync(BuildRecommendationItem(movie), value, changeSource: "Batch"),
+            _ => throw new InvalidOperationException("当前条目不支持该批量状态操作。")
+        };
+    }
+
+    private static string BuildCollectionStateOperationName(BatchCollectionState state, bool value)
+    {
+        return (state, value) switch
+        {
+            (BatchCollectionState.Favorite, true) => "批量标记喜爱",
+            (BatchCollectionState.Favorite, false) => "批量取消喜爱",
+            (BatchCollectionState.WantToWatch, true) => "批量标记想看",
+            (BatchCollectionState.WantToWatch, false) => "批量取消想看",
+            (BatchCollectionState.NotInterested, true) => "批量标记不想看",
+            (BatchCollectionState.NotInterested, false) => "批量取消不想看",
+            _ => "批量状态操作"
+        };
+    }
+
     private async Task BatchAutoIdentifyAsync()
     {
         var selectedItems = GetSelectedVisibleItems();
@@ -1088,6 +1290,12 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             ClearSelection();
             BatchResultSummary = "没有可识别的已选影片。";
+            return;
+        }
+
+        if (selectedItems.Any(item => !item.Movie.IsMovie))
+        {
+            BatchResultSummary = "AI 辅助识别仅支持电影；电视剧季修正入口已分离。";
             return;
         }
 
@@ -1219,6 +1427,11 @@ public sealed class LibraryViewModel : PageViewModelBase
             .ToList();
     }
 
+    private static bool HasMixedMovieAndSeasonSelection(IReadOnlyCollection<LibraryMovieItemViewModel> items)
+    {
+        return items.Any(x => x.Movie.IsMovie) && items.Any(x => x.Movie.IsSeason);
+    }
+
     private void SetSelectionToFailures(IEnumerable<BatchItemError> errors)
     {
         _selectedItemKeys.Clear();
@@ -1267,6 +1480,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(CanBatchMarkWatched));
         OnPropertyChanged(nameof(CanBatchMarkUnwatched));
+        OnPropertyChanged(nameof(CanBatchSetCollectionState));
         OnPropertyChanged(nameof(CanBatchAutoIdentify));
         OnPropertyChanged(nameof(CanBatchRemoveFromLibrary));
         OnPropertyChanged(nameof(CanBatchDeleteMovieRecords));
@@ -1280,6 +1494,12 @@ public sealed class LibraryViewModel : PageViewModelBase
         ToggleBatchSelectionModeCommand.RaiseCanExecuteChanged();
         BatchMarkWatchedCommand.RaiseCanExecuteChanged();
         BatchMarkUnwatchedCommand.RaiseCanExecuteChanged();
+        BatchMarkFavoriteCommand.RaiseCanExecuteChanged();
+        BatchUnmarkFavoriteCommand.RaiseCanExecuteChanged();
+        BatchMarkWantToWatchCommand.RaiseCanExecuteChanged();
+        BatchUnmarkWantToWatchCommand.RaiseCanExecuteChanged();
+        BatchMarkNotInterestedCommand.RaiseCanExecuteChanged();
+        BatchUnmarkNotInterestedCommand.RaiseCanExecuteChanged();
         BatchAutoIdentifyCommand.RaiseCanExecuteChanged();
         CancelBatchOperationCommand.RaiseCanExecuteChanged();
         BatchRemoveFromLibraryCommand.RaiseCanExecuteChanged();
@@ -1339,6 +1559,18 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        if (movie.IsSeries && movie.SeriesId > 0)
+        {
+            _navigationStateService.RequestTvSeriesOverview(movie.SeriesId);
+            return;
+        }
+
+        if (movie.IsSeason && movie.SeasonId > 0)
+        {
+            _navigationStateService.RequestTvSeasonDetail(movie.SeasonId);
+            return;
+        }
+
         if (movie.IsInLibrary && movie.MovieId > 0)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId);
@@ -1391,6 +1623,16 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private static string BuildSelectionKey(LibraryMovieListItem item)
     {
+        if (item.IsSeason && item.SeasonId > 0)
+        {
+            return $"season:{item.SeasonId}";
+        }
+
+        if (item.IsSeries && item.SeriesId > 0)
+        {
+            return $"series:{item.SeriesId}";
+        }
+
         if (item.IsInLibrary && item.MovieId > 0)
         {
             return $"movie:{item.MovieId}";
@@ -1544,4 +1786,11 @@ public sealed class LibraryViewModel : PageViewModelBase
     }
 
     private sealed record BatchItemError(string SelectionKey, string Title, string Message);
+
+    private enum BatchCollectionState
+    {
+        Favorite,
+        WantToWatch,
+        NotInterested
+    }
 }

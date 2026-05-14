@@ -8,7 +8,11 @@ public interface IPlayerWindowService
 
     int? ActiveMovieId { get; }
 
+    int? ActiveEpisodeId { get; }
+
     int? ActiveMediaFileId { get; }
 
     Task OpenAsync(int movieId, int? mediaFileId = null, CancellationToken cancellationToken = default);
+
+    Task OpenEpisodeAsync(int episodeId, int? mediaFileId = null, CancellationToken cancellationToken = default);
 }

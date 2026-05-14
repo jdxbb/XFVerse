@@ -8,6 +8,22 @@ namespace MediaLibrary.Core.Services.Implementations;
 
 public sealed class LibraryQueryService : ILibraryQueryService
 {
+    public async Task<IReadOnlyList<LibraryMovieListItem>> GetLibraryItemsAsync(
+        bool expandSeriesToSeasons,
+        CancellationToken cancellationToken = default)
+    {
+        var movies = await GetLibraryMoviesAsync(cancellationToken);
+        var tvItems = expandSeriesToSeasons
+            ? await GetTvSeasonLibraryItemsAsync(cancellationToken)
+            : await GetTvSeriesLibraryItemsAsync(cancellationToken);
+
+        return movies
+            .Concat(tvItems)
+            .OrderByDescending(x => x.UpdatedAt)
+            .ThenBy(x => x.Title)
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<LibraryMovieListItem>> GetLibraryMoviesAsync(
         CancellationToken cancellationToken = default)
     {
@@ -257,6 +273,311 @@ public sealed class LibraryQueryService : ILibraryQueryService
             : sourceName;
     }
 
+    private static async Task<IReadOnlyList<LibraryMovieListItem>> GetTvSeriesLibraryItemsAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var seriesRows = await dbContext.TvSeries
+            .AsNoTracking()
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.TmdbSeriesId,
+                    x.Name,
+                    x.OriginalName,
+                    x.Overview,
+                    x.PosterRemoteUrl,
+                    x.FirstAirYear,
+                    x.GenresText,
+                    x.Country,
+                    x.Language,
+                    x.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+        var seriesIds = seriesRows.Select(x => x.Id).ToArray();
+        if (seriesIds.Length == 0)
+        {
+            return [];
+        }
+
+        var seasonRows = await dbContext.TvSeasons
+            .AsNoTracking()
+            .Where(x => seriesIds.Contains(x.TvSeriesId))
+            .Select(
+                x => new TvSeasonLibraryRow
+                {
+                    SeasonId = x.Id,
+                    SeriesId = x.TvSeriesId,
+                    SeasonNumber = x.SeasonNumber,
+                    Name = x.Name,
+                    PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
+                    AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : (int?)null,
+                    TotalEpisodeCount = x.TmdbEpisodeCount,
+                    IdentificationStatus = x.IdentificationStatus,
+                    UpdatedAt = x.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+        var seasonIds = seasonRows.Select(x => x.SeasonId).ToArray();
+        var episodeRows = seasonIds.Length == 0
+            ? []
+            : await dbContext.TvEpisodes
+                .AsNoTracking()
+                .Where(x => seasonIds.Contains(x.TvSeasonId))
+                .Select(
+                    x => new TvEpisodeLibraryRow
+                    {
+                        EpisodeId = x.Id,
+                        SeasonId = x.TvSeasonId,
+                        IsWatched = x.IsWatched
+                    })
+                .ToListAsync(cancellationToken);
+        var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
+        var stateRows = await LoadTvCollectionStateRowsAsync(dbContext, seasonIds, cancellationToken);
+
+        var seasonsBySeries = seasonRows
+            .GroupBy(x => x.SeriesId)
+            .ToDictionary(x => x.Key, x => x.ToList());
+        var episodesBySeason = episodeRows
+            .GroupBy(x => x.SeasonId)
+            .ToDictionary(x => x.Key, x => x.ToList());
+        var sourcesBySeason = sourceRows
+            .Join(episodeRows, source => source.EpisodeId, episode => episode.EpisodeId, (source, episode) => new { episode.SeasonId, source.ProtocolType })
+            .GroupBy(x => x.SeasonId)
+            .ToDictionary(x => x.Key, x => x.ToList());
+        var stateSeasonIds = stateRows.Select(x => x.SeasonId).ToHashSet();
+
+        return seriesRows
+            .Select(
+                series =>
+                {
+                    var seasons = seasonsBySeries.GetValueOrDefault(series.Id) ?? [];
+                    var seasonIdsForSeries = seasons.Select(x => x.SeasonId).ToHashSet();
+                    var sources = seasons
+                        .SelectMany(season => sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
+                        .ToList();
+                    var hasState = stateSeasonIds.Overlaps(seasonIdsForSeries);
+                    var inLibraryEpisodeCount = sources.Select(x => x).Count();
+                    var watchedEpisodeCount = seasons
+                        .SelectMany(season => episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
+                        .Count(x => x.IsWatched);
+                    var totalEpisodeCount = seasons.Sum(
+                        season => season.TotalEpisodeCount.GetValueOrDefault() > 0
+                            ? season.TotalEpisodeCount!.Value
+                            : episodesBySeason.GetValueOrDefault(season.SeasonId)?.Count ?? 0);
+                    var latestSeasonPoster = seasons
+                        .OrderByDescending(x => x.SeasonNumber)
+                        .Select(x => x.PosterRemoteUrl)
+                        .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+                        ?? string.Empty;
+                    return new LibraryMovieListItem
+                    {
+                        ItemKind = LibraryMediaItemKind.Series,
+                        SeriesId = series.Id,
+                        TmdbId = series.TmdbSeriesId,
+                        Title = series.Name,
+                        OriginalTitle = series.OriginalName ?? string.Empty,
+                        ReleaseYear = series.FirstAirYear,
+                        PosterRemoteUrl = FirstNonEmpty(series.PosterRemoteUrl, latestSeasonPoster),
+                        GenresText = series.GenresText ?? string.Empty,
+                        Overview = series.Overview ?? string.Empty,
+                        Country = series.Country ?? string.Empty,
+                        Language = series.Language ?? string.Empty,
+                        IdentificationStatus = seasons.Any(x => x.IdentificationStatus == IdentificationStatus.Failed)
+                            ? IdentificationStatus.Failed
+                            : IdentificationStatus.Matched,
+                        SourceCount = sources.Count,
+                        HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
+                        HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        IsInLibrary = sources.Count > 0,
+                        IsWatched = inLibraryEpisodeCount > 0 && watchedEpisodeCount >= inLibraryEpisodeCount,
+                        SeasonCount = seasons.Count,
+                        InLibraryEpisodeCount = inLibraryEpisodeCount,
+                        WatchedEpisodeCount = watchedEpisodeCount,
+                        TotalEpisodeCount = totalEpisodeCount,
+                        UpdatedAt = seasons.Select(x => x.UpdatedAt).Append(series.UpdatedAt).Max()
+                    };
+                })
+            .Where(x => x.IsInLibrary || stateRows.Any(state => state.SeriesId == x.SeriesId))
+            .OrderByDescending(x => x.UpdatedAt)
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<LibraryMovieListItem>> GetTvSeasonLibraryItemsAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var seasonRows = await dbContext.TvSeasons
+            .AsNoTracking()
+            .Select(
+                x => new TvSeasonLibraryRow
+                {
+                    SeasonId = x.Id,
+                    SeriesId = x.TvSeriesId,
+                    TmdbSeriesId = x.Series!.TmdbSeriesId,
+                    SeasonNumber = x.SeasonNumber,
+                    Name = x.Name,
+                    SeriesName = x.Series.Name,
+                    OriginalSeriesName = x.Series.OriginalName ?? string.Empty,
+                    Overview = x.Overview ?? x.Series.Overview ?? string.Empty,
+                    PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
+                    SeriesPosterRemoteUrl = x.Series.PosterRemoteUrl ?? string.Empty,
+                    GenresText = x.Series.GenresText ?? string.Empty,
+                    Country = x.Series.Country ?? string.Empty,
+                    Language = x.Series.Language ?? string.Empty,
+                    AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
+                    TotalEpisodeCount = x.TmdbEpisodeCount,
+                    IdentificationStatus = x.IdentificationStatus,
+                    UpdatedAt = x.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+        var seasonIds = seasonRows.Select(x => x.SeasonId).ToArray();
+        if (seasonIds.Length == 0)
+        {
+            return [];
+        }
+
+        var episodeRows = await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => seasonIds.Contains(x.TvSeasonId))
+            .Select(
+                x => new TvEpisodeLibraryRow
+                {
+                    EpisodeId = x.Id,
+                    SeasonId = x.TvSeasonId,
+                    IsWatched = x.IsWatched
+                })
+            .ToListAsync(cancellationToken);
+        var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
+        var stateRows = await LoadTvCollectionStateRowsAsync(dbContext, seasonIds, cancellationToken);
+        var stateBySeason = stateRows
+            .GroupBy(x => x.SeasonId)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(y => y.UpdatedAt).First());
+        var episodesBySeason = episodeRows
+            .GroupBy(x => x.SeasonId)
+            .ToDictionary(x => x.Key, x => x.ToList());
+        var sourcesBySeason = sourceRows
+            .Join(episodeRows, source => source.EpisodeId, episode => episode.EpisodeId, (source, episode) => new { episode.SeasonId, source.ProtocolType })
+            .GroupBy(x => x.SeasonId)
+            .ToDictionary(x => x.Key, x => x.ToList());
+
+        return seasonRows
+            .Select(
+                season =>
+                {
+                    var episodes = episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
+                    var sources = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
+                    stateBySeason.TryGetValue(season.SeasonId, out var state);
+                    var inLibraryEpisodeCount = sources.Count;
+                    var totalEpisodeCount = season.TotalEpisodeCount.GetValueOrDefault() > 0
+                        ? season.TotalEpisodeCount!.Value
+                        : episodes.Count;
+                    return new LibraryMovieListItem
+                    {
+                        ItemKind = LibraryMediaItemKind.Season,
+                        SeriesId = season.SeriesId,
+                        SeasonId = season.SeasonId,
+                        SeasonNumber = season.SeasonNumber,
+                        TmdbId = season.TmdbSeriesId,
+                        Title = BuildSeasonTitle(season.SeriesName, season.Name, season.SeasonNumber),
+                        OriginalTitle = season.OriginalSeriesName,
+                        ReleaseYear = season.AirYear,
+                        PosterRemoteUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl),
+                        GenresText = season.GenresText,
+                        Overview = season.Overview,
+                        Country = season.Country,
+                        Language = season.Language,
+                        IdentificationStatus = season.IdentificationStatus,
+                        SourceCount = sources.Count,
+                        HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
+                        HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        IsInLibrary = sources.Count > 0,
+                        IsFavorite = state?.IsFavorite == true,
+                        IsWantToWatch = state?.IsWantToWatch == true,
+                        IsNotInterested = state?.IsNotInterested == true,
+                        IsWatched = inLibraryEpisodeCount > 0 && episodes.Count(x => x.IsWatched) >= inLibraryEpisodeCount,
+                        WatchedEpisodeCount = episodes.Count(x => x.IsWatched),
+                        InLibraryEpisodeCount = inLibraryEpisodeCount,
+                        TotalEpisodeCount = totalEpisodeCount,
+                        UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
+                    };
+                })
+            .Where(x => x.IsInLibrary || x.IsFavorite || x.IsWantToWatch || x.IsNotInterested)
+            .OrderByDescending(x => x.UpdatedAt)
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<TvSourceLibraryRow>> LoadTvSourceRowsAsync(
+        AppDbContext dbContext,
+        IReadOnlyCollection<int> episodeIds,
+        CancellationToken cancellationToken)
+    {
+        if (episodeIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(
+                x => x.EpisodeId.HasValue
+                     && episodeIds.Contains(x.EpisodeId.Value)
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted)
+            .Select(
+                x => new TvSourceLibraryRow
+                {
+                    EpisodeId = x.EpisodeId!.Value,
+                    ProtocolType = x.SourceConnection!.ProtocolType
+                })
+            .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<TvSeasonStateLibraryRow>> LoadTvCollectionStateRowsAsync(
+        AppDbContext dbContext,
+        IReadOnlyCollection<int> seasonIds,
+        CancellationToken cancellationToken)
+    {
+        if (seasonIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.UserTvSeasonCollectionItems
+            .AsNoTracking()
+            .Where(
+                x => x.TvSeasonId.HasValue
+                     && seasonIds.Contains(x.TvSeasonId.Value)
+                     && (x.IsFavorite || x.IsWantToWatch || x.IsNotInterested))
+            .Select(
+                x => new TvSeasonStateLibraryRow
+                {
+                    SeasonId = x.TvSeasonId!.Value,
+                    SeriesId = x.TvSeriesId,
+                    IsFavorite = x.IsFavorite,
+                    IsWantToWatch = x.IsWantToWatch,
+                    IsNotInterested = x.IsNotInterested,
+                    UpdatedAt = x.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+    }
+
+    private static string BuildSeasonTitle(string seriesTitle, string seasonTitle, int seasonNumber)
+    {
+        var normalizedSeries = string.IsNullOrWhiteSpace(seriesTitle) ? "未命名电视剧" : seriesTitle.Trim();
+        var normalizedSeason = string.IsNullOrWhiteSpace(seasonTitle) ? $"S{seasonNumber:D2}" : seasonTitle.Trim();
+        return normalizedSeason.Contains(normalizedSeries, StringComparison.OrdinalIgnoreCase)
+            ? normalizedSeason
+            : $"{normalizedSeries} {normalizedSeason}";
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
     private record LibraryCollectionIdentity(
         int? MovieId,
         int? TmdbId,
@@ -341,5 +662,73 @@ public sealed class LibraryQueryService : ILibraryQueryService
                    && releaseYear.HasValue
                    && _titleYearKeys.Contains(BuildTitleYearKey(title, releaseYear));
         }
+    }
+
+    private sealed class TvSeasonLibraryRow
+    {
+        public int SeasonId { get; set; }
+
+        public int SeriesId { get; set; }
+
+        public int? TmdbSeriesId { get; set; }
+
+        public int SeasonNumber { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string SeriesName { get; set; } = string.Empty;
+
+        public string OriginalSeriesName { get; set; } = string.Empty;
+
+        public string Overview { get; set; } = string.Empty;
+
+        public string PosterRemoteUrl { get; set; } = string.Empty;
+
+        public string SeriesPosterRemoteUrl { get; set; } = string.Empty;
+
+        public string GenresText { get; set; } = string.Empty;
+
+        public string Country { get; set; } = string.Empty;
+
+        public string Language { get; set; } = string.Empty;
+
+        public int? AirYear { get; set; }
+
+        public int? TotalEpisodeCount { get; set; }
+
+        public IdentificationStatus IdentificationStatus { get; set; }
+
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    private sealed class TvEpisodeLibraryRow
+    {
+        public int EpisodeId { get; set; }
+
+        public int SeasonId { get; set; }
+
+        public bool IsWatched { get; set; }
+    }
+
+    private sealed class TvSourceLibraryRow
+    {
+        public int EpisodeId { get; set; }
+
+        public ProtocolType ProtocolType { get; set; }
+    }
+
+    private sealed class TvSeasonStateLibraryRow
+    {
+        public int SeasonId { get; set; }
+
+        public int? SeriesId { get; set; }
+
+        public bool IsFavorite { get; set; }
+
+        public bool IsWantToWatch { get; set; }
+
+        public bool IsNotInterested { get; set; }
+
+        public DateTime UpdatedAt { get; set; }
     }
 }

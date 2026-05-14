@@ -12,6 +12,16 @@ public sealed class HomeMovieItem : INotifyPropertyChanged
 
     public int MovieId { get; set; }
 
+    public int? EpisodeId { get; set; }
+
+    public int? TvSeasonId { get; set; }
+
+    public int? TvSeriesId { get; set; }
+
+    public int SeasonNumber { get; set; }
+
+    public int EpisodeNumber { get; set; }
+
     public int? MediaFileId { get; set; }
 
     public string Title { get; set; } = string.Empty;
@@ -45,6 +55,10 @@ public sealed class HomeMovieItem : INotifyPropertyChanged
     public bool HasProgressPosition { get; set; }
 
     public bool HasProgressPercent { get; set; }
+
+    public bool IsEpisode => EpisodeId.HasValue;
+
+    public string DetailKindText => IsEpisode ? "剧集" : "电影";
 
     public bool CanContinuePlayback
     {

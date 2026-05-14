@@ -38,6 +38,7 @@ public static class AppServiceProvider
         services.AddSingleton<ILocalMediaScanService, LocalMediaScanService>();
         services.AddSingleton<ILibraryQueryService, LibraryQueryService>();
         services.AddSingleton<IMovieDetailQueryService, MovieDetailQueryService>();
+        services.AddSingleton<ITvDetailQueryService, TvDetailQueryService>();
         services.AddSingleton<IMovieManagementService, MovieManagementService>();
         services.AddSingleton<IPlaybackSourceService, PlaybackSourceService>();
         services.AddSingleton<IWatchHistoryService, WatchHistoryService>();
@@ -47,6 +48,7 @@ public static class AppServiceProvider
         services.AddSingleton<IRecommendationPreferenceService, RecommendationPreferenceService>();
         services.AddSingleton<IRecommendationService, RecommendationService>();
         services.AddSingleton<IUserCollectionService, UserCollectionService>();
+        services.AddSingleton<ITvSeasonCollectionService, TvSeasonCollectionService>();
         services.AddSingleton<IDiscoveryMovieStatusResolver, DiscoveryMovieStatusResolver>();
         services.AddSingleton<IWatchInsightCacheService, WatchInsightCacheService>();
         services.AddSingleton<IWatchStatisticsService, WatchStatisticsService>();
@@ -69,6 +71,8 @@ public static class AppServiceProvider
         services.AddSingleton<MovieDiscoveryViewModel>();
         services.AddSingleton<WatchHistoryViewModel>();
         services.AddSingleton<MovieDetailViewModel>();
+        services.AddSingleton<SeriesOverviewViewModel>();
+        services.AddSingleton<TvSeasonDetailViewModel>();
         services.AddSingleton<ScanTasksViewModel>();
         services.AddSingleton<RecommendationsViewModel>();
         services.AddSingleton<WatchInsightsViewModel>();

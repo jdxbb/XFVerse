@@ -307,7 +307,14 @@ public sealed class HomeViewModel : PageViewModelBase
         switch (parameter)
         {
             case HomeMovieItem movie:
-                _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId);
+                if (movie.EpisodeId.HasValue && movie.TvSeasonId.HasValue)
+                {
+                    _navigationStateService.RequestTvSeasonDetail(movie.TvSeasonId.Value, movie.EpisodeId);
+                }
+                else
+                {
+                    _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId);
+                }
                 break;
             case CollectionMovieItem collectionMovie:
                 OpenCollectionMovie(collectionMovie);
@@ -342,11 +349,20 @@ public sealed class HomeViewModel : PageViewModelBase
             _isContinuingPlayback = true;
             movie.IsOpeningPlayback = true;
             ContinuePlaybackCommand.RaiseCanExecuteChanged();
-            await _playerWindowService.OpenAsync(movie.MovieId, movie.MediaFileId);
+            if (movie.EpisodeId.HasValue)
+            {
+                await _playerWindowService.OpenEpisodeAsync(movie.EpisodeId.Value, movie.MediaFileId);
+            }
+            else
+            {
+                await _playerWindowService.OpenAsync(movie.MovieId, movie.MediaFileId);
+            }
+
             keepDisabledUntilWindowClosed = _playerWindowService.IsPlayerOpen
                                              && IsSamePlayback(
                                                  movie,
                                                  _playerWindowService.ActiveMovieId,
+                                                 _playerWindowService.ActiveEpisodeId,
                                                  _playerWindowService.ActiveMediaFileId);
         }
         catch (Exception exception)
@@ -402,15 +418,22 @@ public sealed class HomeViewModel : PageViewModelBase
 
         foreach (var movie in RecentlyPlayed)
         {
-            movie.IsOpeningPlayback = IsSamePlayback(
+                movie.IsOpeningPlayback = IsSamePlayback(
                 movie,
                 _playerWindowService.ActiveMovieId,
+                _playerWindowService.ActiveEpisodeId,
                 _playerWindowService.ActiveMediaFileId);
         }
     }
 
-    private static bool IsSamePlayback(HomeMovieItem movie, int? activeMovieId, int? activeMediaFileId)
+    private static bool IsSamePlayback(HomeMovieItem movie, int? activeMovieId, int? activeEpisodeId, int? activeMediaFileId)
     {
+        if (movie.EpisodeId.HasValue)
+        {
+            return activeEpisodeId == movie.EpisodeId.Value
+                   && (!activeMediaFileId.HasValue || movie.MediaFileId == activeMediaFileId);
+        }
+
         return activeMovieId == movie.MovieId
                && (!activeMediaFileId.HasValue || movie.MediaFileId == activeMediaFileId);
     }

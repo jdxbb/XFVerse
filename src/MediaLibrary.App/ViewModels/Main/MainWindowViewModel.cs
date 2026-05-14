@@ -33,6 +33,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         MovieDiscoveryViewModel movieDiscoveryViewModel,
         WatchHistoryViewModel watchHistoryViewModel,
         MovieDetailViewModel movieDetailViewModel,
+        SeriesOverviewViewModel seriesOverviewViewModel,
+        TvSeasonDetailViewModel tvSeasonDetailViewModel,
         ScanTasksViewModel scanTasksViewModel,
         RecommendationsViewModel recommendationsViewModel,
         WatchInsightsViewModel watchInsightsViewModel,
@@ -55,6 +57,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         var hiddenRouteItems = new[]
         {
+            new NavigationItemViewModel(NavigationPageKey.SeriesOverview, "电视剧", seriesOverviewViewModel),
+            new NavigationItemViewModel(NavigationPageKey.TvSeasonDetail, "电视剧季", tvSeasonDetailViewModel),
             new NavigationItemViewModel(NavigationPageKey.MovieDetail, "详情", movieDetailViewModel),
             new NavigationItemViewModel(NavigationPageKey.ScanTasks, "扫描任务", scanTasksViewModel),
             new NavigationItemViewModel(NavigationPageKey.Recommendations, "AI 推荐", recommendationsViewModel),

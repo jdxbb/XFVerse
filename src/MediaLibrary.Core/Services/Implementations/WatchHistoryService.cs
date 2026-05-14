@@ -44,6 +44,43 @@ public sealed class WatchHistoryService : IWatchHistoryService
         return history.Id;
     }
 
+    public async Task<int> StartEpisodeAsync(
+        int episodeId,
+        int mediaFileId,
+        int initialPositionSeconds = 0,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var now = DateTime.UtcNow;
+        var normalizedInitialPosition = Math.Max(0, initialPositionSeconds);
+
+        var history = new WatchHistory
+        {
+            EpisodeId = episodeId,
+            MediaFileId = mediaFileId,
+            StartedAt = now,
+            LastPlayPositionSeconds = normalizedInitialPosition,
+            CreatedAt = now
+        };
+
+        dbContext.WatchHistories.Add(history);
+
+        var episode = await dbContext.TvEpisodes.FirstOrDefaultAsync(x => x.Id == episodeId, cancellationToken);
+        if (episode is not null)
+        {
+            episode.LastPlayedAt = now;
+            if (normalizedInitialPosition > 0)
+            {
+                episode.LastPlayPositionSeconds = normalizedInitialPosition;
+            }
+
+            episode.UpdatedAt = now;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return history.Id;
+    }
+
     public async Task<int> GetResumePositionAsync(int movieId, int mediaFileId, CancellationToken cancellationToken = default)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -51,6 +88,22 @@ public sealed class WatchHistoryService : IWatchHistoryService
         return await dbContext.WatchHistories
             .AsNoTracking()
             .Where(x => x.MovieId == movieId && x.MediaFileId == mediaFileId && !x.IsCompleted)
+            .OrderByDescending(x => x.LastPlayPositionSeconds > 0)
+            .ThenByDescending(x => x.StartedAt)
+            .Select(x => x.LastPlayPositionSeconds)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<int> GetEpisodeResumePositionAsync(
+        int episodeId,
+        int mediaFileId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        return await dbContext.WatchHistories
+            .AsNoTracking()
+            .Where(x => x.EpisodeId == episodeId && x.MediaFileId == mediaFileId && !x.IsCompleted)
             .OrderByDescending(x => x.LastPlayPositionSeconds > 0)
             .ThenByDescending(x => x.StartedAt)
             .Select(x => x.LastPlayPositionSeconds)
@@ -77,7 +130,15 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
         if (!history.MovieId.HasValue)
         {
-            return false;
+            return history.EpisodeId.HasValue
+                && await SaveEpisodeProgressAsync(
+                    dbContext,
+                    history,
+                    positionSeconds,
+                    durationWatchedSeconds,
+                    isCompleted,
+                    mediaDurationSeconds,
+                    cancellationToken);
         }
 
         var movieId = history.MovieId.Value;
@@ -169,21 +230,21 @@ public sealed class WatchHistoryService : IWatchHistoryService
         var take = query.Take <= 0 ? DefaultHistoryTake : query.Take;
         var rawTake = Math.Max(take * 5, take);
 
-        var histories = dbContext.WatchHistories
+        var movieHistories = dbContext.WatchHistories
             .AsNoTracking()
             .Where(x => x.Movie != null);
 
         if (query.StartedAtUtc.HasValue)
         {
-            histories = histories.Where(x => x.StartedAt >= query.StartedAtUtc.Value);
+            movieHistories = movieHistories.Where(x => x.StartedAt >= query.StartedAtUtc.Value);
         }
 
         if (query.EndedBeforeUtc.HasValue)
         {
-            histories = histories.Where(x => x.StartedAt < query.EndedBeforeUtc.Value);
+            movieHistories = movieHistories.Where(x => x.StartedAt < query.EndedBeforeUtc.Value);
         }
 
-        var rows = await histories
+        var movieRows = await movieHistories
             .OrderByDescending(x => x.StartedAt)
             .Take(rawTake)
             .Select(
@@ -209,13 +270,209 @@ public sealed class WatchHistoryService : IWatchHistoryService
                 })
             .ToListAsync(cancellationToken);
 
-        return rows
+        var episodeHistories = dbContext.WatchHistories
+            .AsNoTracking()
+            .Where(x => x.Episode != null);
+
+        if (query.StartedAtUtc.HasValue)
+        {
+            episodeHistories = episodeHistories.Where(x => x.StartedAt >= query.StartedAtUtc.Value);
+        }
+
+        if (query.EndedBeforeUtc.HasValue)
+        {
+            episodeHistories = episodeHistories.Where(x => x.StartedAt < query.EndedBeforeUtc.Value);
+        }
+
+        var episodeRows = await episodeHistories
+            .OrderByDescending(x => x.StartedAt)
+            .Take(rawTake)
+            .Select(
+                x => new WatchHistoryProjection
+                {
+                    HistoryId = x.Id,
+                    MovieId = 0,
+                    EpisodeId = x.EpisodeId,
+                    TvSeasonId = x.Episode!.TvSeasonId,
+                    TvSeriesId = x.Episode.Season!.TvSeriesId,
+                    SeasonNumber = x.Episode.Season.SeasonNumber,
+                    EpisodeNumber = x.Episode.EpisodeNumber,
+                    MediaFileId = x.MediaFileId,
+                    TmdbId = x.Episode.Season.Series!.TmdbSeriesId,
+                    Title = x.Episode.Season.Series.Name + " S" + x.Episode.Season.SeasonNumber.ToString("D2")
+                            + "E" + x.Episode.EpisodeNumber.ToString("D2")
+                            + (string.IsNullOrWhiteSpace(x.Episode.Title) ? string.Empty : " " + x.Episode.Title),
+                    ReleaseYear = x.Episode.AirDate.HasValue
+                        ? x.Episode.AirDate.Value.Year
+                        : x.Episode.Season.AirDate.HasValue
+                            ? x.Episode.Season.AirDate.Value.Year
+                            : x.Episode.Season.Series.FirstAirYear,
+                    PosterRemoteUrl = x.Episode.Season.PosterRemoteUrl ?? x.Episode.Season.Series.PosterRemoteUrl ?? string.Empty,
+                    MediaFileName = x.MediaFile == null ? string.Empty : x.MediaFile.FileName,
+                    StartedAt = x.StartedAt,
+                    EndedAt = x.EndedAt,
+                    DurationWatchedSeconds = x.DurationWatchedSeconds,
+                    LastPlayPositionSeconds = x.LastPlayPositionSeconds,
+                    MediaDurationSeconds = x.MediaFile == null ? null : x.MediaFile.DurationSeconds,
+                    RuntimeMinutes = x.Episode.RuntimeMinutes,
+                    IsCompleted = x.IsCompleted,
+                    IsMediaFileDeleted = x.MediaFile != null && x.MediaFile.IsDeleted,
+                    IdentificationStatus = x.Episode.Season.IdentificationStatus
+                })
+            .ToListAsync(cancellationToken);
+
+        return movieRows
+            .Concat(episodeRows)
             .Select(ToListItem)
             .GroupBy(item => BuildSameDayMovieKey(item), StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(item => item.StartedAtLocal).First())
             .OrderByDescending(item => item.StartedAtLocal)
             .Take(take)
             .ToList();
+    }
+
+    private static async Task<bool> SaveEpisodeProgressAsync(
+        AppDbContext dbContext,
+        WatchHistory history,
+        int positionSeconds,
+        int durationWatchedSeconds,
+        bool isCompleted,
+        int? mediaDurationSeconds,
+        CancellationToken cancellationToken)
+    {
+        if (!history.EpisodeId.HasValue)
+        {
+            return false;
+        }
+
+        var episodeId = history.EpisodeId.Value;
+        var normalizedPosition = Math.Max(0, positionSeconds);
+        var normalizedWatched = Math.Max(0, durationWatchedSeconds);
+        var normalizedMediaDuration = mediaDurationSeconds.HasValue
+            ? Math.Max(0, mediaDurationSeconds.Value)
+            : 0;
+        var mediaFile = await dbContext.MediaFiles
+            .FirstOrDefaultAsync(x => x.Id == history.MediaFileId, cancellationToken);
+        var episode = await dbContext.TvEpisodes
+            .FirstOrDefaultAsync(x => x.Id == episodeId, cancellationToken);
+
+        if (normalizedMediaDuration > 0 && mediaFile is not null)
+        {
+            if (!mediaFile.DurationSeconds.HasValue
+                || Math.Abs(mediaFile.DurationSeconds.Value - normalizedMediaDuration) > 2)
+            {
+                mediaFile.DurationSeconds = normalizedMediaDuration;
+                mediaFile.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        var effectiveDurationSeconds = ResolveEffectiveEpisodeDurationSeconds(
+            normalizedMediaDuration,
+            mediaFile,
+            episode);
+
+        if (normalizedPosition > 0 && normalizedWatched >= 3)
+        {
+            history.LastPlayPositionSeconds = normalizedPosition;
+            history.DurationWatchedSeconds = Math.Max(history.DurationWatchedSeconds, normalizedWatched);
+        }
+
+        history.EndedAt = DateTime.UtcNow;
+
+        var completionResult = await EvaluateEpisodeCompletionAsync(
+            dbContext,
+            history,
+            normalizedPosition,
+            history.DurationWatchedSeconds,
+            effectiveDurationSeconds,
+            isCompleted,
+            cancellationToken);
+        var finalHistoryCompleted = history.IsCompleted || completionResult.IsSingleWatchCompleted;
+        if (!history.IsCompleted && finalHistoryCompleted)
+        {
+            history.IsCompleted = true;
+        }
+
+        if (episode is not null)
+        {
+            episode.LastPlayedAt = DateTime.UtcNow;
+            if (normalizedPosition > 0)
+            {
+                episode.LastPlayPositionSeconds = normalizedPosition;
+            }
+
+            episode.DurationWatchedSeconds = Math.Max(episode.DurationWatchedSeconds, history.DurationWatchedSeconds);
+            if (finalHistoryCompleted)
+            {
+                episode.IsWatched = true;
+            }
+
+            episode.UpdatedAt = DateTime.UtcNow;
+        }
+
+        LogEpisodeCompletionEvaluation(
+            episodeId,
+            history.MediaFileId,
+            isCompleted,
+            normalizedPosition,
+            effectiveDurationSeconds,
+            history.DurationWatchedSeconds,
+            finalHistoryCompleted,
+            completionResult);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return false;
+    }
+
+    private static async Task<WatchCompletionResult> EvaluateEpisodeCompletionAsync(
+        AppDbContext dbContext,
+        WatchHistory history,
+        int normalizedPosition,
+        int effectiveWatchedSeconds,
+        int? effectiveDurationSeconds,
+        bool externalCompleted,
+        CancellationToken cancellationToken)
+    {
+        if (!effectiveDurationSeconds.HasValue
+            || effectiveDurationSeconds.Value <= WatchCompletionOptions.DefaultMinimumValidDurationSeconds)
+        {
+            return WatchCompletionResult.NotCompleted("no-duration");
+        }
+
+        var histories = new List<WatchCompletionHistoryItem>();
+        if (ShouldQueryMovieHistoriesForAggregate(
+            normalizedPosition,
+            effectiveWatchedSeconds,
+            effectiveDurationSeconds.Value,
+            externalCompleted))
+        {
+            histories = await dbContext.WatchHistories
+                .AsNoTracking()
+                .Where(x => x.EpisodeId == history.EpisodeId)
+                .Select(x => new WatchCompletionHistoryItem
+                {
+                    Id = x.Id,
+                    LastPlayPositionSeconds = x.LastPlayPositionSeconds,
+                    DurationWatchedSeconds = x.DurationWatchedSeconds,
+                    StartedAt = x.StartedAt
+                })
+                .ToListAsync(cancellationToken);
+            histories.RemoveAll(x => x.Id == history.Id);
+        }
+
+        histories.Add(new WatchCompletionHistoryItem
+        {
+            Id = history.Id,
+            LastPlayPositionSeconds = Math.Max(0, history.LastPlayPositionSeconds),
+            DurationWatchedSeconds = Math.Max(0, effectiveWatchedSeconds),
+            StartedAt = history.StartedAt
+        });
+
+        return WatchCompletionEvaluator.Evaluate(
+            normalizedPosition,
+            effectiveWatchedSeconds,
+            effectiveDurationSeconds,
+            histories);
     }
 
     private static async Task<WatchCompletionResult> EvaluateCompletionAsync(
@@ -329,6 +586,29 @@ public sealed class WatchHistoryService : IWatchHistoryService
         if (movie?.RuntimeMinutes is > 0)
         {
             return movie.RuntimeMinutes.Value * 60;
+        }
+
+        return null;
+    }
+
+    private static int? ResolveEffectiveEpisodeDurationSeconds(
+        int normalizedMediaDuration,
+        MediaFile? mediaFile,
+        TvEpisode? episode)
+    {
+        if (normalizedMediaDuration > 0)
+        {
+            return normalizedMediaDuration;
+        }
+
+        if (mediaFile?.DurationSeconds is > 0)
+        {
+            return mediaFile.DurationSeconds.Value;
+        }
+
+        if (episode?.RuntimeMinutes is > 0)
+        {
+            return episode.RuntimeMinutes.Value * 60;
         }
 
         return null;
@@ -478,6 +758,30 @@ public sealed class WatchHistoryService : IWatchHistoryService
         }
     }
 
+    private static void LogEpisodeCompletionEvaluation(
+        int episodeId,
+        int mediaFileId,
+        bool externalCompleted,
+        int positionSeconds,
+        int? durationSeconds,
+        int watchedSeconds,
+        bool historyCompleted,
+        WatchCompletionResult result)
+    {
+        if (!ShouldLogCompletionDetails(externalCompleted, positionSeconds, durationSeconds, result))
+        {
+            return;
+        }
+
+        WatchCompletionDiagnostics.Write(
+            $"watch-completion-result episodeId={episodeId} mediaFileId={mediaFileId} "
+            + $"single={result.IsSingleWatchCompleted.ToString().ToLowerInvariant()} "
+            + $"aggregate={result.IsAggregateCompleted.ToString().ToLowerInvariant()} "
+            + $"historyCompleted={historyCompleted.ToString().ToLowerInvariant()} "
+            + $"position={positionSeconds} duration={FormatNullableDuration(durationSeconds)} watched={watchedSeconds} "
+            + $"reason={ResolveCompletionResultReason(externalCompleted, result)}");
+    }
+
     private static void LogAutoMarkedWatched(int movieId, WatchCompletionResult result)
     {
         var source = result.IsSingleWatchCompleted ? "single" : "aggregate";
@@ -552,6 +856,11 @@ public sealed class WatchHistoryService : IWatchHistoryService
         {
             HistoryId = row.HistoryId,
             MovieId = row.MovieId,
+            EpisodeId = row.EpisodeId,
+            TvSeasonId = row.TvSeasonId,
+            TvSeriesId = row.TvSeriesId,
+            SeasonNumber = row.SeasonNumber,
+            EpisodeNumber = row.EpisodeNumber,
             MediaFileId = row.MediaFileId,
             TmdbId = row.TmdbId,
             Title = string.IsNullOrWhiteSpace(row.Title) ? row.MediaFileName : row.Title,
@@ -590,6 +899,11 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
     private static string BuildSameDayMovieKey(WatchHistoryListItem item)
     {
+        if (item.EpisodeId.HasValue)
+        {
+            return $"{item.StartedAtLocal.Date:yyyyMMdd}:episode:{item.EpisodeId.Value}";
+        }
+
         var movieKey = item.TmdbId.HasValue
             ? $"tmdb:{item.TmdbId.Value}"
             : $"movie:{item.MovieId}";
@@ -623,6 +937,11 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
         if (!history.MovieId.HasValue)
         {
+            if (history.EpisodeId.HasValue)
+            {
+                await DiscardEpisodeAsync(dbContext, history, cancellationToken);
+            }
+
             return;
         }
 
@@ -654,11 +973,54 @@ public sealed class WatchHistoryService : IWatchHistoryService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    private static async Task DiscardEpisodeAsync(
+        AppDbContext dbContext,
+        WatchHistory history,
+        CancellationToken cancellationToken)
+    {
+        var episodeId = history.EpisodeId!.Value;
+        if (history.LastPlayPositionSeconds > 0
+            || history.DurationWatchedSeconds > 0
+            || history.IsCompleted)
+        {
+            history.EndedAt ??= DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        var previousLastPlayedAt = await dbContext.WatchHistories
+            .AsNoTracking()
+            .Where(x => x.EpisodeId == episodeId && x.Id != history.Id)
+            .OrderByDescending(x => x.EndedAt ?? x.StartedAt)
+            .Select(x => (DateTime?)(x.EndedAt ?? x.StartedAt))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var episode = await dbContext.TvEpisodes.FirstOrDefaultAsync(x => x.Id == episodeId, cancellationToken);
+        if (episode is not null)
+        {
+            episode.LastPlayedAt = previousLastPlayedAt;
+            episode.UpdatedAt = DateTime.UtcNow;
+        }
+
+        dbContext.WatchHistories.Remove(history);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private sealed class WatchHistoryProjection
     {
         public int HistoryId { get; init; }
 
         public int MovieId { get; init; }
+
+        public int? EpisodeId { get; init; }
+
+        public int? TvSeasonId { get; init; }
+
+        public int? TvSeriesId { get; init; }
+
+        public int SeasonNumber { get; init; }
+
+        public int EpisodeNumber { get; init; }
 
         public int MediaFileId { get; init; }
 

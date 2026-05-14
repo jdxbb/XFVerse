@@ -10,7 +10,15 @@ public interface IWatchHistoryService
         int initialPositionSeconds = 0,
         CancellationToken cancellationToken = default);
 
+    Task<int> StartEpisodeAsync(
+        int episodeId,
+        int mediaFileId,
+        int initialPositionSeconds = 0,
+        CancellationToken cancellationToken = default);
+
     Task<int> GetResumePositionAsync(int movieId, int mediaFileId, CancellationToken cancellationToken = default);
+
+    Task<int> GetEpisodeResumePositionAsync(int episodeId, int mediaFileId, CancellationToken cancellationToken = default);
 
     Task<bool> SaveProgressAsync(
         int watchHistoryId,

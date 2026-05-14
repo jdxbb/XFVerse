@@ -106,6 +106,13 @@
                                   Style="{StaticResource FormComboBoxStyle}" />
                     </StackPanel>
 
+                    <StackPanel Width="132" Margin="0,0,12,12">
+                        <TextBlock Text="内容" Style="{StaticResource BodyMutedTextStyle}" />
+                        <ComboBox SelectedItem="{Binding SelectedContentTypeFilter}"
+                                  ItemsSource="{Binding ContentTypeOptions}"
+                                  Style="{StaticResource FormComboBoxStyle}" />
+                    </StackPanel>
+
                     <StackPanel Width="190" Margin="0,0,12,12">
                         <TextBlock Text="范围" Style="{StaticResource BodyMutedTextStyle}" />
                         <Menu>
@@ -288,6 +295,30 @@
                             Command="{Binding BatchAutoIdentifyCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
                     <Button Margin="0,0,10,10"
+                            Content="标记喜爱"
+                            Command="{Binding BatchMarkFavoriteCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
+                            Content="取消喜爱"
+                            Command="{Binding BatchUnmarkFavoriteCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
+                            Content="标记想看"
+                            Command="{Binding BatchMarkWantToWatchCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
+                            Content="取消想看"
+                            Command="{Binding BatchUnmarkWantToWatchCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
+                            Content="标记不想看"
+                            Command="{Binding BatchMarkNotInterestedCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
+                            Content="取消不想看"
+                            Command="{Binding BatchUnmarkNotInterestedCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
                             Content="取消"
                             Command="{Binding CancelBatchOperationCommand}">
                         <Button.Style>
@@ -427,6 +458,9 @@
                                                        Text="{Binding Title}"
                                                        TextWrapping="Wrap"
                                                        Style="{StaticResource SectionTitleTextStyle}" />
+                                            <TextBlock Margin="0,4,0,0"
+                                                       Text="{Binding MediaKindText}"
+                                                       Style="{StaticResource BodyMutedTextStyle}" />
                                             <TextBlock Margin="0,4,0,0" Text="{Binding ReleaseYear}" Style="{StaticResource BodyMutedTextStyle}" />
                                             <TextBlock Margin="0,6,0,0"
                                                        Text="{Binding GenresText}"
@@ -439,7 +473,7 @@
                                                            Style="{StaticResource BodyMutedTextStyle}" />
                                             </DockPanel>
                                             <TextBlock Margin="0,5,0,0"
-                                                       Text="{Binding SourceSummary}"
+                                                       Text="{Binding ProgressSummary}"
                                                        Style="{StaticResource BodyMutedTextStyle}" />
                                             <Button Margin="0,14,0,0"
                                                     Content="查看详情"

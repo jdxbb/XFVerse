@@ -324,6 +324,8 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="70" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="70" />
@@ -337,13 +339,25 @@
                         <Button Grid.Column="1"
                                 Width="72"
                                 Margin="10,0,0,0"
+                                Command="{Binding GoPreviousEpisodeCommand}"
+                                Content="上一集"
+                                ToolTip="{Binding PreviousEpisodeToolTip}" />
+                        <Button Grid.Column="2"
+                                Width="72"
+                                Margin="10,0,0,0"
+                                Command="{Binding GoNextEpisodeCommand}"
+                                Content="下一集"
+                                ToolTip="{Binding NextEpisodeToolTip}" />
+                        <Button Grid.Column="3"
+                                Width="72"
+                                Margin="10,0,0,0"
                                 Command="{Binding StopCommand}"
                                 Content="停止" />
-                        <TextBlock Grid.Column="2"
+                        <TextBlock Grid.Column="4"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Text="{Binding PositionText}" />
-                        <Grid Grid.Column="3"
+                        <Grid Grid.Column="5"
                               VerticalAlignment="Center">
                             <Slider x:Name="ProgressSlider"
                                     VerticalAlignment="Center"
@@ -352,11 +366,11 @@
                                     PreviewMouseLeftButtonDown="ProgressSlider_PreviewMouseLeftButtonDown"
                                     Value="{Binding PositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
-                        <TextBlock Grid.Column="4"
+                        <TextBlock Grid.Column="6"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Text="{Binding DurationText}" />
-                        <StackPanel Grid.Column="5"
+                        <StackPanel Grid.Column="7"
                                     Margin="14,0,8,0"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center">
@@ -375,7 +389,7 @@
                             <TextBlock VerticalAlignment="Center"
                                        Text="{Binding VolumeText}" />
                         </StackPanel>
-                        <Slider Grid.Column="6"
+                        <Slider Grid.Column="8"
                                 Width="130"
                                 Minimum="0"
                                 Maximum="200"

@@ -13,6 +13,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
 {
     private const string CollectionChangeSource = "Collection";
     private readonly IUserCollectionService _userCollectionService;
+    private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IMovieManagementService _movieManagementService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
@@ -22,12 +23,14 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
     public FavoritesViewModel(
         IUserCollectionService userCollectionService,
+        ITvSeasonCollectionService tvSeasonCollectionService,
         IMovieManagementService movieManagementService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService)
         : base("收藏夹", "集中查看喜爱和想看的影片。")
     {
         _userCollectionService = userCollectionService;
+        _tvSeasonCollectionService = tvSeasonCollectionService;
         _movieManagementService = movieManagementService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
@@ -117,7 +120,9 @@ public sealed class FavoritesViewModel : PageViewModelBase
         try
         {
             StatusMessage = "正在加载收藏夹。";
-            var items = await _userCollectionService.GetCollectionItemsAsync(cancellationToken);
+            var movieItems = await _userCollectionService.GetCollectionItemsAsync(cancellationToken);
+            var tvItems = await _tvSeasonCollectionService.GetCollectionItemsAsync(cancellationToken);
+            var items = movieItems.Concat(tvItems).ToList();
             ReplaceItems(FavoriteMovies, BuildTabItems(items.Where(x => x.IsLiked), FavoriteTabKind.Favorite));
             ReplaceItems(WantToWatchMovies, BuildTabItems(items.Where(x => x.IsWantToWatch), FavoriteTabKind.WantToWatch));
             RaiseCountsChanged();
@@ -151,9 +156,16 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
     private static string BuildDeduplicationKey(CollectionMovieItem item)
     {
+        if (item.TvSeasonId.HasValue)
+        {
+            return $"season:{item.TvSeasonId.Value}";
+        }
+
         if (item.TmdbId.HasValue)
         {
-            return $"tmdb:{item.TmdbId.Value}";
+            return item.IsTvSeason
+                ? $"tv-tmdb:{item.TmdbId.Value}:s{item.SeasonNumber}"
+                : $"tmdb:{item.TmdbId.Value}";
         }
 
         if (item.MovieId.HasValue)
@@ -220,6 +232,16 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
     private async Task RemoveFavoriteAsync(FavoriteCollectionItemViewModel item)
     {
+        if (item.IsTvSeason && item.TvSeasonId.HasValue)
+        {
+            await _tvSeasonCollectionService.SetFavoriteAsync(
+                item.TvSeasonId.Value,
+                isFavorite: false,
+                changeSource: CollectionChangeSource);
+            StatusMessage = $"已取消喜爱：{item.Title}";
+            return;
+        }
+
         if (!item.MovieId.HasValue)
         {
             StatusMessage = "库外喜爱暂未接入，无法取消喜爱。";
@@ -235,6 +257,16 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
     private async Task RemoveWantToWatchAsync(FavoriteCollectionItemViewModel item)
     {
+        if (item.IsTvSeason && item.TvSeasonId.HasValue)
+        {
+            await _tvSeasonCollectionService.SetWantToWatchAsync(
+                item.TvSeasonId.Value,
+                isWantToWatch: false,
+                changeSource: CollectionChangeSource);
+            StatusMessage = $"已取消想看：{item.Title}";
+            return;
+        }
+
         await _userCollectionService.RemoveWantToWatchAsync(
             ToRecommendation(item, keepMovieId: true),
             changeSource: CollectionChangeSource);
@@ -251,6 +283,12 @@ public sealed class FavoritesViewModel : PageViewModelBase
         if (movie.IsInLibrary && movie.MovieId.HasValue)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId.Value);
+            return;
+        }
+
+        if (movie.IsTvSeason && movie.TvSeasonId.HasValue)
+        {
+            _navigationStateService.RequestTvSeasonDetail(movie.TvSeasonId.Value);
             return;
         }
 
@@ -320,6 +358,10 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         public int? MovieId => _item.MovieId;
 
+        public bool IsTvSeason => _item.IsTvSeason;
+
+        public int? TvSeasonId => _item.TvSeasonId;
+
         public int? TmdbId => _item.TmdbId;
 
         public string Title => _item.Title;
@@ -382,6 +424,6 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         public string ActionText => TabKind == FavoriteTabKind.Favorite ? "取消喜爱" : "取消想看";
 
-        public bool CanRemove => TabKind != FavoriteTabKind.Favorite || MovieId.HasValue;
+        public bool CanRemove => IsTvSeason || TabKind != FavoriteTabKind.Favorite || MovieId.HasValue;
     }
 }

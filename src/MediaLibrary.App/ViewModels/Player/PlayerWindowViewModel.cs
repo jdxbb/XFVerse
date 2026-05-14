@@ -126,6 +126,9 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private IntPtr _playbackHostHandle;
     private VideoCachePlaybackLease? _currentVideoCacheLease;
     private PlaybackSessionModel? _session;
+    private PlaybackContentType _currentContentType = PlaybackContentType.Movie;
+    private PlaybackEpisodeNavigationItem? _previousEpisode;
+    private PlaybackEpisodeNavigationItem? _nextEpisode;
     private PlaybackSourceItem? _selectedSource;
     private PlaybackSubtitleItem? _selectedSubtitle;
     private PlaybackSubtitleItem? _appliedSubtitle;
@@ -234,6 +237,12 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
         TogglePlayPauseCommand = new RelayCommand(TogglePlayPause);
         StopCommand = new AsyncRelayCommand(StopAsync, () => !_isStopping);
+        GoPreviousEpisodeCommand = new AsyncRelayCommand(
+            () => OpenAdjacentEpisodeAsync(_previousEpisode, "previous-episode"),
+            () => CanGoPreviousEpisode);
+        GoNextEpisodeCommand = new AsyncRelayCommand(
+            () => OpenAdjacentEpisodeAsync(_nextEpisode, "next-episode"),
+            () => CanGoNextEpisode);
 
         _timer = new DispatcherTimer
         {
@@ -270,11 +279,37 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
     public AsyncRelayCommand StopCommand { get; }
 
+    public AsyncRelayCommand GoPreviousEpisodeCommand { get; }
+
+    public AsyncRelayCommand GoNextEpisodeCommand { get; }
+
     public string MovieTitle
     {
         get => _movieTitle;
         private set => SetProperty(ref _movieTitle, value);
     }
+
+    public bool CanGoPreviousEpisode => _currentContentType == PlaybackContentType.Episode
+                                        && _previousEpisode?.HasPlayableSource == true;
+
+    public bool CanGoNextEpisode => _currentContentType == PlaybackContentType.Episode
+                                    && _nextEpisode?.HasPlayableSource == true;
+
+    public string PreviousEpisodeToolTip => _currentContentType != PlaybackContentType.Episode
+        ? "\u7535\u5f71\u64ad\u653e\u4e0d\u652f\u6301\u4e0a\u4e00\u96c6"
+        : _previousEpisode is null
+            ? "\u5df2\u662f\u672c\u5b63\u7b2c\u4e00\u96c6"
+            : _previousEpisode.HasPlayableSource
+                ? _previousEpisode.DisplayText
+                : "\u4e0a\u4e00\u96c6\u6682\u65e0\u53ef\u7528\u64ad\u653e\u6e90";
+
+    public string NextEpisodeToolTip => _currentContentType != PlaybackContentType.Episode
+        ? "\u7535\u5f71\u64ad\u653e\u4e0d\u652f\u6301\u4e0b\u4e00\u96c6"
+        : _nextEpisode is null
+            ? "\u5df2\u662f\u672c\u5b63\u6700\u540e\u4e00\u96c6"
+            : _nextEpisode.HasPlayableSource
+                ? _nextEpisode.DisplayText
+                : "\u4e0b\u4e00\u96c6\u6682\u65e0\u53ef\u7528\u64ad\u653e\u6e90";
 
     public string StatusMessage
     {
@@ -522,20 +557,46 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     public async Task InitializeAsync(int movieId, int? mediaFileId, CancellationToken cancellationToken = default)
     {
         _session = await _playbackSourceService.GetPlaybackSessionAsync(movieId, mediaFileId, cancellationToken);
+        await ApplySessionAsync(
+            _session,
+            "initialize-no-session",
+            "\u672a\u627e\u5230\u5f71\u7247\u64ad\u653e\u4fe1\u606f\u3002",
+            "\u5f53\u524d\u5f71\u7247\u6ca1\u6709\u53ef\u64ad\u653e\u7684\u89c6\u9891\u6e90\u3002",
+            cancellationToken);
+    }
+
+    public async Task InitializeEpisodeAsync(int episodeId, int? mediaFileId, CancellationToken cancellationToken = default)
+    {
+        _session = await _playbackSourceService.GetEpisodePlaybackSessionAsync(episodeId, mediaFileId, cancellationToken);
+        await ApplySessionAsync(
+            _session,
+            "initialize-no-episode-session",
+            "\u672a\u627e\u5230\u8be5\u96c6\u7684\u64ad\u653e\u4fe1\u606f\u3002",
+            "\u5f53\u524d\u96c6\u6682\u65e0\u53ef\u64ad\u653e\u7684\u89c6\u9891\u6e90\u3002",
+            cancellationToken);
+    }
+
+    private async Task ApplySessionAsync(
+        PlaybackSessionModel? session,
+        string missingSessionReason,
+        string missingSessionMessage,
+        string missingSourceMessage,
+        CancellationToken cancellationToken)
+    {
         if (_disposed)
         {
             return;
         }
 
-        if (_session is null)
+        if (session is null)
         {
-            SetMainPlaybackUiState(MainPlaybackUiState.Error, "initialize-no-session", "\u672a\u627e\u5230\u5f71\u7247\u64ad\u653e\u4fe1\u606f\u3002");
+            SetMainPlaybackUiState(MainPlaybackUiState.Error, missingSessionReason, missingSessionMessage);
             return;
         }
 
-        MovieTitle = _session.MovieTitle;
+        ApplySessionMetadata(session);
         Sources.Clear();
-        foreach (var source in _session.Sources)
+        foreach (var source in session.Sources)
         {
             Sources.Add(source);
         }
@@ -543,15 +604,25 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         await RefreshVideoCacheStatusesAsync(cancellationToken);
 
         _suppressSourceAutoPlay = true;
-        SelectedSource = Sources.FirstOrDefault(x => x.MediaFileId == _session.SelectedMediaFileId) ?? Sources.FirstOrDefault();
+        SelectedSource = Sources.FirstOrDefault(x => x.MediaFileId == session.SelectedMediaFileId) ?? Sources.FirstOrDefault();
         _suppressSourceAutoPlay = false;
         if (SelectedSource is null)
         {
-            SetMainPlaybackUiState(MainPlaybackUiState.Error, "initialize-no-source", "\u5f53\u524d\u5f71\u7247\u6ca1\u6709\u53ef\u64ad\u653e\u7684\u89c6\u9891\u6e90\u3002");
+            SetMainPlaybackUiState(MainPlaybackUiState.Error, "initialize-no-source", missingSourceMessage);
             return;
         }
 
         await PlayCurrentSourceAsync(false);
+    }
+
+    private void ApplySessionMetadata(PlaybackSessionModel session)
+    {
+        _session = session;
+        _currentContentType = session.ContentType;
+        _previousEpisode = session.PreviousEpisode;
+        _nextEpisode = session.NextEpisode;
+        MovieTitle = string.IsNullOrWhiteSpace(session.DisplayTitle) ? "\u64ad\u653e\u5668" : session.DisplayTitle;
+        RaiseEpisodeNavigationStateChanged();
     }
 
     public async Task SaveAndCloseAsync()
@@ -664,6 +735,76 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         Volume = _lastNonZeroVolume > 0 ? _lastNonZeroVolume : 50;
     }
 
+    private void RaiseEpisodeNavigationStateChanged()
+    {
+        OnPropertyChanged(nameof(CanGoPreviousEpisode));
+        OnPropertyChanged(nameof(CanGoNextEpisode));
+        OnPropertyChanged(nameof(PreviousEpisodeToolTip));
+        OnPropertyChanged(nameof(NextEpisodeToolTip));
+        GoPreviousEpisodeCommand.RaiseCanExecuteChanged();
+        GoNextEpisodeCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task OpenAdjacentEpisodeAsync(PlaybackEpisodeNavigationItem? target, string reason)
+    {
+        if (_disposed || target is null)
+        {
+            return;
+        }
+
+        if (!target.HasPlayableSource)
+        {
+            SetOperationNotice(PlayerOperationNoticeKind.Playback, "\u76ee\u6807\u96c6\u6682\u65e0\u53ef\u7528\u64ad\u653e\u6e90\u3002", reason);
+            return;
+        }
+
+        await SwitchToEpisodeAsync(target.EpisodeId, reason);
+    }
+
+    private async Task SwitchToEpisodeAsync(int episodeId, string reason)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            await PersistProgressSnapshotAsync((int)Math.Max(0, PositionSeconds), IsCompleted());
+            _watchHistoryId = null;
+            _activeMediaFileId = null;
+            ClearPendingWatchHistoryStart();
+
+            var nextSession = await _playbackSourceService.GetEpisodePlaybackSessionAsync(episodeId);
+            if (nextSession is null)
+            {
+                SetOperationNotice(PlayerOperationNoticeKind.Playback, "\u672a\u627e\u5230\u76ee\u6807\u96c6\u7684\u64ad\u653e\u4fe1\u606f\u3002", reason);
+                return;
+            }
+
+            if (nextSession.Sources.Count == 0)
+            {
+                ApplySessionMetadata(nextSession);
+                Sources.Clear();
+                SetMainPlaybackUiState(MainPlaybackUiState.Error, "episode-no-source", "\u76ee\u6807\u96c6\u6682\u65e0\u53ef\u7528\u64ad\u653e\u6e90\u3002");
+                return;
+            }
+
+            await ApplySessionAsync(
+                nextSession,
+                "episode-session-missing",
+                "\u672a\u627e\u5230\u76ee\u6807\u96c6\u7684\u64ad\u653e\u4fe1\u606f\u3002",
+                "\u76ee\u6807\u96c6\u6682\u65e0\u53ef\u7528\u64ad\u653e\u6e90\u3002",
+                CancellationToken.None);
+            SetOperationNotice(PlayerOperationNoticeKind.Playback, "\u5df2\u5207\u6362\u5230\u76ee\u6807\u96c6\u3002", reason);
+        }
+        catch (Exception exception)
+        {
+            MpvPlaybackDiagnostics.Write($"episode-switch-failed reason={reason} errorType={exception.GetType().Name}");
+            SetOperationNotice(PlayerOperationNoticeKind.Playback, "\u5207\u6362\u96c6\u6570\u5931\u8d25\uff0c\u53ef\u91cd\u8bd5\u3002", reason);
+        }
+    }
+
     private async Task PlayCurrentSourceAsync(bool keepPosition, bool preservePlaybackState = false)
     {
         if (_disposed || SelectedSource is null || _session is null)
@@ -702,8 +843,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        _watchHistoryId = await _watchHistoryService.StartAsync(
-            _session.MovieId,
+        _watchHistoryId = await StartWatchHistoryForCurrentSessionAsync(
             source.MediaFileId,
             ResolveSourceResumePosition(source));
         MpvPlaybackDiagnostics.Write($"mpv-watch-history-start mediaFileId={source.MediaFileId}");
@@ -744,6 +884,27 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         _pendingWatchHistoryStartQueued = false;
     }
 
+    private Task<int> StartWatchHistoryForCurrentSessionAsync(int mediaFileId, int initialPositionSeconds)
+    {
+        if (_session?.ContentType == PlaybackContentType.Episode && _session.EpisodeId.HasValue)
+        {
+            return _watchHistoryService.StartEpisodeAsync(
+                _session.EpisodeId.Value,
+                mediaFileId,
+                initialPositionSeconds);
+        }
+
+        if (_session is null)
+        {
+            throw new InvalidOperationException("Playback session is not initialized.");
+        }
+
+        return _watchHistoryService.StartAsync(
+            _session.MovieId,
+            mediaFileId,
+            initialPositionSeconds);
+    }
+
     private async Task StartPendingWatchHistoryAfterPlaybackReadyAsync()
     {
         var dispatcher = Application.Current?.Dispatcher;
@@ -779,14 +940,11 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var source = SelectedSource;
-        var movieId = _session.MovieId;
         var initialPositionSeconds = _pendingWatchHistoryInitialPositionSeconds;
         ClearPendingWatchHistoryStart();
         try
         {
-            var watchHistoryId = await _watchHistoryService.StartAsync(
-                movieId,
+            var watchHistoryId = await StartWatchHistoryForCurrentSessionAsync(
                 mediaFileId,
                 initialPositionSeconds);
             if (_disposed || SelectedSource?.MediaFileId != mediaFileId)
@@ -2493,10 +2651,37 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         {
             await PersistProgressSnapshotAsync((int)Math.Max(0, PositionSeconds), true);
             MpvPlaybackDiagnostics.Write($"mpv-end-reached-handled mediaFileId={_currentPlaybackSource?.MediaFileId ?? SelectedSource?.MediaFileId ?? 0}");
+            if (_currentContentType == PlaybackContentType.Episode)
+            {
+                await TryAutoPlayNextEpisodeAsync();
+            }
         }
         catch
         {
         }
+    }
+
+    private async Task TryAutoPlayNextEpisodeAsync()
+    {
+        if (_disposed || _session?.ContentType != PlaybackContentType.Episode)
+        {
+            return;
+        }
+
+        var nextEpisode = _session.NextEpisode;
+        if (nextEpisode is null)
+        {
+            SetOperationNotice(PlayerOperationNoticeKind.Playback, "\u672c\u5b63\u5df2\u64ad\u653e\u5230\u6700\u540e\u4e00\u96c6\u3002", "episode-auto-next-end");
+            return;
+        }
+
+        if (!nextEpisode.HasPlayableSource)
+        {
+            SetOperationNotice(PlayerOperationNoticeKind.Playback, "\u4e0b\u4e00\u96c6\u6682\u65e0\u53ef\u7528\u64ad\u653e\u6e90\u3002", "episode-auto-next-no-source");
+            return;
+        }
+
+        await SwitchToEpisodeAsync(nextEpisode.EpisodeId, "episode-auto-next");
     }
 
     private void OnPlaybackEngineEncounteredError(object? sender, PlaybackEngineErrorEventArgs e)
@@ -3524,8 +3709,12 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
         if (syncedCount > 0)
         {
+            var contentKey = _session?.ContentType == PlaybackContentType.Episode ? "episodeId" : "movieId";
+            var contentId = _session?.ContentType == PlaybackContentType.Episode
+                ? _session.EpisodeId.GetValueOrDefault()
+                : _session?.MovieId ?? 0;
             MpvPlaybackDiagnostics.Write(
-                $"watch-history-unified-resume-selected movieId={_session?.MovieId ?? 0} resume={positionSeconds} fromMediaFileId={source.MediaFileId} reason=session-progress-sync");
+                $"watch-history-unified-resume-selected {contentKey}={contentId} resume={positionSeconds} fromMediaFileId={source.MediaFileId} reason=session-progress-sync");
         }
     }
 

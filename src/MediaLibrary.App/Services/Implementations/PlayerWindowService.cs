@@ -23,6 +23,8 @@ public sealed class PlayerWindowService : IPlayerWindowService
 
     public int? ActiveMovieId { get; private set; }
 
+    public int? ActiveEpisodeId { get; private set; }
+
     public int? ActiveMediaFileId { get; private set; }
 
     public async Task OpenAsync(int movieId, int? mediaFileId = null, CancellationToken cancellationToken = default)
@@ -40,6 +42,7 @@ public sealed class PlayerWindowService : IPlayerWindowService
 
         _isOpening = true;
         ActiveMovieId = movieId;
+        ActiveEpisodeId = null;
         ActiveMediaFileId = mediaFileId;
         PlayerWindow? window = null;
 
@@ -91,6 +94,83 @@ public sealed class PlayerWindowService : IPlayerWindowService
             }
 
             ActiveMovieId = null;
+            ActiveEpisodeId = null;
+            ActiveMediaFileId = null;
+
+            throw;
+        }
+        finally
+        {
+            _isOpening = false;
+        }
+    }
+
+    public async Task OpenEpisodeAsync(int episodeId, int? mediaFileId = null, CancellationToken cancellationToken = default)
+    {
+        if (_activeWindow is not null)
+        {
+            _activeWindow.Activate();
+            return;
+        }
+
+        if (_isOpening)
+        {
+            return;
+        }
+
+        _isOpening = true;
+        ActiveMovieId = null;
+        ActiveEpisodeId = episodeId;
+        ActiveMediaFileId = mediaFileId;
+        PlayerWindow? window = null;
+
+        var viewModel = AppServiceProvider.GetRequiredService<PlayerWindowViewModel>();
+        try
+        {
+            window = new PlayerWindow
+            {
+                DataContext = viewModel
+            };
+            _activeWindow = window;
+            _closeNotified = false;
+            window.CloseLifecycleStarted += OnPlayerWindowCloseLifecycleStarted;
+            window.Closed += OnPlayerWindowClosed;
+
+            window.Show();
+
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            if (!ReferenceEquals(_activeWindow, window) || !window.IsVisible)
+            {
+                return;
+            }
+
+            await viewModel.InitializeEpisodeAsync(episodeId, mediaFileId, cancellationToken);
+        }
+        catch
+        {
+            if (window is not null)
+            {
+                window.CloseLifecycleStarted -= OnPlayerWindowCloseLifecycleStarted;
+                window.Closed -= OnPlayerWindowClosed;
+                if (window.IsVisible)
+                {
+                    try
+                    {
+                        window.Close();
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (ReferenceEquals(_activeWindow, window))
+                {
+                    _activeWindow = null;
+                }
+            }
+
+            ActiveMovieId = null;
+            ActiveEpisodeId = null;
             ActiveMediaFileId = null;
 
             throw;
@@ -128,6 +208,7 @@ public sealed class PlayerWindowService : IPlayerWindowService
         }
 
         ActiveMovieId = null;
+        ActiveEpisodeId = null;
         ActiveMediaFileId = null;
 
         if (_closeNotified)

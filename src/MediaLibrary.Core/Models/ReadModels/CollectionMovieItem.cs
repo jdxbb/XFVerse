@@ -2,7 +2,23 @@ namespace MediaLibrary.Core.Models.ReadModels;
 
 public sealed class CollectionMovieItem
 {
+    public bool IsTvSeason { get; set; }
+
     public int? MovieId { get; set; }
+
+    public int? TvSeasonId { get; set; }
+
+    public int? TvSeriesId { get; set; }
+
+    public int SeasonNumber { get; set; }
+
+    public int WatchedEpisodeCount { get; set; }
+
+    public int TotalEpisodeCount { get; set; }
+
+    public int InLibraryEpisodeCount { get; set; }
+
+    public string SourceSummary { get; set; } = string.Empty;
 
     public int? TmdbId { get; set; }
 
@@ -68,9 +84,15 @@ public sealed class CollectionMovieItem
                     ? "已看"
                     : "收藏";
 
-    public string AvailabilityText => IsInLibrary ? "已入库" : "未入库";
+    public string AvailabilityText => IsTvSeason
+        ? InLibraryEpisodeCount > 0 ? $"已入库 {InLibraryEpisodeCount} 集" : "暂无播放源"
+        : IsInLibrary ? "已入库" : "未入库";
 
-    public string WatchStateText => IsWatched ? "已看" : "未看";
+    public string WatchStateText => IsTvSeason
+        ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}"
+        : IsWatched ? "已看" : "未看";
 
-    public string DetailButtonText => IsInLibrary ? "查看详情并播放" : "查看详情（未入库）";
+    public string DetailButtonText => IsTvSeason
+        ? "查看季详情"
+        : IsInLibrary ? "查看详情并播放" : "查看详情（未入库）";
 }

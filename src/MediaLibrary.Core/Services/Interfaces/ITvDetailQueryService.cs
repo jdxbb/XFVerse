@@ -2,12 +2,13 @@ using MediaLibrary.Core.Models.ReadModels;
 
 namespace MediaLibrary.Core.Services.Interfaces;
 
-public interface ILibraryQueryService
+public interface ITvDetailQueryService
 {
-    Task<IReadOnlyList<LibraryMovieListItem>> GetLibraryMoviesAsync(
+    Task<TvSeriesOverviewModel?> GetSeriesOverviewAsync(
+        int seriesId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<LibraryMovieListItem>> GetLibraryItemsAsync(
-        bool expandSeriesToSeasons,
+    Task<TvSeasonDetailModel?> GetSeasonDetailAsync(
+        int seasonId,
         CancellationToken cancellationToken = default);
 }
