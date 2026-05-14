@@ -411,3 +411,100 @@ Phase-outside items recorded only:
 25. AI recommendation tab does not include TV.
 26. Watch Insights remains Movie-only.
 27. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10 - TV Metadata Hydration And Unavailable Seasons
+
+Phase adjustment after the Phase 4.9 audit:
+
+- Phase 4.10 covers metadata hydration and unavailable Season / Episode display.
+- Phase 4.11 covers TV correction entry UI.
+- Phase 4.12 covers TV scan / rescan / history-location hardening.
+- Phase 4.13 covers full Phase 4 regression and documentation closeout.
+
+Implemented scope:
+
+- Added a centralized TV metadata hydration service by TMDB Series ID.
+- Hydration upserts `TvSeries`, all TMDB Seasons including Season 0, and all TMDB Episodes for each Season.
+- Hydration does not create `MediaFile`, does not fabricate playback sources, does not modify existing source rows, and does not write Season collection state.
+- TV scan / identification now requests full Series hydration after a successful Series match.
+- `SeriesOverviewPage` attempts hydration when opened and refreshes to show all known Seasons.
+- `SeriesOverviewPage` displays Season 0 as `特别篇` and shows source-less Seasons as `暂无播放源`.
+- `TvSeasonDetailPage` displays Episode air date metadata and disables playback for source-less Episodes.
+- TV discovery Series clicks now hydrate metadata and navigate to `SeriesOverviewPage`; not-in-library TV no longer uses the external-detail placeholder.
+- TV discovery status now treats metadata-only Series as not in library unless active Episode sources exist.
+- Hydration fetches TMDB Season detail outside the database write transaction and batches Episode inserts to avoid blocking the UI while metadata is being refreshed.
+- Hydration is serialized per TMDB Series ID so repeated clicks cannot race against the first metadata write.
+- Discovery TV open status now uses request-version guards so stale hydration tasks cannot overwrite paging / ranking status after the user moves on.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. An in-library Series can hydrate all TMDB Seasons when opening `SeriesOverviewPage`.
+4. Season 0 / Specials displays as `特别篇`.
+5. Source-less Seasons display `暂无播放源`.
+6. Source-less Seasons can open `TvSeasonDetailPage`.
+7. `TvSeasonDetailPage` displays all known Episode metadata.
+8. Source-less Episodes display `暂无播放源`.
+9. Source-less Episode play buttons are disabled.
+10. Existing Episode sources remain playable.
+11. Metadata-only Episodes can still be marked watched / unwatched.
+12. Whole-season watched / unwatched still applies to all known TMDB Episodes.
+13. Season favorite / want-to-watch / not-interested rules remain unchanged.
+14. TV search not-in-library Series clicks hydrate metadata and navigate to `SeriesOverviewPage`.
+15. Not-in-library Series hydration does not create `MediaFile`.
+16. Not-in-library Series hydration does not fabricate playback sources.
+17. TV ranking not-in-library Series clicks use the same hydration path.
+18. TV search / ranking do not navigate to Movie detail for TV.
+19. TV metadata does not enter AI recommendations.
+20. TV metadata does not enter Watch Insights.
+21. Existing Movie discovery and Movie ranking behavior remain separate.
+22. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10.1 - Metadata-only TV Library Visibility And Batch Rules
+
+Implemented scope:
+
+- Normal media-library mode no longer shows pure metadata-only TV created by discovery browsing unless the Series has active Episode sources or a Season has user state.
+- A source-backed Series remains a Series aggregation card in normal mode.
+- Batch mode expands source-backed Series into all known Seasons, including metadata-only Seasons and Season 0.
+- A metadata-only Series without playback sources exposes only Seasons with user state in batch mode, limiting default library pollution.
+- Season user state now includes collection flags plus explicit watched / unwatched state history, so manually marked metadata-only Seasons can remain visible.
+- Metadata-only Seasons can be batch marked watched / unwatched; the operation updates Episode watched state and does not create `WatchHistory`, `MediaFile`, or fake sources.
+- Batch remove skips metadata-only Seasons and not-in-library Movies with `暂无播放源可移出` instead of deleting records.
+- Batch delete record keeps the existing software-record deletion behavior and is documented as not deleting local or WebDAV files.
+- Batch toolbar remains limited to watched, unwatched, remove, and delete-record actions.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.1 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. A metadata-only TV Series with no source and no state does not appear in the default media-library list.
+4. A Series with at least one active Episode source appears in normal media-library mode.
+5. A source-backed Series expands to all known Seasons in batch mode, including source-less Seasons.
+6. Source-less Seasons show `暂无播放源`.
+7. A metadata-only Season with user state can appear through library-related views.
+8. Metadata-only Seasons can be batch marked watched.
+9. Metadata-only Seasons can be batch marked unwatched.
+10. Metadata-only Season batch watched / unwatched does not create `WatchHistory`.
+11. Metadata-only Season batch watched / unwatched does not create `MediaFile`.
+12. Metadata-only Season batch remove is skipped with a no-source message.
+13. Metadata-only Season batch delete record uses software-record deletion only.
+14. Not-in-library Movies can still be batch marked watched / unwatched through the existing external-state path.
+15. Not-in-library Movie batch remove is skipped with a no-source message.
+16. Not-in-library Movie batch delete record remains available through the existing external-record path.
+17. In-library Movie batch operations remain unchanged.
+18. In-library Season batch operations remain unchanged.
+19. Batch favorite, want-to-watch, and not-interested actions remain absent from the toolbar.
+20. Series still does not carry Season state.
+21. Episodes still do not enter media-library top-level lists or batch lists.
+22. TV state does not enter Watch Insights.
+23. TV state does not enter AI recommendation or recommendation fingerprints.
+24. Delete record does not delete local or WebDAV files.
+25. Documents and reports do not include secrets or private media locations.

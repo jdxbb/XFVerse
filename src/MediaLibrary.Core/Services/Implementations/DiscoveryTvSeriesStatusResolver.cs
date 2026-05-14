@@ -38,7 +38,9 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                     series.FirstAirYear,
                     Country = series.Country ?? string.Empty,
                     Language = series.Language ?? string.Empty,
-                    SeasonCount = series.Seasons.Count,
+                    PlayableSeasonCount = series.Seasons.Count(
+                        season => season.Episodes.Any(
+                            episode => episode.MediaFiles.Any(file => !file.IsDeleted))),
                     series.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
@@ -61,16 +63,17 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
         foreach (var group in seriesRows.GroupBy(row => row.TmdbSeriesId))
         {
             var series = group
-                .OrderByDescending(row => row.SeasonCount)
+                .OrderByDescending(row => row.PlayableSeasonCount)
                 .ThenByDescending(row => row.UpdatedAt)
                 .First();
+            var inLibrarySeasonCount = group.Sum(row => row.PlayableSeasonCount);
 
             result[group.Key] = new DiscoveryTvSeriesStatus
             {
                 TmdbSeriesId = group.Key,
                 TvSeriesId = series.Id,
-                IsInLibrary = true,
-                InLibrarySeasonCount = group.Sum(row => row.SeasonCount),
+                IsInLibrary = inLibrarySeasonCount > 0,
+                InLibrarySeasonCount = inLibrarySeasonCount,
                 Name = series.Name,
                 OriginalName = series.OriginalName,
                 Overview = series.Overview,
@@ -90,7 +93,7 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                 {
                     TmdbSeriesId = group.Key,
                     TvSeriesId = group.Select(row => row.TvSeriesId).FirstOrDefault(id => id.HasValue),
-                    IsInLibrary = group.Any(row => row.TvSeriesId.HasValue)
+                    IsInLibrary = false
                 };
                 result[group.Key] = status;
             }

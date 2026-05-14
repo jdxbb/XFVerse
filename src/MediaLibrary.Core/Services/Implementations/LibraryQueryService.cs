@@ -8,6 +8,15 @@ namespace MediaLibrary.Core.Services.Implementations;
 
 public sealed class LibraryQueryService : ILibraryQueryService
 {
+    private static readonly string[] TvLibraryStateTypes =
+    [
+        "Watched",
+        "Unwatched",
+        "Favorite",
+        "WantToWatch",
+        "NotInterested"
+    ];
+
     public async Task<IReadOnlyList<LibraryMovieListItem>> GetLibraryItemsAsync(
         bool expandSeriesToSeasons,
         CancellationToken cancellationToken = default)
@@ -154,11 +163,18 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         SourceCount = x.SourceCount,
                         HasLocalSource = x.HasLocalSource,
                         HasWebDavSource = x.HasWebDavSource,
+                        HasLibraryContext = x.SourceCount > 0,
                         IsInLibrary = x.SourceCount > 0,
                         IsFavorite = x.IsFavorite,
                         IsWatched = x.IsWatched || watchedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
                         IsWantToWatch = wantToWatchIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
                         IsNotInterested = notInterestedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
+                        HasUserState = x.IsFavorite
+                                       || x.IsWatched
+                                       || x.HasWatchHistory
+                                       || watchedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear)
+                                       || wantToWatchIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear)
+                                       || notInterestedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
                         HasWatchHistory = x.HasWatchHistory,
                         UpdatedAt = x.UpdatedAt
                     };
@@ -206,6 +222,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     OmdbSourceUrl = x.OmdbSourceUrl,
                     OmdbLastUpdatedAt = x.OmdbLastUpdatedAt,
                     SourceCount = 0,
+                    HasLibraryContext = false,
+                    HasUserState = true,
                     IsInLibrary = false,
                     IsWatched = x.IsWatched,
                     IsWantToWatch = x.IsWantToWatch,
@@ -350,7 +368,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
-        var stateSeasonIds = stateRows.Select(x => x.SeasonId).ToHashSet();
+        var stateSeasonIds = stateRows.Where(x => x.HasUserState).Select(x => x.SeasonId).ToHashSet();
 
         return seriesRows
             .Select(
@@ -366,6 +384,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var watchedEpisodeCount = seasons
                         .SelectMany(season => episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
                         .Count(x => x.IsWatched);
+                    var hasWatchedEpisodeState = watchedEpisodeCount > 0;
                     var totalEpisodeCount = seasons.Sum(
                         season => season.TotalEpisodeCount.GetValueOrDefault() > 0
                             ? season.TotalEpisodeCount!.Value
@@ -395,6 +414,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         SourceCount = sources.Count,
                         HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
                         HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        HasLibraryContext = sources.Count > 0,
+                        HasUserState = hasState || hasWatchedEpisodeState,
                         IsInLibrary = sources.Count > 0,
                         IsWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount),
                         SeasonCount = seasons.Count,
@@ -404,7 +425,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         UpdatedAt = seasons.Select(x => x.UpdatedAt).Append(series.UpdatedAt).Max()
                     };
                 })
-            .Where(x => x.IsInLibrary || stateRows.Any(state => state.SeriesId == x.SeriesId))
+            .Where(x => x.IsInLibrary || x.HasUserState)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
     }
@@ -471,6 +492,18 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
+        var seriesWithSources = sourceRows
+            .Join(
+                episodeRows,
+                source => source.EpisodeId,
+                episode => episode.EpisodeId,
+                (_, episode) => episode.SeasonId)
+            .Join(
+                seasonRows,
+                seasonId => seasonId,
+                season => season.SeasonId,
+                (_, season) => season.SeriesId)
+            .ToHashSet();
 
         return seasonRows
             .Select(
@@ -486,6 +519,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var watchedEpisodeCount = episodes.Count(x => x.IsWatched);
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
                     var isUnwatched = watchedEpisodeCount == 0;
+                    var hasUserState = state?.HasUserState == true || watchedEpisodeCount > 0;
                     return new LibraryMovieListItem
                     {
                         ItemKind = LibraryMediaItemKind.Season,
@@ -505,6 +539,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         SourceCount = sources.Count,
                         HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
                         HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        HasLibraryContext = sources.Count > 0 || seriesWithSources.Contains(season.SeriesId),
+                        HasUserState = hasUserState,
                         IsInLibrary = sources.Count > 0,
                         IsFavorite = state?.IsFavorite == true && isWatched,
                         IsWantToWatch = state?.IsWantToWatch == true && isUnwatched,
@@ -516,7 +552,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
                     };
                 })
-            .Where(x => x.IsInLibrary || x.IsFavorite || x.IsWantToWatch || x.IsNotInterested)
+            .Where(x => x.IsInLibrary || x.HasUserState || x.HasLibraryContext)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
     }
@@ -557,7 +593,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
             return [];
         }
 
-        return await dbContext.UserTvSeasonCollectionItems
+        var collectionRows = await dbContext.UserTvSeasonCollectionItems
             .AsNoTracking()
             .Where(
                 x => x.TvSeasonId.HasValue
@@ -571,9 +607,42 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     IsFavorite = x.IsFavorite,
                     IsWantToWatch = x.IsWantToWatch,
                     IsNotInterested = x.IsNotInterested,
+                    HasUserState = true,
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
+
+        var historyRows = await dbContext.UserTvSeasonStateChangeHistories
+            .AsNoTracking()
+            .Where(
+                x => x.TvSeasonId.HasValue
+                     && seasonIds.Contains(x.TvSeasonId.Value)
+                     && TvLibraryStateTypes.Contains(x.StateType))
+            .Select(
+                x => new TvSeasonStateLibraryRow
+                {
+                    SeasonId = x.TvSeasonId!.Value,
+                    SeriesId = x.TvSeriesId,
+                    HasUserState = true,
+                    UpdatedAt = x.ChangedAtUtc
+                })
+            .ToListAsync(cancellationToken);
+
+        return collectionRows
+            .Concat(historyRows)
+            .GroupBy(x => x.SeasonId)
+            .Select(
+                group => new TvSeasonStateLibraryRow
+                {
+                    SeasonId = group.Key,
+                    SeriesId = group.Where(x => x.SeriesId.HasValue).Select(x => x.SeriesId).FirstOrDefault(),
+                    IsFavorite = group.Any(x => x.IsFavorite),
+                    IsWantToWatch = group.Any(x => x.IsWantToWatch),
+                    IsNotInterested = group.Any(x => x.IsNotInterested),
+                    HasUserState = group.Any(x => x.HasUserState),
+                    UpdatedAt = group.Max(x => x.UpdatedAt)
+                })
+            .ToList();
     }
 
     private static string BuildSeasonTitle(string seriesTitle, string seasonTitle, int seasonNumber)
@@ -750,6 +819,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public bool IsWantToWatch { get; set; }
 
         public bool IsNotInterested { get; set; }
+
+        public bool HasUserState { get; set; }
 
         public DateTime UpdatedAt { get; set; }
     }

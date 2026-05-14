@@ -82,13 +82,17 @@ public sealed class LibraryMovieListItem
 
     public bool HasWebDavSource { get; set; }
 
+    public bool HasLibraryContext { get; set; }
+
+    public bool HasUserState { get; set; }
+
     public string SourceSummary
     {
         get
         {
             if (!IsInLibrary)
             {
-                return "未入库";
+                return IsSeries || IsSeason ? "暂无播放源" : "未入库";
             }
 
             return (HasLocalSource, HasWebDavSource) switch
@@ -133,7 +137,9 @@ public sealed class LibraryMovieListItem
         LibraryMediaItemKind.Series => SeasonCount > 0
             ? $"{SeasonCount} 季 · 已入库 {InLibraryEpisodeCount} 集"
             : $"已入库 {InLibraryEpisodeCount} 集",
-        LibraryMediaItemKind.Season => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 已入库 {InLibraryEpisodeCount} 集",
+        LibraryMediaItemKind.Season => InLibraryEpisodeCount > 0
+            ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 已入库 {InLibraryEpisodeCount} 集"
+            : $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 暂无播放源",
         _ => SourceSummary
     };
 }

@@ -12,6 +12,8 @@
 - No known Phase 4.7 blocker after rating display and mixed batch closeout; build verification remains the gate.
 - No known Phase 4.8 blocker after TV discovery search and rankings integration; build verification remains the gate.
 - No known Phase 4.8 Bugfix blocker after TV discovery UI / filtering / ranking parity fixes; build verification remains the gate.
+- No known Phase 4.10 blocker after TV metadata hydration and unavailable Season display; build verification remains the gate.
+- No known Phase 4.10.1 blocker after metadata-only TV library visibility and batch-rule refinement; build verification remains the gate.
 
 ## Deferred
 
@@ -22,15 +24,21 @@
 - Multi-episode file expansion remains deferred.
 - Final correction dialogs / UI entry points remain deferred.
 - Per-episode independent collection state remains deferred.
-- Full not-in-library TV external detail pages remain deferred; Phase 4.8 shows a placeholder instead of reusing Movie detail.
+- Full not-in-library TV external detail pages are replaced by Phase 4.10 metadata hydration and `SeriesOverviewPage` reuse.
 - Full advanced TV discovery filters remain deferred; Phase 4.8 Bugfix adds basic client-side filters without forcing Movie person search or Movie genre semantics onto TV.
 - Full TV feature-gap audit and stage reorder remains deferred to the next phase.
-- Not-in-library TV detail pages remain deferred; Phase 4.8 / Bugfix still use a prompt instead of Movie detail.
-- Full Series / Season metadata completion and source-less Season display remain deferred.
+- Not-in-library TV metadata cleanup remains deferred.
 - TV correction entry points and cross-type correction UI remain deferred.
 - Full Phase 4 regression and documentation closeout is deferred to Phase 4.9.
 - Full TV status filtering in normal Series mode remains deferred; Season state is surfaced in batch mode and favorites.
 - Final TV UI polish remains deferred.
+- Cleanup for metadata-only TV Series / Seasons / Episodes remains deferred after Phase 4.10.
+- Persistent TV metadata refresh / stale-data policy remains deferred after Phase 4.10.
+- TV correction entry UI remains Phase 4.11.
+- TV scan / rescan / history-location hardening remains Phase 4.12.
+- TV AI support remains a Phase 5 candidate and should not be folded into Phase 4.
+- Automatic cleanup for metadata-only TV rows created by discovery browsing remains deferred after Phase 4.10.1.
+- More granular metadata-only TV library filters remain deferred; Phase 4.10.1 keeps default visibility conservative.
 
 ## Noise
 
@@ -49,4 +57,9 @@
 - Existing matched Seasons with only in-library Episode rows need a rescan or TV correction refresh to populate missing TMDB Episode metadata rows.
 - Phase 4.8 TV rankings are Series-level because TMDB TV ranking endpoints return Series, not Seasons.
 - TV discovery does not request OMDb / IMDb ratings; cards show TMDB Series rating or no rating.
-- Not-in-library TV Series clicks intentionally show a future-detail placeholder and do not enter the Movie detail route.
+- Not-in-library TV Series clicks no longer show the old future-detail placeholder; Phase 4.10 hydrates metadata and enters `SeriesOverviewPage`.
+- Phase 4.10 changes not-in-library TV Series clicks to write metadata-only TV rows and navigate to `SeriesOverviewPage`; these rows are not playback sources and should not be counted as in-library sources.
+- Source-less Episodes can be marked watched / unwatched by design, but they remain non-playable until a real active `MediaFile` is attached.
+- Metadata-only TV Series with no source and no user state are intentionally hidden from the default media-library list.
+- Batch remove intentionally skips source-less Seasons and not-in-library Movies; use delete record when the goal is to remove software metadata / state.
+- Batch delete record removes software records and source rows from the app database only; it must not delete local or WebDAV files.

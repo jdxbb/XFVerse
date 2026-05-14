@@ -38,7 +38,7 @@ public sealed class TvSeriesOverviewModel
         ? FirstAirDate.Value.ToString("yyyy-MM-dd")
         : FirstAirYear?.ToString() ?? "-";
 
-    public string SeasonCountText => $"{InLibrarySeasonCount} / {TotalSeasonCount} 季";
+    public string SeasonCountText => $"{InLibrarySeasonCount} / {TotalSeasonCount} 季有播放源";
 }
 
 public sealed class TvSeriesSeasonListItem
@@ -52,6 +52,8 @@ public sealed class TvSeriesSeasonListItem
     public string PosterRemoteUrl { get; set; } = string.Empty;
 
     public string PosterLocalPath { get; set; } = string.Empty;
+
+    public string PosterDisplayUrl => string.IsNullOrWhiteSpace(PosterRemoteUrl) ? PosterLocalPath : PosterRemoteUrl;
 
     public DateTime? AirDate { get; set; }
 
@@ -67,11 +69,13 @@ public sealed class TvSeriesSeasonListItem
 
     public IdentificationStatus IdentificationStatus { get; set; }
 
-    public string SeasonNumberText => $"S{SeasonNumber:D2}";
+    public bool HasPlayableSource => InLibraryEpisodeCount > 0;
+
+    public string SeasonNumberText => SeasonNumber == 0 ? "特别篇" : $"S{SeasonNumber:D2}";
 
     public string ProgressText => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}";
 
-    public string InLibraryText => $"已入库 {InLibraryEpisodeCount} 集";
+    public string InLibraryText => HasPlayableSource ? $"已入库 {InLibraryEpisodeCount} 集" : "暂无播放源";
 
     public string AirDateText => AirDate.HasValue
         ? AirDate.Value.ToString("yyyy-MM-dd")

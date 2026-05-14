@@ -214,6 +214,9 @@
                                         <WrapPanel Margin="0,8,0,0">
                                             <TextBlock Margin="0,0,16,0"
                                                        Style="{StaticResource BodyMutedTextStyle}"
+                                                       Text="{Binding AirDateText, StringFormat=首播：{0}}" />
+                                            <TextBlock Margin="0,0,16,0"
+                                                       Style="{StaticResource BodyMutedTextStyle}"
                                                        Text="{Binding RuntimeText, StringFormat=时长：{0}}" />
                                             <TextBlock Margin="0,0,16,0"
                                                        Style="{StaticResource BodyMutedTextStyle}"
@@ -231,6 +234,7 @@
                                         <Button Command="{Binding DataContext.PlayEpisodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Content="{Binding PlayButtonText}"
+                                                IsEnabled="{Binding HasPlayableSource}"
                                                 Style="{StaticResource SecondaryButtonStyle}" />
                                         <WrapPanel Margin="0,8,0,0" HorizontalAlignment="Center">
                                             <Button Margin="0,0,8,0"

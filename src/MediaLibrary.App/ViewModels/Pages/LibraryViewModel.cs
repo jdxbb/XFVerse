@@ -720,9 +720,9 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         query = SelectedLibraryScope switch
         {
-            LibraryScopeAll => query.Where(item => item.IsInLibrary || IsExternalHistoryOrNotInterested(item)),
+            LibraryScopeAll => query.Where(IsDefaultLibraryScopeVisible),
             LibraryScopeExternal => query.Where(IsExternalHistoryOrNotInterested),
-            _ => query.Where(item => item.IsInLibrary)
+            _ => query.Where(IsDefaultLibraryScopeVisible)
         };
 
         query = SelectedSourceFilter switch
@@ -774,7 +774,18 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private static bool IsExternalHistoryOrNotInterested(LibraryMovieListItem item)
     {
-        return !item.IsInLibrary && (item.IsWatched || item.IsNotInterested);
+        return !item.IsInLibrary
+               && !item.HasLibraryContext
+               && (item.HasUserState
+                   || item.IsWatched
+                   || item.IsFavorite
+                   || item.IsWantToWatch
+                   || item.IsNotInterested);
+    }
+
+    private static bool IsDefaultLibraryScopeVisible(LibraryMovieListItem item)
+    {
+        return item.IsInLibrary || item.HasLibraryContext || IsExternalHistoryOrNotInterested(item);
     }
 
     private static bool HasSelectedTag(
@@ -1003,6 +1014,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         var successCount = 0;
         var errors = new List<BatchItemError>();
+        var skipped = new List<BatchItemError>();
         IsBatchOperationRunning = true;
         WriteLibraryBatchEvent($"event=library-remove-from-library-start count={selectedItems.Count}");
 
@@ -1014,15 +1026,26 @@ public sealed class LibraryViewModel : PageViewModelBase
                 {
                     if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
                     {
+                        if (item.SourceCount <= 0)
+                        {
+                            skipped.Add(new BatchItemError(item.SelectionKey, item.Title, "暂无播放源可移出。"));
+                            WriteLibraryBatchEvent(
+                                $"event=library-remove-from-library item={FormatSelectionKeyForLog(item.SelectionKey)} result=skipped reason=no-source");
+                            continue;
+                        }
+
                         await _tvSeasonCollectionService.RemoveFromLibraryAsync(item.Movie.SeasonId);
                     }
-                    else if (item.Movie.IsMovie && item.IsInLibrary && item.MovieId > 0)
+                    else if (item.Movie.IsMovie && item.MovieId > 0 && item.IsInLibrary && item.SourceCount > 0)
                     {
                         await _movieManagementService.RemoveFromLibraryAsync(item.MovieId);
                     }
                     else if (item.Movie.IsMovie)
                     {
-                        await _userCollectionService.RemoveCollectionRecordAsync(BuildRecommendationItem(item.Movie));
+                        skipped.Add(new BatchItemError(item.SelectionKey, item.Title, "暂无播放源可移出。"));
+                        WriteLibraryBatchEvent(
+                            $"event=library-remove-from-library item={FormatSelectionKeyForLog(item.SelectionKey)} result=skipped reason=no-source");
+                        continue;
                     }
                     else
                     {
@@ -1042,7 +1065,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 SetSelectionToFailures(errors);
             }
-            else if (successCount > 0)
+            else if (successCount > 0 || skipped.Count > 0)
             {
                 ClearSelection();
                 IsBatchSelectionMode = false;
@@ -1053,10 +1076,10 @@ public sealed class LibraryViewModel : PageViewModelBase
             }
 
             await ActivateAsync();
-            BatchResultSummary = BuildResultSummary("移出媒体库", successCount, errors);
+            BatchResultSummary = BuildResultSummary("移出媒体库", successCount, skipped, errors);
             NotifyAfterBatchRemoveFromLibrary();
             WriteLibraryBatchEvent(
-                $"event=library-remove-from-library-complete success={successCount} failed={errors.Count}");
+                $"event=library-remove-from-library-complete success={successCount} skipped={skipped.Count} failed={errors.Count}");
         }
         finally
         {
@@ -1143,7 +1166,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             }
 
             await ActivateAsync();
-            BatchResultSummary = BuildResultSummary("删除记录", successCount, errors);
+            BatchResultSummary = BuildResultSummary("删除软件记录", successCount, errors);
             NotifyAfterBatchMovieRecordDelete();
             WriteLibraryBatchEvent(
                 $"event=library-delete-movie-records-complete success={successCount} failed={errors.Count}");
@@ -1535,10 +1558,36 @@ public sealed class LibraryViewModel : PageViewModelBase
         int successCount,
         IReadOnlyCollection<BatchItemError> errors)
     {
-        var summary = $"{operationName}完成：成功 {successCount}，失败 {errors.Count}。";
-        if (errors.Count == 0)
+        return BuildResultSummary(operationName, successCount, Array.Empty<BatchItemError>(), errors);
+    }
+
+    private static string BuildResultSummary(
+        string operationName,
+        int successCount,
+        IReadOnlyCollection<BatchItemError> skipped,
+        IReadOnlyCollection<BatchItemError> errors)
+    {
+        var summary = $"{operationName}完成：成功 {successCount}，跳过 {skipped.Count}，失败 {errors.Count}。";
+        if (skipped.Count == 0 && errors.Count == 0)
         {
             return summary;
+        }
+
+        var parts = new List<string>();
+        if (skipped.Count > 0)
+        {
+            var skippedPreview = string.Join(
+                "；",
+                skipped
+                    .Take(3)
+                    .Select(item => $"{item.Title}：{item.Message}"));
+            var skippedSuffix = skipped.Count > 3 ? $"；另有 {skipped.Count - 3} 项跳过" : string.Empty;
+            parts.Add($"跳过项：{skippedPreview}{skippedSuffix}");
+        }
+
+        if (errors.Count == 0)
+        {
+            return $"{summary} {string.Join(" ", parts)}";
         }
 
         var preview = string.Join(
@@ -1547,7 +1596,8 @@ public sealed class LibraryViewModel : PageViewModelBase
                 .Take(3)
                 .Select(error => $"{error.Title}：{error.Message}"));
         var suffix = errors.Count > 3 ? $"；另有 {errors.Count - 3} 项失败" : string.Empty;
-        return $"{summary} 失败项：{preview}{suffix}";
+        parts.Add($"失败项：{preview}{suffix}");
+        return $"{summary} {string.Join(" ", parts)}";
     }
 
     private static string BuildAutoIdentifyResultSummary(

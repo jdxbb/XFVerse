@@ -1,5 +1,21 @@
 # 影片发现 Known Issues
 
+## Phase 4.10 TV Notes
+
+- TV search / ranking not-in-library Series clicks now write metadata-only TV rows and enter `SeriesOverviewPage`.
+- Metadata-only TV rows are not playback sources; they should remain not-in-library in discovery status until active Episode `MediaFile` rows exist.
+- TV discovery still does not create `MediaFile`, fake `RemoteUri`, `AiRecommendationItem`, or Watch Insights input.
+- Cleanup for metadata-only TV rows remains deferred.
+- `ExternalTvSeriesDetailPage` is no longer planned for Phase 4.
+
+## Phase 4.10.1 TV Library Notes
+
+- Discovery browsing may create metadata-only TV rows, but rows with no active Episode source and no Season state are intentionally hidden from the default media-library list.
+- Source-backed Series expand to all known Seasons in batch mode, including source-less Seasons and Season 0.
+- Metadata-only Season watched / unwatched batch operations update TV Episode state only and do not create `WatchHistory`, `MediaFile`, or fake sources.
+- Batch remove skips source-less TV Seasons and not-in-library Movies; batch delete record is the software-record removal path.
+- Automatic cleanup and stale-refresh strategy for metadata-only TV rows remains deferred.
+
 ## 搜索
 
 - 人物中文搜索依赖 TMDB alias / 本地化数据，不保证稳定；无结果时仍建议尝试英文名或原名。

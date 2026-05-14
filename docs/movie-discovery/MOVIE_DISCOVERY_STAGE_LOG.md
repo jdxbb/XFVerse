@@ -101,6 +101,28 @@
 - 未入库 TV 详情页、Series 全季 metadata 补全、无播放源 Season 展示、TV 修正入口和 TV 功能缺口大审查仅记录为后续事项。
 - 未新增 DB 字段，未新增 migration。
 
+## Phase 4.10 TV Discovery Hydration Update
+
+- TV search / ranking Series clicks now call the TV metadata hydration path before opening `SeriesOverviewPage`.
+- Not-in-library TV Series no longer use the deferred external-detail placeholder.
+- Hydration creates or updates TV metadata only: `TvSeries`, all TMDB Seasons including Season 0, and all TMDB Episodes.
+- Hydration does not create `MediaFile`, does not fabricate playback sources, and does not route TV into Movie detail.
+- Metadata-only TV Series remain not-in-library from a playback-source perspective until active Episode sources exist.
+- Movie search, Movie rankings, and AI recommendations remain separate from TV.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.1 Metadata-only TV Library Visibility Note
+
+- Discovery-hydrated TV metadata remains allowed, but pure metadata-only Series with no active Episode source and no Season state no longer pollute the default media-library list.
+- Source-backed Series still appear normally and expand into all known Seasons in batch mode.
+- Metadata-only Seasons with explicit user state can be surfaced in library-related views and participate in watched / unwatched batch operations.
+- Batch remove skips source-less TV Seasons and not-in-library Movies with a no-source message.
+- Batch delete record remains software-record deletion only and does not delete local or WebDAV files.
+- Movie search, Movie rankings, TV search, TV rankings, and AI recommendations remain separated by media type.
+- Did not add a migration.
+- Did not execute database update.
+
 ## FD-2.1 / FD-2.2 Final Log Audit
 
 收尾日志与运行侧检查：

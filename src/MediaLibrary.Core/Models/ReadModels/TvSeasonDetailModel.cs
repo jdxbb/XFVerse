@@ -54,7 +54,7 @@ public sealed class TvSeasonDetailModel
 
     public bool IsUnidentified => IdentificationStatus == IdentificationStatus.Failed;
 
-    public string SeasonNumberText => $"S{SeasonNumber:D2}";
+    public string SeasonNumberText => SeasonNumber == 0 ? "特别篇" : $"S{SeasonNumber:D2}";
 
     public string AirDateText => AirDate.HasValue
         ? AirDate.Value.ToString("yyyy-MM-dd")
@@ -62,7 +62,7 @@ public sealed class TvSeasonDetailModel
 
     public string ProgressText => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}";
 
-    public string InLibraryText => $"已入库 {InLibraryEpisodeCount} 集";
+    public string InLibraryText => InLibraryEpisodeCount > 0 ? $"已入库 {InLibraryEpisodeCount} 集" : "暂无播放源";
 
     public string IdentificationStatusText => TvDetailDisplayText.FormatIdentificationStatus(IdentificationStatus);
 
@@ -83,6 +83,8 @@ public sealed class TvSeasonEpisodeListItem
 
     public string Overview { get; set; } = string.Empty;
 
+    public DateTime? AirDate { get; set; }
+
     public int? RuntimeMinutes { get; set; }
 
     public bool IsWatched { get; set; }
@@ -102,6 +104,8 @@ public sealed class TvSeasonEpisodeListItem
     public int ActiveSourceCount { get; set; }
 
     public string EpisodeNumberText => $"E{EpisodeNumber:D2}";
+
+    public string AirDateText => AirDate.HasValue ? AirDate.Value.ToString("yyyy-MM-dd") : "-";
 
     public string RuntimeText => RuntimeMinutes.HasValue && RuntimeMinutes.Value > 0
         ? $"{RuntimeMinutes.Value} 分钟"

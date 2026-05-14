@@ -10,6 +10,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
 {
     private readonly INavigationStateService _navigationStateService;
     private readonly ITvDetailQueryService _tvDetailQueryService;
+    private readonly ITvMetadataHydrationService _metadataHydrationService;
     private string _name = "未选择电视剧";
     private string _originalName = "-";
     private string _overview = "请先选择一部电视剧。";
@@ -23,11 +24,13 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
 
     public SeriesOverviewViewModel(
         INavigationStateService navigationStateService,
-        ITvDetailQueryService tvDetailQueryService)
-        : base("电视剧", "查看剧集包装信息和已入库季。")
+        ITvDetailQueryService tvDetailQueryService,
+        ITvMetadataHydrationService metadataHydrationService)
+        : base("电视剧", "查看剧集信息和 Season。")
     {
         _navigationStateService = navigationStateService;
         _tvDetailQueryService = tvDetailQueryService;
+        _metadataHydrationService = metadataHydrationService;
         NavigateToSeasonCommand = new RelayCommand(NavigateToSeason);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
     }
@@ -94,31 +97,79 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 return;
             }
 
-            HasSeries = true;
-            Name = model.Name;
-            OriginalName = string.IsNullOrWhiteSpace(model.OriginalName) ? "-" : model.OriginalName;
-            Overview = string.IsNullOrWhiteSpace(model.Overview) ? "暂无简介。" : model.Overview;
-            PosterDisplayUrl = model.PosterDisplayUrl;
-            FirstAirDateText = model.FirstAirDateText;
-            GenresText = string.IsNullOrWhiteSpace(model.GenresText) ? "未提供" : model.GenresText;
-            SourceSummary = model.SourceSummary;
-            SeasonCountText = model.SeasonCountText;
-            Seasons.Clear();
-            foreach (var season in model.Seasons)
+            ApplyModel(model);
+            if (model.TmdbSeriesId.HasValue)
             {
-                Seasons.Add(season);
+                _ = HydrateAndRefreshAsync(model.SeriesId, cancellationToken);
             }
-
-            OnPropertyChanged(nameof(HasSeasons));
-            OnPropertyChanged(nameof(HasNoSeasons));
-            StatusMessage = Seasons.Count == 0
-                ? "该剧暂无已入库季。"
-                : $"已加载 {Seasons.Count} 个已入库季。";
         }
         catch (Exception exception)
         {
             Clear($"加载电视剧详情失败：{DescribeException(exception)}");
         }
+    }
+
+    private async Task HydrateAndRefreshAsync(int seriesId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            StatusMessage = "正在补齐 TV metadata。";
+            var result = await Task.Run(
+                () => _metadataHydrationService.EnsureHydratedBySeriesIdAsync(
+                    seriesId,
+                    cancellationToken: cancellationToken),
+                cancellationToken);
+
+            if (_navigationStateService.SelectedTvSeriesId != seriesId)
+            {
+                return;
+            }
+
+            var model = await _tvDetailQueryService.GetSeriesOverviewAsync(seriesId, cancellationToken);
+            if (model is null)
+            {
+                return;
+            }
+
+            ApplyModel(model);
+            StatusMessage = result.Skipped
+                ? $"已加载 {Seasons.Count} 个 Season。"
+                : result.BuildStatusMessage();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (_navigationStateService.SelectedTvSeriesId == seriesId)
+            {
+                StatusMessage = $"TV metadata 补齐失败：{DescribeException(exception)}";
+            }
+        }
+    }
+
+    private void ApplyModel(TvSeriesOverviewModel model)
+    {
+        HasSeries = true;
+        Name = model.Name;
+        OriginalName = string.IsNullOrWhiteSpace(model.OriginalName) ? "-" : model.OriginalName;
+        Overview = string.IsNullOrWhiteSpace(model.Overview) ? "暂无简介。" : model.Overview;
+        PosterDisplayUrl = model.PosterDisplayUrl;
+        FirstAirDateText = model.FirstAirDateText;
+        GenresText = string.IsNullOrWhiteSpace(model.GenresText) ? "未提供" : model.GenresText;
+        SourceSummary = model.SourceSummary;
+        SeasonCountText = model.SeasonCountText;
+        Seasons.Clear();
+        foreach (var season in model.Seasons)
+        {
+            Seasons.Add(season);
+        }
+
+        OnPropertyChanged(nameof(HasSeasons));
+        OnPropertyChanged(nameof(HasNoSeasons));
+        StatusMessage = Seasons.Count == 0
+            ? "该剧暂无 Season metadata。"
+            : $"已加载 {Seasons.Count} 个 Season。";
     }
 
     private void NavigateToSeason(object? parameter)

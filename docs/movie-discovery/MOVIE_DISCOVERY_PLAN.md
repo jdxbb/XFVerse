@@ -50,6 +50,26 @@
 - TV 搜索和榜单海报使用现有海报缓存行为。
 - TV 不进入 AI 推荐、Watch Insights、画像、观影人格或推荐 fingerprint。
 
+## Phase 4.10 TV Discovery Hydration Update
+
+- TV search and TV ranking not-in-library Series clicks now hydrate TV metadata and navigate to `SeriesOverviewPage`.
+- Hydration writes `TvSeries`, all TMDB Seasons including Season 0, and all TMDB Episodes.
+- Hydration does not create `MediaFile`, does not fabricate playback sources, and does not convert TV results into `AiRecommendationItem`.
+- Metadata-only TV Series remain not-in-library from a playback-source perspective until active Episode sources exist.
+- The separate `ExternalTvSeriesDetailPage` is no longer planned for Phase 4.
+- Browsing not-in-library TV can accumulate metadata-only rows; cleanup is deferred.
+- TV discovery remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.10.1 Metadata-only TV Library Update
+
+- TV discovery can still write metadata-only TV rows when a not-in-library Series is opened.
+- Metadata-only TV rows do not count as playback-source library items until active Episode `MediaFile` rows exist.
+- A discovery-hydrated Series with no playback source and no Season state stays out of the default media-library list.
+- If the user marks a metadata-only Season watched, unwatched, want-to-watch, favorite, or not-interested, that Series / Season can surface in library-related views.
+- Batch remove skips source-less Seasons and not-in-library Movies with a no-source message.
+- Batch delete record removes software records / metadata / state only and must not delete local or WebDAV files.
+- Metadata-only TV cleanup and refresh policies remain deferred.
+
 ## Phase 4.8 Bugfix TV Parity
 
 - TV 榜单布局与电影榜单一致：第 1 名为大卡，第 2 名后为两列。

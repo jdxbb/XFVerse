@@ -17,13 +17,16 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
     private readonly ISettingsService _settingsService;
     private readonly ITmdbService _tmdbService;
+    private readonly ITvMetadataHydrationService _metadataHydrationService;
 
     public TvSeasonIdentificationService(
         ISettingsService settingsService,
-        ITmdbService tmdbService)
+        ITmdbService tmdbService,
+        ITvMetadataHydrationService metadataHydrationService)
     {
         _settingsService = settingsService;
         _tmdbService = tmdbService;
+        _metadataHydrationService = metadataHydrationService;
     }
 
     public async Task<TvSeasonIdentificationRunResult> IdentifyMediaFilesAsync(
@@ -131,6 +134,9 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     seasonDetails,
                     IdentificationStatusFromConfidence(bestCandidate.Confidence),
                     cancellationToken);
+                await _metadataHydrationService.HydrateSeriesAsync(
+                    bestCandidate.Item.TmdbId,
+                    cancellationToken: cancellationToken);
                 result.Summary.BoundCount++;
             }
             catch (Exception exception)
@@ -161,7 +167,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             throw new ArgumentOutOfRangeException(nameof(seriesTmdbId));
         }
 
-        if (seasonNumber <= 0)
+        if (seasonNumber < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(seasonNumber));
         }
@@ -228,6 +234,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await _metadataHydrationService.HydrateSeriesAsync(seriesTmdbId, force: true, cancellationToken);
         return tvEpisode.Id;
     }
 

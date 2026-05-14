@@ -390,3 +390,70 @@ Phase 4.8 Bugfix aligns TV discovery with the Movie discovery experience without
 - Full TV feature-gap audit and stage reorder remains deferred to the next phase.
 - Full Phase 4 regression and documentation closeout remains Phase 4.9.
 - Final TV visual polish remains deferred.
+
+## Phase 4.10 Goal
+
+Phase 4.10 adds centralized TV metadata hydration and unavailable Season / Episode display. It reuses the existing Series overview, Season detail, `TvSeries`, `TvSeason`, and `TvEpisode` model instead of adding an external TV detail page.
+
+- A TMDB Series ID can be hydrated into local `TvSeries`, all TMDB `TvSeason` rows, and all TMDB `TvEpisode` rows.
+- Hydration does not create `MediaFile`, does not fabricate playback sources, does not modify existing source rows, and does not write collection state.
+- Existing Episode playback progress and watched state are preserved while metadata fields can be refreshed.
+- Season 0 is displayed as `特别篇` and is not hidden.
+- Series overview displays all known Seasons, including Seasons without active Episode sources.
+- Season detail displays all known Episodes, including Episodes without active sources.
+- Episodes without active sources show `暂无播放源`; their play button is disabled while watched / unwatched actions remain available.
+- TV discovery not-in-library Series clicks hydrate metadata and navigate to `SeriesOverviewPage` instead of showing the old external-detail placeholder.
+- Browsing not-in-library TV can accumulate TV metadata rows; cleanup is deferred.
+
+## Phase 4.10 Boundaries
+
+- No migration is added.
+- No database update is executed.
+- No `ExternalTvSeriesDetailPage` is added.
+- No `MediaFile` or fake `RemoteUri` is created for metadata-only TV.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.10 Roadmap Rebase
+
+- Phase 4.11: TV correction entry UI.
+- Phase 4.12: TV scan / rescan / history-location hardening.
+- Phase 4.13: Full Phase 4 regression and documentation closeout.
+
+## Phase 4.10 Deferred
+
+- Cleanup strategy for metadata-only TV Series / Seasons / Episodes.
+- Persistent TV metadata refresh and stale-data policy.
+- TV correction entry UI and cross-type correction UI.
+- Scan / rescan edge-case hardening.
+- TV AI support as a Phase 5 candidate.
+
+## Phase 4.10.1 Goal
+
+Phase 4.10.1 refines metadata-only TV visibility in the media library and locks the batch-operation rules for source-less Seasons and not-in-library Movies.
+
+- Metadata-only TV created by discovery browsing does not appear in the default media-library list unless it has playback context or user state.
+- A Series appears in normal library mode when at least one Episode has an active `MediaFile`, or when at least one Season has user state.
+- User state for metadata-only TV includes Season collection flags and explicit watched / unwatched history recorded through Season state changes.
+- Batch mode expands a source-backed Series into all known Seasons, including source-less Seasons and Season 0.
+- A metadata-only Series with no playback source only exposes Seasons that have user state in batch mode.
+- Episodes remain playback/detail units only; they are not media-library top-level items and are not batch items.
+- Batch watched / unwatched is allowed for metadata-only Seasons and updates all known Episodes without writing `WatchHistory`, `MediaFile`, or fake sources.
+- Batch remove skips source-less Seasons and not-in-library Movies with a readable `暂无播放源可移出` result instead of deleting metadata or state.
+- Batch delete record removes software records / metadata / state according to the existing record-deletion path and does not delete local or WebDAV files.
+
+## Phase 4.10.1 Boundaries
+
+- No migration is added.
+- No database update is executed.
+- No TV correction UI is added.
+- No scan / rescan hardening is included.
+- No metadata-only auto-cleanup or stale-refresh policy is added.
+- TV state and metadata remain excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.10.1 Deferred
+
+- Cleanup policy for metadata-only TV rows created by discovery browsing.
+- Persistent TV metadata refresh / stale-data policy.
+- Phase 4.11 TV correction entry UI.
+- Phase 4.12 TV scan / rescan / history-location hardening.
+- TV AI support remains a Phase 5 candidate.

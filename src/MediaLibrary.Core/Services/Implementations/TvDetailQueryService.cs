@@ -129,9 +129,12 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
 
         var posterFallback = seasonItems
             .OrderByDescending(x => x.SeasonNumber)
-            .Select(x => x.PosterRemoteUrl)
+            .Select(x => x.PosterDisplayUrl)
             .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
             ?? string.Empty;
+        var seriesPoster = string.IsNullOrWhiteSpace(series.PosterRemoteUrl)
+            ? series.PosterLocalPath ?? string.Empty
+            : series.PosterRemoteUrl;
         var sourceSummary = TvDetailDisplayText.FormatSourceSummary(
             sourceRows.Select(x => x.ProtocolType).Distinct().ToArray());
 
@@ -144,7 +147,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             Overview = series.Overview ?? string.Empty,
             PosterRemoteUrl = series.PosterRemoteUrl ?? string.Empty,
             PosterLocalPath = series.PosterLocalPath ?? string.Empty,
-            PosterDisplayUrl = string.IsNullOrWhiteSpace(series.PosterRemoteUrl) ? posterFallback : series.PosterRemoteUrl,
+            PosterDisplayUrl = string.IsNullOrWhiteSpace(seriesPoster) ? posterFallback : seriesPoster,
             FirstAirDate = series.FirstAirDate,
             FirstAirYear = series.FirstAirYear,
             GenresText = series.GenresText ?? string.Empty,
@@ -217,6 +220,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     x.EpisodeNumber,
                     x.Title,
                     x.Overview,
+                    x.AirDate,
                     x.RuntimeMinutes,
                     x.IsWatched,
                     x.LastPlayedAt,
@@ -244,6 +248,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         EpisodeNumber = episode.EpisodeNumber,
                         Name = episode.Title,
                         Overview = episode.Overview ?? string.Empty,
+                        AirDate = episode.AirDate,
                         RuntimeMinutes = episode.RuntimeMinutes,
                         IsWatched = episode.IsWatched,
                         LastPlayedAt = episode.LastPlayedAt,

@@ -144,6 +144,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             .ToListAsync(cancellationToken);
         var totalEpisodeCount = ResolveTotalEpisodeCount(season, episodes);
         var oldAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
+        var oldAggregateUnwatched = IsAggregateUnwatched(episodes);
 
         foreach (var episode in episodes)
         {
@@ -169,6 +170,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         }
 
         var newAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
+        var newAggregateUnwatched = IsAggregateUnwatched(episodes);
         season.UpdatedAt = now;
         RecordStateChange(
             dbContext,
@@ -179,6 +181,15 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             newAggregateWatched,
             changeSource,
             now);
+        if (!isWatched && oldAggregateUnwatched && newAggregateUnwatched)
+        {
+            RecordStateTouch(dbContext, season, item, StateUnwatched, true, changeSource, now);
+        }
+        else if (!isWatched)
+        {
+            RecordStateChange(dbContext, season, item, StateUnwatched, oldAggregateUnwatched, newAggregateUnwatched, changeSource, now);
+        }
+
         if (item is not null)
         {
             RecordStateChange(dbContext, season, item, StateFavorite, oldFavorite, item.IsFavorite, changeSource, now);
@@ -522,6 +533,35 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                 StateType = stateType,
                 OldValue = oldValue,
                 NewValue = newValue,
+                Source = NormalizeSource(source),
+                ChangedAtUtc = now,
+                CreatedAtUtc = now
+            });
+    }
+
+    private static void RecordStateTouch(
+        AppDbContext dbContext,
+        TvSeason season,
+        UserTvSeasonCollectionItem? collectionItem,
+        string stateType,
+        bool value,
+        string? source,
+        DateTime now)
+    {
+        dbContext.UserTvSeasonStateChangeHistories.Add(
+            new UserTvSeasonStateChangeHistory
+            {
+                TmdbSeriesId = collectionItem?.TmdbSeriesId ?? season.Series?.TmdbSeriesId,
+                TmdbSeasonId = collectionItem?.TmdbSeasonId ?? season.TmdbSeasonId,
+                TvSeriesId = season.TvSeriesId,
+                TvSeasonId = season.Id,
+                UserTvSeasonCollectionItemId = collectionItem?.Id > 0 ? collectionItem.Id : null,
+                SeasonNumber = season.SeasonNumber,
+                SeriesTitle = collectionItem?.SeriesTitle ?? season.Series?.Name,
+                SeasonTitle = collectionItem?.SeasonTitle ?? season.Name,
+                StateType = stateType,
+                OldValue = value,
+                NewValue = value,
                 Source = NormalizeSource(source),
                 ChangedAtUtc = now,
                 CreatedAtUtc = now

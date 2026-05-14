@@ -97,7 +97,7 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="已入库季" />
+                    <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="全部 Season" />
                     <ScrollViewer Grid.Row="1"
                                   Margin="0,16,0,0"
                                   HorizontalScrollBarVisibility="Disabled"
@@ -116,7 +116,7 @@
                                         </Grid.ColumnDefinitions>
 
                                         <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="12">
-                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}" Stretch="UniformToFill" />
                                         </Border>
 
                                         <StackPanel Grid.Column="2" Margin="0,0,18,0">
@@ -180,7 +180,7 @@
                             </Style>
                         </Border.Style>
                         <TextBlock Style="{StaticResource BodyTextStyle}"
-                                   Text="暂无已入库季。"
+                                   Text="暂无 Season metadata。"
                                    TextWrapping="Wrap" />
                     </Border>
                 </Grid>
