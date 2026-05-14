@@ -206,6 +206,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             seriesDetails,
             seasonDetails,
             cancellationToken);
+        await UpsertSeasonMetadataEpisodesAsync(dbContext, tvSeason, seasonDetails, cancellationToken);
         var tvEpisode = await UpsertEpisodeAsync(
             dbContext,
             tvSeason,
@@ -404,6 +405,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             seriesDetails,
             seasonDetails,
             cancellationToken);
+        await UpsertSeasonMetadataEpisodesAsync(dbContext, tvSeason, seasonDetails, cancellationToken);
 
         foreach (var candidateFile in candidate.Files)
         {
@@ -582,6 +584,33 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         return tvSeason;
     }
 
+    private static async Task UpsertSeasonMetadataEpisodesAsync(
+        AppDbContext dbContext,
+        TvSeason tvSeason,
+        TmdbTvSeasonDetailResult? seasonDetails,
+        CancellationToken cancellationToken)
+    {
+        if (seasonDetails is null || seasonDetails.Episodes.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var metadata in seasonDetails.Episodes
+                     .Where(x => x.EpisodeNumber > 0)
+                     .GroupBy(x => x.EpisodeNumber)
+                     .Select(x => x.OrderByDescending(y => y.TmdbId).First())
+                     .OrderBy(x => x.EpisodeNumber))
+        {
+            await UpsertEpisodeAsync(
+                dbContext,
+                tvSeason,
+                metadata.EpisodeNumber,
+                metadata,
+                candidateFile: null,
+                cancellationToken);
+        }
+    }
+
     private static async Task<TvEpisode> UpsertEpisodeAsync(
         AppDbContext dbContext,
         TvSeason tvSeason,
@@ -612,7 +641,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             FirstNonEmpty(
                 metadata?.Name,
                 candidateFile?.ParseResult.EpisodeTitleCandidate,
-                $"Episode {episodeNumber:D2}"),
+                $"第 {episodeNumber} 集"),
             300);
         tvEpisode.Overview = Truncate(metadata?.Overview ?? string.Empty, 5000);
         tvEpisode.StillRemoteUrl = EmptyToNull(metadata?.StillRemoteUrl);

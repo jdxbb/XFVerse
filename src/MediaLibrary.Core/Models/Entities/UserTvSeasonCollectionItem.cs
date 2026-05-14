@@ -36,7 +36,7 @@ public sealed class UserTvSeasonCollectionItem
 
     public bool IsFavorite { get; set; }
 
-    public bool IsWantToWatch { get; set; } = true;
+    public bool IsWantToWatch { get; set; }
 
     public bool IsNotInterested { get; set; }
 

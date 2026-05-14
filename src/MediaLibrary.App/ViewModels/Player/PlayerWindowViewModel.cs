@@ -2653,12 +2653,24 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             MpvPlaybackDiagnostics.Write($"mpv-end-reached-handled mediaFileId={_currentPlaybackSource?.MediaFileId ?? SelectedSource?.MediaFileId ?? 0}");
             if (_currentContentType == PlaybackContentType.Episode)
             {
-                await TryAutoPlayNextEpisodeAsync();
+                await TryAutoPlayNextEpisodeOnDispatcherAsync();
             }
         }
         catch
         {
         }
+    }
+
+    private async Task TryAutoPlayNextEpisodeOnDispatcherAsync()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            await dispatcher.InvokeAsync(TryAutoPlayNextEpisodeAsync).Task.Unwrap();
+            return;
+        }
+
+        await TryAutoPlayNextEpisodeAsync();
     }
 
     private async Task TryAutoPlayNextEpisodeAsync()
@@ -2681,7 +2693,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        await SwitchToEpisodeAsync(nextEpisode.EpisodeId, "episode-auto-next");
+        await OpenAdjacentEpisodeAsync(nextEpisode, "episode-auto-next");
     }
 
     private void OnPlaybackEngineEncounteredError(object? sender, PlaybackEngineErrorEventArgs e)

@@ -61,8 +61,12 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                         season?.SeriesName ?? item.SeriesTitle,
                         season?.SeasonName ?? item.SeasonTitle,
                         season?.SeasonNumber ?? item.SeasonNumber);
-                    var totalEpisodeCount = season?.TotalEpisodeCount
-                                            ?? Math.Max(0, season?.EpisodeCount ?? 0);
+                    var totalEpisodeCount = ResolveTotalEpisodeCount(season?.TotalEpisodeCount, season?.EpisodeCount ?? 0);
+                    var watchedEpisodeCount = season?.WatchedEpisodeCount ?? 0;
+                    var isWatched = IsAggregateWatched(watchedEpisodeCount, season?.EpisodeCount ?? 0, totalEpisodeCount);
+                    var isUnwatched = watchedEpisodeCount == 0;
+                    var isFavorite = item.IsFavorite && isWatched;
+                    var isWantToWatch = item.IsWantToWatch && isUnwatched;
                     return new CollectionMovieItem
                     {
                         IsTvSeason = true,
@@ -79,12 +83,12 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                         GenresText = FirstNonEmpty(season?.GenresText, item.GenresText),
                         Country = item.Country,
                         Language = item.Language,
-                        IsLiked = item.IsFavorite,
-                        IsWantToWatch = item.IsWantToWatch,
-                        IsWatched = season is not null && season.InLibraryEpisodeCount > 0 && season.WatchedEpisodeCount >= season.InLibraryEpisodeCount,
+                        IsLiked = isFavorite,
+                        IsWantToWatch = isWantToWatch,
+                        IsWatched = isWatched,
                         IsNotInterested = item.IsNotInterested,
                         IsInLibrary = season?.InLibraryEpisodeCount > 0,
-                        WatchedEpisodeCount = season?.WatchedEpisodeCount ?? 0,
+                        WatchedEpisodeCount = watchedEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
                         InLibraryEpisodeCount = season?.InLibraryEpisodeCount ?? 0,
                         SourceSummary = FormatSourceSummary(season?.HasLocalSource == true, season?.HasWebDavSource == true),
@@ -138,43 +142,119 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             .Include(x => x.MediaFiles)
             .Where(x => x.TvSeasonId == tvSeasonId)
             .ToListAsync(cancellationToken);
-        var inLibraryEpisodes = episodes
-            .Where(x => x.MediaFiles.Any(media => !media.IsDeleted && media.MediaType == MediaType.Video))
-            .ToList();
-        var oldAggregateWatched = inLibraryEpisodes.Count > 0 && inLibraryEpisodes.All(x => x.IsWatched);
+        var totalEpisodeCount = ResolveTotalEpisodeCount(season, episodes);
+        var oldAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
 
-        foreach (var episode in inLibraryEpisodes)
+        foreach (var episode in episodes)
         {
-            episode.IsWatched = isWatched;
-            episode.UpdatedAt = now;
-            if (isWatched)
-            {
-                episode.LastPlayedAt ??= now;
-                var durationSeconds = ResolveEpisodeDurationSeconds(episode);
-                if (durationSeconds > 0)
-                {
-                    episode.LastPlayPositionSeconds = durationSeconds;
-                    episode.DurationWatchedSeconds = Math.Max(episode.DurationWatchedSeconds, durationSeconds);
-                }
-
-                continue;
-            }
-
-            episode.LastPlayedAt = null;
-            episode.LastPlayPositionSeconds = 0;
-            episode.DurationWatchedSeconds = 0;
+            ApplyEpisodeWatchedState(episode, isWatched, now);
         }
 
+        var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+        var oldFavorite = item?.IsFavorite ?? false;
+        var oldWantToWatch = item?.IsWantToWatch ?? false;
+        if (item is not null)
+        {
+            ApplySeasonSnapshot(item, season);
+            if (isWatched)
+            {
+                item.IsWantToWatch = false;
+            }
+            else
+            {
+                item.IsFavorite = false;
+            }
+
+            item.UpdatedAt = now;
+        }
+
+        var newAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
         season.UpdatedAt = now;
         RecordStateChange(
             dbContext,
             season,
-            collectionItem: null,
+            item,
             StateWatched,
             oldAggregateWatched,
-            isWatched && inLibraryEpisodes.Count > 0,
+            newAggregateWatched,
             changeSource,
             now);
+        if (item is not null)
+        {
+            RecordStateChange(dbContext, season, item, StateFavorite, oldFavorite, item.IsFavorite, changeSource, now);
+            RecordStateChange(dbContext, season, item, StateWantToWatch, oldWantToWatch, item.IsWantToWatch, changeSource, now);
+            CleanupCollectionEntityIfEmpty(dbContext, item);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetEpisodeWatchedAsync(
+        int tvEpisodeId,
+        bool isWatched,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var targetEpisode = await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => x.Id == tvEpisodeId)
+            .Select(x => new { x.Id, x.TvSeasonId })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("电视剧集不存在。");
+
+        var season = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .FirstOrDefaultAsync(x => x.Id == targetEpisode.TvSeasonId, cancellationToken)
+            ?? throw new InvalidOperationException("电视剧季不存在。");
+        var episodes = await dbContext.TvEpisodes
+            .Include(x => x.MediaFiles)
+            .Where(x => x.TvSeasonId == season.Id)
+            .ToListAsync(cancellationToken);
+        var episode = episodes.FirstOrDefault(x => x.Id == tvEpisodeId)
+            ?? throw new InvalidOperationException("电视剧集不存在。");
+        var now = DateTime.UtcNow;
+        var totalEpisodeCount = ResolveTotalEpisodeCount(season, episodes);
+        var oldAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
+        var oldAggregateUnwatched = IsAggregateUnwatched(episodes);
+
+        ApplyEpisodeWatchedState(episode, isWatched, now);
+
+        var newAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
+        var newAggregateUnwatched = IsAggregateUnwatched(episodes);
+        var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+        var oldFavorite = item?.IsFavorite ?? false;
+        var oldWantToWatch = item?.IsWantToWatch ?? false;
+        if (item is not null)
+        {
+            ApplySeasonSnapshot(item, season);
+            if (!newAggregateWatched)
+            {
+                item.IsFavorite = false;
+            }
+
+            if (!newAggregateUnwatched)
+            {
+                item.IsWantToWatch = false;
+            }
+
+            item.UpdatedAt = now;
+        }
+
+        season.UpdatedAt = now;
+        RecordStateChange(dbContext, season, item, StateWatched, oldAggregateWatched, newAggregateWatched, changeSource, now);
+        if (oldAggregateUnwatched != newAggregateUnwatched)
+        {
+            RecordStateChange(dbContext, season, item, StateUnwatched, oldAggregateUnwatched, newAggregateUnwatched, changeSource, now);
+        }
+
+        if (item is not null)
+        {
+            RecordStateChange(dbContext, season, item, StateFavorite, oldFavorite, item.IsFavorite, changeSource, now);
+            RecordStateChange(dbContext, season, item, StateWantToWatch, oldWantToWatch, item.IsWantToWatch, changeSource, now);
+            CleanupCollectionEntityIfEmpty(dbContext, item);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -295,7 +375,32 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             ?? throw new InvalidOperationException("电视剧季不存在。");
         var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
         var now = DateTime.UtcNow;
-        item ??= new UserTvSeasonCollectionItem { CreatedAt = now };
+        var episodes = await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => x.TvSeasonId == tvSeasonId)
+            .Select(x => new { x.IsWatched })
+            .ToListAsync(cancellationToken);
+        var totalEpisodeCount = ResolveTotalEpisodeCount(season.TmdbEpisodeCount, episodes.Count);
+        var isSeasonWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
+        var isSeasonUnwatched = episodes.All(x => !x.IsWatched);
+
+        if (stateType == StateFavorite && newValue && !isSeasonWatched)
+        {
+            throw new InvalidOperationException("只有整季已看的电视剧季可以标记喜爱。");
+        }
+
+        if (stateType == StateWantToWatch && newValue && !isSeasonUnwatched)
+        {
+            throw new InvalidOperationException("只有未看的电视剧季可以标记想看。");
+        }
+
+        item ??= new UserTvSeasonCollectionItem
+        {
+            CreatedAt = now,
+            IsFavorite = false,
+            IsWantToWatch = false,
+            IsNotInterested = false
+        };
         if (item.Id == 0)
         {
             dbContext.UserTvSeasonCollectionItems.Add(item);
@@ -312,6 +417,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                 item.IsFavorite = newValue;
                 if (newValue)
                 {
+                    item.IsWantToWatch = false;
                     item.IsNotInterested = false;
                 }
 
@@ -320,6 +426,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                 item.IsWantToWatch = newValue;
                 if (newValue)
                 {
+                    item.IsFavorite = false;
                     item.IsNotInterested = false;
                 }
 
@@ -429,6 +536,55 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         }
     }
 
+    private static int ResolveTotalEpisodeCount(TvSeason season, IReadOnlyCollection<TvEpisode> episodes)
+    {
+        return ResolveTotalEpisodeCount(season.TmdbEpisodeCount, episodes.Count);
+    }
+
+    private static int ResolveTotalEpisodeCount(int? tmdbEpisodeCount, int knownEpisodeCount)
+    {
+        return tmdbEpisodeCount.GetValueOrDefault() > 0
+            ? tmdbEpisodeCount!.Value
+            : Math.Max(0, knownEpisodeCount);
+    }
+
+    private static bool IsAggregateWatched(int watchedEpisodeCount, int knownEpisodeCount, int totalEpisodeCount)
+    {
+        if (totalEpisodeCount <= 0)
+        {
+            return knownEpisodeCount > 0 && watchedEpisodeCount >= knownEpisodeCount;
+        }
+
+        return knownEpisodeCount >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount;
+    }
+
+    private static bool IsAggregateUnwatched(IEnumerable<TvEpisode> episodes)
+    {
+        return episodes.All(x => !x.IsWatched);
+    }
+
+    private static void ApplyEpisodeWatchedState(TvEpisode episode, bool isWatched, DateTime now)
+    {
+        episode.IsWatched = isWatched;
+        episode.UpdatedAt = now;
+        if (isWatched)
+        {
+            episode.LastPlayedAt ??= now;
+            var durationSeconds = ResolveEpisodeDurationSeconds(episode);
+            if (durationSeconds > 0)
+            {
+                episode.LastPlayPositionSeconds = durationSeconds;
+                episode.DurationWatchedSeconds = Math.Max(episode.DurationWatchedSeconds, durationSeconds);
+            }
+
+            return;
+        }
+
+        episode.LastPlayedAt = null;
+        episode.LastPlayPositionSeconds = 0;
+        episode.DurationWatchedSeconds = 0;
+    }
+
     private static int ResolveEpisodeDurationSeconds(TvEpisode episode)
     {
         var mediaDuration = episode.MediaFiles
@@ -532,6 +688,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
     }
 
     private const string StateWatched = "Watched";
+    private const string StateUnwatched = "Unwatched";
     private const string StateFavorite = "Favorite";
     private const string StateWantToWatch = "WantToWatch";
     private const string StateNotInterested = "NotInterested";

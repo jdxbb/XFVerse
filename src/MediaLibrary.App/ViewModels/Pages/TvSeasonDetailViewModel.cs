@@ -11,6 +11,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private readonly INavigationStateService _navigationStateService;
     private readonly ITvDetailQueryService _tvDetailQueryService;
     private readonly IPlayerWindowService _playerWindowService;
+    private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
+    private readonly IDataRefreshService _dataRefreshService;
+    private int? _seasonId;
     private int? _seriesId;
     private string _seriesName = "-";
     private string _name = "未选择电视剧季";
@@ -28,18 +31,34 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private string _statusMessage = "请先选择一个电视剧季。";
     private bool _hasSeason;
     private bool _isUnidentified;
+    private bool _isFavorite;
+    private bool _isWantToWatch;
+    private bool _isNotInterested;
+    private bool _isSeasonWatched;
+    private bool _isSeasonUnwatched;
 
     public TvSeasonDetailViewModel(
         INavigationStateService navigationStateService,
         ITvDetailQueryService tvDetailQueryService,
-        IPlayerWindowService playerWindowService)
+        IPlayerWindowService playerWindowService,
+        ITvSeasonCollectionService tvSeasonCollectionService,
+        IDataRefreshService dataRefreshService)
         : base("电视剧季", "查看电视剧季详情、聚合进度和集列表。")
     {
         _navigationStateService = navigationStateService;
         _tvDetailQueryService = tvDetailQueryService;
         _playerWindowService = playerWindowService;
+        _tvSeasonCollectionService = tvSeasonCollectionService;
+        _dataRefreshService = dataRefreshService;
         NavigateBackToSeriesCommand = new RelayCommand(NavigateBackToSeries, () => _seriesId.HasValue);
         PlayEpisodeCommand = new AsyncRelayCommand(PlayEpisodeAsync);
+        ToggleFavoriteCommand = new AsyncRelayCommand(() => ToggleFavoriteAsync(), () => HasSeason && (IsFavorite || IsSeasonWatched));
+        ToggleWantToWatchCommand = new AsyncRelayCommand(() => ToggleWantToWatchAsync(), () => HasSeason && (IsWantToWatch || IsSeasonUnwatched));
+        ToggleNotInterestedCommand = new AsyncRelayCommand(() => ToggleNotInterestedAsync(), () => HasSeason);
+        MarkSeasonWatchedCommand = new AsyncRelayCommand(() => SetSeasonWatchedAsync(true), () => HasSeason);
+        MarkSeasonUnwatchedCommand = new AsyncRelayCommand(() => SetSeasonWatchedAsync(false), () => HasSeason);
+        MarkEpisodeWatchedCommand = new AsyncRelayCommand(parameter => SetEpisodeWatchedAsync(parameter, true));
+        MarkEpisodeUnwatchedCommand = new AsyncRelayCommand(parameter => SetEpisodeWatchedAsync(parameter, false));
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
     }
 
@@ -48,6 +67,20 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public RelayCommand NavigateBackToSeriesCommand { get; }
 
     public AsyncRelayCommand PlayEpisodeCommand { get; }
+
+    public AsyncRelayCommand ToggleFavoriteCommand { get; }
+
+    public AsyncRelayCommand ToggleWantToWatchCommand { get; }
+
+    public AsyncRelayCommand ToggleNotInterestedCommand { get; }
+
+    public AsyncRelayCommand MarkSeasonWatchedCommand { get; }
+
+    public AsyncRelayCommand MarkSeasonUnwatchedCommand { get; }
+
+    public AsyncRelayCommand MarkEpisodeWatchedCommand { get; }
+
+    public AsyncRelayCommand MarkEpisodeUnwatchedCommand { get; }
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -89,6 +122,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(HasNoSeason));
                 OnPropertyChanged(nameof(HasEpisodes));
                 OnPropertyChanged(nameof(HasNoEpisodes));
+                RaiseSeasonStateCommandCanExecuteChanged();
             }
         }
     }
@@ -104,6 +138,74 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         get => _isUnidentified;
         private set => SetProperty(ref _isUnidentified, value);
     }
+
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        private set
+        {
+            if (SetProperty(ref _isFavorite, value))
+            {
+                OnPropertyChanged(nameof(FavoriteButtonText));
+                RaiseSeasonStateCommandCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsWantToWatch
+    {
+        get => _isWantToWatch;
+        private set
+        {
+            if (SetProperty(ref _isWantToWatch, value))
+            {
+                OnPropertyChanged(nameof(WantToWatchButtonText));
+                RaiseSeasonStateCommandCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsNotInterested
+    {
+        get => _isNotInterested;
+        private set
+        {
+            if (SetProperty(ref _isNotInterested, value))
+            {
+                OnPropertyChanged(nameof(NotInterestedButtonText));
+            }
+        }
+    }
+
+    public bool IsSeasonWatched
+    {
+        get => _isSeasonWatched;
+        private set
+        {
+            if (SetProperty(ref _isSeasonWatched, value))
+            {
+                RaiseSeasonStateCommandCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsSeasonUnwatched
+    {
+        get => _isSeasonUnwatched;
+        private set
+        {
+            if (SetProperty(ref _isSeasonUnwatched, value))
+            {
+                RaiseSeasonStateCommandCanExecuteChanged();
+            }
+        }
+    }
+
+    public string FavoriteButtonText => IsFavorite ? "取消喜爱" : "喜爱";
+
+    public string WantToWatchButtonText => IsWantToWatch ? "取消想看" : "想看";
+
+    public string NotInterestedButtonText => IsNotInterested ? "取消不想看" : "不想看";
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
@@ -123,6 +225,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 return;
             }
 
+            _seasonId = model.SeasonId;
             _seriesId = model.SeriesId;
             HasSeason = true;
             SeriesName = model.SeriesName;
@@ -139,6 +242,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             IdentificationStatusText = model.IdentificationStatusText;
             IsUnidentified = model.IsUnidentified;
             UnidentifiedSummary = model.UnidentifiedSummary;
+            IsFavorite = model.IsFavorite;
+            IsWantToWatch = model.IsWantToWatch;
+            IsNotInterested = model.IsNotInterested;
+            IsSeasonWatched = model.IsSeasonWatched;
+            IsSeasonUnwatched = model.IsSeasonUnwatched;
             Episodes.Clear();
             foreach (var episode in model.Episodes)
             {
@@ -146,6 +254,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             }
 
             NavigateBackToSeriesCommand.RaiseCanExecuteChanged();
+            RaiseSeasonStateCommandCanExecuteChanged();
             OnPropertyChanged(nameof(HasEpisodes));
             OnPropertyChanged(nameof(HasNoEpisodes));
             var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
@@ -166,6 +275,106 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         if (_seriesId.HasValue)
         {
             _navigationStateService.RequestTvSeriesOverview(_seriesId.Value);
+        }
+    }
+
+    private async Task ToggleFavoriteAsync()
+    {
+        if (!_seasonId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await _tvSeasonCollectionService.SetFavoriteAsync(_seasonId.Value, !IsFavorite, changeSource: "Manual");
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"更新喜爱状态失败：{DescribeException(exception)}";
+        }
+    }
+
+    private async Task ToggleWantToWatchAsync()
+    {
+        if (!_seasonId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await _tvSeasonCollectionService.SetWantToWatchAsync(_seasonId.Value, !IsWantToWatch, changeSource: "Manual");
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"更新想看状态失败：{DescribeException(exception)}";
+        }
+    }
+
+    private async Task ToggleNotInterestedAsync()
+    {
+        if (!_seasonId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await _tvSeasonCollectionService.SetNotInterestedAsync(_seasonId.Value, !IsNotInterested, changeSource: "Manual");
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"更新不想看状态失败：{DescribeException(exception)}";
+        }
+    }
+
+    private async Task SetSeasonWatchedAsync(bool isWatched)
+    {
+        if (!_seasonId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await _tvSeasonCollectionService.SetWatchedAsync(_seasonId.Value, isWatched, changeSource: "Manual");
+            _dataRefreshService.NotifyPlaybackChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+            StatusMessage = isWatched ? "已标记整季为已看。" : "已标记整季为未看。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"更新整季观看状态失败：{DescribeException(exception)}";
+        }
+    }
+
+    private async Task SetEpisodeWatchedAsync(object? parameter, bool isWatched)
+    {
+        if (parameter is not TvSeasonEpisodeListItem episode)
+        {
+            StatusMessage = "请先选择要标记的集。";
+            return;
+        }
+
+        try
+        {
+            await _tvSeasonCollectionService.SetEpisodeWatchedAsync(episode.EpisodeId, isWatched, changeSource: "Manual");
+            _dataRefreshService.NotifyPlaybackChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+            StatusMessage = $"{episode.EpisodeNumberText} 已标记为{(isWatched ? "已看" : "未看")}。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"更新集观看状态失败：{DescribeException(exception)}";
         }
     }
 
@@ -196,6 +405,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     private void Clear(string statusMessage)
     {
+        _seasonId = null;
         _seriesId = null;
         HasSeason = false;
         SeriesName = "-";
@@ -212,11 +422,26 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         IdentificationStatusText = "未加载";
         IsUnidentified = false;
         UnidentifiedSummary = string.Empty;
+        IsFavorite = false;
+        IsWantToWatch = false;
+        IsNotInterested = false;
+        IsSeasonWatched = false;
+        IsSeasonUnwatched = true;
         StatusMessage = statusMessage;
         Episodes.Clear();
         NavigateBackToSeriesCommand.RaiseCanExecuteChanged();
+        RaiseSeasonStateCommandCanExecuteChanged();
         OnPropertyChanged(nameof(HasEpisodes));
         OnPropertyChanged(nameof(HasNoEpisodes));
+    }
+
+    private void RaiseSeasonStateCommandCanExecuteChanged()
+    {
+        ToggleFavoriteCommand.RaiseCanExecuteChanged();
+        ToggleWantToWatchCommand.RaiseCanExecuteChanged();
+        ToggleNotInterestedCommand.RaiseCanExecuteChanged();
+        MarkSeasonWatchedCommand.RaiseCanExecuteChanged();
+        MarkSeasonUnwatchedCommand.RaiseCanExecuteChanged();
     }
 
     private static string DescribeException(Exception exception)

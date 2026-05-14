@@ -7,6 +7,8 @@
 - No known Phase 4.4 build blocker after hidden route and page validation.
 - No known Phase 4.5 build blocker after Episode playback integration.
 - No known Phase 4.6 build blocker after media-library, home, history, and favorites integration.
+- No known Phase 4.6 Bugfix blocker after validation fixes are applied; build verification remains the gate.
+- No known Phase 4.6 Bugfix 2 blocker after Season state and poster-cache fixes; build verification remains the gate.
 
 ## Deferred
 
@@ -21,6 +23,10 @@
 - TV discovery entry points are deferred to Phase 4.7.
 - Rich mixed Movie + Season batch semantics remain deferred; Phase 4.6 asks users to split mixed selections.
 - Full TV status filtering in normal Series mode remains deferred; Season state is surfaced in batch mode and favorites.
+- Movie + Season mixed batch operations remain deferred.
+- Season-level rating display remains deferred.
+- TV search and TV ranking remain deferred to Phase 4.7.
+- Final TV UI polish remains deferred.
 
 ## Noise
 
@@ -34,3 +40,6 @@
 - Previous / next and auto-next intentionally stay inside one Season.
 - Missing adjacent Episode sources show a friendly notice instead of falling back across seasons.
 - Phase 4.6 uses existing card layouts with minimal TV fields; final visual polish remains deferred.
+- Batch favorite, want-to-watch, and not-interested are intentionally not in the batch toolbar. Use Season detail or favorites card actions instead.
+- Watch Insights and Watch Profile stay Movie-only; Episode watch history is available in history UI but excluded from statistics, profile, persona, and recommendation fingerprints.
+- Existing matched Seasons with only in-library Episode rows need a rescan or TV correction refresh to populate missing TMDB Episode metadata rows.

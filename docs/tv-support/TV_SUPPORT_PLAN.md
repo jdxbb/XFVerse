@@ -258,9 +258,12 @@ Phase 4.6 still does not add TV discovery search / rankings, AI recommendations,
 
 - Season favorite, want-to-watch, and not-interested state is stored in `UserTvSeasonCollectionItem`.
 - State changes are recorded in `UserTvSeasonStateChangeHistory`.
-- Batch watched / unwatched updates only Episodes with active in-library sources.
+- Season favorite, want-to-watch, and not-interested are single-item actions on Season detail or favorites cards.
+- Batch operations do not include favorite, want-to-watch, or not-interested.
+- The final batch toolbar scope is watched, unwatched, remove from library, and delete record.
+- Batch watched / unwatched updates all TMDB Season Episodes once metadata has been populated, including Episodes without playable sources.
 - Batch watched / unwatched does not create `WatchHistory`.
-- Season progress stays derived from Episode rows.
+- Season progress uses watched Episode count over TMDB total Episode count.
 
 ## Phase 4.6 Home, History And Favorites
 
@@ -269,6 +272,33 @@ Phase 4.6 still does not add TV discovery search / rankings, AI recommendations,
 - Favorites merge Movie cards with Season cards in favorite and want-to-watch tabs.
 - Favorites do not display Series cards or Episode cards.
 - TV remains excluded from AI, Watch Insights, profiles, personalities, and recommendation fingerprints.
+
+## Phase 4.6 Bugfix / Validation Fixes
+
+Phase 4.6 validation fixes keep the project inside the library / home / history / favorites scope and do not start Phase 4.7.
+
+- Auto-next now uses the same adjacent-Episode switching path as the manual next button and stays on the UI dispatcher.
+- `TvSeasonDetailPage` exposes Season-level favorite, want-to-watch, and not-interested toggle buttons.
+- Episode rows expose watched / unwatched buttons that update only `TvEpisode` lightweight summary fields and do not create `WatchHistory`.
+- The media-library batch toolbar only exposes watched, unwatched, remove from library, and delete record.
+- Mixed Movie + Season batch operation semantics remain deferred.
+- `SeriesOverviewPage` Season list is structurally scrollable when content exceeds available height.
+- Watch Insights, Watch Profile, persona inputs, and recommendation fingerprint remain Movie-only. Existing statistics queries filter `WatchHistory.MovieId` and never consume Episode history.
+
+## Phase 4.6 Bugfix 2 / Season State And Poster Cache Fixes
+
+Phase 4.6 Bugfix 2 keeps the project inside the TV library integration scope and does not start Phase 4.7.
+
+- TV poster image bindings now use the existing poster cache behavior for Series, Season, favorites, home continue watching, watch history, and TV detail pages.
+- Season favorite / want-to-watch / not-interested rules follow the movie rules: only fully watched Seasons can be favorite, only unwatched Seasons can be want-to-watch, and not-interested is mutually exclusive with favorite / want-to-watch.
+- Marking not-interested does not change Episode watched state.
+- Marking a Season watched updates all known TMDB Season Episode metadata rows, cancels want-to-watch, and does not create `WatchHistory`.
+- Marking a Season unwatched updates all known TMDB Season Episode metadata rows, cancels favorite, and does not create `WatchHistory`.
+- TV identification and manual TV correction upsert the full TMDB Season detail Episode metadata so missing Episodes without media sources can still participate in Season watched state.
+- Season progress is displayed as watched Episodes over TMDB total Episodes, for example `3 / 7` when only three of seven TMDB Episodes are watched.
+- Episode watched / unwatched actions remain single-Episode actions and refresh aggregate Season state.
+- Episodes without active media remain non-playable even when their metadata exists and their watched state can be edited.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
 
 ## Phase 4.6 Delete / Remove Policy
 

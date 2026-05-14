@@ -34,6 +34,12 @@ public sealed class TvSeasonDetailModel
 
     public string SourceSummary { get; set; } = string.Empty;
 
+    public bool IsFavorite { get; set; }
+
+    public bool IsWantToWatch { get; set; }
+
+    public bool IsNotInterested { get; set; }
+
     public int WatchedEpisodeCount { get; set; }
 
     public int TotalEpisodeCount { get; set; }
@@ -59,6 +65,12 @@ public sealed class TvSeasonDetailModel
     public string InLibraryText => $"已入库 {InLibraryEpisodeCount} 集";
 
     public string IdentificationStatusText => TvDetailDisplayText.FormatIdentificationStatus(IdentificationStatus);
+
+    public bool IsSeasonWatched => TotalEpisodeCount > 0
+        ? Episodes.Count >= TotalEpisodeCount && WatchedEpisodeCount >= TotalEpisodeCount
+        : Episodes.Count > 0 && WatchedEpisodeCount >= Episodes.Count;
+
+    public bool IsSeasonUnwatched => WatchedEpisodeCount == 0;
 }
 
 public sealed class TvSeasonEpisodeListItem
@@ -110,6 +122,10 @@ public sealed class TvSeasonEpisodeListItem
         : "暂无进度";
 
     public string PlayButtonText => HasPlayableSource ? "播放" : "暂无播放源";
+
+    public string WatchedActionText => IsWatched ? "已看" : "标记已看";
+
+    public string UnwatchedActionText => IsWatched ? "标记未看" : "未看";
 }
 
 internal static class TvDetailDisplayText

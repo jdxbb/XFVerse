@@ -343,7 +343,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
         var sourcesBySeason = sourceRows
-            .Join(episodeRows, source => source.EpisodeId, episode => episode.EpisodeId, (source, episode) => new { episode.SeasonId, source.ProtocolType })
+            .Join(
+                episodeRows,
+                source => source.EpisodeId,
+                episode => episode.EpisodeId,
+                (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
         var stateSeasonIds = stateRows.Select(x => x.SeasonId).ToHashSet();
@@ -358,7 +362,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .SelectMany(season => sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
                         .ToList();
                     var hasState = stateSeasonIds.Overlaps(seasonIdsForSeries);
-                    var inLibraryEpisodeCount = sources.Select(x => x).Count();
+                    var inLibraryEpisodeCount = sources.Select(x => x.EpisodeId).Distinct().Count();
                     var watchedEpisodeCount = seasons
                         .SelectMany(season => episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
                         .Count(x => x.IsWatched);
@@ -366,6 +370,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         season => season.TotalEpisodeCount.GetValueOrDefault() > 0
                             ? season.TotalEpisodeCount!.Value
                             : episodesBySeason.GetValueOrDefault(season.SeasonId)?.Count ?? 0);
+                    var knownEpisodeCount = seasons.Sum(season => episodesBySeason.GetValueOrDefault(season.SeasonId)?.Count ?? 0);
                     var latestSeasonPoster = seasons
                         .OrderByDescending(x => x.SeasonNumber)
                         .Select(x => x.PosterRemoteUrl)
@@ -391,7 +396,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
                         HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
                         IsInLibrary = sources.Count > 0,
-                        IsWatched = inLibraryEpisodeCount > 0 && watchedEpisodeCount >= inLibraryEpisodeCount,
+                        IsWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount),
                         SeasonCount = seasons.Count,
                         InLibraryEpisodeCount = inLibraryEpisodeCount,
                         WatchedEpisodeCount = watchedEpisodeCount,
@@ -459,7 +464,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
         var sourcesBySeason = sourceRows
-            .Join(episodeRows, source => source.EpisodeId, episode => episode.EpisodeId, (source, episode) => new { episode.SeasonId, source.ProtocolType })
+            .Join(
+                episodeRows,
+                source => source.EpisodeId,
+                episode => episode.EpisodeId,
+                (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
 
@@ -470,10 +479,13 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var episodes = episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
                     var sources = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
                     stateBySeason.TryGetValue(season.SeasonId, out var state);
-                    var inLibraryEpisodeCount = sources.Count;
+                    var inLibraryEpisodeCount = sources.Select(x => x.EpisodeId).Distinct().Count();
                     var totalEpisodeCount = season.TotalEpisodeCount.GetValueOrDefault() > 0
                         ? season.TotalEpisodeCount!.Value
                         : episodes.Count;
+                    var watchedEpisodeCount = episodes.Count(x => x.IsWatched);
+                    var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
+                    var isUnwatched = watchedEpisodeCount == 0;
                     return new LibraryMovieListItem
                     {
                         ItemKind = LibraryMediaItemKind.Season,
@@ -494,11 +506,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
                         HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
                         IsInLibrary = sources.Count > 0,
-                        IsFavorite = state?.IsFavorite == true,
-                        IsWantToWatch = state?.IsWantToWatch == true,
+                        IsFavorite = state?.IsFavorite == true && isWatched,
+                        IsWantToWatch = state?.IsWantToWatch == true && isUnwatched,
                         IsNotInterested = state?.IsNotInterested == true,
-                        IsWatched = inLibraryEpisodeCount > 0 && episodes.Count(x => x.IsWatched) >= inLibraryEpisodeCount,
-                        WatchedEpisodeCount = episodes.Count(x => x.IsWatched),
+                        IsWatched = isWatched,
+                        WatchedEpisodeCount = watchedEpisodeCount,
                         InLibraryEpisodeCount = inLibraryEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
@@ -576,6 +588,16 @@ public sealed class LibraryQueryService : ILibraryQueryService
     private static string FirstNonEmpty(params string?[] values)
     {
         return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
+    private static bool IsAggregateWatched(int watchedEpisodeCount, int knownEpisodeCount, int totalEpisodeCount)
+    {
+        if (totalEpisodeCount <= 0)
+        {
+            return knownEpisodeCount > 0 && watchedEpisodeCount >= knownEpisodeCount;
+        }
+
+        return knownEpisodeCount >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount;
     }
 
     private record LibraryCollectionIdentity(

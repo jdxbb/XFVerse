@@ -129,12 +129,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         ToggleBatchSelectionModeCommand = new RelayCommand(ToggleBatchSelectionMode, () => !IsBatchOperationRunning);
         BatchMarkWatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(true), () => CanBatchMarkWatched);
         BatchMarkUnwatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(false), () => CanBatchMarkUnwatched);
-        BatchMarkFavoriteCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.Favorite, true), () => CanBatchSetCollectionState);
-        BatchUnmarkFavoriteCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.Favorite, false), () => CanBatchSetCollectionState);
-        BatchMarkWantToWatchCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.WantToWatch, true), () => CanBatchSetCollectionState);
-        BatchUnmarkWantToWatchCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.WantToWatch, false), () => CanBatchSetCollectionState);
-        BatchMarkNotInterestedCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.NotInterested, true), () => CanBatchSetCollectionState);
-        BatchUnmarkNotInterestedCommand = new AsyncRelayCommand(() => BatchSetCollectionStateAsync(BatchCollectionState.NotInterested, false), () => CanBatchSetCollectionState);
         BatchAutoIdentifyCommand = new AsyncRelayCommand(BatchAutoIdentifyAsync, () => CanBatchAutoIdentify);
         CancelBatchOperationCommand = new RelayCommand(CancelBatchOperation, () => CanCancelBatchOperation);
         BatchRemoveFromLibraryCommand = new AsyncRelayCommand(BatchRemoveFromLibraryAsync, () => CanBatchRemoveFromLibrary);
@@ -198,18 +192,6 @@ public sealed class LibraryViewModel : PageViewModelBase
     public AsyncRelayCommand BatchMarkWatchedCommand { get; }
 
     public AsyncRelayCommand BatchMarkUnwatchedCommand { get; }
-
-    public AsyncRelayCommand BatchMarkFavoriteCommand { get; }
-
-    public AsyncRelayCommand BatchUnmarkFavoriteCommand { get; }
-
-    public AsyncRelayCommand BatchMarkWantToWatchCommand { get; }
-
-    public AsyncRelayCommand BatchUnmarkWantToWatchCommand { get; }
-
-    public AsyncRelayCommand BatchMarkNotInterestedCommand { get; }
-
-    public AsyncRelayCommand BatchUnmarkNotInterestedCommand { get; }
 
     public AsyncRelayCommand BatchAutoIdentifyCommand { get; }
 
@@ -459,8 +441,6 @@ public sealed class LibraryViewModel : PageViewModelBase
     public bool CanBatchMarkWatched => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
     public bool CanBatchMarkUnwatched => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
-
-    public bool CanBatchSetCollectionState => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
     public bool CanBatchAutoIdentify => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
@@ -1182,107 +1162,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
-    private async Task BatchSetCollectionStateAsync(BatchCollectionState state, bool value)
-    {
-        var selectedItems = GetSelectedVisibleItems();
-        if (selectedItems.Count == 0)
-        {
-            ClearSelection();
-            BatchResultSummary = "没有可处理的已选条目。";
-            return;
-        }
-
-        if (HasMixedMovieAndSeasonSelection(selectedItems))
-        {
-            BatchResultSummary = "电影和电视剧季请分开批量操作。";
-            return;
-        }
-
-        var operationName = BuildCollectionStateOperationName(state, value);
-        var successCount = 0;
-        var errors = new List<BatchItemError>();
-        IsBatchOperationRunning = true;
-        try
-        {
-            foreach (var item in selectedItems)
-            {
-                try
-                {
-                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
-                    {
-                        await SetSeasonCollectionStateAsync(item.Movie.SeasonId, state, value);
-                    }
-                    else
-                    {
-                        await SetMovieCollectionStateAsync(item.Movie, state, value);
-                    }
-
-                    successCount++;
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(new BatchItemError(item.SelectionKey, item.Title, DescribeException(exception)));
-                }
-            }
-
-            if (errors.Count > 0)
-            {
-                SetSelectionToFailures(errors);
-            }
-            else if (successCount > 0)
-            {
-                ClearSelection();
-                IsBatchSelectionMode = false;
-            }
-
-            await ActivateAsync();
-            BatchResultSummary = BuildResultSummary(operationName, successCount, errors);
-            NotifyAfterBatchStatusChange();
-        }
-        finally
-        {
-            IsBatchOperationRunning = false;
-        }
-    }
-
-    private Task SetSeasonCollectionStateAsync(int seasonId, BatchCollectionState state, bool value)
-    {
-        return state switch
-        {
-            BatchCollectionState.Favorite => _tvSeasonCollectionService.SetFavoriteAsync(seasonId, value, changeSource: "Batch"),
-            BatchCollectionState.WantToWatch => _tvSeasonCollectionService.SetWantToWatchAsync(seasonId, value, changeSource: "Batch"),
-            BatchCollectionState.NotInterested => _tvSeasonCollectionService.SetNotInterestedAsync(seasonId, value, changeSource: "Batch"),
-            _ => Task.CompletedTask
-        };
-    }
-
-    private Task SetMovieCollectionStateAsync(LibraryMovieListItem movie, BatchCollectionState state, bool value)
-    {
-        return state switch
-        {
-            BatchCollectionState.Favorite when movie.MovieId > 0 => _movieManagementService.SetFavoriteAsync(movie.MovieId, value, changeSource: "Batch"),
-            BatchCollectionState.WantToWatch when value => _userCollectionService.AddWantToWatchAsync(BuildRecommendationItem(movie), changeSource: "Batch"),
-            BatchCollectionState.WantToWatch => _userCollectionService.RemoveWantToWatchAsync(BuildRecommendationItem(movie), changeSource: "Batch"),
-            BatchCollectionState.NotInterested when movie.MovieId > 0 => _userCollectionService.SetNotInterestedAsync(movie.MovieId, value, changeSource: "Batch"),
-            BatchCollectionState.NotInterested => _userCollectionService.SetNotInterestedAsync(BuildRecommendationItem(movie), value, changeSource: "Batch"),
-            _ => throw new InvalidOperationException("当前条目不支持该批量状态操作。")
-        };
-    }
-
-    private static string BuildCollectionStateOperationName(BatchCollectionState state, bool value)
-    {
-        return (state, value) switch
-        {
-            (BatchCollectionState.Favorite, true) => "批量标记喜爱",
-            (BatchCollectionState.Favorite, false) => "批量取消喜爱",
-            (BatchCollectionState.WantToWatch, true) => "批量标记想看",
-            (BatchCollectionState.WantToWatch, false) => "批量取消想看",
-            (BatchCollectionState.NotInterested, true) => "批量标记不想看",
-            (BatchCollectionState.NotInterested, false) => "批量取消不想看",
-            _ => "批量状态操作"
-        };
-    }
-
     private async Task BatchAutoIdentifyAsync()
     {
         var selectedItems = GetSelectedVisibleItems();
@@ -1480,7 +1359,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(CanBatchMarkWatched));
         OnPropertyChanged(nameof(CanBatchMarkUnwatched));
-        OnPropertyChanged(nameof(CanBatchSetCollectionState));
         OnPropertyChanged(nameof(CanBatchAutoIdentify));
         OnPropertyChanged(nameof(CanBatchRemoveFromLibrary));
         OnPropertyChanged(nameof(CanBatchDeleteMovieRecords));
@@ -1494,12 +1372,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         ToggleBatchSelectionModeCommand.RaiseCanExecuteChanged();
         BatchMarkWatchedCommand.RaiseCanExecuteChanged();
         BatchMarkUnwatchedCommand.RaiseCanExecuteChanged();
-        BatchMarkFavoriteCommand.RaiseCanExecuteChanged();
-        BatchUnmarkFavoriteCommand.RaiseCanExecuteChanged();
-        BatchMarkWantToWatchCommand.RaiseCanExecuteChanged();
-        BatchUnmarkWantToWatchCommand.RaiseCanExecuteChanged();
-        BatchMarkNotInterestedCommand.RaiseCanExecuteChanged();
-        BatchUnmarkNotInterestedCommand.RaiseCanExecuteChanged();
         BatchAutoIdentifyCommand.RaiseCanExecuteChanged();
         CancelBatchOperationCommand.RaiseCanExecuteChanged();
         BatchRemoveFromLibraryCommand.RaiseCanExecuteChanged();
@@ -1786,11 +1658,4 @@ public sealed class LibraryViewModel : PageViewModelBase
     }
 
     private sealed record BatchItemError(string SelectionKey, string Title, string Message);
-
-    private enum BatchCollectionState
-    {
-        Favorite,
-        WantToWatch,
-        NotInterested
-    }
 }

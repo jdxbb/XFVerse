@@ -14,6 +14,8 @@ public interface ITvSeasonCollectionService
 
     Task SetWatchedAsync(int tvSeasonId, bool isWatched, CancellationToken cancellationToken = default, string changeSource = "Manual");
 
+    Task SetEpisodeWatchedAsync(int tvEpisodeId, bool isWatched, CancellationToken cancellationToken = default, string changeSource = "Manual");
+
     Task RemoveFromLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default);
 
     Task DeleteSeasonRecordAsync(int tvSeasonId, CancellationToken cancellationToken = default);

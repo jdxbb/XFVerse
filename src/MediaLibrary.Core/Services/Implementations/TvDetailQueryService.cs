@@ -170,6 +170,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     x.IdentificationStatus,
                     SeriesName = x.Series!.Name,
                     SeriesOriginalName = x.Series.OriginalName,
+                    SeriesTmdbId = x.Series.TmdbSeriesId,
                     SeriesGenresText = x.Series.GenresText,
                     SeriesPosterRemoteUrl = x.Series.PosterRemoteUrl
                 })
@@ -179,6 +180,21 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         {
             return null;
         }
+
+        var collectionState = await dbContext.UserTvSeasonCollectionItems
+            .AsNoTracking()
+            .Where(x => x.TvSeasonId == season.Id
+                || (season.SeriesTmdbId.HasValue
+                    && x.TmdbSeriesId == season.SeriesTmdbId.Value
+                    && x.SeasonNumber == season.SeasonNumber))
+            .OrderByDescending(x => x.UpdatedAt)
+            .Select(x => new
+            {
+                x.IsFavorite,
+                x.IsWantToWatch,
+                x.IsNotInterested
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         var episodes = await dbContext.TvEpisodes
             .AsNoTracking()
@@ -234,6 +250,11 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         var totalEpisodeCount = season.TmdbEpisodeCount.GetValueOrDefault() > 0
             ? season.TmdbEpisodeCount!.Value
             : episodeItems.Count;
+        var watchedEpisodeCount = episodeItems.Count(x => x.IsWatched);
+        var isSeasonWatched = totalEpisodeCount > 0
+            ? episodeItems.Count >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount
+            : episodeItems.Count > 0 && watchedEpisodeCount >= episodeItems.Count;
+        var isSeasonUnwatched = watchedEpisodeCount == 0;
         var sourceSummary = TvDetailDisplayText.FormatSourceSummary(
             sourceRows.Select(x => x.ProtocolType).Distinct().ToArray());
         var posterDisplayUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl);
@@ -254,7 +275,10 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             AirYear = season.AirYear,
             GenreDisplay = season.SeriesGenresText ?? string.Empty,
             SourceSummary = sourceSummary,
-            WatchedEpisodeCount = episodeItems.Count(x => x.IsWatched),
+            IsFavorite = collectionState?.IsFavorite == true && isSeasonWatched,
+            IsWantToWatch = collectionState?.IsWantToWatch == true && isSeasonUnwatched,
+            IsNotInterested = collectionState?.IsNotInterested == true,
+            WatchedEpisodeCount = watchedEpisodeCount,
             TotalEpisodeCount = totalEpisodeCount,
             InLibraryEpisodeCount = episodeItems.Count(x => x.HasPlayableSource),
             IdentificationStatus = season.IdentificationStatus,

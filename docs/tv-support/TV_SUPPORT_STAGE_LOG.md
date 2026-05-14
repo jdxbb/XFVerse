@@ -142,7 +142,8 @@ Implemented the user-visible TV integration layer:
 - Content type filtering now supports all, Movie, and TV.
 - Series cards navigate to `SeriesOverviewPage`.
 - Season batch items can navigate to `TvSeasonDetailPage`.
-- Season batch actions support favorite, want-to-watch, not-interested, watched / unwatched, remove from library, and delete record.
+- Season single-item actions support favorite, want-to-watch, and not-interested from Season detail / favorites card interactions.
+- Batch actions support watched / unwatched, remove from library, and delete record.
 - Season watched / unwatched only updates in-library Episodes and does not create `WatchHistory`.
 - Movie + Season mixed batch selections are rejected with a split-operation message for MVP safety.
 - Home continue watching can show and resume Episode playback.
@@ -164,14 +165,92 @@ Implemented the user-visible TV integration layer:
 8. Content type filter can isolate Movie or TV items.
 9. Source filter still applies to Series / Season source aggregates.
 10. Batch mode expands Series into Season cards.
-11. Season batch state actions update `UserTvSeasonCollectionItem` and state history.
-12. Season batch watched / unwatched only affects in-library Episodes and creates no WatchHistory rows.
-13. Season remove marks Episode media files removed without deleting physical files.
-14. Season delete removes software records only and does not delete physical files.
-15. Favorites favorite tab includes favorite Seasons.
-16. Favorites want-to-watch tab includes want-to-watch Seasons.
-17. Favorites do not show Series or Episode cards.
-18. Home continue watching can resume Episodes through the Episode player entry.
-19. Watch history displays Episode-specific titles and navigates to Season detail.
-20. Existing Movie library, batch, home, history, favorites, playback, scanning, recommendations, and Watch Insights remain separate from TV.
-21. Documents and reports do not include secrets or private media locations.
+11. Season single-item state actions update `UserTvSeasonCollectionItem` and state history.
+12. The batch toolbar only exposes watched, unwatched, remove from library, and delete record.
+13. Season batch watched / unwatched only affects in-library Episodes and creates no WatchHistory rows.
+14. Season remove marks Episode media files removed without deleting physical files.
+15. Season delete removes software records only and does not delete physical files.
+16. Favorites favorite tab includes favorite Seasons.
+17. Favorites want-to-watch tab includes want-to-watch Seasons.
+18. Favorites do not show Series or Episode cards.
+19. Home continue watching can resume Episodes through the Episode player entry.
+20. Watch history displays Episode-specific titles and navigates to Season detail.
+21. Existing Movie library, batch, home, history, favorites, playback, scanning, recommendations, and Watch Insights remain separate from TV.
+22. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.6 Bugfix - TV Seasons Integration Validation Fixes
+
+Validation fixes applied before Phase 4.7:
+
+- Auto-next Episode playback now reuses the same adjacent Episode switching path as manual next and runs the UI-affecting switch on the UI dispatcher.
+- `TvSeasonDetailPage` now has Season-level favorite, want-to-watch, and not-interested toggle buttons.
+- Episode rows now expose watched / unwatched actions that update `TvEpisode` summary fields without creating `WatchHistory`.
+- The media-library batch toolbar is restricted to watched, unwatched, remove from library, and delete record.
+- Batch favorite, want-to-watch, not-interested, and batch AI identify are not shown in the toolbar.
+- `SeriesOverviewPage` Season list now uses bounded grid layout so the list can scroll.
+- Watch Insights / Watch Profile audit confirmed TV is excluded through Movie-only statistics and profile input queries.
+- Did not add a migration.
+- Did not start TV discovery search / ranking UI.
+
+## Phase 4.6 Bugfix Manual Acceptance Checklist
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. Manual next Episode still works.
+4. Auto-next no longer reports switching failure.
+5. Auto-next stays inside the same Season.
+6. Last Episode stops instead of crossing Season.
+7. Season detail shows favorite, want-to-watch, and not-interested toggle buttons.
+8. Season state changes are visible in favorites after refresh.
+9. Episode rows show watched / unwatched actions.
+10. Episode watched / unwatched changes refresh aggregate progress.
+11. Episode watched / unwatched does not create WatchHistory rows.
+12. Batch toolbar only shows watched, unwatched, remove from library, and delete record.
+13. Batch toolbar does not show favorite, want-to-watch, or not-interested.
+14. Movie batch watched / unwatched / remove / delete remain available.
+15. Season batch watched / unwatched still avoids WatchHistory.
+16. `SeriesOverviewPage` Season list scrolls when content exceeds the page height.
+17. Watch Insights total and monthly watch time do not include Episode history.
+18. Watch count, calendar, distributions, profile input, persona input, and recommendation fingerprint remain Movie-only.
+19. TV does not enter AI recommendations.
+20. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.6 Bugfix 2 - Season State Rules And Poster Cache
+
+Validation fixes applied before Phase 4.7:
+
+- TV poster bindings now use the existing poster cache image behavior on Library, Series overview, Season detail, Favorites, Home, and Watch History surfaces.
+- `UserTvSeasonCollectionItem.IsWantToWatch` no longer defaults to true in code, fixing the favorite action accidentally creating want-to-watch state.
+- Season favorite is allowed only when the full TMDB Episode count is watched.
+- Season want-to-watch is allowed only when watched Episode count is zero.
+- Season not-interested cancels favorite and want-to-watch but does not alter Episode watched state.
+- Season watched / unwatched actions now operate on all populated TMDB Season Episode metadata rows, not only Episodes with active media sources.
+- TV identification and manual TV correction populate the full TMDB Season detail Episode list, so unavailable Episodes can still be marked watched / unwatched while remaining non-playable.
+- Season progress uses watched Episode count over TMDB total Episode count.
+- Episode watched / unwatched actions refresh Season aggregate state and can cancel invalid favorite / want-to-watch state.
+- Batch Season watched / unwatched uses the same all-TMDB-Episode rule as the Season detail actions.
+- Watch Insights, Watch Profile, persona inputs, and recommendation fingerprint remain Movie-only.
+- Did not add a migration.
+- Did not start TV discovery search / ranking UI.
+
+## Phase 4.6 Bugfix 2 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. Season / Series / Episode poster surfaces use the existing poster cache behavior.
+4. Season favorite no longer creates want-to-watch.
+5. Unwatched Season cannot be marked favorite.
+6. Fully watched Season cannot be marked want-to-watch.
+7. Not-interested cancels favorite / want-to-watch.
+8. Not-interested does not change Episode watched state.
+9. Season detail has whole-season watched / unwatched actions.
+10. A 7-Episode TMDB Season can show `7 / 7` after whole-season watched.
+11. The same Season can show `0 / 7` after whole-season unwatched.
+12. Batch Season watched / unwatched follows the same `7 / 7` and `0 / 7` total-count rule.
+13. Episode watched / unwatched updates aggregate progress.
+14. Manual Season and Episode watched / unwatched actions do not create `WatchHistory`.
+15. Unavailable Episodes can be watched / unwatched but remain without playable source.
+16. Batch toolbar still excludes favorite, want-to-watch, and not-interested.
+17. Watch Insights and recommendation fingerprint do not include TV data.
+18. Existing Movie state and Movie batch behavior remain separate.
+19. Documents and reports do not include secrets or private media locations.
