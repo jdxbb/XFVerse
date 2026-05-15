@@ -70,9 +70,15 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             if (!force && RecentAttempts.TryGetValue(tmdbSeriesId, out var lastAttempt)
                 && DateTime.UtcNow - lastAttempt < AttemptCooldown)
             {
-                result.Skipped = true;
-                result.TvSeriesId = await FindSeriesIdAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
-                return result;
+                var existingSeriesId = await FindSeriesIdAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
+                if (existingSeriesId.HasValue)
+                {
+                    result.Skipped = true;
+                    result.TvSeriesId = existingSeriesId;
+                    return result;
+                }
+
+                RecentAttempts.TryRemove(tmdbSeriesId, out _);
             }
 
             var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(tmdbSeriesId, cancellationToken: cancellationToken)

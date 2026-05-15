@@ -224,6 +224,106 @@ public sealed class MovieManagementService : IMovieManagementService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task AddToLibraryAsync(
+        int movieId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var movie = await dbContext.Movies
+            .Include(x => x.MediaFiles)
+            .Include(x => x.RatingSources)
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken)
+            ?? throw new InvalidOperationException("褰辩墖涓嶅瓨鍦ㄣ€?");
+
+        var now = DateTime.UtcNow;
+        var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
+        var entity = collectionItems
+            .OrderByDescending(x => x.MovieId == movie.Id)
+            .ThenByDescending(x => x.LibraryVisibilityState == LibraryVisibilityState.Hidden)
+            .ThenByDescending(x => x.UpdatedAt)
+            .FirstOrDefault();
+
+        if (entity is null)
+        {
+            entity = new UserMovieCollectionItem
+            {
+                CreatedAt = now,
+                IsWantToWatch = false,
+                IsWatched = false,
+                IsNotInterested = false
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
+        }
+
+        ApplyRemovedLibrarySnapshot(entity, movie);
+        entity.IsInLibrary = movie.MediaFiles.Any(x => !x.IsDeleted && x.MediaType == MediaType.Video);
+        entity.LibraryVisibilityState = LibraryVisibilityState.Visible;
+        entity.UpdatedAt = now;
+
+        foreach (var item in collectionItems.Where(x => x.Id != entity.Id && x.LibraryVisibilityState == LibraryVisibilityState.Hidden))
+        {
+            item.LibraryVisibilityState = LibraryVisibilityState.Visible;
+            item.UpdatedAt = now;
+            CleanupCollectionEntityIfEmpty(dbContext, item);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RestoreToLibraryAsync(
+        int movieId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var movie = await dbContext.Movies
+            .Include(x => x.MediaFiles)
+            .Include(x => x.RatingSources)
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken)
+            ?? throw new InvalidOperationException("褰辩墖涓嶅瓨鍦ㄣ€?");
+
+        var now = DateTime.UtcNow;
+        var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
+        var entity = collectionItems
+            .OrderByDescending(x => x.MovieId == movie.Id)
+            .ThenByDescending(x => x.LibraryVisibilityState == LibraryVisibilityState.Hidden)
+            .ThenByDescending(x => x.UpdatedAt)
+            .FirstOrDefault();
+
+        if (entity is null)
+        {
+            entity = new UserMovieCollectionItem
+            {
+                CreatedAt = now,
+                IsWantToWatch = false
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
+        }
+
+        var hasActiveSource = movie.MediaFiles.Any(x => !x.IsDeleted && x.MediaType == MediaType.Video);
+        var hasCurrentState = movie.IsFavorite
+                              || movie.IsWatched
+                              || movie.UserRating.HasValue
+                              || collectionItems.Any(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested);
+        var restoredVisibilityState = ResolveRestoredVisibilityState(hasActiveSource, hasCurrentState);
+
+        ApplyRemovedLibrarySnapshot(entity, movie);
+        entity.IsInLibrary = hasActiveSource;
+        entity.LibraryVisibilityState = restoredVisibilityState;
+        entity.UpdatedAt = now;
+        CleanupCollectionEntityIfEmpty(dbContext, entity);
+
+        foreach (var item in collectionItems.Where(x => x.Id != entity.Id && x.LibraryVisibilityState == LibraryVisibilityState.Hidden))
+        {
+            item.LibraryVisibilityState = restoredVisibilityState;
+            item.UpdatedAt = now;
+            CleanupCollectionEntityIfEmpty(dbContext, item);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private static void PreserveRemovedLibraryState(
         AppDbContext dbContext,
         Movie movie,
@@ -576,5 +676,12 @@ public sealed class MovieManagementService : IMovieManagementService
         {
             entity.LibraryVisibilityState = LibraryVisibilityState.Auto;
         }
+    }
+
+    private static LibraryVisibilityState ResolveRestoredVisibilityState(bool hasActiveSource, bool hasCurrentState)
+    {
+        return hasActiveSource || hasCurrentState
+            ? LibraryVisibilityState.Auto
+            : LibraryVisibilityState.Visible;
     }
 }

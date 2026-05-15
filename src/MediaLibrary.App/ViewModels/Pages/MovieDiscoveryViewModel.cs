@@ -5,6 +5,7 @@ using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
 using MediaLibrary.Core.Diagnostics;
+using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Implementations;
 using MediaLibrary.Core.Services.Interfaces;
@@ -101,6 +102,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private readonly IDiscoveryMovieStatusResolver _statusResolver;
     private readonly IDiscoveryTvSeriesStatusResolver _tvStatusResolver;
     private readonly ITvMetadataHydrationService _tvMetadataHydrationService;
+    private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IUserCollectionService _userCollectionService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
@@ -206,6 +208,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         IDiscoveryMovieStatusResolver statusResolver,
         IDiscoveryTvSeriesStatusResolver tvStatusResolver,
         ITvMetadataHydrationService tvMetadataHydrationService,
+        ITvSeasonCollectionService tvSeasonCollectionService,
         IUserCollectionService userCollectionService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
@@ -218,6 +221,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _statusResolver = statusResolver;
         _tvStatusResolver = tvStatusResolver;
         _tvMetadataHydrationService = tvMetadataHydrationService;
+        _tvSeasonCollectionService = tvSeasonCollectionService;
         _userCollectionService = userCollectionService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
@@ -246,13 +250,16 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         ShowLayoutSwitchPlaceholderCommand = new RelayCommand(() => SearchStatusMessage = "切布局将在后续视觉阶段接入。");
         OpenSearchMovieCommand = new RelayCommand(OpenSearchMovie);
         ToggleSearchWantToWatchCommand = new AsyncRelayCommand(ToggleSearchWantToWatchAsync);
+        AddSearchMovieToLibraryCommand = new AsyncRelayCommand(AddSearchMovieToLibraryAsync);
         SelectRankingTypeCommand = new RelayCommand(SelectRankingType);
         SelectTrendingTimeCommand = new RelayCommand(SelectTrendingTime, _ => IsActiveTrendingRanking);
         GoPreviousRankingPageCommand = new AsyncRelayCommand(GoPreviousRankingPageAsync, () => CanGoPreviousActiveRankingPage);
         GoNextRankingPageCommand = new AsyncRelayCommand(GoNextRankingPageAsync, () => CanGoNextActiveRankingPage);
         OpenRankingMovieCommand = new RelayCommand(OpenRankingMovie);
         ToggleRankingWantToWatchCommand = new AsyncRelayCommand(ToggleRankingWantToWatchAsync);
+        AddRankingMovieToLibraryCommand = new AsyncRelayCommand(AddRankingMovieToLibraryAsync);
         OpenTvSeriesCommand = new RelayCommand(OpenTvSeries);
+        AddTvSeriesToLibraryCommand = new AsyncRelayCommand(AddTvSeriesToLibraryAsync);
     }
 
     public RecommendationsViewModel AiRecommendationViewModel => _aiRecommendationViewModel;
@@ -311,6 +318,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public AsyncRelayCommand ToggleSearchWantToWatchCommand { get; }
 
+    public AsyncRelayCommand AddSearchMovieToLibraryCommand { get; }
+
     public RelayCommand SelectRankingTypeCommand { get; }
 
     public RelayCommand SelectTrendingTimeCommand { get; }
@@ -324,6 +333,10 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public AsyncRelayCommand ToggleRankingWantToWatchCommand { get; }
 
     public RelayCommand OpenTvSeriesCommand { get; }
+
+    public AsyncRelayCommand AddRankingMovieToLibraryCommand { get; }
+
+    public AsyncRelayCommand AddTvSeriesToLibraryCommand { get; }
 
     public int SelectedTabIndex
     {
@@ -2043,6 +2056,19 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             () => RebuildSearchDisplay());
     }
 
+    private async Task AddSearchMovieToLibraryAsync(object? parameter)
+    {
+        if (parameter is not DiscoveryMovieCardViewModel item)
+        {
+            return;
+        }
+
+        await AddDiscoveryMovieToLibraryAsync(
+            item,
+            message => SearchStatusMessage = message,
+            () => RebuildSearchDisplay());
+    }
+
     private void OpenRankingMovie(object? parameter)
     {
         if (parameter is not DiscoveryMovieCardViewModel item)
@@ -2074,6 +2100,115 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             item,
             message => RankingStatusMessage = message,
             () => RebuildRankingRows());
+    }
+
+    private async Task AddRankingMovieToLibraryAsync(object? parameter)
+    {
+        if (parameter is not DiscoveryMovieCardViewModel item)
+        {
+            return;
+        }
+
+        await AddDiscoveryMovieToLibraryAsync(
+            item,
+            message => RankingStatusMessage = message,
+            () => RebuildRankingRows());
+    }
+
+    private async Task AddTvSeriesToLibraryAsync(object? parameter)
+    {
+        if (parameter is not DiscoveryTvSeriesCardViewModel item)
+        {
+            return;
+        }
+
+        var requestVersion = ++_tvSeriesOpenRequestVersion;
+        try
+        {
+            SetTvOpenStatusMessage(requestVersion, "正在写入 TV metadata 并加入媒体库。");
+            var tvSeriesId = item.TvSeriesId;
+            if (!tvSeriesId.HasValue && item.TmdbSeriesId > 0)
+            {
+                var hydrateResult = await Task.Run(() => _tvMetadataHydrationService.HydrateSeriesAsync(item.TmdbSeriesId));
+                if (!IsCurrentTvSeriesOpenRequest(requestVersion))
+                {
+                    return;
+                }
+
+                if (!hydrateResult.TvSeriesId.HasValue)
+                {
+                    SetTvOpenStatusMessage(requestVersion, hydrateResult.HasErrors ? hydrateResult.BuildStatusMessage() : "TV metadata 写入失败，无法加入媒体库。");
+                    return;
+                }
+
+                tvSeriesId = hydrateResult.TvSeriesId.Value;
+            }
+
+            if (!tvSeriesId.HasValue)
+            {
+                SetTvOpenStatusMessage(requestVersion, "缺少 TV Series ID，无法加入媒体库。");
+                return;
+            }
+
+            await _tvMetadataHydrationService.EnsureHydratedBySeriesIdAsync(tvSeriesId.Value);
+            if (item.HasHiddenSeason)
+            {
+                await _tvSeasonCollectionService.RestoreSeriesToLibraryAsync(tvSeriesId.Value);
+            }
+            else
+            {
+                await _tvSeasonCollectionService.AddSeriesToLibraryAsync(tvSeriesId.Value);
+            }
+            var statuses = await _tvStatusResolver.ResolveAsync([item.TmdbSeriesId]);
+            if (statuses.TryGetValue(item.TmdbSeriesId, out var status))
+            {
+                item.ApplyStatus(status);
+            }
+
+            _dataRefreshService.NotifyCollectionChanged();
+            _dataRefreshService.NotifyLibraryChanged();
+            SetTvOpenStatusMessage(requestVersion, $"已加入媒体库：{item.Title}");
+        }
+        catch (Exception exception)
+        {
+            SetTvOpenStatusMessage(requestVersion, $"加入媒体库失败：{exception.Message}");
+        }
+    }
+
+    private async Task AddDiscoveryMovieToLibraryAsync(
+        DiscoveryMovieCardViewModel item,
+        Action<string> setStatusMessage,
+        Action rebuild)
+    {
+        try
+        {
+            if (item.LibraryVisibilityState == LibraryVisibilityState.Hidden)
+            {
+                await _userCollectionService.RestoreToLibraryAsync(
+                    DiscoveryExternalMovieAdapter.ToRecommendation(item),
+                    changeSource: "Discovery");
+            }
+            else
+            {
+                await _userCollectionService.AddToLibraryAsync(
+                    DiscoveryExternalMovieAdapter.ToRecommendation(item),
+                    changeSource: "Discovery");
+            }
+            var statuses = await _statusResolver.ResolveAsync([item.TmdbId]);
+            if (statuses.TryGetValue(item.TmdbId, out var status))
+            {
+                item.ApplyStatus(status);
+            }
+
+            _dataRefreshService.NotifyCollectionChanged();
+            _dataRefreshService.NotifyLibraryChanged();
+            rebuild();
+            setStatusMessage($"已加入媒体库：{item.Title}");
+        }
+        catch (Exception exception)
+        {
+            setStatusMessage($"加入媒体库失败：{exception.Message}");
+        }
     }
 
     private void OpenDiscoveryMovie(
@@ -2114,7 +2249,36 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                 SetTvOpenStatusMessage(
                     requestVersion,
                     result.HasErrors ? result.BuildStatusMessage() : "TV metadata 已准备好，正在打开详情。");
-                _navigationStateService.RequestTvSeriesOverview(tvSeriesId);
+                if (result.TvSeriesId.HasValue)
+                {
+                    _navigationStateService.RequestTvSeriesOverview(result.TvSeriesId.Value);
+                    return;
+                }
+
+                if (item.TmdbSeriesId > 0)
+                {
+                    SetTvOpenStatusMessage(requestVersion, "本地 TV metadata 已删除，正在重新写入。");
+                    result = await Task.Run(() => _tvMetadataHydrationService.HydrateSeriesAsync(item.TmdbSeriesId, force: true));
+                    if (!IsCurrentTvSeriesOpenRequest(requestVersion))
+                    {
+                        return;
+                    }
+
+                    if (result.TvSeriesId.HasValue)
+                    {
+                        SetTvOpenStatusMessage(
+                            requestVersion,
+                            result.HasErrors ? result.BuildStatusMessage() : "TV metadata 已准备好，正在打开详情。");
+                        _navigationStateService.RequestTvSeriesOverview(result.TvSeriesId.Value);
+                        return;
+                    }
+                }
+
+                SetTvOpenStatusMessage(
+                    requestVersion,
+                    result.HasErrors
+                        ? $"TV metadata 写入失败：{string.Join("；", result.Errors)}"
+                        : "TV metadata 写入失败。");
                 return;
             }
 

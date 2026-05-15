@@ -48,6 +48,10 @@ public sealed class MovieDetailModel
 
     public bool IsNotInterested { get; set; }
 
+    public bool IsVisibleInLibrary { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
+
     public IReadOnlyList<MovieRatingItem> Ratings { get; set; } = [];
 
     public IReadOnlyList<MovieSourceItem> Sources { get; set; } = [];

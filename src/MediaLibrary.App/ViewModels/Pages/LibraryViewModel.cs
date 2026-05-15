@@ -82,8 +82,11 @@ public sealed class LibraryViewModel : PageViewModelBase
     private bool _isPosterView = true;
     private bool _isBatchSelectionMode;
     private bool _isBatchOperationRunning;
+    private bool _isRemovedLibraryPanelOpen;
+    private bool _isRemovedLibraryLoading;
     private string _statusMessage = "媒体库会展示已识别的真实影片数据。";
     private string _batchResultSummary = string.Empty;
+    private string _removedLibraryStatusMessage = "已移出媒体库项目会保留状态和播放源。";
 
     public LibraryViewModel(
         ILibraryQueryService libraryQueryService,
@@ -133,6 +136,11 @@ public sealed class LibraryViewModel : PageViewModelBase
         CancelBatchOperationCommand = new RelayCommand(CancelBatchOperation, () => CanCancelBatchOperation);
         BatchRemoveFromLibraryCommand = new AsyncRelayCommand(BatchRemoveFromLibraryAsync, () => CanBatchRemoveFromLibrary);
         BatchDeleteMovieRecordsCommand = new AsyncRelayCommand(BatchDeleteMovieRecordsAsync, () => CanBatchDeleteMovieRecords);
+        OpenRemovedLibraryCommand = new AsyncRelayCommand(OpenRemovedLibraryAsync, () => !IsRemovedLibraryLoading);
+        CloseRemovedLibraryCommand = new RelayCommand(CloseRemovedLibrary);
+        RestoreRemovedLibraryItemCommand = new AsyncRelayCommand(RestoreRemovedLibraryItemAsync, _ => !IsRemovedLibraryLoading);
+        DeleteRemovedLibraryItemCommand = new AsyncRelayCommand(DeleteRemovedLibraryItemAsync, _ => !IsRemovedLibraryLoading);
+        OpenRemovedLibraryDetailCommand = new RelayCommand(OpenMovie);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
         ApplySearchCommand = new RelayCommand(ApplyFilters);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
@@ -140,6 +148,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     }
 
     public ObservableCollection<LibraryMovieItemViewModel> Movies { get; } = [];
+
+    public ObservableCollection<LibraryMovieItemViewModel> RemovedLibraryItems { get; } = [];
 
     public ObservableCollection<TagFilterOption> TypeTagOptions { get; } = [];
 
@@ -200,6 +210,16 @@ public sealed class LibraryViewModel : PageViewModelBase
     public AsyncRelayCommand BatchRemoveFromLibraryCommand { get; }
 
     public AsyncRelayCommand BatchDeleteMovieRecordsCommand { get; }
+
+    public AsyncRelayCommand OpenRemovedLibraryCommand { get; }
+
+    public RelayCommand CloseRemovedLibraryCommand { get; }
+
+    public AsyncRelayCommand RestoreRemovedLibraryItemCommand { get; }
+
+    public AsyncRelayCommand DeleteRemovedLibraryItemCommand { get; }
+
+    public RelayCommand OpenRemovedLibraryDetailCommand { get; }
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -452,6 +472,34 @@ public sealed class LibraryViewModel : PageViewModelBase
                                            && _batchIdentifyCancellationTokenSource is not null
                                            && !_batchIdentifyCancellationTokenSource.IsCancellationRequested;
 
+    public bool IsRemovedLibraryPanelOpen
+    {
+        get => _isRemovedLibraryPanelOpen;
+        private set => SetProperty(ref _isRemovedLibraryPanelOpen, value);
+    }
+
+    public bool IsRemovedLibraryLoading
+    {
+        get => _isRemovedLibraryLoading;
+        private set
+        {
+            if (SetProperty(ref _isRemovedLibraryLoading, value))
+            {
+                OpenRemovedLibraryCommand.RaiseCanExecuteChanged();
+                RestoreRemovedLibraryItemCommand.RaiseCanExecuteChanged();
+                DeleteRemovedLibraryItemCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string RemovedLibraryStatusMessage
+    {
+        get => _removedLibraryStatusMessage;
+        private set => SetProperty(ref _removedLibraryStatusMessage, value);
+    }
+
+    public bool HasRemovedLibraryItems => RemovedLibraryItems.Count > 0;
+
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -473,6 +521,142 @@ public sealed class LibraryViewModel : PageViewModelBase
             Movies.Clear();
             OnPropertyChanged(nameof(HasMovies));
             StatusMessage = $"加载媒体库失败：{exception.Message}";
+        }
+    }
+
+    private async Task OpenRemovedLibraryAsync()
+    {
+        IsRemovedLibraryPanelOpen = true;
+        await LoadRemovedLibraryItemsAsync();
+    }
+
+    private async Task LoadRemovedLibraryItemsAsync(CancellationToken cancellationToken = default)
+    {
+        if (IsRemovedLibraryLoading)
+        {
+            return;
+        }
+
+        IsRemovedLibraryLoading = true;
+        try
+        {
+            RemovedLibraryStatusMessage = "正在加载已移出媒体库项目。";
+            var items = await _libraryQueryService.GetHiddenLibraryItemsAsync(cancellationToken);
+            RemovedLibraryItems.Clear();
+            foreach (var item in items)
+            {
+                RemovedLibraryItems.Add(new LibraryMovieItemViewModel(item, BuildSelectionKey(item), false, false));
+            }
+
+            OnPropertyChanged(nameof(HasRemovedLibraryItems));
+            RemovedLibraryStatusMessage = items.Count == 0
+                ? "当前没有已移出媒体库项目。"
+                : $"已移出媒体库 {items.Count} 项。";
+        }
+        catch (Exception exception)
+        {
+            RemovedLibraryItems.Clear();
+            OnPropertyChanged(nameof(HasRemovedLibraryItems));
+            RemovedLibraryStatusMessage = $"加载已移出媒体库失败：{exception.Message}";
+        }
+        finally
+        {
+            IsRemovedLibraryLoading = false;
+        }
+    }
+
+    private void CloseRemovedLibrary()
+    {
+        IsRemovedLibraryPanelOpen = false;
+    }
+
+    private async Task RestoreRemovedLibraryItemAsync(object? parameter)
+    {
+        if (parameter is not LibraryMovieItemViewModel item)
+        {
+            return;
+        }
+
+        try
+        {
+            if (item.IsSeason && item.SeasonId > 0)
+            {
+                await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(item.SeasonId);
+            }
+            else if (item.IsMovie && item.MovieId > 0)
+            {
+                await _movieManagementService.RestoreToLibraryAsync(item.MovieId);
+            }
+            else if (item.IsMovie)
+            {
+                await _userCollectionService.RestoreToLibraryAsync(BuildRecommendationItem(item.Movie), changeSource: "RemovedLibrary");
+            }
+            else
+            {
+                RemovedLibraryStatusMessage = "电视剧总览没有独立恢复状态，请恢复具体 Season。";
+                return;
+            }
+
+            RemovedLibraryStatusMessage = $"已恢复到媒体库：{item.Title}";
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await LoadRemovedLibraryItemsAsync();
+            await ActivateAsync();
+        }
+        catch (Exception exception)
+        {
+            RemovedLibraryStatusMessage = $"恢复到媒体库失败：{exception.Message}";
+        }
+    }
+
+    private async Task DeleteRemovedLibraryItemAsync(object? parameter)
+    {
+        if (parameter is not LibraryMovieItemViewModel item)
+        {
+            return;
+        }
+
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "确认删除记录？",
+            "删除记录会清除软件内记录、metadata 和状态，但不会删除本地文件或 WebDAV 文件。",
+            "删除记录",
+            "取消");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            if (item.IsSeason && item.SeasonId > 0)
+            {
+                await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.SeasonId);
+            }
+            else if (item.IsMovie && item.MovieId > 0)
+            {
+                await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
+            }
+            else if (item.IsMovie)
+            {
+                await _userCollectionService.DeleteCollectionRecordAsync(BuildRecommendationItem(item.Movie));
+            }
+            else
+            {
+                RemovedLibraryStatusMessage = "电视剧总览没有独立删除记录，请处理具体 Season。";
+                return;
+            }
+
+            RemovedLibraryStatusMessage = $"已删除记录：{item.Title}";
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyPlaybackChanged();
+            _dataRefreshService.NotifyMetadataChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await LoadRemovedLibraryItemsAsync();
+            await ActivateAsync();
+        }
+        catch (Exception exception)
+        {
+            RemovedLibraryStatusMessage = $"删除记录失败：{exception.Message}";
         }
     }
 
@@ -1429,7 +1613,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
-        if (movie.IsInLibrary && movie.MovieId > 0)
+        if (movie.MovieId > 0)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId);
             return;

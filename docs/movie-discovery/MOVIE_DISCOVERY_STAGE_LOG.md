@@ -160,6 +160,26 @@
 - Discovery remains source-oriented and can still show Hidden source-backed items as `有播放源`.
 - Old `IsDeleted` source rows are not automatically restored; rescanning existing files remains the safe recovery path to verify later.
 
+## Phase 4.10.5 Add-to-Library Actions
+
+- Discovery Movie rows now expose add / restore actions when they are not media-library-visible.
+- Discovery TV Series rows now expose add / restore actions and write `Visible` for all known Seasons after metadata is available.
+- Add-to-library writes media-library visibility only; it does not set want-to-watch, favorite, not-interested, watched, or source rows.
+- Hidden source-backed rows can be restored without changing active playback sources.
+- TV Discovery remains excluded from `AiRecommendationItem`, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+- No new migration was added.
+- Database update was not executed.
+
+## Phase 4.10.5b Restore Strategy And Series Actions
+
+- Discovery restore actions now use source / state-aware restore instead of blindly writing `Visible`.
+- Hidden Movie / TV rows with active source or real current state restore to `Auto`; source-less no-state rows restore to `Visible`.
+- Explicit add-to-library remains `Visible` and remains separate from preference state.
+- SeriesOverview now keeps a series-level action area visible for one-season, partial, hidden, and all-visible series states.
+- TV Discovery navigation and hydration loading contention remains deferred to Phase 4.10.6.
+- No new migration was added.
+- Database update was not executed.
+
 ## FD-2.1 / FD-2.2 Final Log Audit
 
 收尾日志与运行侧检查：

@@ -101,10 +101,28 @@
 
 - Movie and TV Discovery source filters use `全部`, `有播放源`, and `无播放源`.
 - Movie and TV Discovery cards use `有播放源` / `无播放源` instead of old `已入库` / `未入库` source labels.
-- Add-to-library-specific labels such as `已加入媒体库` remain Phase 4.10.5 because that action does not exist yet.
+- Add-to-library-specific actions are implemented in Phase 4.10.5 and write `LibraryVisibilityState.Visible`.
 - Pure visibility-only Movie rows are excluded from movie AI/profile/statistics/recommendation fingerprints and fallback external candidates.
 - Real-state source-less Movie rows still represent user preference and remain eligible for movie AI/profile/recommendation inputs.
 - TV Discovery still does not create `AiRecommendationItem` and TV remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+
+## Phase 4.10.5 Discovery Add-to-Library Actions
+
+- Discovery Movie cards can write `LibraryVisibilityState.Visible` for explicit add-to-library on source-less rows through the user collection service.
+- Hidden Discovery Movie restore uses source / state-aware restore semantics from Phase 4.10.5b.
+- Discovery TV Series cards can ensure / hydrate TV metadata and write `Visible` for explicit add-to-library across all known Seasons, including Season 0 / Specials.
+- Hidden Discovery TV Series restore uses per-Season source / state-aware restore semantics from Phase 4.10.5b.
+- Discovery add-to-library does not set want-to-watch, favorite, not-interested, watched, or fake playback sources.
+- Discovery add-to-library does not create `MediaFile` and does not restore old `IsDeleted` source rows.
+- TV Discovery remains separate from `AiRecommendationItem`, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+- Hydration performance optimization remains Phase 4.10.6.
+
+## Phase 4.10.5b Discovery Restore Notes
+
+- Restore-to-library no longer blindly writes `Visible`.
+- Hidden rows with active source or real current state restore to `Auto`; source-less no-state rows restore to `Visible`.
+- Automatic `Auto` invisibility is not shown in the removed-library management entry.
+- TV Discovery navigation / hydration loading remains Phase 4.10.6.
 
 ## Phase 4.8 Bugfix TV Parity
 

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -11,6 +12,9 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     private readonly INavigationStateService _navigationStateService;
     private readonly ITvDetailQueryService _tvDetailQueryService;
     private readonly ITvMetadataHydrationService _metadataHydrationService;
+    private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
+    private readonly IDataRefreshService _dataRefreshService;
+    private int? _seriesId;
     private string _name = "未选择电视剧";
     private string _originalName = "-";
     private string _overview = "请先选择一部电视剧。";
@@ -21,23 +25,31 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     private string _seasonCountText = "-";
     private string _statusMessage = "请先选择一部电视剧。";
     private bool _hasSeries;
+    private bool _canAddSeriesToLibrary;
 
     public SeriesOverviewViewModel(
         INavigationStateService navigationStateService,
         ITvDetailQueryService tvDetailQueryService,
-        ITvMetadataHydrationService metadataHydrationService)
+        ITvMetadataHydrationService metadataHydrationService,
+        ITvSeasonCollectionService tvSeasonCollectionService,
+        IDataRefreshService dataRefreshService)
         : base("电视剧", "查看剧集信息和 Season。")
     {
         _navigationStateService = navigationStateService;
         _tvDetailQueryService = tvDetailQueryService;
         _metadataHydrationService = metadataHydrationService;
+        _tvSeasonCollectionService = tvSeasonCollectionService;
+        _dataRefreshService = dataRefreshService;
         NavigateToSeasonCommand = new RelayCommand(NavigateToSeason);
+        AddSeriesToLibraryCommand = new AsyncRelayCommand(AddSeriesToLibraryAsync, () => CanAddSeriesToLibrary);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
     }
 
     public ObservableCollection<TvSeriesSeasonListItem> Seasons { get; } = [];
 
     public RelayCommand NavigateToSeasonCommand { get; }
+
+    public AsyncRelayCommand AddSeriesToLibraryCommand { get; }
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -78,6 +90,46 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     public bool HasSeasons => HasSeries && Seasons.Count > 0;
 
     public bool HasNoSeasons => HasSeries && Seasons.Count == 0;
+
+    public bool CanAddSeriesToLibrary
+    {
+        get => _canAddSeriesToLibrary;
+        private set
+        {
+            if (SetProperty(ref _canAddSeriesToLibrary, value))
+            {
+                AddSeriesToLibraryCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool ShowSeriesLibraryAction => HasSeasons;
+
+    public string AddSeriesToLibraryButtonText
+    {
+        get
+        {
+            if (Seasons.Count == 0)
+            {
+                return "暂无季信息";
+            }
+
+            var visibleSeasonCount = Seasons.Count(x => x.IsVisibleInLibrary);
+            if (Seasons.Any(x => x.LibraryVisibilityState == LibraryVisibilityState.Hidden))
+            {
+                return "恢复到媒体库";
+            }
+
+            if (visibleSeasonCount <= 0)
+            {
+                return "加入整部剧";
+            }
+
+            return visibleSeasonCount < Seasons.Count
+                ? "补充加入全部季"
+                : "已在媒体库";
+        }
+    }
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
@@ -150,6 +202,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
 
     private void ApplyModel(TvSeriesOverviewModel model)
     {
+        _seriesId = model.SeriesId;
         HasSeries = true;
         Name = model.Name;
         OriginalName = string.IsNullOrWhiteSpace(model.OriginalName) ? "-" : model.OriginalName;
@@ -165,6 +218,9 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
             Seasons.Add(season);
         }
 
+        CanAddSeriesToLibrary = model.Seasons.Any(season => !season.IsVisibleInLibrary);
+        OnPropertyChanged(nameof(AddSeriesToLibraryButtonText));
+        OnPropertyChanged(nameof(ShowSeriesLibraryAction));
         OnPropertyChanged(nameof(HasSeasons));
         OnPropertyChanged(nameof(HasNoSeasons));
         StatusMessage = Seasons.Count == 0
@@ -182,8 +238,45 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         _navigationStateService.RequestTvSeasonDetail(season.SeasonId);
     }
 
+    private async Task AddSeriesToLibraryAsync()
+    {
+        if (!_seriesId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            StatusMessage = "正在加入媒体库。";
+            await _metadataHydrationService.EnsureHydratedBySeriesIdAsync(_seriesId.Value);
+            if (Seasons.Any(x => x.LibraryVisibilityState == LibraryVisibilityState.Hidden))
+            {
+                await _tvSeasonCollectionService.RestoreSeriesToLibraryAsync(_seriesId.Value);
+            }
+            else
+            {
+                await _tvSeasonCollectionService.AddSeriesToLibraryAsync(_seriesId.Value);
+            }
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            var model = await _tvDetailQueryService.GetSeriesOverviewAsync(_seriesId.Value);
+            if (model is not null)
+            {
+                ApplyModel(model);
+            }
+
+            StatusMessage = "已加入媒体库。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"加入媒体库失败：{DescribeException(exception)}";
+        }
+    }
+
     private void Clear(string statusMessage)
     {
+        _seriesId = null;
+        CanAddSeriesToLibrary = false;
         HasSeries = false;
         Name = "未选择电视剧";
         OriginalName = "-";
@@ -195,6 +288,8 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         SeasonCountText = "-";
         StatusMessage = statusMessage;
         Seasons.Clear();
+        OnPropertyChanged(nameof(AddSeriesToLibraryButtonText));
+        OnPropertyChanged(nameof(ShowSeriesLibraryAction));
         OnPropertyChanged(nameof(HasSeasons));
         OnPropertyChanged(nameof(HasNoSeasons));
     }

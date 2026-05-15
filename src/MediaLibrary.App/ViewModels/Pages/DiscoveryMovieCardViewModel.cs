@@ -1,4 +1,5 @@
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Implementations;
 
@@ -89,6 +90,10 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public bool IsInLibrary { get; private set; }
 
+    public bool IsVisibleInLibrary { get; private set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; private set; } = LibraryVisibilityState.Auto;
+
     public bool IsWantToWatch
     {
         get => _isWantToWatch;
@@ -167,10 +172,16 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public string WantToWatchButtonText => IsWatched ? "已看" : IsWantToWatch ? "想看" : "+ 想看";
 
+    public bool CanAddToLibrary => !IsVisibleInLibrary;
+
+    public string AddToLibraryButtonText => LibraryVisibilityState == LibraryVisibilityState.Hidden ? "恢复到媒体库" : "加入媒体库";
+
     public void ApplyStatus(DiscoveryMovieStatus status)
     {
         MovieId = status.MovieId;
         IsInLibrary = status.IsInLibrary;
+        IsVisibleInLibrary = status.IsVisibleInLibrary;
+        LibraryVisibilityState = status.LibraryVisibilityState;
         IsWatched = status.IsWatched;
         IsWantToWatch = status.IsWantToWatch;
         IsFavorite = status.IsFavorite;
@@ -233,6 +244,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(IsInLibrary));
             OnPropertyChanged(nameof(MovieId));
             OnPropertyChanged(nameof(AvailabilityText));
+            OnPropertyChanged(nameof(CanAddToLibrary));
+            OnPropertyChanged(nameof(AddToLibraryButtonText));
             OnPropertyChanged(nameof(WatchStateText));
         }
         else
@@ -241,6 +254,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(IsInLibrary));
             OnPropertyChanged(nameof(MovieId));
             OnPropertyChanged(nameof(AvailabilityText));
+            OnPropertyChanged(nameof(CanAddToLibrary));
+            OnPropertyChanged(nameof(AddToLibraryButtonText));
         }
     }
 

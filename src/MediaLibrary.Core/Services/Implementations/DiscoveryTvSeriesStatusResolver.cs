@@ -1,4 +1,5 @@
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -55,7 +56,8 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                     item.TvSeriesId,
                     item.IsWantToWatch,
                     item.IsFavorite,
-                    item.IsNotInterested
+                    item.IsNotInterested,
+                    item.LibraryVisibilityState
                 })
             .ToListAsync(cancellationToken);
 
@@ -73,6 +75,7 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                 TmdbSeriesId = group.Key,
                 TvSeriesId = series.Id,
                 IsInLibrary = inLibrarySeasonCount > 0,
+                IsVisibleInLibrary = inLibrarySeasonCount > 0,
                 InLibrarySeasonCount = inLibrarySeasonCount,
                 Name = series.Name,
                 OriginalName = series.OriginalName,
@@ -89,11 +92,16 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
         {
             if (!result.TryGetValue(group.Key, out var status))
             {
+                var visibilityState = ResolveLibraryVisibilityState(group.Select(row => row.LibraryVisibilityState));
+                var hasState = group.Any(row => row.IsWantToWatch || row.IsFavorite || row.IsNotInterested);
                 status = new DiscoveryTvSeriesStatus
                 {
                     TmdbSeriesId = group.Key,
                     TvSeriesId = group.Select(row => row.TvSeriesId).FirstOrDefault(id => id.HasValue),
-                    IsInLibrary = false
+                    IsInLibrary = false,
+                    IsVisibleInLibrary = ResolveIsVisibleInLibrary(false, visibilityState, hasState),
+                    HasHiddenSeason = group.Any(row => row.LibraryVisibilityState == LibraryVisibilityState.Hidden),
+                    LibraryVisibilityState = visibilityState
                 };
                 result[group.Key] = status;
             }
@@ -101,8 +109,34 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
             status.HasWantToWatchSeason = group.Any(row => row.IsWantToWatch);
             status.HasFavoriteSeason = group.Any(row => row.IsFavorite);
             status.HasNotInterestedSeason = group.Any(row => row.IsNotInterested);
+            status.HasHiddenSeason = group.Any(row => row.LibraryVisibilityState == LibraryVisibilityState.Hidden);
+            status.LibraryVisibilityState = ResolveLibraryVisibilityState(group.Select(row => row.LibraryVisibilityState));
+            status.IsVisibleInLibrary = ResolveIsVisibleInLibrary(
+                status.IsInLibrary,
+                status.LibraryVisibilityState,
+                status.HasWantToWatchSeason || status.HasFavoriteSeason || status.HasNotInterestedSeason);
         }
 
         return result;
+    }
+
+    private static bool ResolveIsVisibleInLibrary(
+        bool hasActiveSource,
+        LibraryVisibilityState visibilityState,
+        bool hasCurrentState)
+    {
+        return visibilityState switch
+        {
+            LibraryVisibilityState.Hidden => false,
+            LibraryVisibilityState.Visible => true,
+            _ => hasActiveSource || hasCurrentState
+        };
+    }
+
+    private static LibraryVisibilityState ResolveLibraryVisibilityState(IEnumerable<LibraryVisibilityState> states)
+    {
+        return states
+            .OrderByDescending(state => state != LibraryVisibilityState.Auto)
+            .FirstOrDefault();
     }
 }

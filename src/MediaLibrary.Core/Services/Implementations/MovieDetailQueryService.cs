@@ -41,7 +41,8 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
                     x.IdentifiedConfidence,
                     x.DefaultMediaFileId,
                     x.IsFavorite,
-                    x.IsWatched
+                    x.IsWatched,
+                    x.UserRating
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -59,6 +60,23 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
                      || (!string.IsNullOrWhiteSpace(movie.ImdbId) && x.ImdbId == movie.ImdbId)
                      || (x.Title == movie.Title && x.ReleaseYear == movie.ReleaseYear),
                 cancellationToken);
+
+        var collectionState = await dbContext.UserMovieCollectionItems
+            .AsNoTracking()
+            .Where(
+                x => x.MovieId == movie.Id
+                     || (movie.TmdbId.HasValue && x.TmdbId == movie.TmdbId.Value)
+                     || (!string.IsNullOrWhiteSpace(movie.ImdbId) && x.ImdbId == movie.ImdbId)
+                     || (x.Title == movie.Title && x.ReleaseYear == movie.ReleaseYear))
+            .OrderByDescending(x => x.LibraryVisibilityState != LibraryVisibilityState.Auto)
+            .ThenByDescending(x => x.UpdatedAt)
+            .Select(
+                x => new
+                {
+                    x.LibraryVisibilityState,
+                    HasUserState = x.IsWatched || x.IsWantToWatch || x.IsNotInterested
+                })
+            .FirstOrDefaultAsync(cancellationToken);
 
         var ratings = await dbContext.RatingSources
             .AsNoTracking()
@@ -112,6 +130,12 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
         {
             source.IsDefault = source.MediaFileId == effectiveDefaultMediaFileId;
         }
+        var hasActiveSource = sources.Count > 0;
+        var libraryVisibilityState = collectionState?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
+        var isVisibleInLibrary = ResolveIsVisibleInLibrary(
+            hasActiveSource,
+            libraryVisibilityState,
+            movie.IsFavorite || movie.IsWatched || movie.UserRating.HasValue || isNotInterested || collectionState?.HasUserState == true);
 
         sources = sources
             .OrderBy(source => source.MediaFileId == effectiveDefaultMediaFileId ? 0 : 1)
@@ -207,8 +231,23 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
             IsFavorite = movie.IsFavorite,
             IsWatched = movie.IsWatched,
             IsNotInterested = isNotInterested,
+            IsVisibleInLibrary = isVisibleInLibrary,
+            LibraryVisibilityState = libraryVisibilityState,
             Ratings = ratings,
             Sources = sources
+        };
+    }
+
+    private static bool ResolveIsVisibleInLibrary(
+        bool hasActiveSource,
+        LibraryVisibilityState visibilityState,
+        bool hasCurrentState)
+    {
+        return visibilityState switch
+        {
+            LibraryVisibilityState.Hidden => false,
+            LibraryVisibilityState.Visible => true,
+            _ => hasActiveSource || hasCurrentState
         };
     }
 

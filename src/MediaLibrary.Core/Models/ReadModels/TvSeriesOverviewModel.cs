@@ -65,6 +65,10 @@ public sealed class TvSeriesSeasonListItem
 
     public int InLibraryEpisodeCount { get; set; }
 
+    public bool IsVisibleInLibrary { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
+
     public string SourceSummary { get; set; } = string.Empty;
 
     public IdentificationStatus IdentificationStatus { get; set; }

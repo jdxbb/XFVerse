@@ -1,3 +1,5 @@
+using MediaLibrary.Core.Models.Enums;
+
 namespace MediaLibrary.Core.Models.ReadModels;
 
 public sealed class DiscoveryMovieStatus
@@ -7,6 +9,10 @@ public sealed class DiscoveryMovieStatus
     public int? MovieId { get; set; }
 
     public bool IsInLibrary { get; set; }
+
+    public bool IsVisibleInLibrary { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
     public bool IsWatched { get; set; }
 

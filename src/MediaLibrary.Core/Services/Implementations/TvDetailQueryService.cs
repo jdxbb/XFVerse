@@ -99,6 +99,29 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             .Where(x => inLibraryEpisodeIds.Contains(x.Id))
             .GroupBy(x => x.TvSeasonId)
             .ToDictionary(x => x.Key, x => x.Count());
+        var collectionRows = seasonIds.Length == 0
+            ? []
+            : await dbContext.UserTvSeasonCollectionItems
+                .AsNoTracking()
+                .Where(x => x.TvSeasonId.HasValue && seasonIds.Contains(x.TvSeasonId.Value))
+                .Select(
+                    x => new
+                    {
+                        TvSeasonId = x.TvSeasonId!.Value,
+                        x.IsFavorite,
+                        x.IsWantToWatch,
+                        x.IsNotInterested,
+                        x.LibraryVisibilityState,
+                        x.UpdatedAt
+                    })
+                .ToListAsync(cancellationToken);
+        var collectionBySeason = collectionRows
+            .GroupBy(x => x.TvSeasonId)
+            .ToDictionary(
+                x => x.Key,
+                x => x.OrderByDescending(y => y.LibraryVisibilityState != LibraryVisibilityState.Auto)
+                    .ThenByDescending(y => y.UpdatedAt)
+                    .First());
 
         var seasonItems = seasons
             .Select(
@@ -109,6 +132,13 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         ? season.TmdbEpisodeCount!.Value
                         : seasonEpisodes.Count;
                     var protocols = sourceProtocolsBySeason.GetValueOrDefault(season.Id) ?? [];
+                    collectionBySeason.TryGetValue(season.Id, out var collection);
+                    var activeSourceCount = inLibraryEpisodeCountsBySeason.GetValueOrDefault(season.Id);
+                    var visibilityState = collection?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
+                    var hasCurrentState = collection?.IsFavorite == true
+                                          || collection?.IsWantToWatch == true
+                                          || collection?.IsNotInterested == true
+                                          || seasonEpisodes.Any(x => x.IsWatched);
                     return new TvSeriesSeasonListItem
                     {
                         SeasonId = season.Id,
@@ -120,7 +150,9 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         AirYear = season.AirYear,
                         WatchedEpisodeCount = seasonEpisodes.Count(x => x.IsWatched),
                         TotalEpisodeCount = totalEpisodeCount,
-                        InLibraryEpisodeCount = inLibraryEpisodeCountsBySeason.GetValueOrDefault(season.Id),
+                        InLibraryEpisodeCount = activeSourceCount,
+                        LibraryVisibilityState = visibilityState,
+                        IsVisibleInLibrary = ResolveIsVisibleInLibrary(activeSourceCount > 0, visibilityState, hasCurrentState),
                         SourceSummary = TvDetailDisplayText.FormatSourceSummary(protocols),
                         IdentificationStatus = season.IdentificationStatus
                     };
@@ -205,7 +237,8 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             {
                 x.IsFavorite,
                 x.IsWantToWatch,
-                x.IsNotInterested
+                x.IsNotInterested,
+                x.LibraryVisibilityState
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -273,6 +306,14 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         var sourceSummary = TvDetailDisplayText.FormatSourceSummary(
             sourceRows.Select(x => x.ProtocolType).Distinct().ToArray());
         var posterDisplayUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl);
+        var visibilityState = collectionState?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
+        var isVisibleInLibrary = ResolveIsVisibleInLibrary(
+            episodeItems.Any(x => x.HasPlayableSource),
+            visibilityState,
+            collectionState?.IsFavorite == true
+            || collectionState?.IsWantToWatch == true
+            || collectionState?.IsNotInterested == true
+            || watchedEpisodeCount > 0);
 
         return new TvSeasonDetailModel
         {
@@ -293,6 +334,8 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             IsFavorite = collectionState?.IsFavorite == true && isSeasonWatched,
             IsWantToWatch = collectionState?.IsWantToWatch == true && isSeasonUnwatched,
             IsNotInterested = collectionState?.IsNotInterested == true,
+            IsVisibleInLibrary = isVisibleInLibrary,
+            LibraryVisibilityState = visibilityState,
             WatchedEpisodeCount = watchedEpisodeCount,
             TotalEpisodeCount = totalEpisodeCount,
             InLibraryEpisodeCount = episodeItems.Count(x => x.HasPlayableSource),
@@ -352,6 +395,19 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         {
             return string.Empty;
         }
+    }
+
+    private static bool ResolveIsVisibleInLibrary(
+        bool hasActiveSource,
+        LibraryVisibilityState visibilityState,
+        bool hasCurrentState)
+    {
+        return visibilityState switch
+        {
+            LibraryVisibilityState.Hidden => false,
+            LibraryVisibilityState.Visible => true,
+            _ => hasActiveSource || hasCurrentState
+        };
     }
 
     private static async Task<IReadOnlyList<SourceRow>> LoadSourceRowsAsync(

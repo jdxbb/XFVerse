@@ -111,6 +111,21 @@
                                     Style="{StaticResource SecondaryButtonStyle}" />
                         </WrapPanel>
 
+                        <Button Margin="0,8,0,0"
+                                Content="{Binding AddSeasonToLibraryButtonText}"
+                                Command="{Binding AddSeasonToLibraryCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CanAddSeasonToLibrary}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <Border Margin="0,14,0,0" Style="{StaticResource CompactCardStyle}">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding ProgressText}" />

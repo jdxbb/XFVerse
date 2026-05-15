@@ -109,6 +109,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                     x.IsWatched,
                     x.IsNotInterested,
                     x.IsInLibrary,
+                    x.LibraryVisibilityState,
                     x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
@@ -127,6 +128,8 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                 TmdbId = movie.TmdbId,
                 MovieId = movie.Id,
                 IsInLibrary = movie.SourceCount > 0,
+                IsVisibleInLibrary = movie.SourceCount > 0,
+                LibraryVisibilityState = LibraryVisibilityState.Auto,
                 IsWatched = group.Any(x => x.IsWatched),
                 IsFavorite = group.Any(x => x.IsFavorite),
                 Title = movie.Title,
@@ -159,11 +162,14 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
             var collection = group.OrderByDescending(x => x.UpdatedAt).First();
             if (!result.TryGetValue(group.Key, out var status))
             {
+                var hasState = group.Any(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested);
                 status = new DiscoveryMovieStatus
                 {
                     TmdbId = group.Key,
                     MovieId = collection.MovieId,
                     IsInLibrary = collection.IsInLibrary,
+                    IsVisibleInLibrary = ResolveIsVisibleInLibrary(collection.IsInLibrary, collection.LibraryVisibilityState, hasState),
+                    LibraryVisibilityState = collection.LibraryVisibilityState,
                     Title = collection.Title,
                     OriginalTitle = collection.OriginalTitle,
                     ReleaseYear = collection.ReleaseYear,
@@ -189,6 +195,11 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
             status.IsWatched |= group.Any(x => x.IsWatched);
             status.IsNotInterested = group.Any(x => x.IsNotInterested);
             status.IsInLibrary |= group.Any(x => x.IsInLibrary);
+            status.LibraryVisibilityState = ResolveLibraryVisibilityState(group.Select(x => new CollectionVisibilityRow(x.LibraryVisibilityState, x.UpdatedAt)));
+            status.IsVisibleInLibrary = ResolveIsVisibleInLibrary(
+                status.IsInLibrary,
+                status.LibraryVisibilityState,
+                status.IsWatched || status.IsWantToWatch || status.IsFavorite || status.IsNotInterested);
             status.OmdbScoreValue ??= collection.OmdbScoreValue;
             status.OmdbScoreScale ??= collection.OmdbScoreScale;
             status.OmdbVoteCount ??= collection.OmdbVoteCount;
@@ -200,4 +211,28 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
 
         return result;
     }
+
+    private static bool ResolveIsVisibleInLibrary(
+        bool hasActiveSource,
+        LibraryVisibilityState visibilityState,
+        bool hasCurrentState)
+    {
+        return visibilityState switch
+        {
+            LibraryVisibilityState.Hidden => false,
+            LibraryVisibilityState.Visible => true,
+            _ => hasActiveSource || hasCurrentState
+        };
+    }
+
+    private static LibraryVisibilityState ResolveLibraryVisibilityState(IEnumerable<CollectionVisibilityRow> rows)
+    {
+        return rows
+            .OrderByDescending(x => x.LibraryVisibilityState != LibraryVisibilityState.Auto)
+            .ThenByDescending(x => x.UpdatedAt)
+            .Select(x => x.LibraryVisibilityState)
+            .FirstOrDefault();
+    }
+
+    private sealed record CollectionVisibilityRow(LibraryVisibilityState LibraryVisibilityState, DateTime UpdatedAt);
 }

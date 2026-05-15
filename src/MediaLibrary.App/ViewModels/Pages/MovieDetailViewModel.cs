@@ -66,6 +66,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _isWatched;
     private bool _isWantToWatch;
     private bool _isNotInterested;
+    private bool _isVisibleInLibrary;
+    private bool _isAddingToLibrary;
+    private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
 
     public MovieDetailViewModel(
         INavigationStateService navigationStateService,
@@ -96,6 +99,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ToggleWatchedCommand = new AsyncRelayCommand(ToggleWatchedAsync, () => CanToggleWatched);
         ToggleWantToWatchCommand = new AsyncRelayCommand(ToggleWantToWatchAsync, () => CanToggleWantToWatch);
         ToggleNotInterestedCommand = new AsyncRelayCommand(ToggleNotInterestedAsync, () => CanToggleNotInterested);
+        AddToLibraryCommand = new AsyncRelayCommand(AddToLibraryAsync, () => CanAddToLibrary);
         AiSuggestSearchCommand = new AsyncRelayCommand(AiSuggestSearchAsync);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
 
@@ -125,6 +129,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public AsyncRelayCommand ToggleWantToWatchCommand { get; }
 
     public AsyncRelayCommand ToggleNotInterestedCommand { get; }
+
+    public AsyncRelayCommand AddToLibraryCommand { get; }
 
     public AsyncRelayCommand AiSuggestSearchCommand { get; }
 
@@ -197,9 +203,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
                 OnPropertyChanged(nameof(ShowNotInterestedAction));
                 OnPropertyChanged(nameof(ShowWatchedAction));
+                OnPropertyChanged(nameof(ShowAddToLibraryAction));
                 RefreshWantToWatchCommandState();
                 RefreshNotInterestedCommandState();
                 RefreshWatchedCommandState();
+                RefreshAddToLibraryCommandState();
             }
         }
     }
@@ -219,9 +227,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
                 OnPropertyChanged(nameof(ShowNotInterestedAction));
                 OnPropertyChanged(nameof(ShowWatchedAction));
+                OnPropertyChanged(nameof(ShowAddToLibraryAction));
                 RefreshWantToWatchCommandState();
                 RefreshNotInterestedCommandState();
                 RefreshWatchedCommandState();
+                RefreshAddToLibraryCommandState();
             }
         }
     }
@@ -305,6 +315,39 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public bool ShowWatchedAction => HasMovie && (IsLibraryMovie || _externalRecommendation is not null);
 
+    public bool ShowAddToLibraryAction => HasMovie && !IsVisibleInLibrary;
+
+    public bool CanAddToLibrary => ShowAddToLibraryAction && !_isAddingToLibrary;
+
+    public string AddToLibraryButtonText => _libraryVisibilityState == LibraryVisibilityState.Hidden
+        ? "恢复到媒体库"
+        : "加入媒体库";
+
+    public bool IsVisibleInLibrary
+    {
+        get => _isVisibleInLibrary;
+        private set
+        {
+            if (SetProperty(ref _isVisibleInLibrary, value))
+            {
+                OnPropertyChanged(nameof(ShowAddToLibraryAction));
+                RefreshAddToLibraryCommandState();
+            }
+        }
+    }
+
+    private LibraryVisibilityState CurrentLibraryVisibilityState
+    {
+        get => _libraryVisibilityState;
+        set
+        {
+            if (SetProperty(ref _libraryVisibilityState, value))
+            {
+                OnPropertyChanged(nameof(AddToLibraryButtonText));
+            }
+        }
+    }
+
     public bool CanToggleWatched => ShowWatchedAction && !_isTogglingWatched;
 
     public bool CanToggleWantToWatch => ShowExternalWantToWatchAction
@@ -355,9 +398,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             IsWatched = detail.IsWatched;
             IsWantToWatch = false;
             IsNotInterested = detail.IsNotInterested;
+            IsVisibleInLibrary = detail.IsVisibleInLibrary;
+            CurrentLibraryVisibilityState = detail.LibraryVisibilityState;
             RefreshWantToWatchCommandState();
             RefreshNotInterestedCommandState();
             RefreshWatchedCommandState();
+            RefreshAddToLibraryCommandState();
             AvailabilityText = "已入库 / 可播放";
             TitleText = detail.Title;
             OriginalTitle = string.IsNullOrWhiteSpace(detail.OriginalTitle) ? "-" : detail.OriginalTitle;
@@ -446,6 +492,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _externalRecommendation = recommendation;
         HasMovie = true;
         IsLibraryMovie = false;
+        IsVisibleInLibrary = false;
+        CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
         _identificationStatus = IdentificationStatus.Pending;
         OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
         IsFavorite = false;
@@ -645,6 +693,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ToggleWatchedCommand?.RaiseCanExecuteChanged();
     }
 
+    private void RefreshAddToLibraryCommandState()
+    {
+        OnPropertyChanged(nameof(CanAddToLibrary));
+        AddToLibraryCommand?.RaiseCanExecuteChanged();
+    }
+
     private void NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation()
     {
         var hasReliableLibraryIdentity = IsLibraryMovie
@@ -683,6 +737,68 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         StatusMessage = IsFavorite ? "已标记为喜爱。" : "已取消喜爱。";
         _dataRefreshService.NotifyCollectionChanged();
         NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation();
+    }
+
+    private async Task AddToLibraryAsync()
+    {
+        if (!HasMovie)
+        {
+            return;
+        }
+
+        _isAddingToLibrary = true;
+        RefreshAddToLibraryCommandState();
+        try
+        {
+            if (IsLibraryMovie && _movieId.HasValue)
+            {
+                if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
+                {
+                    await _movieManagementService.RestoreToLibraryAsync(_movieId.Value);
+                }
+                else
+                {
+                    await _movieManagementService.AddToLibraryAsync(_movieId.Value);
+                }
+                _dataRefreshService.NotifyLibraryChanged();
+                _dataRefreshService.NotifyCollectionChanged();
+                await LoadMovieAsync(_movieId.Value, CancellationToken.None);
+                StatusMessage = "已恢复到媒体库。";
+                return;
+            }
+
+            if (_externalRecommendation is null)
+            {
+                StatusMessage = "缺少外部影片信息，无法加入媒体库。";
+                return;
+            }
+
+            if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
+            {
+                await _userCollectionService.RestoreToLibraryAsync(_externalRecommendation, changeSource: "MovieDetail");
+            }
+            else
+            {
+                await _userCollectionService.AddToLibraryAsync(_externalRecommendation, changeSource: "MovieDetail");
+            }
+            IsVisibleInLibrary = true;
+            CurrentLibraryVisibilityState = _libraryVisibilityState == LibraryVisibilityState.Hidden
+                                     && (IsWatched || IsWantToWatch || IsNotInterested)
+                ? LibraryVisibilityState.Auto
+                : LibraryVisibilityState.Visible;
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            StatusMessage = "已加入媒体库。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"加入媒体库失败：{DescribeException(exception)}";
+        }
+        finally
+        {
+            _isAddingToLibrary = false;
+            RefreshAddToLibraryCommandState();
+        }
     }
 
     private async Task ToggleWatchedAsync()
@@ -1083,9 +1199,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         IsWatched = false;
         IsWantToWatch = false;
         IsNotInterested = false;
+        IsVisibleInLibrary = false;
+        CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
         RefreshWantToWatchCommandState();
         RefreshNotInterestedCommandState();
         RefreshWatchedCommandState();
+        RefreshAddToLibraryCommandState();
         AvailabilityText = "未加载";
         PlayButtonText = "播放默认源";
         TitleText = "未选择影片";

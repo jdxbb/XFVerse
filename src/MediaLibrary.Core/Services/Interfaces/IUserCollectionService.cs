@@ -18,6 +18,10 @@ public interface IUserCollectionService
 
     Task HideFromLibraryAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default, string changeSource = "Manual");
 
+    Task AddToLibraryAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default, string changeSource = "Manual");
+
+    Task RestoreToLibraryAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default, string changeSource = "Manual");
+
     Task<bool> IsNotInterestedAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<NotInterestedMovieKey>> GetNotInterestedKeysAsync(CancellationToken cancellationToken = default);

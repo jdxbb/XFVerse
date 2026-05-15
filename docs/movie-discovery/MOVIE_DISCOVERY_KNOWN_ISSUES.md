@@ -19,18 +19,28 @@
 ## Phase 4.10.3 Visibility Schema Notes
 
 - `LibraryVisibilityState` exists after Phase 4.10.3 but Discovery does not use it yet.
-- Source-less TV rows opened from Discovery remain metadata-only unless later Phase 4.10.5 add-to-library actions write `Visible`.
-- Discovery add-to-library-specific labels remain deferred until the add-to-library action exists.
+- Source-less TV rows opened from Discovery remain metadata-only unless explicit add-to-library actions write `Visible`.
+- Discovery add-to-library-specific labels are available after Phase 4.10.5, while fuller added / hidden status design can still be refined later.
 
 ## Phase 4.10.4 Visibility Semantics Notes
 
 - Source-less media-library remove now writes `Hidden` and preserves state / metadata.
 - Media-library source-state filters use active source presence instead of old in-library wording.
-- Discovery still does not write `Visible`; add-to-library actions remain deferred to Phase 4.10.5.
-- Phase 4.10.4d changes source-status labels to `有播放源` / `无播放源`; labels that specifically mean added-to-library remain deferred until Phase 4.10.5.
+- Discovery metadata browsing still does not write `Visible`; only explicit add-to-library actions do.
+- Phase 4.10.4d changes source-status labels to `有播放源` / `无播放源`; explicit add / restore actions are available after Phase 4.10.5.
 - Pure visibility-only Movie rows should stay out of movie AI/profile/statistics/recommendation fingerprints and fallback external candidates.
 - Phase 4.10.4f changes remove-from-library to hide-only semantics; it no longer disables active playback sources.
 - Old `MediaFile.IsDeleted` rows created by earlier remove-from-library behavior are not restored automatically because they cannot be safely distinguished from missing files, removed paths, or delete-record cleanup; rescan recovery is a Phase 4.13 validation item.
+
+## Phase 4.10.5 Add-to-Library Notes
+
+- Add-to-library writes `LibraryVisibilityState.Visible` only.
+- Restore-to-library is superseded by Phase 4.10.5b and now writes `Auto` when active source or real current state exists, falling back to `Visible` only for source-less no-state rows.
+- Movie add-to-library does not set want-to-watch, favorite, not-interested, watched, or `MediaFile`.
+- TV Series add-to-library writes `Visible` for all known Seasons, including Season 0 / Specials, after metadata is available.
+- Add-to-library does not restore old `IsDeleted` source rows.
+- TV Discovery navigation / hydration contention remains deferred to Phase 4.10.6.
+- TV Discovery remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
 
 ## 搜索
 

@@ -335,6 +335,10 @@
                                     Content="{Binding BatchSelectionButtonText}"
                                     Command="{Binding ToggleBatchSelectionModeCommand}"
                                     Style="{StaticResource SecondaryButtonStyle}" />
+                            <Button Margin="10,0,0,0"
+                                    Content="已移出媒体库"
+                                    Command="{Binding OpenRemovedLibraryCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
                         </StackPanel>
 
                         <StackPanel>
@@ -566,5 +570,114 @@
                 </Grid>
             </Border>
         </Grid>
+
+        <Border Grid.RowSpan="3"
+                Background="#99000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsRemovedLibraryPanelOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border Width="860"
+                    MaxHeight="640"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PageCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right"
+                                Content="关闭"
+                                Command="{Binding CloseRemovedLibraryCommand}"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                        <StackPanel>
+                            <TextBlock Text="已移出媒体库" Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Margin="0,6,18,0"
+                                       Text="{Binding RemovedLibraryStatusMessage}"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource BodyMutedTextStyle}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Grid Grid.Row="2">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Text="暂无已移出媒体库项目"
+	                                   >
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRemovedLibraryItems}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+	                        <ListBox ItemsSource="{Binding RemovedLibraryItems}">
+                            <ListBox.Style>
+                                <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRemovedLibraryItems}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.Style>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="110" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,18,0">
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
+                                            <WrapPanel Margin="0,6,0,0">
+                                                <TextBlock Margin="0,0,12,0" Text="{Binding MediaKindText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Margin="0,0,12,0" Text="{Binding SourceStatusText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Text="{Binding StateSummary}" Style="{StaticResource BodyMutedTextStyle}" />
+                                            </WrapPanel>
+                                        </StackPanel>
+                                        <Button Grid.Column="2"
+                                                Content="恢复"
+                                                Command="{Binding DataContext.RestoreRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource PrimaryButtonStyle}" />
+                                        <Button Grid.Column="3"
+                                                Margin="10,0,0,0"
+                                                Content="详情"
+                                                Command="{Binding DataContext.OpenRemovedLibraryDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                        <Button Grid.Column="4"
+                                                Margin="10,0,0,0"
+                                                Content="删除记录"
+                                                Command="{Binding DataContext.DeleteRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

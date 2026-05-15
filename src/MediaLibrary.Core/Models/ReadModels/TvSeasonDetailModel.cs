@@ -40,6 +40,10 @@ public sealed class TvSeasonDetailModel
 
     public bool IsNotInterested { get; set; }
 
+    public bool IsVisibleInLibrary { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
+
     public int WatchedEpisodeCount { get; set; }
 
     public int TotalEpisodeCount { get; set; }

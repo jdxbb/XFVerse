@@ -645,3 +645,84 @@ Implemented scope:
 13. Delete record remains the software-record cleanup path and does not delete physical files.
 14. Old `IsDeleted` rows are not automatically restored; rescanning existing files is the recovery path to validate in Phase 4.13.
 15. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10.5 - Add Media Library Visibility Actions
+
+Implemented scope:
+
+- Added explicit add-to-library / restore-to-library service paths for Movie and TV Season rows that write `LibraryVisibilityState.Visible`.
+- Added TV Series add-to-library behavior that writes `Visible` for all known Seasons, including Season 0 / Specials, after ensuring metadata is available.
+- Added a media-library `已移出媒体库` management entry that lists Hidden Movie and TV Season rows.
+- Hidden management supports restore to library, view detail, and delete-record actions.
+- Discovery Movie and TV Series cards expose add / restore actions when the row is not currently media-library-visible.
+- Movie detail, Series overview, and TV Season detail expose add / restore actions when the current item is not media-library-visible.
+- Add-to-library does not set want-to-watch, favorite, not-interested, watched, or fake playback sources.
+- Add-to-library does not create `MediaFile`, does not restore old `IsDeleted` source rows, and does not execute database update.
+- TV remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.5 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.10.5 migration is created.
+3. Media library exposes an `已移出媒体库` entry.
+4. Hidden Movie rows appear in the removed-library management view.
+5. Hidden TV Season rows appear in the removed-library management view.
+6. Restoring a Hidden source-backed Movie writes `Visible`, returns it to the media library, and keeps playback sources active.
+7. Restoring a Hidden source-less Movie writes `Visible` and shows it as source-less.
+8. Restoring a Hidden source-backed Season writes `Visible` and keeps Episode sources playable.
+9. Restoring a Hidden source-less Season writes `Visible` and shows it as source-less.
+10. Delete record from the removed-library view uses existing software-record deletion and does not delete physical files.
+11. View detail from the removed-library view does not change visibility.
+12. Discovery Movie rows can be added / restored to the media library.
+13. External Movie add-to-library does not set want-to-watch, favorite, not-interested, or watched.
+14. Series add-to-library makes all known Seasons visible, including Season 0 / Specials.
+15. TV Season detail can add only the current Season.
+16. Add-to-library does not create `MediaFile` or fake playback sources.
+17. Add-to-library does not affect AI recommendations, Watch Insights, or recommendation fingerprints.
+18. TV remains excluded from AI / Watch Insights / recommendation fingerprints.
+19. Rescan does not automatically clear `Hidden`.
+20. Media-library `全部`, `有播放源`, and `无播放源` lists still exclude Hidden rows until they are restored.
+21. Restore writes `Visible` in Phase 4.10.5; Phase 4.10.5b supersedes this with source / state-aware restore.
+22. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10.5b - Restore Visibility And Series-Level Actions
+
+Implemented scope:
+
+- Removed-library restore now uses source / state-aware visibility instead of blindly writing `Visible`.
+- Hidden Movie restore writes `Auto` when the Movie has an active source, watched state, favorite state, not-interested / want-to-watch state, or explicit user rating; otherwise it writes `Visible`.
+- Hidden TV Season restore writes `Auto` when the Season has an active Episode source or real Season state, including want-to-watch, favorite, not-interested, or any watched Episode; otherwise it writes `Visible`.
+- Discovery, Movie detail, TV Season detail, and the removed-library management view use the restore path when the item is Hidden.
+- SeriesOverview uses series-level restore when any Season is Hidden and add-to-library when Seasons are merely not visible.
+- SeriesOverview keeps a visible series-level action area for one-season and all-visible series; all-visible series display an already-in-library disabled state.
+- Movie add-to-library creation explicitly clears default want-to-watch / watched / not-interested flags so visibility-only rows do not become preference state.
+- Movie user rating is counted as real current state for media-library visibility.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.5b Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.10.5b migration is created.
+3. Auto source-less Season can enter the media library after watched state is set.
+4. Auto source-less Season becomes media-library-invisible again after watched state is cleared and no other state remains.
+5. Auto automatic invisibility does not enter the removed-library management view.
+6. Hidden source-less state-backed Season restores to `Auto`.
+7. Hidden source-less state-backed Season can disappear again after its final state is cleared.
+8. Hidden source-less no-state Season restores to `Visible`.
+9. Hidden source-less no-state Season remains visible after restore.
+10. Hidden source-backed Season restores to `Auto`, remains visible, and keeps Episode playback sources active.
+11. Movie restore follows the same source / state-aware rule.
+12. Visible rows remain visible after state is cleared.
+13. The removed-library management view still lists only `Hidden`.
+14. One-season SeriesOverview shows a series-level action area.
+15. Partial SeriesOverview shows a complete-all-seasons action.
+16. SeriesOverview with Hidden Seasons shows restore wording.
+17. All-visible SeriesOverview shows an already-in-library disabled state.
+18. TV Season detail keeps the current-season add / restore action.
+19. Series add / restore still includes Season 0 when metadata is present.
+20. Restore and add actions do not create playback sources or fake source rows.
+21. TV remains excluded from AI / Watch Insights / recommendation fingerprints.
+22. Documents and reports do not include secrets or private media locations.

@@ -1,4 +1,5 @@
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Implementations;
 
@@ -11,6 +12,9 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
     private bool _hasWantToWatchSeason;
     private bool _hasFavoriteSeason;
     private bool _hasNotInterestedSeason;
+    private bool _isVisibleInLibrary;
+    private bool _hasHiddenSeason;
+    private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
     private int? _totalSeasonCount;
     private bool _hasLoadedSeasonCount;
 
@@ -113,6 +117,44 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             if (SetProperty(ref _inLibrarySeasonCount, value))
             {
                 OnPropertyChanged(nameof(LibraryStatusText));
+            }
+        }
+    }
+
+    public bool IsVisibleInLibrary
+    {
+        get => _isVisibleInLibrary;
+        private set
+        {
+            if (SetProperty(ref _isVisibleInLibrary, value))
+            {
+                OnPropertyChanged(nameof(CanAddToLibrary));
+                OnPropertyChanged(nameof(AddToLibraryButtonText));
+            }
+        }
+    }
+
+    public bool HasHiddenSeason
+    {
+        get => _hasHiddenSeason;
+        private set
+        {
+            if (SetProperty(ref _hasHiddenSeason, value))
+            {
+                OnPropertyChanged(nameof(CanAddToLibrary));
+                OnPropertyChanged(nameof(AddToLibraryButtonText));
+            }
+        }
+    }
+
+    public LibraryVisibilityState LibraryVisibilityState
+    {
+        get => _libraryVisibilityState;
+        private set
+        {
+            if (SetProperty(ref _libraryVisibilityState, value))
+            {
+                OnPropertyChanged(nameof(AddToLibraryButtonText));
             }
         }
     }
@@ -232,10 +274,17 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
 
     public bool HasSeasonStateSummary => !string.IsNullOrWhiteSpace(SeasonStateSummaryText);
 
+    public bool CanAddToLibrary => !IsVisibleInLibrary || HasHiddenSeason;
+
+    public string AddToLibraryButtonText => HasHiddenSeason ? "恢复到媒体库" : "加入媒体库";
+
     public void ApplyStatus(DiscoveryTvSeriesStatus status)
     {
         TvSeriesId = status.TvSeriesId;
         IsInLibrary = status.IsInLibrary;
+        IsVisibleInLibrary = status.IsVisibleInLibrary;
+        HasHiddenSeason = status.HasHiddenSeason;
+        LibraryVisibilityState = status.LibraryVisibilityState;
         InLibrarySeasonCount = status.InLibrarySeasonCount;
         HasWantToWatchSeason = status.HasWantToWatchSeason;
         HasFavoriteSeason = status.HasFavoriteSeason;

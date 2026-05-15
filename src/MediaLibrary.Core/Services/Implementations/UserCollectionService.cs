@@ -298,7 +298,10 @@ public sealed class UserCollectionService : IUserCollectionService
         {
             entity = new UserMovieCollectionItem
             {
-                CreatedAt = now
+                CreatedAt = now,
+                IsWantToWatch = false,
+                IsWatched = false,
+                IsNotInterested = false
             };
             dbContext.UserMovieCollectionItems.Add(entity);
         }
@@ -582,6 +585,92 @@ public sealed class UserCollectionService : IUserCollectionService
         await dbContext.SaveChangesAsync(cancellationToken);
         AiPerfDiagnostics.WriteEvent(
             $"event=library-hide-external-movie title=\"{SanitizeLogText(entity.Title)}\" year={FormatOptional(entity.ReleaseYear)} source={SanitizeLogText(changeSource, 32)}");
+    }
+
+    public async Task AddToLibraryAsync(
+        AiRecommendationItem recommendation,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
+        var movie = await FindMovieForRecommendationAsync(dbContext, recommendation, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        if (entity is null)
+        {
+            entity = new UserMovieCollectionItem
+            {
+                CreatedAt = now
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
+        }
+
+        if (movie is not null)
+        {
+            ApplyMovieSnapshot(entity, movie);
+        }
+        else
+        {
+            ApplyRecommendationSnapshot(entity, recommendation);
+        }
+
+        entity.LibraryVisibilityState = LibraryVisibilityState.Visible;
+        entity.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        AiPerfDiagnostics.WriteEvent(
+            $"event=library-add-movie-visible title=\"{SanitizeLogText(entity.Title)}\" year={FormatOptional(entity.ReleaseYear)} source={SanitizeLogText(changeSource, 32)}");
+    }
+
+    public async Task RestoreToLibraryAsync(
+        AiRecommendationItem recommendation,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
+        var movie = await FindMovieForRecommendationAsync(dbContext, recommendation, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        if (entity is null)
+        {
+            entity = new UserMovieCollectionItem
+            {
+                CreatedAt = now,
+                IsWantToWatch = false,
+                IsWatched = false,
+                IsNotInterested = false
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
+        }
+
+        if (movie is not null)
+        {
+            ApplyMovieSnapshot(entity, movie);
+        }
+        else
+        {
+            ApplyRecommendationSnapshot(entity, recommendation);
+        }
+
+        var hasActiveSource = movie?.MediaFiles.Any(media => !media.IsDeleted && media.MediaType == MediaType.Video) == true;
+        var hasCurrentState = movie?.IsFavorite == true
+                              || movie?.IsWatched == true
+                              || movie?.UserRating.HasValue == true
+                              || entity.IsWatched
+                              || entity.IsWantToWatch
+                              || entity.IsNotInterested
+                              || recommendation.IsWatched
+                              || recommendation.IsWantToWatch
+                              || recommendation.IsNotInterested;
+        entity.LibraryVisibilityState = ResolveRestoredVisibilityState(hasActiveSource, hasCurrentState);
+        entity.UpdatedAt = now;
+        CleanupCollectionEntityIfEmpty(dbContext, entity);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        AiPerfDiagnostics.WriteEvent(
+            $"event=library-restore-movie title=\"{SanitizeLogText(entity.Title)}\" year={FormatOptional(entity.ReleaseYear)} source={SanitizeLogText(changeSource, 32)} visibility={entity.LibraryVisibilityState}");
     }
 
     public async Task<bool> IsNotInterestedAsync(
@@ -873,6 +962,13 @@ public sealed class UserCollectionService : IUserCollectionService
         {
             entity.LibraryVisibilityState = LibraryVisibilityState.Auto;
         }
+    }
+
+    private static LibraryVisibilityState ResolveRestoredVisibilityState(bool hasActiveSource, bool hasCurrentState)
+    {
+        return hasActiveSource || hasCurrentState
+            ? LibraryVisibilityState.Auto
+            : LibraryVisibilityState.Visible;
     }
 
     private static void WriteNotInterestedStateLog(string eventName, UserMovieCollectionItem entity)

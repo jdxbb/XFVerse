@@ -297,6 +297,139 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task AddSeasonToLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var season = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
+            ?? throw new InvalidOperationException("鐢佃鍓у涓嶅瓨鍦ㄣ€?");
+        var now = DateTime.UtcNow;
+
+        var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+        if (item is null)
+        {
+            item = new UserTvSeasonCollectionItem
+            {
+                CreatedAt = now
+            };
+            dbContext.UserTvSeasonCollectionItems.Add(item);
+        }
+
+        ApplySeasonSnapshot(item, season);
+        item.LibraryVisibilityState = LibraryVisibilityState.Visible;
+        item.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddSeriesToLibraryAsync(int tvSeriesId, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var seasons = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .Where(x => x.TvSeriesId == tvSeriesId)
+            .OrderBy(x => x.SeasonNumber)
+            .ToListAsync(cancellationToken);
+
+        if (seasons.Count == 0)
+        {
+            var seriesExists = await dbContext.TvSeries.AnyAsync(x => x.Id == tvSeriesId, cancellationToken);
+            if (!seriesExists)
+            {
+                throw new InvalidOperationException("鐢佃鍓т笉瀛樺湪銆?");
+            }
+
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var season in seasons)
+        {
+            var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+            if (item is null)
+            {
+                item = new UserTvSeasonCollectionItem
+                {
+                    CreatedAt = now
+                };
+                dbContext.UserTvSeasonCollectionItems.Add(item);
+            }
+
+            ApplySeasonSnapshot(item, season);
+            item.LibraryVisibilityState = LibraryVisibilityState.Visible;
+            item.UpdatedAt = now;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RestoreSeasonToLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var season = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .Include(x => x.Episodes)
+            .ThenInclude(x => x.MediaFiles)
+            .FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
+            ?? throw new InvalidOperationException("鐢佃鍓у涓嶅瓨鍦ㄣ€?");
+
+        var now = DateTime.UtcNow;
+        var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+        if (item is null)
+        {
+            item = new UserTvSeasonCollectionItem
+            {
+                CreatedAt = now
+            };
+            dbContext.UserTvSeasonCollectionItems.Add(item);
+        }
+
+        RestoreSeasonToLibrary(dbContext, item, season, now);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RestoreSeriesToLibraryAsync(int tvSeriesId, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var seasons = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .Include(x => x.Episodes)
+            .ThenInclude(x => x.MediaFiles)
+            .Where(x => x.TvSeriesId == tvSeriesId)
+            .OrderBy(x => x.SeasonNumber)
+            .ToListAsync(cancellationToken);
+
+        if (seasons.Count == 0)
+        {
+            var seriesExists = await dbContext.TvSeries.AnyAsync(x => x.Id == tvSeriesId, cancellationToken);
+            if (!seriesExists)
+            {
+                throw new InvalidOperationException("閻絻顫嬮崜褌绗夌€涙ê婀妴?");
+            }
+
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var season in seasons)
+        {
+            var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+            if (item is null)
+            {
+                item = new UserTvSeasonCollectionItem
+                {
+                    CreatedAt = now
+                };
+                dbContext.UserTvSeasonCollectionItems.Add(item);
+            }
+
+            RestoreSeasonToLibrary(dbContext, item, season, now);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task DeleteSeasonRecordAsync(int tvSeasonId, CancellationToken cancellationToken = default)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -589,6 +722,32 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         {
             entity.LibraryVisibilityState = LibraryVisibilityState.Auto;
         }
+    }
+
+    private static void RestoreSeasonToLibrary(
+        AppDbContext dbContext,
+        UserTvSeasonCollectionItem item,
+        TvSeason season,
+        DateTime now)
+    {
+        ApplySeasonSnapshot(item, season);
+        var hasActiveSource = season.Episodes.Any(
+            episode => episode.MediaFiles.Any(file => !file.IsDeleted && file.MediaType == MediaType.Video));
+        var hasCurrentState = item.IsFavorite
+                              || item.IsWantToWatch
+                              || item.IsNotInterested
+                              || season.Episodes.Any(episode => episode.IsWatched);
+
+        item.LibraryVisibilityState = ResolveRestoredVisibilityState(hasActiveSource, hasCurrentState);
+        item.UpdatedAt = now;
+        CleanupCollectionEntityIfEmpty(dbContext, item);
+    }
+
+    private static LibraryVisibilityState ResolveRestoredVisibilityState(bool hasActiveSource, bool hasCurrentState)
+    {
+        return hasActiveSource || hasCurrentState
+            ? LibraryVisibilityState.Auto
+            : LibraryVisibilityState.Visible;
     }
 
     private static int ResolveTotalEpisodeCount(TvSeason season, IReadOnlyCollection<TvEpisode> episodes)

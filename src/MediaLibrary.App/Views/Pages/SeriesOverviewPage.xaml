@@ -75,6 +75,21 @@
                                Style="{StaticResource BodyMutedTextStyle}"
                                Text="{Binding StatusMessage}"
                                TextWrapping="Wrap" />
+                    <Button Margin="0,14,0,0"
+                            HorizontalAlignment="Left"
+                            Content="{Binding AddSeriesToLibraryButtonText}"
+                            Command="{Binding AddSeriesToLibraryCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowSeriesLibraryAction}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </Border>
         </Grid>

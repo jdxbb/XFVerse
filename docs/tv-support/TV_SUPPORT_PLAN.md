@@ -492,7 +492,7 @@ Phase 4.10.4 connects `LibraryVisibilityState` to media-library query and remove
 ## Phase 4.10.4 Deferred
 
 - Phase 4.10.5 will add explicit add-to-library actions that write `Visible`.
-- Add-to-library-specific Discovery wording remains deferred until the add-to-library path exists.
+- Add-to-library-specific actions are implemented in Phase 4.10.5 and write `LibraryVisibilityState.Visible`.
 - TV metadata hydration loading optimization remains Phase 4.10.6.
 - TV correction entry UI remains Phase 4.11.
 
@@ -520,3 +520,39 @@ Phase 4.10.4f changes remove-from-library to hide-only semantics without adding 
 - Favorites, Watch History, detail pages, playback source selection, scanning, and Discovery continue to use active `MediaFile` semantics instead of `Hidden`.
 - Old `MediaFile.IsDeleted` rows created by earlier remove behavior are not automatically restored because old hide operations cannot be safely distinguished from missing files, path removals, or delete-record cleanup.
 - Phase 4.10.5 remains the explicit add-to-library action that writes `Visible`.
+
+## Phase 4.10.5 Goal
+
+Phase 4.10.5 adds explicit media-library visibility actions without changing playback-source, AI, or Watch Insights semantics.
+
+- Add-to-library writes `LibraryVisibilityState.Visible`.
+- Movie add-to-library creates or updates the Movie user-state row only for visibility; it does not set want-to-watch, favorite, not-interested, watched, or `IsInLibrary`, and it does not create `MediaFile`.
+- TV Season add-to-library writes `Visible` on `UserTvSeasonCollectionItem` only; it does not create Episode sources or set Season state flags.
+- TV Series add-to-library acts on all known Seasons, including Season 0 / Specials, after ensuring TV metadata exists.
+- The media-library page exposes an `已移出媒体库` management entry for Hidden Movie / Season rows.
+- Hidden management supports restore, detail navigation, and delete-record operations while preserving the existing delete-record semantics.
+- Discovery and detail pages can expose add / restore actions for source-less or Hidden Movie / TV rows.
+- `Visible` is media-library visibility only and is not an AI preference signal.
+- TV remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+
+## Phase 4.10.5b Goal
+
+Phase 4.10.5b refines restore semantics and SeriesOverview series-level actions without adding a migration.
+
+- Restore-to-library no longer blindly writes `Visible`.
+- Hidden Movie / Season restore writes `Auto` when the row has active source or real current state.
+- Hidden Movie / Season restore writes `Visible` only when the row has no active source and no real current state.
+- Real current state includes want-to-watch, favorite, not-interested, watched, and explicit Movie user rating when present; unwatched and metadata-only rows are not real current state.
+- Auto rows can become media-library-invisible again after the final state is cleared.
+- Visible rows remain visible after state is cleared because they represent explicit add-to-library.
+- The removed-library management list still shows only `Hidden`; automatic Auto invisibility does not enter that list.
+- SeriesOverview always exposes a series-level library action area: join whole series, complete all seasons, restore hidden seasons, or show an already-in-library disabled state.
+- One-season SeriesOverview pages still show the series-level action area.
+- TV Season detail keeps the current-season add / restore action.
+
+## Phase 4.10.5 Deferred
+
+- TV metadata hydration progressive loading remains Phase 4.10.6.
+- TV correction entry UI remains Phase 4.11.
+- Scan / rescan / history-location hardening remains Phase 4.12.
+- Old `MediaFile.IsDeleted` rows from earlier remove behavior are still not automatically restored.

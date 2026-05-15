@@ -71,11 +71,44 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public int SourceCount => Movie.SourceCount;
 
+    public bool HasActiveSource => Movie.HasActiveSource;
+
     public bool HasLocalSource => Movie.HasLocalSource;
 
     public bool HasWebDavSource => Movie.HasWebDavSource;
 
     public string SourceSummary => Movie.SourceSummary;
+
+    public string SourceStatusText => Movie.HasActiveSource ? Movie.SourceSummary : "暂无播放源";
+
+    public string StateSummary
+    {
+        get
+        {
+            var states = new List<string>();
+            if (Movie.IsFavorite)
+            {
+                states.Add("喜爱");
+            }
+
+            if (Movie.IsWantToWatch)
+            {
+                states.Add("想看");
+            }
+
+            if (Movie.IsNotInterested)
+            {
+                states.Add("不想看");
+            }
+
+            if (Movie.IsWatched)
+            {
+                states.Add("已看");
+            }
+
+            return states.Count == 0 ? "无状态" : string.Join(" / ", states);
+        }
+    }
 
     public bool IsInLibrary => Movie.IsInLibrary;
 

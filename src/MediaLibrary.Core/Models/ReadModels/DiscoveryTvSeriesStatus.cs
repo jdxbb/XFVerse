@@ -1,3 +1,5 @@
+using MediaLibrary.Core.Models.Enums;
+
 namespace MediaLibrary.Core.Models.ReadModels;
 
 public sealed class DiscoveryTvSeriesStatus
@@ -7,6 +9,12 @@ public sealed class DiscoveryTvSeriesStatus
     public int? TvSeriesId { get; set; }
 
     public bool IsInLibrary { get; set; }
+
+    public bool IsVisibleInLibrary { get; set; }
+
+    public bool HasHiddenSeason { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
     public int InLibrarySeasonCount { get; set; }
 

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -40,6 +41,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private bool _isNotInterested;
     private bool _isSeasonWatched;
     private bool _isSeasonUnwatched;
+    private bool _isVisibleInLibrary;
+    private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
     private string _tmdbRatingDisplay = SeasonRatingUnavailableText;
     private string _imdbRatingDisplay = string.Empty;
 
@@ -63,6 +66,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         ToggleNotInterestedCommand = new AsyncRelayCommand(() => ToggleNotInterestedAsync(), () => HasSeason);
         MarkSeasonWatchedCommand = new AsyncRelayCommand(() => SetSeasonWatchedAsync(true), () => HasSeason);
         MarkSeasonUnwatchedCommand = new AsyncRelayCommand(() => SetSeasonWatchedAsync(false), () => HasSeason);
+        AddSeasonToLibraryCommand = new AsyncRelayCommand(AddSeasonToLibraryAsync, () => CanAddSeasonToLibrary);
         MarkEpisodeWatchedCommand = new AsyncRelayCommand(parameter => SetEpisodeWatchedAsync(parameter, true));
         MarkEpisodeUnwatchedCommand = new AsyncRelayCommand(parameter => SetEpisodeWatchedAsync(parameter, false));
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
@@ -83,6 +87,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public AsyncRelayCommand MarkSeasonWatchedCommand { get; }
 
     public AsyncRelayCommand MarkSeasonUnwatchedCommand { get; }
+
+    public AsyncRelayCommand AddSeasonToLibraryCommand { get; }
 
     public AsyncRelayCommand MarkEpisodeWatchedCommand { get; }
 
@@ -213,6 +219,37 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public string NotInterestedButtonText => IsNotInterested ? "取消不想看" : "不想看";
 
+    public bool IsVisibleInLibrary
+    {
+        get => _isVisibleInLibrary;
+        private set
+        {
+            if (SetProperty(ref _isVisibleInLibrary, value))
+            {
+                OnPropertyChanged(nameof(CanAddSeasonToLibrary));
+                AddSeasonToLibraryCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool CanAddSeasonToLibrary => HasSeason && !IsVisibleInLibrary;
+
+    public string AddSeasonToLibraryButtonText => _libraryVisibilityState == LibraryVisibilityState.Hidden
+        ? "恢复到媒体库"
+        : "加入媒体库";
+
+    private LibraryVisibilityState CurrentLibraryVisibilityState
+    {
+        get => _libraryVisibilityState;
+        set
+        {
+            if (SetProperty(ref _libraryVisibilityState, value))
+            {
+                OnPropertyChanged(nameof(AddSeasonToLibraryButtonText));
+            }
+        }
+    }
+
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         var selectedSeasonId = _navigationStateService.SelectedTvSeasonId;
@@ -253,6 +290,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             IsNotInterested = model.IsNotInterested;
             IsSeasonWatched = model.IsSeasonWatched;
             IsSeasonUnwatched = model.IsSeasonUnwatched;
+            IsVisibleInLibrary = model.IsVisibleInLibrary;
+            CurrentLibraryVisibilityState = model.LibraryVisibilityState;
             Episodes.Clear();
             foreach (var episode in model.Episodes)
             {
@@ -417,6 +456,34 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         }
     }
 
+    private async Task AddSeasonToLibraryAsync()
+    {
+        if (!_seasonId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
+            {
+                await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(_seasonId.Value);
+            }
+            else
+            {
+                await _tvSeasonCollectionService.AddSeasonToLibraryAsync(_seasonId.Value);
+            }
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+            StatusMessage = "已加入媒体库。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"加入媒体库失败：{DescribeException(exception)}";
+        }
+    }
+
     private async Task SetEpisodeWatchedAsync(object? parameter, bool isWatched)
     {
         if (parameter is not TvSeasonEpisodeListItem episode)
@@ -490,6 +557,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         IsNotInterested = false;
         IsSeasonWatched = false;
         IsSeasonUnwatched = true;
+        IsVisibleInLibrary = false;
+        CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
         StatusMessage = statusMessage;
         Episodes.Clear();
         NavigateBackToSeriesCommand.RaiseCanExecuteChanged();
@@ -505,6 +574,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         ToggleNotInterestedCommand.RaiseCanExecuteChanged();
         MarkSeasonWatchedCommand.RaiseCanExecuteChanged();
         MarkSeasonUnwatchedCommand.RaiseCanExecuteChanged();
+        AddSeasonToLibraryCommand.RaiseCanExecuteChanged();
     }
 
     private static string DescribeException(Exception exception)

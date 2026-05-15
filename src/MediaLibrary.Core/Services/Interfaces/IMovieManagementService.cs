@@ -25,6 +25,14 @@ public interface IMovieManagementService
         int movieId,
         CancellationToken cancellationToken = default);
 
+    Task AddToLibraryAsync(
+        int movieId,
+        CancellationToken cancellationToken = default);
+
+    Task RestoreToLibraryAsync(
+        int movieId,
+        CancellationToken cancellationToken = default);
+
     Task DeleteMovieRecordAsync(
         int movieId,
         CancellationToken cancellationToken = default);
