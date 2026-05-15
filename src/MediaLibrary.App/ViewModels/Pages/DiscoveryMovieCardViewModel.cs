@@ -159,7 +159,7 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public string OverviewText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
 
-    public string AvailabilityText => IsInLibrary ? "已入库" : "未入库";
+    public string AvailabilityText => IsInLibrary ? "有播放源" : "无播放源";
 
     public string WatchStateText => IsWatched ? "已看" : "未看";
 

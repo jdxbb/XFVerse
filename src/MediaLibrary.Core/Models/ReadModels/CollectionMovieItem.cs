@@ -85,8 +85,8 @@ public sealed class CollectionMovieItem
                     : "收藏";
 
     public string AvailabilityText => IsTvSeason
-        ? InLibraryEpisodeCount > 0 ? $"已入库 {InLibraryEpisodeCount} 集" : "暂无播放源"
-        : IsInLibrary ? "已入库" : "未入库";
+        ? InLibraryEpisodeCount > 0 ? $"有播放源 {InLibraryEpisodeCount} 集" : "暂无播放源"
+        : IsInLibrary ? "有播放源" : "暂无播放源";
 
     public string WatchStateText => IsTvSeason
         ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}"
@@ -94,5 +94,5 @@ public sealed class CollectionMovieItem
 
     public string DetailButtonText => IsTvSeason
         ? "查看季详情"
-        : IsInLibrary ? "查看详情并播放" : "查看详情（未入库）";
+        : IsInLibrary ? "查看详情并播放" : "查看详情（暂无播放源）";
 }

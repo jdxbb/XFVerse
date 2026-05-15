@@ -175,6 +175,7 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
             .AsNoTracking()
             .Where(x => x.TmdbId.HasValue
                 && x.TmdbId.Value > 0
+                && (x.IsInLibrary || x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
                 && !string.IsNullOrWhiteSpace(x.Title)
                 && (!x.MovieId.HasValue
                     || dbContext.Movies.Any(movie => movie.Id == x.MovieId.Value

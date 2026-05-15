@@ -29,7 +29,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private string _ratingDisplay = RatingUnavailableText;
     private string _sourceSummary = "暂无播放源";
     private string _progressText = "已看 0 / 0";
-    private string _inLibraryText = "已入库 0 集";
+    private string _inLibraryText = "暂无播放源";
     private string _identificationStatusText = "未加载";
     private string _unidentifiedSummary = string.Empty;
     private string _statusMessage = "请先选择一个电视剧季。";
@@ -481,7 +481,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         RatingDisplay = RatingUnavailableText;
         SourceSummary = "暂无播放源";
         ProgressText = "已看 0 / 0";
-        InLibraryText = "已入库 0 集";
+        InLibraryText = "暂无播放源";
         IdentificationStatusText = "未加载";
         IsUnidentified = false;
         UnidentifiedSummary = string.Empty;

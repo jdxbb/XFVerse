@@ -74,6 +74,7 @@ public sealed class MovieManagementService : IMovieManagementService
             {
                 var oldNotInterested = item.IsNotInterested;
                 item.IsNotInterested = false;
+                RestoreAutoVisibilityForPositiveState(item, isPositiveState: true);
                 item.UpdatedAt = now;
                 UserMovieStateChangeHistoryRecorder.RecordIfChanged(
                     dbContext,
@@ -143,12 +144,13 @@ public sealed class MovieManagementService : IMovieManagementService
         if (isWatched)
         {
             var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
-            foreach (var item in collectionItems.Where(x => x.IsWantToWatch || x.IsWatched != isWatched))
+            foreach (var item in collectionItems.Where(x => x.IsWantToWatch || x.IsWatched != isWatched || x.LibraryVisibilityState == LibraryVisibilityState.Hidden))
             {
                 var oldWantToWatch = item.IsWantToWatch;
                 var oldWatched = item.IsWatched;
                 item.IsWantToWatch = false;
                 item.IsWatched = true;
+                RestoreAutoVisibilityForPositiveState(item, isPositiveState: true);
                 item.UpdatedAt = now;
                 UserMovieStateChangeHistoryRecorder.RecordIfChanged(
                     dbContext,
@@ -207,79 +209,19 @@ public sealed class MovieManagementService : IMovieManagementService
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
         var movie = await dbContext.Movies
-            .Include(x => x.MediaFiles)
             .Include(x => x.RatingSources)
             .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken)
             ?? throw new InvalidOperationException("影片不存在。");
 
         var now = DateTime.UtcNow;
-        var activeVideoFiles = movie.MediaFiles
-            .Where(x => x.MediaType == MediaType.Video && !x.IsDeleted)
-            .ToList();
         var collectionItems = await FindCollectionItemsForMovieAsync(dbContext, movie, cancellationToken);
         var hasWatchHistory = await dbContext.WatchHistories
             .AsNoTracking()
             .AnyAsync(x => x.MovieId == movieId, cancellationToken);
-        var preserveState = ShouldPreserveRemovedLibraryState(movie, collectionItems, hasWatchHistory);
 
-        if (activeVideoFiles.Count == 0)
-        {
-            if (preserveState)
-            {
-                PreserveRemovedLibraryState(dbContext, movie, collectionItems, hasWatchHistory, now);
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-
-            return;
-        }
-
-        var deletedMediaFileIds = activeVideoFiles.Select(x => x.Id).ToHashSet();
-        foreach (var mediaFile in activeVideoFiles)
-        {
-            mediaFile.IsDeleted = true;
-            mediaFile.UpdatedAt = now;
-        }
-
-        if (movie.DefaultMediaFileId.HasValue && deletedMediaFileIds.Contains(movie.DefaultMediaFileId.Value))
-        {
-            movie.DefaultMediaFileId = movie.MediaFiles
-                .Where(x => x.MediaType == MediaType.Video && !x.IsDeleted && !deletedMediaFileIds.Contains(x.Id))
-                .OrderBy(x => x.FileName)
-                .Select(x => (int?)x.Id)
-                .FirstOrDefault();
-        }
-
-        movie.UpdatedAt = now;
-
-        if (preserveState)
-        {
-            PreserveRemovedLibraryState(dbContext, movie, collectionItems, hasWatchHistory, now);
-        }
-        else
-        {
-            foreach (var item in collectionItems.Where(x => x.MovieId == movieId && x.IsInLibrary))
-            {
-                item.IsInLibrary = false;
-                item.UpdatedAt = now;
-                CleanupCollectionEntityIfEmpty(dbContext, item);
-            }
-
-            AiPerfDiagnostics.WriteEvent($"event=library-remove-from-library-no-state movieId={movie.Id} preserveCollection=false");
-        }
+        PreserveRemovedLibraryState(dbContext, movie, collectionItems, hasWatchHistory, now);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private static bool ShouldPreserveRemovedLibraryState(
-        Movie movie,
-        IReadOnlyCollection<UserMovieCollectionItem> collectionItems,
-        bool hasWatchHistory)
-    {
-        return movie.IsWatched
-               || movie.IsFavorite
-               || movie.UserRating.HasValue
-               || hasWatchHistory
-               || collectionItems.Any(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested);
     }
 
     private static void PreserveRemovedLibraryState(
@@ -292,50 +234,45 @@ public sealed class MovieManagementService : IMovieManagementService
         var collectionWatched = collectionItems.Any(x => x.IsWatched);
         var collectionWantToWatch = collectionItems.Any(x => x.IsWantToWatch);
         var collectionNotInterested = collectionItems.Any(x => x.IsNotInterested);
-        var shouldKeepCollectionState = movie.IsWatched || collectionWatched || collectionWantToWatch || collectionNotInterested;
-        UserMovieCollectionItem? entity = null;
-        var collectionCreated = false;
+        var entity = collectionItems
+            .OrderByDescending(x => x.MovieId == movie.Id)
+            .ThenByDescending(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested || x.LibraryVisibilityState != LibraryVisibilityState.Auto)
+            .ThenByDescending(x => x.UpdatedAt)
+            .FirstOrDefault();
+        var collectionCreated = entity is null;
 
-        if (shouldKeepCollectionState)
+        if (entity is null)
         {
-            entity = collectionItems
-                .OrderByDescending(x => x.MovieId == movie.Id)
-                .ThenByDescending(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
-                .ThenByDescending(x => x.UpdatedAt)
-                .FirstOrDefault();
-            collectionCreated = entity is null;
-
-            if (entity is null)
+            entity = new UserMovieCollectionItem
             {
-                entity = new UserMovieCollectionItem
-                {
-                    CreatedAt = now
-                };
-                dbContext.UserMovieCollectionItems.Add(entity);
-            }
-
-            ApplyRemovedLibrarySnapshot(entity, movie);
-            entity.IsInLibrary = false;
-            entity.IsWatched = movie.IsWatched || collectionWatched;
-            entity.IsWantToWatch = !entity.IsWatched && collectionWantToWatch;
-            entity.IsNotInterested = collectionNotInterested;
-            entity.UpdatedAt = now;
+                CreatedAt = now
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
         }
 
-        foreach (var item in collectionItems.Where(x => (entity is null || x.Id != entity.Id) && x.MovieId == movie.Id && x.IsInLibrary))
+        ApplyRemovedLibrarySnapshot(entity, movie);
+        entity.IsInLibrary = false;
+        entity.LibraryVisibilityState = LibraryVisibilityState.Hidden;
+        entity.IsWatched = movie.IsWatched || collectionWatched;
+        entity.IsWantToWatch = !entity.IsWatched && collectionWantToWatch;
+        entity.IsNotInterested = collectionNotInterested;
+        entity.UpdatedAt = now;
+
+        foreach (var item in collectionItems.Where(x => x.Id != entity.Id))
         {
             item.IsInLibrary = false;
+            item.LibraryVisibilityState = LibraryVisibilityState.Hidden;
             item.UpdatedAt = now;
             CleanupCollectionEntityIfEmpty(dbContext, item);
         }
 
         AiPerfDiagnostics.WriteEvent(
             $"event=library-remove-from-library-preserve-state movieId={movie.Id} collectionCreated={collectionCreated} "
-            + $"watched={entity?.IsWatched == true} favorite={movie.IsFavorite} want={entity?.IsWantToWatch == true} "
-            + $"notInterested={entity?.IsNotInterested == true} hasHistory={hasWatchHistory}");
+            + $"watched={entity.IsWatched} favorite={movie.IsFavorite} want={entity.IsWantToWatch} "
+            + $"notInterested={entity.IsNotInterested} hasHistory={hasWatchHistory} visibility=hidden");
         AiPerfDiagnostics.WriteEvent(
             $"event=library-remove-from-library-state-visible movieId={movie.Id} isInLibrary=false "
-            + $"visibleInLibrary=true visibleInCollection={(movie.IsFavorite || entity?.IsWantToWatch == true)}");
+            + $"visibleInLibrary=false visibleInCollection={(movie.IsFavorite || entity.IsWantToWatch)}");
     }
 
     private static void ApplyRemovedLibrarySnapshot(UserMovieCollectionItem entity, Movie movie)
@@ -624,9 +561,20 @@ public sealed class MovieManagementService : IMovieManagementService
 
     private static void CleanupCollectionEntityIfEmpty(AppDbContext dbContext, UserMovieCollectionItem entity)
     {
-        if (!entity.IsWatched && !entity.IsWantToWatch && !entity.IsNotInterested)
+        if (!entity.IsWatched
+            && !entity.IsWantToWatch
+            && !entity.IsNotInterested
+            && entity.LibraryVisibilityState == LibraryVisibilityState.Auto)
         {
             dbContext.UserMovieCollectionItems.Remove(entity);
+        }
+    }
+
+    private static void RestoreAutoVisibilityForPositiveState(UserMovieCollectionItem entity, bool isPositiveState)
+    {
+        if (isPositiveState && entity.LibraryVisibilityState == LibraryVisibilityState.Hidden)
+        {
+            entity.LibraryVisibilityState = LibraryVisibilityState.Auto;
         }
     }
 }

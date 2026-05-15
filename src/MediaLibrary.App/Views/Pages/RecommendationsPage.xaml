@@ -19,14 +19,14 @@
                     <TextBlock Text="AI 推荐 / 观影偏好" Style="{StaticResource CardTitleTextStyle}" />
                     <TextBlock Margin="0,8,0,0" Text="{Binding StatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
                     <TextBlock Margin="0,6,0,0"
-                               Text="基于已看记录生成 3 部推荐，并标明库内 / 库外。"
+                               Text="基于已看记录生成 3 部推荐，并标明已有播放源 / 外部候选。"
                                Style="{StaticResource BodyMutedTextStyle}" />
                 </StackPanel>
 
                 <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
                     <StackPanel Width="180">
-                        <TextBlock Text="入库范围" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox AutomationProperties.Name="入库范围"
+                        <TextBlock Text="来源范围" Style="{StaticResource BodyMutedTextStyle}" />
+                        <ComboBox AutomationProperties.Name="来源范围"
                                   ItemsSource="{Binding LibraryScopeOptions}"
                                   IsEnabled="{Binding CanChangeFilters}"
                                   SelectedItem="{Binding SelectedLibraryScope}"

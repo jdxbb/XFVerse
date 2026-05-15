@@ -62,7 +62,7 @@ public sealed class TvSeasonDetailModel
 
     public string ProgressText => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}";
 
-    public string InLibraryText => InLibraryEpisodeCount > 0 ? $"已入库 {InLibraryEpisodeCount} 集" : "暂无播放源";
+    public string InLibraryText => InLibraryEpisodeCount > 0 ? $"有播放源 {InLibraryEpisodeCount} 集" : "暂无播放源";
 
     public string IdentificationStatusText => TvDetailDisplayText.FormatIdentificationStatus(IdentificationStatus);
 

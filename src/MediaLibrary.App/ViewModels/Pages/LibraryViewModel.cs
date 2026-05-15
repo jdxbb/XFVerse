@@ -17,8 +17,6 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string WatchedFilterWatched = "已看";
     private const string WatchedFilterUnwatched = "未看";
     private const string WatchedFilterNotInterested = "不想看";
-    private const string LibraryScopeInLibrary = "库内";
-    private const string LibraryScopeExternal = "库外";
     private const string LibraryScopeAll = "全部";
     private const string SourceFilterAll = "全部来源";
     private const string SourceFilterLocal = "本地";
@@ -35,6 +33,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string StatusFailed = "识别失败";
     private const string StatusPending = "未识别";
     private const string DecadeAll = "全部年代";
+    private const string LibraryScopeWithSource = "有播放源";
+    private const string LibraryScopeWithoutSource = "无播放源";
     private static readonly string[] TypeTagLabels =
     [
         "动作", "冒险", "动画", "喜剧", "犯罪", "纪录片", "剧情", "家庭", "奇幻", "历史",
@@ -73,7 +73,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private string _selectedSortDirection = "降序";
     private string _selectedStatusFilter = FilterAll;
     private string _selectedWatchedFilter = FilterAll;
-    private string _selectedLibraryScope = LibraryScopeInLibrary;
+    private string _selectedLibraryScope = LibraryScopeAll;
     private string _selectedSourceFilter = SourceFilterAll;
     private string _selectedCollectionStatusFilter = FilterAll;
     private string _selectedContentTypeFilter = "全部";
@@ -111,7 +111,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         StatusOptions = [FilterAll, StatusMatched, StatusNeedsReview, StatusManualConfirmed, StatusFailed, StatusPending];
 
         WatchedFilterOptions = [FilterAll, WatchedFilterWatched, WatchedFilterUnwatched, WatchedFilterNotInterested];
-        LibraryScopeOptions = [LibraryScopeAll, LibraryScopeInLibrary, LibraryScopeExternal];
+        LibraryScopeOptions = [LibraryScopeAll, LibraryScopeWithSource, LibraryScopeWithoutSource];
         SourceFilterOptions = [SourceFilterAll, SourceFilterLocal, SourceFilterWebDav];
         CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested];
         ContentTypeOptions = ["全部", "电影", "电视剧"];
@@ -348,8 +348,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     }
 
     public string LibraryScopeMenuHeader => SelectedSourceFilter == SourceFilterAll
-        ? $"范围：{SelectedLibraryScope}"
-        : $"范围：{SelectedLibraryScope} / {SelectedSourceFilter}";
+        ? $"播放源状态：{SelectedLibraryScope}"
+        : $"播放源状态：{SelectedLibraryScope} / {SelectedSourceFilter}";
 
     public string TagFilterMenuHeader
     {
@@ -496,7 +496,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         SelectedDecadeFilter = DecadeAll;
         SelectedStatusFilter = FilterAll;
         SelectedWatchedFilter = FilterAll;
-        SelectedLibraryScope = LibraryScopeInLibrary;
+        SelectedLibraryScope = LibraryScopeAll;
         SelectedSourceFilter = SourceFilterAll;
         SelectedCollectionStatusFilter = FilterAll;
         SelectedContentTypeFilter = "全部";
@@ -720,9 +720,9 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         query = SelectedLibraryScope switch
         {
-            LibraryScopeAll => query.Where(IsDefaultLibraryScopeVisible),
-            LibraryScopeExternal => query.Where(IsExternalHistoryOrNotInterested),
-            _ => query.Where(IsDefaultLibraryScopeVisible)
+            LibraryScopeWithSource => query.Where(item => item.IsVisibleInLibrary && item.HasActiveSource),
+            LibraryScopeWithoutSource => query.Where(item => item.IsVisibleInLibrary && !item.HasActiveSource),
+            _ => query.Where(item => item.IsVisibleInLibrary)
         };
 
         query = SelectedSourceFilter switch
@@ -770,22 +770,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         return message;
-    }
-
-    private static bool IsExternalHistoryOrNotInterested(LibraryMovieListItem item)
-    {
-        return !item.IsInLibrary
-               && !item.HasLibraryContext
-               && (item.HasUserState
-                   || item.IsWatched
-                   || item.IsFavorite
-                   || item.IsWantToWatch
-                   || item.IsNotInterested);
-    }
-
-    private static bool IsDefaultLibraryScopeVisible(LibraryMovieListItem item)
-    {
-        return item.IsInLibrary || item.HasLibraryContext || IsExternalHistoryOrNotInterested(item);
     }
 
     private static bool HasSelectedTag(
@@ -996,13 +980,13 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (selectedItems.Count == 0)
         {
             ClearSelection();
-            BatchResultSummary = "没有可移出的已选项目。";
+            BatchResultSummary = "没有可隐藏的已选项目。";
             return;
         }
 
         var confirmed = await _confirmationDialogService.ConfirmAsync(
             "确认移出媒体库？",
-            "移出后将从当前媒体库列表中移除所选资源，但不会删除本地文件、WebDAV 文件或播放历史。后续扫描可能重新发现。",
+            "移出后所选项目将从媒体库列表隐藏，但不会删除或禁用播放源、状态、metadata、播放历史、本地文件或 WebDAV 文件。",
             "移出",
             "取消");
 
@@ -1013,8 +997,8 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         var successCount = 0;
+        var hiddenCount = 0;
         var errors = new List<BatchItemError>();
-        var skipped = new List<BatchItemError>();
         IsBatchOperationRunning = true;
         WriteLibraryBatchEvent($"event=library-remove-from-library-start count={selectedItems.Count}");
 
@@ -1026,26 +1010,18 @@ public sealed class LibraryViewModel : PageViewModelBase
                 {
                     if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
                     {
-                        if (item.SourceCount <= 0)
-                        {
-                            skipped.Add(new BatchItemError(item.SelectionKey, item.Title, "暂无播放源可移出。"));
-                            WriteLibraryBatchEvent(
-                                $"event=library-remove-from-library item={FormatSelectionKeyForLog(item.SelectionKey)} result=skipped reason=no-source");
-                            continue;
-                        }
-
+                        hiddenCount++;
                         await _tvSeasonCollectionService.RemoveFromLibraryAsync(item.Movie.SeasonId);
                     }
-                    else if (item.Movie.IsMovie && item.MovieId > 0 && item.IsInLibrary && item.SourceCount > 0)
+                    else if (item.Movie.IsMovie && item.MovieId > 0)
                     {
+                        hiddenCount++;
                         await _movieManagementService.RemoveFromLibraryAsync(item.MovieId);
                     }
                     else if (item.Movie.IsMovie)
                     {
-                        skipped.Add(new BatchItemError(item.SelectionKey, item.Title, "暂无播放源可移出。"));
-                        WriteLibraryBatchEvent(
-                            $"event=library-remove-from-library item={FormatSelectionKeyForLog(item.SelectionKey)} result=skipped reason=no-source");
-                        continue;
+                        hiddenCount++;
+                        await _userCollectionService.HideFromLibraryAsync(BuildRecommendationItem(item.Movie), changeSource: "Batch");
                     }
                     else
                     {
@@ -1065,7 +1041,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 SetSelectionToFailures(errors);
             }
-            else if (successCount > 0 || skipped.Count > 0)
+            else if (successCount > 0)
             {
                 ClearSelection();
                 IsBatchSelectionMode = false;
@@ -1076,10 +1052,10 @@ public sealed class LibraryViewModel : PageViewModelBase
             }
 
             await ActivateAsync();
-            BatchResultSummary = BuildResultSummary("移出媒体库", successCount, skipped, errors);
+            BatchResultSummary = BuildRemoveFromLibraryResultSummary(successCount, hiddenCount, errors);
             NotifyAfterBatchRemoveFromLibrary();
             WriteLibraryBatchEvent(
-                $"event=library-remove-from-library-complete success={successCount} skipped={skipped.Count} failed={errors.Count}");
+                $"event=library-remove-from-library-complete success={successCount} hidden={hiddenCount} failed={errors.Count}");
         }
         finally
         {
@@ -1223,7 +1199,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                 if (!item.IsInLibrary || item.MovieId <= 0)
                 {
                     failedCount++;
-                    retainedItems.Add(new BatchItemError(item.SelectionKey, item.Title, "仅已入库影片支持 AI 辅助识别。"));
+                    retainedItems.Add(new BatchItemError(item.SelectionKey, item.Title, "仅有播放源影片支持 AI 辅助识别。"));
                     UpdateBatchAutoIdentifyProgress(index + 1, selectedItems.Count, successCount, noResultCount, failedCount, cancelledCount);
                     itemStopwatch.Stop();
                     WriteBatch2Event(
@@ -1498,7 +1474,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             IsWantToWatch = movie.IsWantToWatch,
             IsNotInterested = movie.IsNotInterested,
             ScopeText = "媒体库",
-            AvailabilityText = movie.IsInLibrary ? "已入库" : "未入库",
+            AvailabilityText = movie.HasActiveSource ? "有播放源" : "暂无播放源",
             WatchStateText = movie.IsWatched ? "已看" : "未看"
         };
     }
@@ -1515,7 +1491,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             return $"series:{item.SeriesId}";
         }
 
-        if (item.IsInLibrary && item.MovieId > 0)
+        if (item.MovieId > 0)
         {
             return $"movie:{item.MovieId}";
         }
@@ -1559,6 +1535,26 @@ public sealed class LibraryViewModel : PageViewModelBase
         IReadOnlyCollection<BatchItemError> errors)
     {
         return BuildResultSummary(operationName, successCount, Array.Empty<BatchItemError>(), errors);
+    }
+
+    private static string BuildRemoveFromLibraryResultSummary(
+        int successCount,
+        int hiddenCount,
+        IReadOnlyCollection<BatchItemError> errors)
+    {
+        var summary = $"移出媒体库完成：处理 {successCount} 项，已从媒体库隐藏 {hiddenCount} 项，失败 {errors.Count} 项。";
+        if (errors.Count == 0)
+        {
+            return summary;
+        }
+
+        var preview = string.Join(
+            "；",
+            errors
+                .Take(3)
+                .Select(error => $"{error.Title}：{error.Message}"));
+        var suffix = errors.Count > 3 ? $"；另有 {errors.Count - 3} 项失败" : string.Empty;
+        return $"{summary} 失败项：{preview}{suffix}";
     }
 
     private static string BuildResultSummary(

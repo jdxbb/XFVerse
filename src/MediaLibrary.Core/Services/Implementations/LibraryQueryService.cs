@@ -8,15 +8,6 @@ namespace MediaLibrary.Core.Services.Implementations;
 
 public sealed class LibraryQueryService : ILibraryQueryService
 {
-    private static readonly string[] TvLibraryStateTypes =
-    [
-        "Watched",
-        "Unwatched",
-        "Favorite",
-        "WantToWatch",
-        "NotInterested"
-    ];
-
     public async Task<IReadOnlyList<LibraryMovieListItem>> GetLibraryItemsAsync(
         bool expandSeriesToSeasons,
         CancellationToken cancellationToken = default)
@@ -40,7 +31,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
 
         var collectionStates = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
-            .Where(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
+            .Where(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested || x.LibraryVisibilityState != LibraryVisibilityState.Auto)
             .Select(
                 x => new LibraryCollectionState(
                     x.MovieId,
@@ -50,7 +41,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.ReleaseYear,
                     x.IsWatched,
                     x.IsWantToWatch,
-                    x.IsNotInterested))
+                    x.IsNotInterested,
+                    x.LibraryVisibilityState,
+                    x.UpdatedAt))
             .ToListAsync(cancellationToken);
         var collectionMovieIds = collectionStates
             .Where(x => x.MovieId is > 0)
@@ -129,6 +122,20 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .FirstOrDefault();
                     var tmdbRating = x.Ratings.FirstOrDefault(rating => string.Equals(rating.SourceName, "TMDB", StringComparison.OrdinalIgnoreCase));
                     var omdbRating = x.Ratings.FirstOrDefault(rating => string.Equals(rating.SourceName, "OMDb", StringComparison.OrdinalIgnoreCase));
+                    var matchingStates = collectionStates
+                        .Where(state => MatchesCollectionIdentity(state, x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear))
+                        .ToList();
+                    var visibilityState = ResolveLibraryVisibilityState(matchingStates);
+                    var isWatched = x.IsWatched || watchedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear);
+                    var isWantToWatch = wantToWatchIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear);
+                    var isNotInterested = notInterestedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear);
+                    var hasActiveSource = x.SourceCount > 0;
+                    var hasUserState = x.IsFavorite
+                                       || isWatched
+                                       || x.HasWatchHistory
+                                       || isWantToWatch
+                                       || isNotInterested;
+                    var isVisibleInLibrary = ResolveIsVisibleInLibrary(hasActiveSource, visibilityState, hasUserState);
 
                     return new LibraryMovieListItem
                     {
@@ -161,27 +168,27 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         OmdbSourceUrl = omdbRating?.SourceUrl ?? string.Empty,
                         OmdbLastUpdatedAt = omdbRating?.LastUpdatedAt,
                         SourceCount = x.SourceCount,
+                        ActiveSourceCount = x.SourceCount,
+                        HasActiveSource = hasActiveSource,
                         HasLocalSource = x.HasLocalSource,
                         HasWebDavSource = x.HasWebDavSource,
-                        HasLibraryContext = x.SourceCount > 0,
-                        IsInLibrary = x.SourceCount > 0,
+                        IsVisibleInLibrary = isVisibleInLibrary,
+                        LibraryVisibilityState = visibilityState,
+                        HasLibraryContext = isVisibleInLibrary,
+                        IsInLibrary = hasActiveSource,
                         IsFavorite = x.IsFavorite,
-                        IsWatched = x.IsWatched || watchedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
-                        IsWantToWatch = wantToWatchIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
-                        IsNotInterested = notInterestedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
-                        HasUserState = x.IsFavorite
-                                       || x.IsWatched
-                                       || x.HasWatchHistory
-                                       || watchedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear)
-                                       || wantToWatchIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear)
-                                       || notInterestedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear),
+                        IsWatched = isWatched,
+                        IsWantToWatch = isWantToWatch,
+                        IsNotInterested = isNotInterested,
+                        HasUserState = hasUserState,
                         HasWatchHistory = x.HasWatchHistory,
                         UpdatedAt = x.UpdatedAt
                     };
                 })
+            .Where(x => x.IsVisibleInLibrary)
             .Concat(await GetExternalCollectionMoviesAsync(dbContext, cancellationToken))
             .GroupBy(BuildLibraryItemKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.OrderByDescending(x => x.IsInLibrary).ThenByDescending(x => x.UpdatedAt).First())
+            .Select(group => group.OrderByDescending(x => x.HasActiveSource).ThenByDescending(x => x.IsVisibleInLibrary).ThenByDescending(x => x.UpdatedAt).First())
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
     }
@@ -190,53 +197,100 @@ public sealed class LibraryQueryService : ILibraryQueryService
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.UserMovieCollectionItems
+        var rows = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
-            .Where(x => !x.IsInLibrary && (x.IsWatched || x.IsWantToWatch || x.IsNotInterested))
+            .Where(
+                x => !x.IsInLibrary
+                     && (x.IsWatched
+                         || x.IsWantToWatch
+                         || x.IsNotInterested
+                         || x.LibraryVisibilityState != LibraryVisibilityState.Auto))
             .OrderByDescending(x => x.UpdatedAt)
             .Select(
-                x => new LibraryMovieListItem
+                x => new
                 {
-                    MovieId = 0,
-                    TmdbId = x.TmdbId,
-                    Title = x.Title,
-                    OriginalTitle = x.OriginalTitle,
-                    ReleaseYear = x.ReleaseYear,
-                    PosterRemoteUrl = x.PosterRemoteUrl,
-                    GenresText = x.GenresText,
-                    Overview = x.Overview,
-                    Country = x.Country,
-                    Language = x.Language,
-                    RuntimeMinutes = x.RuntimeMinutes,
-                    ImdbId = x.ImdbId,
-                    IdentificationStatus = IdentificationStatus.Pending,
-                    PrimaryRatingSourceName = x.OmdbScoreValue.HasValue ? "IMDb" : x.TmdbRating.HasValue ? "TMDB" : string.Empty,
-                    PrimaryRatingValue = x.OmdbScoreValue ?? x.TmdbRating,
-                    PrimaryRatingScale = x.OmdbScoreScale ?? (x.TmdbRating.HasValue ? 10d : null),
-                    PrimaryRatingVoteCount = x.OmdbVoteCount ?? x.TmdbVoteCount,
-                    TmdbRating = x.TmdbRating,
-                    TmdbVoteCount = x.TmdbVoteCount,
-                    OmdbScoreValue = x.OmdbScoreValue,
-                    OmdbScoreScale = x.OmdbScoreScale,
-                    OmdbVoteCount = x.OmdbVoteCount,
-                    OmdbSourceUrl = x.OmdbSourceUrl,
-                    OmdbLastUpdatedAt = x.OmdbLastUpdatedAt,
-                    SourceCount = 0,
-                    HasLibraryContext = false,
-                    HasUserState = true,
-                    IsInLibrary = false,
-                    IsWatched = x.IsWatched,
-                    IsWantToWatch = x.IsWantToWatch,
-                    IsNotInterested = x.IsNotInterested,
-                    HasWatchHistory = false,
-                    UpdatedAt = x.UpdatedAt
+                    x.MovieId,
+                    x.TmdbId,
+                    x.Title,
+                    x.OriginalTitle,
+                    x.ReleaseYear,
+                    x.PosterRemoteUrl,
+                    x.GenresText,
+                    x.Overview,
+                    x.Country,
+                    x.Language,
+                    x.RuntimeMinutes,
+                    x.ImdbId,
+                    x.TmdbRating,
+                    x.TmdbVoteCount,
+                    x.OmdbScoreValue,
+                    x.OmdbScoreScale,
+                    x.OmdbVoteCount,
+                    x.OmdbSourceUrl,
+                    x.OmdbLastUpdatedAt,
+                    x.IsWatched,
+                    x.IsWantToWatch,
+                    x.IsNotInterested,
+                    x.LibraryVisibilityState,
+                    x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(
+                x =>
+                {
+                    var hasUserState = x.IsWatched || x.IsWantToWatch || x.IsNotInterested;
+                    var isVisibleInLibrary = ResolveIsVisibleInLibrary(false, x.LibraryVisibilityState, hasUserState);
+
+                    return new LibraryMovieListItem
+                    {
+                        MovieId = x.MovieId.GetValueOrDefault(),
+                        TmdbId = x.TmdbId,
+                        Title = x.Title,
+                        OriginalTitle = x.OriginalTitle,
+                        ReleaseYear = x.ReleaseYear,
+                        PosterRemoteUrl = x.PosterRemoteUrl,
+                        GenresText = x.GenresText,
+                        Overview = x.Overview,
+                        Country = x.Country,
+                        Language = x.Language,
+                        RuntimeMinutes = x.RuntimeMinutes,
+                        ImdbId = x.ImdbId,
+                        IdentificationStatus = IdentificationStatus.Pending,
+                        PrimaryRatingSourceName = x.OmdbScoreValue.HasValue ? "IMDb" : x.TmdbRating.HasValue ? "TMDB" : string.Empty,
+                        PrimaryRatingValue = x.OmdbScoreValue ?? x.TmdbRating,
+                        PrimaryRatingScale = x.OmdbScoreScale ?? (x.TmdbRating.HasValue ? 10d : null),
+                        PrimaryRatingVoteCount = x.OmdbVoteCount ?? x.TmdbVoteCount,
+                        TmdbRating = x.TmdbRating,
+                        TmdbVoteCount = x.TmdbVoteCount,
+                        OmdbScoreValue = x.OmdbScoreValue,
+                        OmdbScoreScale = x.OmdbScoreScale,
+                        OmdbVoteCount = x.OmdbVoteCount,
+                        OmdbSourceUrl = x.OmdbSourceUrl,
+                        OmdbLastUpdatedAt = x.OmdbLastUpdatedAt,
+                        SourceCount = 0,
+                        ActiveSourceCount = 0,
+                        HasActiveSource = false,
+                        IsVisibleInLibrary = isVisibleInLibrary,
+                        LibraryVisibilityState = x.LibraryVisibilityState,
+                        HasLibraryContext = isVisibleInLibrary,
+                        HasUserState = hasUserState,
+                        IsInLibrary = false,
+                        IsWatched = x.IsWatched,
+                        IsWantToWatch = x.IsWantToWatch,
+                        IsNotInterested = x.IsNotInterested,
+                        HasWatchHistory = false,
+                        UpdatedAt = x.UpdatedAt
+                    };
+                })
+            .Where(x => x.IsVisibleInLibrary)
+            .ToList();
     }
 
     private static string BuildLibraryItemKey(LibraryMovieListItem item)
     {
-        if (item.IsInLibrary && item.MovieId > 0)
+        if (item.HasActiveSource && item.MovieId > 0)
         {
             if (item.TmdbId.HasValue)
             {
@@ -368,19 +422,44 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
-        var stateSeasonIds = stateRows.Where(x => x.HasUserState).Select(x => x.SeasonId).ToHashSet();
+        var stateBySeason = stateRows
+            .GroupBy(x => x.SeasonId)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(y => y.UpdatedAt).First());
 
         return seriesRows
             .Select(
                 series =>
                 {
                     var seasons = seasonsBySeries.GetValueOrDefault(series.Id) ?? [];
-                    var seasonIdsForSeries = seasons.Select(x => x.SeasonId).ToHashSet();
                     var sources = seasons
                         .SelectMany(season => sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
                         .ToList();
-                    var hasState = stateSeasonIds.Overlaps(seasonIdsForSeries);
-                    var inLibraryEpisodeCount = sources.Select(x => x.EpisodeId).Distinct().Count();
+                    var visibleSeasonCount = 0;
+                    var visibleSeasonIds = new HashSet<int>();
+                    var hasState = false;
+                    foreach (var season in seasons)
+                    {
+                        stateBySeason.TryGetValue(season.SeasonId, out var state);
+                        var watchedInSeason = (episodesBySeason.GetValueOrDefault(season.SeasonId) ?? []).Count(x => x.IsWatched);
+                        var seasonHasCurrentState = state?.HasUserState == true || watchedInSeason > 0;
+                        var seasonHasActiveSource = (sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? []).Count > 0;
+                        hasState |= seasonHasCurrentState;
+                        if (ResolveIsVisibleInLibrary(
+                                seasonHasActiveSource,
+                                state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto,
+                                seasonHasCurrentState))
+                        {
+                            visibleSeasonCount++;
+                            visibleSeasonIds.Add(season.SeasonId);
+                        }
+                    }
+
+                    var visibleSources = sources
+                        .Where(x => visibleSeasonIds.Contains(x.SeasonId))
+                        .ToList();
+                    var hasActiveSource = visibleSources.Count > 0;
+                    var isVisibleInLibrary = visibleSeasonCount > 0;
+                    var inLibraryEpisodeCount = visibleSources.Select(x => x.EpisodeId).Distinct().Count();
                     var watchedEpisodeCount = seasons
                         .SelectMany(season => episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
                         .Count(x => x.IsWatched);
@@ -411,12 +490,16 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IdentificationStatus = seasons.Any(x => x.IdentificationStatus == IdentificationStatus.Failed)
                             ? IdentificationStatus.Failed
                             : IdentificationStatus.Matched,
-                        SourceCount = sources.Count,
-                        HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
-                        HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
-                        HasLibraryContext = sources.Count > 0,
+                        SourceCount = visibleSources.Count,
+                        ActiveSourceCount = visibleSources.Count,
+                        HasActiveSource = hasActiveSource,
+                        HasLocalSource = visibleSources.Any(x => x.ProtocolType == ProtocolType.Local),
+                        HasWebDavSource = visibleSources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        IsVisibleInLibrary = isVisibleInLibrary,
+                        LibraryVisibilityState = LibraryVisibilityState.Auto,
+                        HasLibraryContext = isVisibleInLibrary,
                         HasUserState = hasState || hasWatchedEpisodeState,
-                        IsInLibrary = sources.Count > 0,
+                        IsInLibrary = hasActiveSource,
                         IsWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount),
                         SeasonCount = seasons.Count,
                         InLibraryEpisodeCount = inLibraryEpisodeCount,
@@ -425,7 +508,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         UpdatedAt = seasons.Select(x => x.UpdatedAt).Append(series.UpdatedAt).Max()
                     };
                 })
-            .Where(x => x.IsInLibrary || x.HasUserState)
+            .Where(x => x.IsVisibleInLibrary)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
     }
@@ -492,19 +575,6 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
-        var seriesWithSources = sourceRows
-            .Join(
-                episodeRows,
-                source => source.EpisodeId,
-                episode => episode.EpisodeId,
-                (_, episode) => episode.SeasonId)
-            .Join(
-                seasonRows,
-                seasonId => seasonId,
-                season => season.SeasonId,
-                (_, season) => season.SeriesId)
-            .ToHashSet();
-
         return seasonRows
             .Select(
                 season =>
@@ -520,6 +590,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
                     var isUnwatched = watchedEpisodeCount == 0;
                     var hasUserState = state?.HasUserState == true || watchedEpisodeCount > 0;
+                    var hasActiveSource = sources.Count > 0;
+                    var visibilityState = state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
+                    var isVisibleInLibrary = ResolveIsVisibleInLibrary(hasActiveSource, visibilityState, hasUserState);
                     return new LibraryMovieListItem
                     {
                         ItemKind = LibraryMediaItemKind.Season,
@@ -537,11 +610,15 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Language = season.Language,
                         IdentificationStatus = season.IdentificationStatus,
                         SourceCount = sources.Count,
+                        ActiveSourceCount = sources.Count,
+                        HasActiveSource = hasActiveSource,
                         HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
                         HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
-                        HasLibraryContext = sources.Count > 0 || seriesWithSources.Contains(season.SeriesId),
+                        IsVisibleInLibrary = isVisibleInLibrary,
+                        LibraryVisibilityState = visibilityState,
+                        HasLibraryContext = isVisibleInLibrary,
                         HasUserState = hasUserState,
-                        IsInLibrary = sources.Count > 0,
+                        IsInLibrary = hasActiveSource,
                         IsFavorite = state?.IsFavorite == true && isWatched,
                         IsWantToWatch = state?.IsWantToWatch == true && isUnwatched,
                         IsNotInterested = state?.IsNotInterested == true,
@@ -552,7 +629,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
                     };
                 })
-            .Where(x => x.IsInLibrary || x.HasUserState || x.HasLibraryContext)
+            .Where(x => x.IsVisibleInLibrary)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
     }
@@ -598,7 +675,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .Where(
                 x => x.TvSeasonId.HasValue
                      && seasonIds.Contains(x.TvSeasonId.Value)
-                     && (x.IsFavorite || x.IsWantToWatch || x.IsNotInterested))
+                     && (x.IsFavorite
+                         || x.IsWantToWatch
+                         || x.IsNotInterested
+                         || x.LibraryVisibilityState != LibraryVisibilityState.Auto))
             .Select(
                 x => new TvSeasonStateLibraryRow
                 {
@@ -607,29 +687,13 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     IsFavorite = x.IsFavorite,
                     IsWantToWatch = x.IsWantToWatch,
                     IsNotInterested = x.IsNotInterested,
-                    HasUserState = true,
+                    LibraryVisibilityState = x.LibraryVisibilityState,
+                    HasUserState = x.IsFavorite || x.IsWantToWatch || x.IsNotInterested,
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
 
-        var historyRows = await dbContext.UserTvSeasonStateChangeHistories
-            .AsNoTracking()
-            .Where(
-                x => x.TvSeasonId.HasValue
-                     && seasonIds.Contains(x.TvSeasonId.Value)
-                     && TvLibraryStateTypes.Contains(x.StateType))
-            .Select(
-                x => new TvSeasonStateLibraryRow
-                {
-                    SeasonId = x.TvSeasonId!.Value,
-                    SeriesId = x.TvSeriesId,
-                    HasUserState = true,
-                    UpdatedAt = x.ChangedAtUtc
-                })
-            .ToListAsync(cancellationToken);
-
         return collectionRows
-            .Concat(historyRows)
             .GroupBy(x => x.SeasonId)
             .Select(
                 group => new TvSeasonStateLibraryRow
@@ -639,6 +703,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     IsFavorite = group.Any(x => x.IsFavorite),
                     IsWantToWatch = group.Any(x => x.IsWantToWatch),
                     IsNotInterested = group.Any(x => x.IsNotInterested),
+                    LibraryVisibilityState = ResolveLibraryVisibilityState(group),
                     HasUserState = group.Any(x => x.HasUserState),
                     UpdatedAt = group.Max(x => x.UpdatedAt)
                 })
@@ -669,6 +734,69 @@ public sealed class LibraryQueryService : ILibraryQueryService
         return knownEpisodeCount >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount;
     }
 
+    private static bool ResolveIsVisibleInLibrary(
+        bool hasActiveSource,
+        LibraryVisibilityState visibilityState,
+        bool hasCurrentState)
+    {
+        return visibilityState switch
+        {
+            LibraryVisibilityState.Hidden => false,
+            LibraryVisibilityState.Visible => true,
+            _ => hasActiveSource || hasCurrentState
+        };
+    }
+
+    private static LibraryVisibilityState ResolveLibraryVisibilityState(IEnumerable<LibraryCollectionState> states)
+    {
+        return states
+            .OrderByDescending(x => x.LibraryVisibilityState != LibraryVisibilityState.Auto)
+            .ThenByDescending(x => x.UpdatedAt)
+            .Select(x => x.LibraryVisibilityState)
+            .FirstOrDefault();
+    }
+
+    private static LibraryVisibilityState ResolveLibraryVisibilityState(IEnumerable<TvSeasonStateLibraryRow> states)
+    {
+        return states
+            .OrderByDescending(x => x.LibraryVisibilityState != LibraryVisibilityState.Auto)
+            .ThenByDescending(x => x.UpdatedAt)
+            .Select(x => x.LibraryVisibilityState)
+            .FirstOrDefault();
+    }
+
+    private static bool MatchesCollectionIdentity(
+        LibraryCollectionIdentity identity,
+        int? movieId,
+        int? tmdbId,
+        string? imdbId,
+        string title,
+        int? releaseYear)
+    {
+        if (identity.MovieId is > 0 && movieId == identity.MovieId)
+        {
+            return true;
+        }
+
+        if (identity.TmdbId is > 0 && tmdbId == identity.TmdbId)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(identity.ImdbId)
+            && !string.IsNullOrWhiteSpace(imdbId)
+            && string.Equals(NormalizeImdbId(identity.ImdbId), NormalizeImdbId(imdbId), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(identity.Title)
+               && !string.IsNullOrWhiteSpace(title)
+               && identity.ReleaseYear.HasValue
+               && releaseYear.HasValue
+               && string.Equals(BuildTitleYearKey(identity.Title, identity.ReleaseYear), BuildTitleYearKey(title, releaseYear), StringComparison.OrdinalIgnoreCase);
+    }
+
     private record LibraryCollectionIdentity(
         int? MovieId,
         int? TmdbId,
@@ -684,7 +812,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
         int? ReleaseYear,
         bool IsWatched,
         bool IsWantToWatch,
-        bool IsNotInterested)
+        bool IsNotInterested,
+        LibraryVisibilityState LibraryVisibilityState,
+        DateTime UpdatedAt)
         : LibraryCollectionIdentity(MovieId, TmdbId, ImdbId, Title, ReleaseYear);
 
     private sealed class LibraryCollectionIdentityIndex
@@ -819,6 +949,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public bool IsWantToWatch { get; set; }
 
         public bool IsNotInterested { get; set; }
+
+        public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
         public bool HasUserState { get; set; }
 

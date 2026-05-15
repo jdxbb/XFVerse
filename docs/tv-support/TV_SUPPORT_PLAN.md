@@ -438,7 +438,7 @@ Phase 4.10.1 refines metadata-only TV visibility in the media library and locks 
 - A metadata-only Series with no playback source only exposes Seasons that have user state in batch mode.
 - Episodes remain playback/detail units only; they are not media-library top-level items and are not batch items.
 - Batch watched / unwatched is allowed for metadata-only Seasons and updates all known Episodes without writing `WatchHistory`, `MediaFile`, or fake sources.
-- Batch remove skips source-less Seasons and not-in-library Movies with a readable `暂无播放源可移出` result instead of deleting metadata or state.
+- Phase 4.10.1 originally skipped source-less remove with a no-source result; Phase 4.10.4 supersedes that rule with `LibraryVisibilityState.Hidden`, preserving metadata and state while hiding source-less rows from the media library.
 - Batch delete record removes software records / metadata / state according to the existing record-deletion path and does not delete local or WebDAV files.
 
 ## Phase 4.10.1 Boundaries
@@ -457,3 +457,66 @@ Phase 4.10.1 refines metadata-only TV visibility in the media library and locks 
 - Phase 4.11 TV correction entry UI.
 - Phase 4.12 TV scan / rescan / history-location hardening.
 - TV AI support remains a Phase 5 candidate.
+
+## Phase 4.10.3 Goal
+
+Phase 4.10.3 adds the data-model foundation for explicit media-library visibility without changing runtime library behavior.
+
+- Add `LibraryVisibilityState` with `Auto = 0`, `Visible = 1`, and `Hidden = 2`.
+- Add `LibraryVisibilityState` to `UserMovieCollectionItem` and `UserTvSeasonCollectionItem`.
+- Keep existing `UserMovieCollectionItem.IsInLibrary` unchanged; it is not redefined or reused as visibility state.
+- Default old and new rows to `Auto`.
+- Add only the required EF mapping and migration columns; do not backfill, delete, rename, or clean existing data.
+- Do not change media-library filters, remove behavior, Discovery labels, detail buttons, Favorites, Home, Watch History, AI recommendations, Watch Insights, or recommendation fingerprints in this phase.
+
+## Phase 4.10.3 Deferred
+
+- Phase 4.10.4 will connect visibility state to media-library filters and source-less remove / hide behavior.
+- Phase 4.10.5 will add explicit add-to-library actions that write `Visible`.
+- `Hidden` will affect media-library visibility only after Phase 4.10.4 and must not hide status-based Favorites entries.
+
+## Phase 4.10.4 Goal
+
+Phase 4.10.4 connects `LibraryVisibilityState` to media-library query and remove semantics without adding another migration.
+
+- Media-library source-state filter labels are `全部`, `有播放源`, and `无播放源`.
+- `HasActiveSource` means at least one active video `MediaFile`.
+- `IsVisibleInLibrary` is separate from active source state and from the legacy `UserMovieCollectionItem.IsInLibrary` field.
+- Movie and TV Season `Hidden` hides rows from the media-library list while preserving active sources, state, history, and metadata.
+- Movie / Season remove writes `Hidden`; it no longer skips source-less rows and no longer disables source-backed rows.
+- `MediaFile.IsDeleted` remains the app-level source-unavailable / source-record cleanup marker, not the media-library hide marker.
+- Delete record remains the path that clears app metadata / state records; it still does not delete physical files.
+- Favorites remain status views: `Hidden` must not hide favorite / want-to-watch / not-interested entries there.
+- TV remains excluded from Watch Insights, AI recommendations, profile/persona inputs, and recommendation fingerprints.
+
+## Phase 4.10.4 Deferred
+
+- Phase 4.10.5 will add explicit add-to-library actions that write `Visible`.
+- Add-to-library-specific Discovery wording remains deferred until the add-to-library path exists.
+- TV metadata hydration loading optimization remains Phase 4.10.6.
+- TV correction entry UI remains Phase 4.11.
+
+## Phase 4.10.4d Goal
+
+Phase 4.10.4d closes the remaining visibility wording, Hidden restore, and movie-only AI input gaps without adding a migration.
+
+- Media-library cards and TV detail source labels use source semantics: `有播放源` / `无播放源` / `暂无播放源`, not `已入库` / `未入库`.
+- Discovery search and ranking labels use `有播放源` / `无播放源`; add-to-library-specific wording remains Phase 4.10.5.
+- Positive user state operations clear `Hidden` back to `Auto`: want-to-watch true, favorite true, not-interested true, and watched true.
+- Mark-unwatched and cancel-state operations do not clear `Hidden`.
+- Pure visibility-only Movie rows are excluded from movie AI/profile/statistics/recommendation fingerprints and fallback candidates.
+- Favorites remain state views; `Hidden` does not hide favorite / want-to-watch / not-interested rows.
+- Favorites Movie rows with a local `MovieId` navigate to `MovieDetail`; only pure external metadata rows use external detail.
+- TV remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+- No database update, no new migration, no commit, and no push are part of this phase.
+
+## Phase 4.10.4f Goal
+
+Phase 4.10.4f changes remove-from-library to hide-only semantics without adding a migration.
+
+- Remove from library writes `LibraryVisibilityState.Hidden` for Movie and TV Season regardless of active source state.
+- Remove from library does not mark active `MediaFile` rows deleted, does not reset default playback source, and does not disable Episode sources.
+- `Hidden` has priority over active source in media-library queries, so hidden source-backed rows disappear from `全部`, `有播放源`, and `无播放源`.
+- Favorites, Watch History, detail pages, playback source selection, scanning, and Discovery continue to use active `MediaFile` semantics instead of `Hidden`.
+- Old `MediaFile.IsDeleted` rows created by earlier remove behavior are not automatically restored because old hide operations cannot be safely distinguished from missing files, path removals, or delete-record cleanup.
+- Phase 4.10.5 remains the explicit add-to-library action that writes `Visible`.

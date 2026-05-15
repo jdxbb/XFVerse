@@ -92,7 +92,7 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
 
     public string ScopeText { get; set; } = "AI 推荐";
 
-    public string AvailabilityText { get; set; } = "未入库";
+    public string AvailabilityText { get; set; } = "外部候选";
 
     public string WatchStateText
     {
@@ -100,7 +100,7 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
         set => SetField(ref _watchStateText, value);
     }
 
-    public string DetailButtonText => IsInLibrary ? "查看详情并播放" : "查看详情（未入库）";
+    public string DetailButtonText => IsInLibrary ? "查看详情并播放" : "查看详情（外部候选）";
 
     public bool CanAddWantToWatch => !IsWatched && !IsWantToWatch;
 

@@ -480,7 +480,7 @@ public sealed class HomeViewModel : PageViewModelBase
                 IsWatched = movie.IsWatched,
                 IsWantToWatch = movie.IsWantToWatch,
                 ScopeText = "收藏夹",
-                AvailabilityText = "未入库",
+                AvailabilityText = "暂无播放源",
                 WatchStateText = movie.WatchStateText
             });
     }

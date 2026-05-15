@@ -227,13 +227,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         SearchTypeOptions = [SearchTypeMovie, SearchTypePerson];
         GenreFilterOptions = TmdbGenreMapper.GenreLabels;
         RegionFilterOptions = [FilterAll, "中国大陆", "香港", "台湾", "美国", "日本", "韩国", "英国", "法国", "德国", "印度", "泰国", FilterOther];
-        WatchStatusFilterOptions = [FilterAll, "已入库", "未入库", "已看", "未看", "想看", "喜爱", "不想看"];
+        WatchStatusFilterOptions = [FilterAll, "有播放源", "无播放源", "已看", "未看", "想看", "喜爱", "不想看"];
         SortOptions = [SortRelevance, SortRating, SortPopularity, SortReleaseDate, SortTitle];
         SortDirectionOptions = [DirectionDescending, DirectionAscending];
         DecadeFilterOptions = [DecadeAll, "2020s", "2010s", "2000s", "1990s", "1980s", "1970s", "1960s", DecadeEarlier];
         LanguageFilterOptions = [FilterAll, "中文", "英语", "日语", "韩语", "法语", "德语", "西班牙语", "印地语", "泰语", FilterOther];
         TvGenreFilterOptions = TmdbTvGenreMapper.GenreLabels;
-        TvWatchStatusFilterOptions = [FilterAll, "已入库", "未入库", "有想看 Season", "有喜爱 Season", "有不想看 Season"];
+        TvWatchStatusFilterOptions = [FilterAll, "有播放源", "无播放源", "有想看 Season", "有喜爱 Season", "有不想看 Season"];
         TvSortOptions = [SortRelevance, SortRating, SortPopularity, SortFirstAirYear, SortSeriesName];
         RankingMediaTypeOptions = [DiscoveryMediaTypeMovie, DiscoveryMediaTypeTv];
         RankingTypeOptions = [RankingTypePopular, RankingTypeTopRated, RankingTypeTrending];
@@ -1420,8 +1420,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
         query = SelectedTvWatchStatusFilter switch
         {
-            "已入库" => query.Where(item => item.IsInLibrary),
-            "未入库" => query.Where(item => !item.IsInLibrary),
+            "有播放源" => query.Where(item => item.IsInLibrary),
+            "无播放源" => query.Where(item => !item.IsInLibrary),
             "有想看 Season" => query.Where(item => item.HasWantToWatchSeason),
             "有喜爱 Season" => query.Where(item => item.HasFavoriteSeason),
             "有不想看 Season" => query.Where(item => item.HasNotInterestedSeason),
@@ -1882,8 +1882,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
         query = SelectedWatchStatusFilter switch
         {
-            "已入库" => query.Where(item => item.IsInLibrary),
-            "未入库" => query.Where(item => !item.IsInLibrary),
+            "有播放源" => query.Where(item => item.IsInLibrary),
+            "无播放源" => query.Where(item => !item.IsInLibrary),
             "已看" => query.Where(item => item.IsWatched),
             "未看" => query.Where(item => !item.IsWatched),
             "想看" => query.Where(item => item.IsWantToWatch),
@@ -2088,7 +2088,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
         if (item.TmdbId <= 0)
         {
-            setStatusMessage("缺少 TMDB ID，暂时无法打开未入库详情。");
+            setStatusMessage("缺少 TMDB ID，暂时无法打开无播放源详情。");
             return;
         }
 
@@ -2145,7 +2145,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                 return;
             }
 
-            var message = $"《{item.Title}》尚未入库，TV metadata 暂不可用。";
+            var message = $"《{item.Title}》暂无播放源，TV metadata 暂不可用。";
             SetTvOpenStatusMessage(requestVersion, message);
             await _confirmationDialogService.ConfirmAsync(
                 "电视剧 metadata 不可用",

@@ -13,8 +13,24 @@
 - Discovery browsing may create metadata-only TV rows, but rows with no active Episode source and no Season state are intentionally hidden from the default media-library list.
 - Source-backed Series expand to all known Seasons in batch mode, including source-less Seasons and Season 0.
 - Metadata-only Season watched / unwatched batch operations update TV Episode state only and do not create `WatchHistory`, `MediaFile`, or fake sources.
-- Batch remove skips source-less TV Seasons and not-in-library Movies; batch delete record is the software-record removal path.
+- Phase 4.10.1 originally skipped source-less TV Seasons and not-in-library Movies; Phase 4.10.4 supersedes this with `LibraryVisibilityState.Hidden`, while batch delete record remains the software-record removal path.
 - Automatic cleanup and stale-refresh strategy for metadata-only TV rows remains deferred.
+
+## Phase 4.10.3 Visibility Schema Notes
+
+- `LibraryVisibilityState` exists after Phase 4.10.3 but Discovery does not use it yet.
+- Source-less TV rows opened from Discovery remain metadata-only unless later Phase 4.10.5 add-to-library actions write `Visible`.
+- Discovery add-to-library-specific labels remain deferred until the add-to-library action exists.
+
+## Phase 4.10.4 Visibility Semantics Notes
+
+- Source-less media-library remove now writes `Hidden` and preserves state / metadata.
+- Media-library source-state filters use active source presence instead of old in-library wording.
+- Discovery still does not write `Visible`; add-to-library actions remain deferred to Phase 4.10.5.
+- Phase 4.10.4d changes source-status labels to `有播放源` / `无播放源`; labels that specifically mean added-to-library remain deferred until Phase 4.10.5.
+- Pure visibility-only Movie rows should stay out of movie AI/profile/statistics/recommendation fingerprints and fallback external candidates.
+- Phase 4.10.4f changes remove-from-library to hide-only semantics; it no longer disables active playback sources.
+- Old `MediaFile.IsDeleted` rows created by earlier remove-from-library behavior are not restored automatically because they cannot be safely distinguished from missing files, removed paths, or delete-record cleanup; rescan recovery is a Phase 4.13 validation item.
 
 ## 搜索
 

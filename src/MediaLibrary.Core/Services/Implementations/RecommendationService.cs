@@ -2055,7 +2055,7 @@ public sealed class RecommendationService : IRecommendationService
             libraryItem.Reason = string.IsNullOrWhiteSpace(aiCandidate.Reason)
                 ? libraryItem.Reason
                 : aiCandidate.Reason;
-            libraryItem.ScopeText = "AI 库内推荐";
+            libraryItem.ScopeText = "AI 已有播放源推荐";
             if (userState is not null)
             {
                 libraryItem.IsWantToWatch = userState.IsWantToWatch;
@@ -2091,8 +2091,8 @@ public sealed class RecommendationService : IRecommendationService
             IsWatched = userState?.IsWatched == true,
             IsWantToWatch = userState?.IsWantToWatch == true,
             IsNotInterested = userState?.IsNotInterested == true,
-            ScopeText = "AI 库外推荐",
-            AvailabilityText = "未入库",
+            ScopeText = "AI 外部候选",
+            AvailabilityText = "外部候选",
             WatchStateText = userState?.IsWatched == true ? "已看" : "未看",
             Reason = string.IsNullOrWhiteSpace(aiCandidate.Reason)
                 ? "基于你的已看记录生成，可作为后续入库候选。"
@@ -2119,8 +2119,8 @@ public sealed class RecommendationService : IRecommendationService
             SceneTagsText = AiTagVocabulary.NormalizeText(movie.SceneTagsText, AiTagVocabulary.SceneTags),
             IsInLibrary = true,
             IsWatched = movie.IsWatched,
-            ScopeText = "库内推荐",
-            AvailabilityText = "已在网盘",
+            ScopeText = "已有播放源推荐",
+            AvailabilityText = "有播放源",
             WatchStateText = movie.IsWatched ? "已看" : "未看",
             Reason = movie.IsFavorite
                 ? "你已标记喜爱，适合再次观看或优先补完。"
@@ -2156,8 +2156,8 @@ public sealed class RecommendationService : IRecommendationService
             IsWatched = source.IsWatched,
             IsWantToWatch = source.IsWantToWatch,
             IsNotInterested = source.IsNotInterested,
-            ScopeText = source.IsInLibrary ? "库内推荐" : "库外收藏",
-            AvailabilityText = source.IsInLibrary ? "已在网盘" : "未入库",
+            ScopeText = source.IsInLibrary ? "已有播放源推荐" : "外部状态候选",
+            AvailabilityText = source.IsInLibrary ? "有播放源" : "外部候选",
             WatchStateText = source.IsWatched ? "已看" : "未看",
             Reason = source.IsInLibrary
                 ? source.IsFavorite
@@ -2166,8 +2166,8 @@ public sealed class RecommendationService : IRecommendationService
                         ? "已标记为已看，可作为复看或延伸选择。"
                         : "基于当前片库类型、评分和观看状态推荐。"
                 : source.IsWantToWatch
-                    ? "你已加入想看，当前筛选条件下可作为库外候选。"
-                    : "来自库外用户状态，当前筛选条件下可作为推荐候选。"
+                    ? "你已加入想看，当前筛选条件下可作为外部候选。"
+                    : "来自外部用户状态，当前筛选条件下可作为推荐候选。"
         };
     }
 
@@ -2338,6 +2338,7 @@ public sealed class RecommendationService : IRecommendationService
     {
         return await dbContext.UserMovieCollectionItems
             .AsNoTracking()
+            .Where(x => x.IsInLibrary || x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
             .Select(
                 x => new UserMovieState
                 {
@@ -2382,6 +2383,11 @@ public sealed class RecommendationService : IRecommendationService
     private static bool IsReliableUserMovieStateIdentity(UserMovieState state)
     {
         return state.TmdbId.HasValue && state.TmdbId.Value > 0;
+    }
+
+    private static bool HasMeaningfulUserMovieState(UserMovieState state)
+    {
+        return state.IsInLibrary || state.IsWatched || state.IsWantToWatch || state.IsNotInterested;
     }
 
     private static void ApplyUserCollectionFlags(
@@ -4443,6 +4449,7 @@ public sealed class RecommendationService : IRecommendationService
             .ToList();
         var reliableUserStates = userStates
             .Where(x => IsReliableUserMovieStateIdentity(x) || x.IsNotInterested && HasNotInterestedIdentity(x))
+            .Where(HasMeaningfulUserMovieState)
             .ToList();
         if (reliableLibraryMovies.Count == 0 && reliableUserStates.Count == 0)
         {

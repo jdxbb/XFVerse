@@ -75,7 +75,7 @@ public sealed class TvSeriesSeasonListItem
 
     public string ProgressText => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}";
 
-    public string InLibraryText => HasPlayableSource ? $"已入库 {InLibraryEpisodeCount} 集" : "暂无播放源";
+    public string InLibraryText => HasPlayableSource ? $"有播放源 {InLibraryEpisodeCount} 集" : "暂无播放源";
 
     public string AirDateText => AirDate.HasValue
         ? AirDate.Value.ToString("yyyy-MM-dd")

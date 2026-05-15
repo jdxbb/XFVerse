@@ -117,11 +117,48 @@
 - Discovery-hydrated TV metadata remains allowed, but pure metadata-only Series with no active Episode source and no Season state no longer pollute the default media-library list.
 - Source-backed Series still appear normally and expand into all known Seasons in batch mode.
 - Metadata-only Seasons with explicit user state can be surfaced in library-related views and participate in watched / unwatched batch operations.
-- Batch remove skips source-less TV Seasons and not-in-library Movies with a no-source message.
+- Phase 4.10.1 originally skipped source-less TV Seasons and not-in-library Movies with a no-source message; Phase 4.10.4 supersedes this with `LibraryVisibilityState.Hidden`.
 - Batch delete record remains software-record deletion only and does not delete local or WebDAV files.
 - Movie search, Movie rankings, TV search, TV rankings, and AI recommendations remain separated by media type.
 - Did not add a migration.
 - Did not execute database update.
+
+## Phase 4.10.3 Library Visibility Schema
+
+- Added `LibraryVisibilityState` as schema-only groundwork for source-less media-library visibility.
+- Added the field to Movie and TV Season user-state rows with `Auto = 0` default.
+- Discovery behavior is unchanged: opening not-in-library TV hydrates metadata but does not mark rows `Visible`.
+- Discovery labels and filters are unchanged in this phase.
+- AI recommendations and recommendation fingerprints are unchanged.
+- Database update was not executed.
+
+## Phase 4.10.4 Media Library Visibility Semantics
+
+- Connected `LibraryVisibilityState` to media-library query and remove behavior.
+- Media-library filters now separate visible rows by active source state: all visible, with active source, without active source.
+- Source-less Movie / TV Season remove writes `Hidden` instead of skipping.
+- Source-backed remove still removed app source rows in Phase 4.10.4; Phase 4.10.4f supersedes this with hide-only behavior.
+- Discovery remains metadata-only for not-in-library TV clicks and does not write `Visible`.
+- AI recommendations, Watch Insights, and recommendation fingerprints are unchanged.
+- No new migration was added.
+- Database update was not executed.
+
+## Phase 4.10.4d Visibility Tail Bugfix
+
+- Discovery search / ranking filters now use source wording: `全部`, `有播放源`, and `无播放源`.
+- Discovery Movie and TV cards now show `有播放源` / `无播放源` as source status.
+- Add-to-library-specific Discovery wording remains deferred until Phase 4.10.5.
+- Pure visibility-only Movie rows are filtered out of movie AI/profile/statistics/recommendation fingerprints and fallback external candidates.
+- Real-state source-less Movie rows remain eligible movie preference inputs.
+- TV remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+
+## Phase 4.10.4f Hide Library Items Without Removing Sources
+
+- Movie and TV Season remove-from-library now writes `LibraryVisibilityState.Hidden` only.
+- Active Movie and Episode `MediaFile` rows are not marked deleted by remove-from-library.
+- Hidden source-backed rows are excluded from media-library `全部`, `有播放源`, and `无播放源`.
+- Discovery remains source-oriented and can still show Hidden source-backed items as `有播放源`.
+- Old `IsDeleted` source rows are not automatically restored; rescanning existing files remains the safe recovery path to verify later.
 
 ## FD-2.1 / FD-2.2 Final Log Audit
 

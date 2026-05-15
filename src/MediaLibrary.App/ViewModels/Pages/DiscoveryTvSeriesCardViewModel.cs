@@ -173,11 +173,11 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
 
     public string OverviewText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
 
-    public string AvailabilityText => IsInLibrary ? "已入库" : "未入库";
+    public string AvailabilityText => IsInLibrary ? "有播放源" : "无播放源";
 
     public string LibraryStatusText => IsInLibrary
-        ? InLibrarySeasonCount > 0 ? $"已入库 {InLibrarySeasonCount} 季" : "已入库"
-        : "未入库";
+        ? InLibrarySeasonCount > 0 ? $"有播放源 {InLibrarySeasonCount} 季" : "有播放源"
+        : "无播放源";
 
     public string SeasonCountText
     {

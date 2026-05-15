@@ -1,4 +1,5 @@
 using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -39,6 +40,10 @@ public sealed class UserMovieCollectionItemConfiguration : IEntityTypeConfigurat
 
         builder.Property(x => x.OmdbSourceUrl)
             .HasMaxLength(1024);
+
+        builder.Property(x => x.LibraryVisibilityState)
+            .HasConversion<int>()
+            .HasDefaultValue(LibraryVisibilityState.Auto);
 
         builder.HasOne<Movie>()
             .WithMany()

@@ -117,16 +117,16 @@
                         <TextBlock Text="范围" Style="{StaticResource BodyMutedTextStyle}" />
                         <Menu>
                             <MenuItem Header="{Binding LibraryScopeMenuHeader}">
-                                <MenuItem Header="影片范围">
+                                <MenuItem Header="播放源状态">
                                     <MenuItem Header="全部"
                                               Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
                                               CommandParameter="全部" />
-                                    <MenuItem Header="库内"
+                                    <MenuItem Header="有播放源"
                                               Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
-                                              CommandParameter="库内" />
-                                    <MenuItem Header="库外"
+                                              CommandParameter="有播放源" />
+                                    <MenuItem Header="无播放源"
                                               Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
-                                              CommandParameter="库外" />
+                                              CommandParameter="无播放源" />
                                 </MenuItem>
                                 <Separator />
                                 <MenuItem Header="影片来源">
@@ -408,7 +408,7 @@
                                                         <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsInLibrary}" Value="False">
+                                                                <DataTrigger Binding="{Binding HasActiveSource}" Value="False">
                                                                     <Setter Property="Visibility" Value="Visible" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
@@ -416,7 +416,7 @@
                                                     </Border.Style>
                                                     <TextBlock Foreground="{DynamicResource BrushForegroundPrimary}"
                                                                FontWeight="SemiBold"
-                                                               Text="未入库" />
+                                                               Text="暂无播放源" />
                                                 </Border>
                                                 <Button HorizontalAlignment="Right"
                                                         VerticalAlignment="Top"
@@ -508,12 +508,12 @@
                                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
                                         <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
                                         <TextBlock Margin="0,4,0,0"
-                                                   Text="未入库">
+                                                   Text="暂无播放源">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsInLibrary}" Value="False">
+                                                        <DataTrigger Binding="{Binding HasActiveSource}" Value="False">
                                                             <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
                                                     </Style.Triggers>

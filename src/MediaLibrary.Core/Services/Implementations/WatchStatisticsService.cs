@@ -235,8 +235,11 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .Select(x => (DateTime?)x.CreatedAt)
             .MaxAsync(cancellationToken);
 
-        var collectionItemCount = await dbContext.UserMovieCollectionItems.AsNoTracking().CountAsync(cancellationToken);
-        var collectionItemMaxUpdatedAt = await dbContext.UserMovieCollectionItems
+        var meaningfulCollectionItems = dbContext.UserMovieCollectionItems
+            .AsNoTracking()
+            .Where(x => x.IsInLibrary || x.IsWatched || x.IsWantToWatch || x.IsNotInterested);
+        var collectionItemCount = await meaningfulCollectionItems.CountAsync(cancellationToken);
+        var collectionItemMaxUpdatedAt = await meaningfulCollectionItems
             .AsNoTracking()
             .Select(x => (DateTime?)x.UpdatedAt)
             .MaxAsync(cancellationToken);
@@ -464,6 +467,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .AsNoTracking()
             .Where(x => x.TmdbId.HasValue
                 && x.TmdbId.Value > 0
+                && (x.IsInLibrary || x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
                 && !string.IsNullOrWhiteSpace(x.Title)
                 && (!x.MovieId.HasValue
                     || dbContext.Movies.Any(movie => movie.Id == x.MovieId.Value

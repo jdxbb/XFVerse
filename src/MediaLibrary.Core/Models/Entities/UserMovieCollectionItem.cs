@@ -1,3 +1,5 @@
+using MediaLibrary.Core.Models.Enums;
+
 namespace MediaLibrary.Core.Models.Entities;
 
 public sealed class UserMovieCollectionItem
@@ -49,6 +51,8 @@ public sealed class UserMovieCollectionItem
     public bool IsNotInterested { get; set; }
 
     public bool IsInLibrary { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

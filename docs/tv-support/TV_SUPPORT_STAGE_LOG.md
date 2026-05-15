@@ -474,7 +474,7 @@ Implemented scope:
 - A metadata-only Series without playback sources exposes only Seasons with user state in batch mode, limiting default library pollution.
 - Season user state now includes collection flags plus explicit watched / unwatched state history, so manually marked metadata-only Seasons can remain visible.
 - Metadata-only Seasons can be batch marked watched / unwatched; the operation updates Episode watched state and does not create `WatchHistory`, `MediaFile`, or fake sources.
-- Batch remove skips metadata-only Seasons and not-in-library Movies with `暂无播放源可移出` instead of deleting records.
+- Phase 4.10.1 originally skipped metadata-only Seasons and not-in-library Movies with a no-source message; Phase 4.10.4 supersedes this with `LibraryVisibilityState.Hidden`.
 - Batch delete record keeps the existing software-record deletion behavior and is documented as not deleting local or WebDAV files.
 - Batch toolbar remains limited to watched, unwatched, remove, and delete-record actions.
 - TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
@@ -508,3 +508,140 @@ Implemented scope:
 23. TV state does not enter AI recommendation or recommendation fingerprints.
 24. Delete record does not delete local or WebDAV files.
 25. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10.3 - Library Visibility State Schema
+
+Implemented scope:
+
+- Added `LibraryVisibilityState` enum with `Auto = 0`, `Visible = 1`, and `Hidden = 2`.
+- Added `LibraryVisibilityState` to `UserMovieCollectionItem`.
+- Added `LibraryVisibilityState` to `UserTvSeasonCollectionItem`.
+- Added EF defaults so both columns are stored as `INTEGER NOT NULL DEFAULT 0`.
+- Added `AddLibraryVisibilityState` migration.
+- Kept `UserMovieCollectionItem.IsInLibrary` unchanged.
+- Did not change media-library filters, batch remove behavior, add-to-library UI, Discovery wording, Favorites, Home, Watch History, AI recommendations, Watch Insights, or recommendation fingerprints.
+- Did not execute database update.
+
+## Phase 4.10.3 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. `LibraryVisibilityState` enum exists.
+3. `UserMovieCollectionItem` exposes `LibraryVisibilityState`.
+4. `UserTvSeasonCollectionItem` exposes `LibraryVisibilityState`.
+5. The default value is `Auto = 0`.
+6. The migration only adds two `LibraryVisibilityState` columns.
+7. `AppDbContextModelSnapshot` includes both new columns.
+8. `UserMovieCollectionItem.IsInLibrary` is not removed or redefined.
+9. Media-library filter behavior is unchanged in this phase.
+10. Source-less remove behavior is unchanged in this phase.
+11. Add-to-library buttons are not added in this phase.
+12. AI recommendations, Watch Insights, and recommendation fingerprints are unchanged in this phase.
+13. Follow-up phases remain Phase 4.10.4 for filter / remove semantics and Phase 4.10.5 for add-to-library actions.
+
+## Phase 4.10.4 - Media Library Source Visibility Semantics
+
+Implemented scope:
+
+- Media-library filter wording now uses source-state terminology: `全部`, `有播放源`, `无播放源`.
+- Library read models expose `HasActiveSource`, `ActiveSourceCount`, `IsVisibleInLibrary`, and `LibraryVisibilityState`.
+- Movie visibility resolved from active source first in Phase 4.10.4; Phase 4.10.4f supersedes this so `Hidden` has priority over active source.
+- TV Season visibility uses current `UserTvSeasonCollectionItem` flags and Episode watched state; `UserTvSeasonStateChangeHistory` is no longer used as current visibility input.
+- TV Series visibility is aggregated from source-backed or visible Seasons; Episodes remain detail/playback units only.
+- Source-less Movie and Season remove writes `LibraryVisibilityState.Hidden`, preserving state and metadata.
+- Source-backed Movie and Season remove kept the existing source-removal path in Phase 4.10.4; Phase 4.10.4f supersedes this with hide-only behavior.
+- Batch remove no longer skips source-less Movies / Seasons with a no-source message.
+- Delete-record behavior remains separate and is still the metadata/state cleanup path.
+- Favorites, Home, Watch History, AI recommendations, Watch Insights, and recommendation fingerprints were not intentionally changed.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.4 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.10.4 migration is created.
+3. Media-library filter labels are `全部`, `有播放源`, `无播放源`.
+4. `有播放源` filters by active video `MediaFile` presence.
+5. `无播放源` filters visible rows with no active video source.
+6. Pure metadata-only, no-state, `Auto` TV remains hidden from media-library lists.
+7. `Visible` source-less Movie / Season rows are query-visible when present.
+8. `Hidden` source-less Movie / Season rows are media-library hidden.
+9. Source-less Season remove writes `Hidden`.
+10. Source-less Season remove preserves state and metadata.
+11. Source-less Movie remove writes `Hidden`.
+12. Source-backed Movie / Season remove does not delete physical files.
+13. Superseded by Phase 4.10.4f: source-backed rows are hidden without source removal.
+14. Delete record remains the app-record cleanup path.
+15. Favorites are not filtered by `Hidden`.
+16. Watch History is not filtered by `Hidden`.
+17. Batch toolbar remains limited to watched, unwatched, remove, and delete-record.
+18. Batch remove source-less rows hides them instead of skipping them.
+19. TV remains excluded from Watch Insights / AI / recommendation fingerprints.
+20. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10.4d - Visibility Tail Bugfix
+
+Implemented scope:
+
+- Media-library cards and list labels no longer use `未入库` for visible source-less rows; they use `暂无播放源` / source summaries instead.
+- TV source labels in Series and Season detail read models use `有播放源 N 集` or `暂无播放源`.
+- Discovery search / ranking source filters and card badges use `有播放源` / `无播放源` instead of old in-library wording.
+- Recommendation UI wording was lightly relabeled to existing-source / external-candidate terminology without changing the recommendation algorithm.
+- Positive state writes clear `LibraryVisibilityState.Hidden` back to `Auto` for Movie and TV Season: want-to-watch true, favorite true, not-interested true, and watched true.
+- Mark-unwatched and cancel-state writes do not clear `Hidden`.
+- Movie-only AI/profile/statistics/recommendation input loaders ignore pure visibility-only Movie rows that have no source and no explicit user state.
+- Favorites remains a state view; Movie rows with a local `MovieId` navigate to `MovieDetail` even when they are not media-library-visible.
+- TV remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.4d Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.10.4d migration is created.
+3. Media-library cards / lists do not show `未入库` for source-less visible rows.
+4. Source-less visible rows show `无播放源` / `暂无播放源`.
+5. Discovery source filters do not show `库内` / `库外`.
+6. Discovery cards do not show `已入库` / `未入库` as source status.
+7. Hidden Movie rows re-enter media library after want-to-watch / favorite / not-interested / watched is set true.
+8. Hidden Season rows re-enter media library after want-to-watch / favorite / not-interested / watched is set true.
+9. Mark-unwatched and cancel-state operations do not clear `Hidden`.
+10. Batch watched clears `Hidden`; batch unwatched does not.
+11. Hidden favorite / want-to-watch rows remain visible in Favorites.
+12. Favorites Movie rows with local `MovieId` open `MovieDetail`.
+13. Pure visibility-only Movie rows do not enter movie AI/profile/statistics/recommendation fingerprints.
+14. Real-state source-less Movie rows remain eligible for movie AI/profile/recommendation inputs.
+15. TV still does not enter AI / Watch Insights / recommendation fingerprints.
+16. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10.4f - Hide Library Items Without Removing Sources
+
+Implemented scope:
+
+- Movie remove-from-library now writes `LibraryVisibilityState.Hidden` through the user collection state row and does not mark active `MediaFile` rows deleted.
+- Movie remove-from-library does not reset `DefaultMediaFileId`, clear user state, delete metadata, delete history, or delete local / WebDAV files.
+- TV Season remove-from-library now writes `LibraryVisibilityState.Hidden` and does not mark Episode `MediaFile` rows deleted.
+- Media-library query visibility resolves `Hidden` before active source, so hidden source-backed Movies and Seasons are excluded from `全部`, `有播放源`, and `无播放源`.
+- TV Series aggregation only counts visible Seasons for media-library source counts; Hidden source-backed Seasons do not keep a Series visible.
+- Batch remove wording reports items hidden from the media library rather than source-less items skipped or playback sources removed.
+- Favorites, Watch History, detail pages, playback, scanning, and Discovery were not changed to filter by `Hidden`.
+- Existing `MediaFile.IsDeleted` records are not restored.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.4f Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.10.4f migration is created.
+3. Source-backed Movie remove hides the Movie from media-library lists.
+4. Source-backed Movie remove leaves active `MediaFile` rows active.
+5. Source-backed Movie remove preserves state, metadata, history, and files.
+6. Source-backed TV Season remove hides the Season / Series from media-library lists when no visible Season remains.
+7. Source-backed TV Season remove leaves Episode `MediaFile` rows active.
+8. Hidden source-backed rows are excluded from `全部`.
+9. Hidden source-backed rows are excluded from `有播放源`.
+10. Hidden source-backed rows are excluded from `无播放源`.
+11. Favorites can still show Hidden state rows.
+12. Detail pages and playback continue to depend on active source rows, not media-library visibility.
+13. Delete record remains the software-record cleanup path and does not delete physical files.
+14. Old `IsDeleted` rows are not automatically restored; rescanning existing files is the recovery path to validate in Phase 4.13.
+15. Documents and reports do not include secrets or private media locations.

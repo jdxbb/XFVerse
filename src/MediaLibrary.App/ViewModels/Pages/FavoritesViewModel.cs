@@ -280,7 +280,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
             return;
         }
 
-        if (movie.IsInLibrary && movie.MovieId.HasValue)
+        if (!movie.IsTvSeason && movie.MovieId is > 0)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId.Value);
             return;

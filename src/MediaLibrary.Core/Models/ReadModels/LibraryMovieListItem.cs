@@ -78,9 +78,17 @@ public sealed class LibraryMovieListItem
 
     public int SourceCount { get; set; }
 
+    public int ActiveSourceCount { get; set; }
+
+    public bool HasActiveSource { get; set; }
+
     public bool HasLocalSource { get; set; }
 
     public bool HasWebDavSource { get; set; }
+
+    public bool IsVisibleInLibrary { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
     public bool HasLibraryContext { get; set; }
 
@@ -90,9 +98,9 @@ public sealed class LibraryMovieListItem
     {
         get
         {
-            if (!IsInLibrary)
+            if (!HasActiveSource)
             {
-                return IsSeries || IsSeason ? "暂无播放源" : "未入库";
+                return "暂无播放源";
             }
 
             return (HasLocalSource, HasWebDavSource) switch
@@ -135,10 +143,10 @@ public sealed class LibraryMovieListItem
     public string ProgressSummary => ItemKind switch
     {
         LibraryMediaItemKind.Series => SeasonCount > 0
-            ? $"{SeasonCount} 季 · 已入库 {InLibraryEpisodeCount} 集"
-            : $"已入库 {InLibraryEpisodeCount} 集",
+            ? $"{SeasonCount} 季 · 有播放源 {InLibraryEpisodeCount} 集"
+            : $"有播放源 {InLibraryEpisodeCount} 集",
         LibraryMediaItemKind.Season => InLibraryEpisodeCount > 0
-            ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 已入库 {InLibraryEpisodeCount} 集"
+            ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 有播放源 {InLibraryEpisodeCount} 集"
             : $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 暂无播放源",
         _ => SourceSummary
     };

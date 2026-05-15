@@ -1,3 +1,5 @@
+using MediaLibrary.Core.Models.Enums;
+
 namespace MediaLibrary.Core.Models.Entities;
 
 public sealed class UserTvSeasonCollectionItem
@@ -39,6 +41,8 @@ public sealed class UserTvSeasonCollectionItem
     public bool IsWantToWatch { get; set; }
 
     public bool IsNotInterested { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

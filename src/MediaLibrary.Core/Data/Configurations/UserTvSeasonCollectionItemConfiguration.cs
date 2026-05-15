@@ -1,4 +1,5 @@
 using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -36,6 +37,10 @@ public sealed class UserTvSeasonCollectionItemConfiguration : IEntityTypeConfigu
 
         builder.Property(x => x.Language)
             .HasMaxLength(120);
+
+        builder.Property(x => x.LibraryVisibilityState)
+            .HasConversion<int>()
+            .HasDefaultValue(LibraryVisibilityState.Auto);
 
         builder.HasOne<TvSeason>()
             .WithMany(x => x.CollectionItems)

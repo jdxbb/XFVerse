@@ -197,6 +197,7 @@ public sealed class UserCollectionService : IUserCollectionService
         entity.IsNotInterested = false;
         entity.IsWatched = recommendation.IsWatched;
         entity.IsInLibrary = recommendation.IsInLibrary;
+        RestoreAutoVisibilityForPositiveState(entity, isPositiveState: true);
         entity.UpdatedAt = now;
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
             dbContext,
@@ -309,6 +310,7 @@ public sealed class UserCollectionService : IUserCollectionService
             entity.IsWantToWatch = false;
         }
 
+        RestoreAutoVisibilityForPositiveState(entity, isWatched);
         entity.UpdatedAt = now;
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
             dbContext,
@@ -440,6 +442,7 @@ public sealed class UserCollectionService : IUserCollectionService
             entity.IsWantToWatch = false;
         }
 
+        RestoreAutoVisibilityForPositiveState(entity, isNotInterested);
         entity.UpdatedAt = now;
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
             dbContext,
@@ -510,6 +513,7 @@ public sealed class UserCollectionService : IUserCollectionService
             movie.UpdatedAt = now;
         }
 
+        RestoreAutoVisibilityForPositiveState(entity, isNotInterested);
         entity.UpdatedAt = now;
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
             dbContext,
@@ -547,6 +551,37 @@ public sealed class UserCollectionService : IUserCollectionService
         CleanupCollectionEntityIfEmpty(dbContext, entity);
         await dbContext.SaveChangesAsync(cancellationToken);
         WriteNotInterestedStateLog(isNotInterested ? "recommendation-not-interested-marked" : "recommendation-not-interested-unmarked", entity);
+    }
+
+    public async Task HideFromLibraryAsync(
+        AiRecommendationItem recommendation,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        if (entity is null)
+        {
+            entity = new UserMovieCollectionItem
+            {
+                CreatedAt = now
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
+            ApplyRecommendationSnapshot(entity, recommendation);
+            entity.IsWatched = recommendation.IsWatched;
+            entity.IsWantToWatch = recommendation.IsWantToWatch;
+            entity.IsNotInterested = recommendation.IsNotInterested;
+        }
+
+        entity.IsInLibrary = false;
+        entity.LibraryVisibilityState = LibraryVisibilityState.Hidden;
+        entity.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        AiPerfDiagnostics.WriteEvent(
+            $"event=library-hide-external-movie title=\"{SanitizeLogText(entity.Title)}\" year={FormatOptional(entity.ReleaseYear)} source={SanitizeLogText(changeSource, 32)}");
     }
 
     public async Task<bool> IsNotInterestedAsync(
@@ -823,9 +858,20 @@ public sealed class UserCollectionService : IUserCollectionService
 
     private static void CleanupCollectionEntityIfEmpty(AppDbContext dbContext, UserMovieCollectionItem entity)
     {
-        if (!entity.IsWatched && !entity.IsWantToWatch && !entity.IsNotInterested)
+        if (!entity.IsWatched
+            && !entity.IsWantToWatch
+            && !entity.IsNotInterested
+            && entity.LibraryVisibilityState == LibraryVisibilityState.Auto)
         {
             dbContext.UserMovieCollectionItems.Remove(entity);
+        }
+    }
+
+    private static void RestoreAutoVisibilityForPositiveState(UserMovieCollectionItem entity, bool isPositiveState)
+    {
+        if (isPositiveState && entity.LibraryVisibilityState == LibraryVisibilityState.Hidden)
+        {
+            entity.LibraryVisibilityState = LibraryVisibilityState.Auto;
         }
     }
 

@@ -326,7 +326,7 @@
                                 </StackPanel>
 
                                 <StackPanel Width="150" Margin="0,0,12,12">
-                                    <TextBlock Text="入库状态" Style="{StaticResource BodyMutedTextStyle}" />
+                                    <TextBlock Text="播放源状态" Style="{StaticResource BodyMutedTextStyle}" />
                                     <ComboBox ItemsSource="{Binding TvWatchStatusFilterOptions}"
                                               SelectedItem="{Binding SelectedTvWatchStatusFilter}"
                                               Style="{StaticResource FormComboBoxStyle}" />

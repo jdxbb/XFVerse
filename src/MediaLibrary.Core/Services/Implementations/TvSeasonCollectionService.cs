@@ -160,6 +160,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             if (isWatched)
             {
                 item.IsWantToWatch = false;
+                RestoreAutoVisibilityForPositiveState(item, isPositiveState: true);
             }
             else
             {
@@ -249,6 +250,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                 item.IsWantToWatch = false;
             }
 
+            RestoreAutoVisibilityForPositiveState(item, isWatched);
             item.UpdatedAt = now;
         }
 
@@ -272,25 +274,26 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
     public async Task RemoveFromLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
-        var season = await dbContext.TvSeasons.FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
+        var season = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
             ?? throw new InvalidOperationException("电视剧季不存在。");
         var now = DateTime.UtcNow;
-        var mediaFiles = await dbContext.MediaFiles
-            .Where(
-                x => x.EpisodeId.HasValue
-                     && x.Episode != null
-                     && x.Episode.TvSeasonId == tvSeasonId
-                     && x.MediaType == MediaType.Video
-                     && !x.IsDeleted)
-            .ToListAsync(cancellationToken);
 
-        foreach (var mediaFile in mediaFiles)
+        var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
+        if (item is null)
         {
-            mediaFile.IsDeleted = true;
-            mediaFile.UpdatedAt = now;
+            item = new UserTvSeasonCollectionItem
+            {
+                CreatedAt = now
+            };
+            dbContext.UserTvSeasonCollectionItems.Add(item);
         }
 
-        season.UpdatedAt = now;
+        ApplySeasonSnapshot(item, season);
+        item.LibraryVisibilityState = LibraryVisibilityState.Hidden;
+        item.UpdatedAt = now;
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -453,6 +456,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                 break;
         }
 
+        RestoreAutoVisibilityForPositiveState(item, newValue);
         item.UpdatedAt = now;
         RecordStateChange(dbContext, season, item, StateFavorite, oldFavorite, item.IsFavorite, changeSource, now);
         RecordStateChange(dbContext, season, item, StateWantToWatch, oldWantToWatch, item.IsWantToWatch, changeSource, now);
@@ -570,9 +574,20 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
 
     private static void CleanupCollectionEntityIfEmpty(AppDbContext dbContext, UserTvSeasonCollectionItem entity)
     {
-        if (!entity.IsFavorite && !entity.IsWantToWatch && !entity.IsNotInterested)
+        if (!entity.IsFavorite
+            && !entity.IsWantToWatch
+            && !entity.IsNotInterested
+            && entity.LibraryVisibilityState == LibraryVisibilityState.Auto)
         {
             dbContext.UserTvSeasonCollectionItems.Remove(entity);
+        }
+    }
+
+    private static void RestoreAutoVisibilityForPositiveState(UserTvSeasonCollectionItem entity, bool isPositiveState)
+    {
+        if (isPositiveState && entity.LibraryVisibilityState == LibraryVisibilityState.Hidden)
+        {
+            entity.LibraryVisibilityState = LibraryVisibilityState.Auto;
         }
     }
 

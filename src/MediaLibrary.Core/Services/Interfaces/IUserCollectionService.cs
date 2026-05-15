@@ -16,6 +16,8 @@ public interface IUserCollectionService
 
     Task SetNotInterestedAsync(int movieId, bool isNotInterested, CancellationToken cancellationToken = default, string changeSource = "Manual");
 
+    Task HideFromLibraryAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default, string changeSource = "Manual");
+
     Task<bool> IsNotInterestedAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<NotInterestedMovieKey>> GetNotInterestedKeysAsync(CancellationToken cancellationToken = default);

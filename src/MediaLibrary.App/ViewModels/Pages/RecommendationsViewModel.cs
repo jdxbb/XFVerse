@@ -37,7 +37,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IRecommendationPreferenceService _recommendationPreferenceService;
     private int _batchSeed;
-    private string _selectedLibraryScope = "仅库外";
+    private string _selectedLibraryScope = "仅外部候选";
     private string _selectedWatchFilter = "未看";
     private string _statusMessage = "AI 推荐会基于你的已看记录生成。";
     private string _refreshBatchButtonText = RefreshBatchText;
@@ -62,7 +62,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
         IRecommendationPreferenceService recommendationPreferenceService)
-        : base("AI 推荐", "基于已看记录生成 3 部推荐，并标明库内 / 库外。")
+        : base("AI 推荐", "基于已看记录生成 3 部推荐，并标明已有播放源 / 外部候选。")
     {
         _recommendationService = recommendationService;
         _userCollectionService = userCollectionService;
@@ -85,7 +85,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     public ObservableCollection<AiRecommendationItem> Recommendations { get; } = [];
 
-    public IReadOnlyList<string> LibraryScopeOptions { get; } = ["不区分库内外", "仅库内", "仅库外"];
+    public IReadOnlyList<string> LibraryScopeOptions { get; } = ["不区分来源", "仅已有播放源", "仅外部候选"];
 
     public IReadOnlyList<string> WatchFilterOptions { get; } = ["全部", "已看", "未看"];
 
@@ -726,14 +726,14 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
         if (Recommendations.Count == 0)
         {
-            if (SelectedLibraryScope == "仅库外" && SelectedWatchFilter == "已看")
+            if (SelectedLibraryScope == "仅外部候选" && SelectedWatchFilter == "已看")
             {
-                return "仅库外 + 已看的筛选条件下没有可推荐影片；只有已标记已看的库外影片会进入该组合。";
+                return "仅外部候选 + 已看的筛选条件下没有可推荐影片；只有已标记已看的外部候选影片会进入该组合。";
             }
 
-            if (SelectedLibraryScope == "仅库内" && SelectedWatchFilter == "未看")
+            if (SelectedLibraryScope == "仅已有播放源" && SelectedWatchFilter == "未看")
             {
-                return "库内未看影片不足，建议切换到不区分库内外。";
+                return "已有播放源的未看影片不足，建议切换到不区分来源。";
             }
 
             return SelectedWatchFilter switch
@@ -1426,8 +1426,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     {
         return SelectedLibraryScope switch
         {
-            "仅库内" => RecommendationLibraryScope.InLibraryOnly,
-            "仅库外" => RecommendationLibraryScope.OutsideLibraryOnly,
+            "仅已有播放源" => RecommendationLibraryScope.InLibraryOnly,
+            "仅外部候选" => RecommendationLibraryScope.OutsideLibraryOnly,
             _ => RecommendationLibraryScope.All
         };
     }
