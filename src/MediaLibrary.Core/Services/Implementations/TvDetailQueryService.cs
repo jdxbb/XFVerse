@@ -319,6 +319,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         {
             SeasonId = season.Id,
             SeriesId = season.TvSeriesId,
+            TmdbSeriesId = season.SeriesTmdbId,
             SeasonNumber = season.SeasonNumber,
             SeriesName = season.SeriesName,
             SeriesOriginalName = season.SeriesOriginalName ?? string.Empty,

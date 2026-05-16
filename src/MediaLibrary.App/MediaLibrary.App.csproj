@@ -15,7 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\WatchPersonas\**\*.*" />
+    <Content Include="Assets\WatchPersonas\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Assets\WatchPersonas\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

@@ -20,6 +20,7 @@
 - No known Phase 4.10.4f blocker after changing remove-from-library to hide-only semantics; build verification remains the gate.
 - No known Phase 4.10.5 blocker after adding explicit add / restore visibility actions; build verification remains the gate.
 - No known Phase 4.10.5b blocker after source / state-aware restore and SeriesOverview action consistency fixes; build verification remains the gate.
+- No known Phase 4.10.6 blocker after summary-first TV Discovery navigation and Season-level Episode hydration; build verification remains the gate.
 
 ## Deferred
 
@@ -45,7 +46,6 @@
 - TV AI support remains a Phase 5 candidate and should not be folded into Phase 4.
 - Automatic cleanup for metadata-only TV rows created by discovery browsing remains deferred after Phase 4.10.1.
 - More granular metadata-only TV library filters remain deferred; Phase 4.10.1 keeps default visibility conservative.
-- TV metadata hydration progressive loading remains deferred to Phase 4.10.6.
 - A future explicit remove-source action may be needed if users need to detach playback sources without deleting full software records.
 
 ## Noise
@@ -75,3 +75,4 @@
 - Phase 4.10.4f does not restore old `MediaFile.IsDeleted` rows created by earlier remove-from-library behavior, because those rows cannot be safely separated from missing-file, removed-path, or delete-record history. If files still exist, rescan recovery should be verified in Phase 4.13.
 - Phase 4.10.5 add-to-library writes `Visible` as media-library visibility only; it intentionally does not create playback sources, set preference state, restore old `IsDeleted` rows, or include TV in AI / Watch Insights.
 - Phase 4.10.5b supersedes Phase 4.10.5 restore behavior: removed-library restore writes `Auto` when active source or real current state exists, and writes `Visible` only for source-less no-state rows.
+- Phase 4.10.6 changes TV Discovery navigation to summary-first hydration. Full Episode metadata can complete later in `SeriesOverviewPage` background hydration or on demand in `TvSeasonDetailPage`.

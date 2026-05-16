@@ -493,7 +493,7 @@ Phase 4.10.4 connects `LibraryVisibilityState` to media-library query and remove
 
 - Phase 4.10.5 will add explicit add-to-library actions that write `Visible`.
 - Add-to-library-specific actions are implemented in Phase 4.10.5 and write `LibraryVisibilityState.Visible`.
-- TV metadata hydration loading optimization remains Phase 4.10.6.
+- TV metadata hydration loading optimization is handled by Phase 4.10.6.
 - TV correction entry UI remains Phase 4.11.
 
 ## Phase 4.10.4d Goal
@@ -552,7 +552,21 @@ Phase 4.10.5b refines restore semantics and SeriesOverview series-level actions 
 
 ## Phase 4.10.5 Deferred
 
-- TV metadata hydration progressive loading remains Phase 4.10.6.
 - TV correction entry UI remains Phase 4.11.
 - Scan / rescan / history-location hardening remains Phase 4.12.
 - Old `MediaFile.IsDeleted` rows from earlier remove behavior are still not automatically restored.
+
+## Phase 4.10.6 Goal
+
+Phase 4.10.6 optimizes TV Discovery navigation and metadata hydration without changing media-library visibility, playback-source, AI, or Watch Insights semantics.
+
+- TV search / ranking Series clicks use a summary-first metadata path: ensure `TvSeries` plus TMDB Season summaries, then navigate to `SeriesOverviewPage`.
+- Summary-first hydration only skips when every TMDB Season summary already exists locally, so previously partial Series can still be completed before navigation.
+- Full Episode metadata hydration is no longer required before opening `SeriesOverviewPage`.
+- `SeriesOverviewPage` keeps the existing background full hydration refresh and can show metadata completion / partial failure status without blocking the Season list.
+- `TvSeasonDetailPage` can request current-Season Episode metadata on demand when the Season summary exists but Episode rows are incomplete.
+- TV search / ranking pagination and repeated TV card clicks are guarded while a TV Series detail navigation is in progress.
+- Deleting a TV Season record and reopening the Series from TV search / ranking must still recreate the Series / Season summary and open `SeriesOverviewPage`.
+- Hydration still does not create `MediaFile`, fabricate playback sources, write collection state, or include TV in AI / Watch Insights / fingerprints.
+- Phase 4.11 remains TV correction entry UI.
+- Phase 4.12 remains TV scan / rescan / history-location hardening.

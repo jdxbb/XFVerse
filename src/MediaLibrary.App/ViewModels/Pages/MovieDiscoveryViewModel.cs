@@ -200,6 +200,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool _tvRankingSourceExhausted;
     private bool _canGoToNextTvRankingPage;
     private int _tvSeriesOpenRequestVersion;
+    private bool _isTvSeriesNavigating;
 
     public MovieDiscoveryViewModel(
         RecommendationsViewModel aiRecommendationViewModel,
@@ -258,7 +259,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         OpenRankingMovieCommand = new RelayCommand(OpenRankingMovie);
         ToggleRankingWantToWatchCommand = new AsyncRelayCommand(ToggleRankingWantToWatchAsync);
         AddRankingMovieToLibraryCommand = new AsyncRelayCommand(AddRankingMovieToLibraryAsync);
-        OpenTvSeriesCommand = new RelayCommand(OpenTvSeries);
+        OpenTvSeriesCommand = new RelayCommand(OpenTvSeries, _ => !IsTvSeriesNavigating);
         AddTvSeriesToLibraryCommand = new AsyncRelayCommand(AddTvSeriesToLibraryAsync);
     }
 
@@ -685,6 +686,25 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
     }
 
+    public bool IsTvSeriesNavigating
+    {
+        get => _isTvSeriesNavigating;
+        private set
+        {
+            if (SetProperty(ref _isTvSeriesNavigating, value))
+            {
+                RefreshTvSearchVisibility();
+                RefreshSearchCommandState();
+                RefreshTvRankingVisibility();
+                RefreshRankingCommandState();
+                OnPropertyChanged(nameof(CanOpenTvSeries));
+                OpenTvSeriesCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool CanOpenTvSeries => !IsTvSeriesNavigating;
+
     public int TvSearchPageIndex
     {
         get => _tvSearchPageIndex;
@@ -717,7 +737,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public bool ShowTvSearchEmptyState => !HasSearchTvSeries && !IsTvSearchLoading;
 
-    public bool ShowTvSearchStatusOverlay => IsTvSearchLoading || ShowTvSearchEmptyState;
+    public bool ShowTvSearchStatusOverlay => IsTvSearchLoading || IsTvSeriesNavigating || ShowTvSearchEmptyState;
 
     public bool IsActiveSearchLoading => IsTvSearchSelected ? IsTvSearchLoading : IsSearchLoading;
 
@@ -729,9 +749,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public string ActiveSearchStatusOverlayText => ActiveSearchStatusMessage;
 
-    public bool CanGoPreviousTvSearchPage => !IsTvSearchLoading && TvSearchPageIndex > 1;
+    public bool CanGoPreviousTvSearchPage => !IsTvSearchLoading && !IsTvSeriesNavigating && TvSearchPageIndex > 1;
 
-    public bool CanGoNextTvSearchPage => !IsTvSearchLoading && _canGoToNextTvSearchPage;
+    public bool CanGoNextTvSearchPage => !IsTvSearchLoading && !IsTvSeriesNavigating && _canGoToNextTvSearchPage;
 
     public bool CanGoPreviousActiveSearchPage => IsTvSearchSelected ? CanGoPreviousTvSearchPage : CanGoPreviousSearchPage;
 
@@ -868,7 +888,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public bool IsTvTrendingRanking => string.Equals(SelectedTvRankingType, RankingTypeTrending, StringComparison.Ordinal);
 
-    public bool IsTvRankingTimeSelectable => IsTvTrendingRanking && !IsTvRankingLoading;
+    public bool IsTvRankingTimeSelectable => IsTvTrendingRanking && !IsTvRankingLoading && !IsTvSeriesNavigating;
 
     public string ActiveRankingTitle => IsTvRankingSelected ? TvRankingTitle : RankingTitle;
 
@@ -1045,7 +1065,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public bool ShowTvRankingEmptyState => !HasRankingTvSeries && !IsTvRankingLoading;
 
-    public bool ShowTvRankingStatusOverlay => IsTvRankingLoading || ShowTvRankingEmptyState;
+    public bool ShowTvRankingStatusOverlay => IsTvRankingLoading || IsTvSeriesNavigating || ShowTvRankingEmptyState;
 
     public bool IsActiveRankingLoading => IsTvRankingSelected ? IsTvRankingLoading : IsRankingLoading;
 
@@ -1057,9 +1077,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public string ActiveRankingStatusOverlayText => ActiveRankingStatusMessage;
 
-    public bool CanGoPreviousTvRankingPage => !IsTvRankingLoading && TvRankingPageIndex > 1;
+    public bool CanGoPreviousTvRankingPage => !IsTvRankingLoading && !IsTvSeriesNavigating && TvRankingPageIndex > 1;
 
-    public bool CanGoNextTvRankingPage => !IsTvRankingLoading && _canGoToNextTvRankingPage;
+    public bool CanGoNextTvRankingPage => !IsTvRankingLoading && !IsTvSeriesNavigating && _canGoToNextTvRankingPage;
 
     public bool CanGoPreviousActiveRankingPage => IsTvRankingSelected ? CanGoPreviousTvRankingPage : CanGoPreviousRankingPage;
 
@@ -1183,7 +1203,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task LoadTvSearchDisplayPageAsync(int displayPage)
     {
-        if (displayPage < 1 || string.IsNullOrWhiteSpace(SearchText))
+        if (IsTvSeriesNavigating || displayPage < 1 || string.IsNullOrWhiteSpace(SearchText))
         {
             return;
         }
@@ -2081,6 +2101,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private void OpenTvSeries(object? parameter)
     {
+        if (IsTvSeriesNavigating)
+        {
+            return;
+        }
+
         if (parameter is not DiscoveryTvSeriesCardViewModel item)
         {
             return;
@@ -2233,6 +2258,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private async Task OpenTvSeriesAsync(DiscoveryTvSeriesCardViewModel item)
     {
         var requestVersion = ++_tvSeriesOpenRequestVersion;
+        IsTvSeriesNavigating = true;
         try
         {
             if (item.IsInLibrary && item.TvSeriesId is > 0)
@@ -2240,7 +2266,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                 var tvSeriesId = item.TvSeriesId.Value;
                 SetTvOpenStatusMessage(requestVersion, "正在读取 TV metadata。");
                 var result = await Task.Run(
-                    () => _tvMetadataHydrationService.EnsureHydratedBySeriesIdAsync(tvSeriesId));
+                    () => _tvMetadataHydrationService.EnsureSeriesSummaryBySeriesIdAsync(tvSeriesId));
                 if (!IsCurrentTvSeriesOpenRequest(requestVersion))
                 {
                     return;
@@ -2258,7 +2284,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                 if (item.TmdbSeriesId > 0)
                 {
                     SetTvOpenStatusMessage(requestVersion, "本地 TV metadata 已删除，正在重新写入。");
-                    result = await Task.Run(() => _tvMetadataHydrationService.HydrateSeriesAsync(item.TmdbSeriesId, force: true));
+                    result = await Task.Run(() => _tvMetadataHydrationService.EnsureSeriesSummaryAsync(item.TmdbSeriesId, force: true));
                     if (!IsCurrentTvSeriesOpenRequest(requestVersion))
                     {
                         return;
@@ -2285,7 +2311,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (item.TmdbSeriesId > 0)
             {
                 SetTvOpenStatusMessage(requestVersion, "正在读取并写入 TV metadata。");
-                var result = await Task.Run(() => _tvMetadataHydrationService.HydrateSeriesAsync(item.TmdbSeriesId));
+                var result = await Task.Run(() => _tvMetadataHydrationService.EnsureSeriesSummaryAsync(item.TmdbSeriesId));
                 if (!IsCurrentTvSeriesOpenRequest(requestVersion))
                 {
                     return;
@@ -2320,6 +2346,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         catch (Exception exception)
         {
             SetTvOpenStatusMessage(requestVersion, $"TV metadata 读取失败：{DescribeException(exception)}");
+        }
+        finally
+        {
+            if (IsCurrentTvSeriesOpenRequest(requestVersion))
+            {
+                IsTvSeriesNavigating = false;
+            }
         }
     }
 
@@ -2675,6 +2708,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task ResetAndLoadTvRankingsAsync()
     {
+        if (IsTvSeriesNavigating)
+        {
+            return;
+        }
+
         InvalidateTvSeriesOpenRequest();
         _rankingCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource = new CancellationTokenSource();
@@ -2693,7 +2731,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task LoadTvRankingDisplayPageAsync(int displayPage)
     {
-        if (IsTvRankingLoading || displayPage < 1 || displayPage > TvRankingTotalDisplayPages)
+        if (IsTvSeriesNavigating || IsTvRankingLoading || displayPage < 1 || displayPage > TvRankingTotalDisplayPages)
         {
             return;
         }

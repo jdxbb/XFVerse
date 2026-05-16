@@ -726,3 +726,42 @@ Implemented scope:
 20. Restore and add actions do not create playback sources or fake source rows.
 21. TV remains excluded from AI / Watch Insights / recommendation fingerprints.
 22. Documents and reports do not include secrets or private media locations.
+
+## Phase 4.10.6 - Progressive TV Metadata Hydration
+
+Implemented scope:
+
+- TV search and TV ranking Series clicks now use a summary-first hydration path before navigation.
+- Summary-first hydration writes / updates `TvSeries` and TMDB Season summaries, including Season 0 / Specials, without requiring all Episode metadata first.
+- Summary-first hydration only skips when all TMDB Season summaries already exist locally; a Series that previously had only one scanned Season can still be completed before opening `SeriesOverviewPage`.
+- `SeriesOverviewPage` still starts the existing full metadata hydration in the background after navigation, so Episode metadata is eventually completed without blocking the Season list.
+- `TvSeasonDetailPage` can request current-Season Episode metadata on demand when the Season summary exists but Episode rows are incomplete.
+- TV search / ranking navigation uses an `IsTvSeriesNavigating` guard to disable repeated TV card clicks and TV pagination while the detail navigation request is in flight.
+- Navigation status messages are request-version guarded so stale hydration tasks cannot overwrite current search / ranking status.
+- The deleted-Season reopening path still recreates Series / Season summary metadata from TMDB and opens `SeriesOverviewPage`.
+- Hydration still does not create `MediaFile`, fabricate playback sources, write preference state, or route TV into Movie detail / AI surfaces.
+- Did not add a migration.
+- Did not execute database update.
+
+## Phase 4.10.6 Manual Acceptance Matrix
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.10.6 migration is created.
+3. TV search not-in-library Series click opens `SeriesOverviewPage` after Series + Season summary hydration.
+4. TV ranking not-in-library Series click uses the same summary-first path.
+5. Full Episode metadata is not required before `SeriesOverviewPage` opens.
+6. A previously one-season local Series can receive all TMDB Season summaries before overview navigation.
+7. Season 0 / Specials remains included in summary hydration.
+8. `SeriesOverviewPage` background hydration can later complete Episode metadata.
+9. `TvSeasonDetailPage` can hydrate missing current-Season Episodes on demand.
+10. Source-less Episodes remain non-playable until a real active `MediaFile` exists.
+11. TV card repeat-click is disabled while TV Series navigation is in progress.
+12. TV search previous / next pagination is disabled while TV Series navigation is in progress.
+13. TV ranking previous / next pagination is disabled while TV Series navigation is in progress.
+14. Failed metadata requests restore UI command availability and show a readable status.
+15. Deleting a Season record and reopening the Series from TV search / ranking can recreate summary metadata.
+16. Hydration does not create playback sources or fake source rows.
+17. Hydration does not write `Visible`, `Hidden`, want-to-watch, favorite, not-interested, or watched state.
+18. TV remains excluded from AI / Watch Insights / recommendation fingerprints.
+19. Movie search / ranking flows are not changed by the TV navigation guard.
+20. Documents and reports do not include secrets or private media locations.

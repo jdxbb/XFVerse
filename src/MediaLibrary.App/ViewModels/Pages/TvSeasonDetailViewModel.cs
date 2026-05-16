@@ -15,6 +15,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private const string SeasonRatingUnavailableText = "暂无季评分";
     private readonly INavigationStateService _navigationStateService;
     private readonly ITvDetailQueryService _tvDetailQueryService;
+    private readonly ITvMetadataHydrationService _metadataHydrationService;
     private readonly IPlayerWindowService _playerWindowService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IDataRefreshService _dataRefreshService;
@@ -42,6 +43,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private bool _isSeasonWatched;
     private bool _isSeasonUnwatched;
     private bool _isVisibleInLibrary;
+    private bool _isEpisodeMetadataLoading;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
     private string _tmdbRatingDisplay = SeasonRatingUnavailableText;
     private string _imdbRatingDisplay = string.Empty;
@@ -49,6 +51,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public TvSeasonDetailViewModel(
         INavigationStateService navigationStateService,
         ITvDetailQueryService tvDetailQueryService,
+        ITvMetadataHydrationService metadataHydrationService,
         IPlayerWindowService playerWindowService,
         ITvSeasonCollectionService tvSeasonCollectionService,
         IDataRefreshService dataRefreshService)
@@ -56,6 +59,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     {
         _navigationStateService = navigationStateService;
         _tvDetailQueryService = tvDetailQueryService;
+        _metadataHydrationService = metadataHydrationService;
         _playerWindowService = playerWindowService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _dataRefreshService = dataRefreshService;
@@ -144,6 +148,20 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public bool HasEpisodes => HasSeason && Episodes.Count > 0;
 
     public bool HasNoEpisodes => HasSeason && Episodes.Count == 0;
+
+    public bool IsEpisodeMetadataLoading
+    {
+        get => _isEpisodeMetadataLoading;
+        private set
+        {
+            if (SetProperty(ref _isEpisodeMetadataLoading, value))
+            {
+                OnPropertyChanged(nameof(EpisodeEmptyText));
+            }
+        }
+    }
+
+    public string EpisodeEmptyText => IsEpisodeMetadataLoading ? "正在加载本季集信息..." : "暂无已解析集。";
 
     public bool IsUnidentified
     {
@@ -298,6 +316,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 Episodes.Add(episode);
             }
 
+            var shouldEnsureEpisodeMetadata = ShouldEnsureEpisodeMetadata(model);
+            IsEpisodeMetadataLoading = shouldEnsureEpisodeMetadata;
             NavigateBackToSeriesCommand.RaiseCanExecuteChanged();
             RaiseSeasonStateCommandCanExecuteChanged();
             OnPropertyChanged(nameof(HasEpisodes));
@@ -306,13 +326,80 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             StatusMessage = selectedEpisodeId.HasValue
                 ? $"已加载集列表，目标集 ID：{selectedEpisodeId.Value}。"
                 : Episodes.Count == 0
-                    ? "该季暂无已解析集。"
+                    ? EpisodeEmptyText
                     : $"已加载 {Episodes.Count} 集。";
             _ = LoadRatingDisplayAsync(model.SeasonId, cancellationToken);
+            if (shouldEnsureEpisodeMetadata)
+            {
+                _ = EnsureSeasonEpisodesAndRefreshAsync(model.SeasonId, cancellationToken);
+            }
         }
         catch (Exception exception)
         {
             Clear($"加载电视剧季详情失败：{DescribeException(exception)}");
+        }
+    }
+
+    private static bool ShouldEnsureEpisodeMetadata(TvSeasonDetailModel model)
+    {
+        return model.TmdbSeriesId is > 0
+               && (model.Episodes.Count == 0
+                   || (model.TotalEpisodeCount > 0 && model.Episodes.Count < model.TotalEpisodeCount));
+    }
+
+    private async Task EnsureSeasonEpisodesAndRefreshAsync(int seasonId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            StatusMessage = "正在补齐本季集信息。";
+            var result = await Task.Run(
+                () => _metadataHydrationService.EnsureSeasonEpisodesAsync(
+                    seasonId,
+                    cancellationToken: cancellationToken),
+                cancellationToken);
+
+            if (_navigationStateService.SelectedTvSeasonId != seasonId)
+            {
+                return;
+            }
+
+            var model = await _tvDetailQueryService.GetSeasonDetailAsync(seasonId, cancellationToken);
+            if (model is null)
+            {
+                IsEpisodeMetadataLoading = false;
+                return;
+            }
+
+            Episodes.Clear();
+            foreach (var episode in model.Episodes)
+            {
+                Episodes.Add(episode);
+            }
+
+            ProgressText = model.ProgressText;
+            InLibraryText = model.InLibraryText;
+            IsSeasonWatched = model.IsSeasonWatched;
+            IsSeasonUnwatched = model.IsSeasonUnwatched;
+            IsEpisodeMetadataLoading = false;
+            OnPropertyChanged(nameof(HasEpisodes));
+            OnPropertyChanged(nameof(HasNoEpisodes));
+            RaiseSeasonStateCommandCanExecuteChanged();
+            StatusMessage = result.HasErrors
+                ? result.BuildStatusMessage()
+                : result.Skipped
+                    ? $"已加载 {Episodes.Count} 集。"
+                    : $"已补齐 {Episodes.Count} 集。";
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            IsEpisodeMetadataLoading = false;
+            if (_navigationStateService.SelectedTvSeasonId == seasonId)
+            {
+                StatusMessage = $"本季集信息补齐失败：{DescribeException(exception)}";
+            }
         }
     }
 
@@ -558,6 +645,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         IsSeasonWatched = false;
         IsSeasonUnwatched = true;
         IsVisibleInLibrary = false;
+        IsEpisodeMetadataLoading = false;
         CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
         StatusMessage = statusMessage;
         Episodes.Clear();

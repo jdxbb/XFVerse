@@ -8,6 +8,8 @@ public sealed class TvSeasonDetailModel
 
     public int SeriesId { get; set; }
 
+    public int? TmdbSeriesId { get; set; }
+
     public int SeasonNumber { get; set; }
 
     public string SeriesName { get; set; } = string.Empty;

@@ -7,6 +7,7 @@
         <DataTemplate DataType="{x:Type viewModels:DiscoveryTvSeriesCardViewModel}">
             <Border Width="232"
                     Margin="0,0,18,18"
+                    IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}"
                     Style="{StaticResource CompactCardStyle}">
                 <Border.InputBindings>
                     <MouseBinding MouseAction="LeftClick"
@@ -1158,7 +1159,8 @@
                                     </ScrollViewer.Style>
                                     <StackPanel>
                                         <Border Margin="0,0,0,18"
-                                                DataContext="{Binding TopRankingTvSeries}">
+                                                DataContext="{Binding TopRankingTvSeries}"
+                                                IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                             <Border.Style>
                                                 <Style TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
                                                     <Setter Property="Visibility" Value="Visible" />
@@ -1256,7 +1258,9 @@
                                                             <ColumnDefinition Width="*" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Grid DataContext="{Binding LeftItem}" Margin="0,0,14,0">
+                                                        <Grid DataContext="{Binding LeftItem}"
+                                                              Margin="0,0,14,0"
+                                                              IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                                             <Grid.InputBindings>
                                                                 <MouseBinding MouseAction="LeftClick"
                                                                               Command="{Binding DataContext.OpenTvSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -1323,7 +1327,8 @@
 
                                                         <Grid Grid.Column="2"
                                                               DataContext="{Binding RightItem}"
-                                                              Margin="14,0,0,0">
+                                                              Margin="14,0,0,0"
+                                                              IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                                             <Grid.Style>
                                                                 <Style TargetType="Grid">
                                                                     <Setter Property="Visibility" Value="Collapsed" />

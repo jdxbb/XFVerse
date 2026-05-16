@@ -21,6 +21,36 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         _tmdbService = tmdbService;
     }
 
+    public async Task<TvMetadataHydrationResult> EnsureSeriesSummaryBySeriesIdAsync(
+        int tvSeriesId,
+        bool force = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (tvSeriesId <= 0)
+        {
+            return new TvMetadataHydrationResult { Skipped = true };
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var series = await dbContext.TvSeries
+            .AsNoTracking()
+            .Where(x => x.Id == tvSeriesId)
+            .Select(x => new { x.Id, x.TmdbSeriesId })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (series?.TmdbSeriesId is not > 0)
+        {
+            return new TvMetadataHydrationResult
+            {
+                TvSeriesId = series?.Id,
+                Skipped = true
+            };
+        }
+
+        return await EnsureSeriesSummaryAsync(series.TmdbSeriesId.Value, force, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<TvMetadataHydrationResult> EnsureHydratedBySeriesIdAsync(
         int tvSeriesId,
         bool force = false,
@@ -49,6 +79,79 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
 
         return await HydrateSeriesAsync(series.TmdbSeriesId.Value, force, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task<TvMetadataHydrationResult> EnsureSeriesSummaryAsync(
+        int tmdbSeriesId,
+        bool force = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new TvMetadataHydrationResult { TmdbSeriesId = tmdbSeriesId };
+        if (tmdbSeriesId <= 0)
+        {
+            result.AddError("TMDB Series ID 无效。");
+            return result;
+        }
+
+        var gate = HydrationLocks.GetOrAdd(tmdbSeriesId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(tmdbSeriesId, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            var existingSeriesId = await FindSeriesIdAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
+            if (seriesDetails is null)
+            {
+                result.AddError("无法读取 TMDB TV Series metadata。");
+                result.TvSeriesId = existingSeriesId;
+                return result;
+            }
+
+            var seasonSummaries = NormalizeSeasonSummaries(seriesDetails.Seasons);
+            if (!force
+                && existingSeriesId.HasValue
+                && await HasSeriesSummaryAsync(existingSeriesId.Value, seasonSummaries, cancellationToken).ConfigureAwait(false))
+            {
+                result.Skipped = true;
+                result.TvSeriesId = existingSeriesId;
+                return result;
+            }
+
+            await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var tvSeries = await UpsertSeriesAsync(dbContext, seriesDetails, cancellationToken).ConfigureAwait(false);
+            result.TvSeriesId = tvSeries.Id;
+
+            foreach (var summary in seasonSummaries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var seasonResult = await UpsertSeasonAsync(
+                        dbContext,
+                        tvSeries,
+                        summary,
+                        detail: null,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (seasonResult.IsAdded)
+                {
+                    result.AddedSeasonCount++;
+                }
+                else
+                {
+                    result.UpdatedSeasonCount++;
+                }
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return result;
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     public async Task<TvMetadataHydrationResult> HydrateSeriesAsync(
@@ -171,6 +274,103 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         }
     }
 
+    public async Task<TvMetadataHydrationResult> EnsureSeasonEpisodesAsync(
+        int tvSeasonId,
+        bool force = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new TvMetadataHydrationResult();
+        if (tvSeasonId <= 0)
+        {
+            result.AddError("TV Season ID 无效。");
+            return result;
+        }
+
+        var seasonKey = await LoadSeasonHydrationKeyAsync(tvSeasonId, cancellationToken).ConfigureAwait(false);
+        if (seasonKey is null)
+        {
+            result.AddError("未找到对应的 TV Season。");
+            return result;
+        }
+
+        result.TmdbSeriesId = seasonKey.TmdbSeriesId;
+        result.TvSeriesId = seasonKey.SeriesId;
+
+        if (!force
+            && seasonKey.ExistingEpisodeCount > 0
+            && seasonKey.TmdbEpisodeCount.GetValueOrDefault() > 0
+            && seasonKey.ExistingEpisodeCount >= seasonKey.TmdbEpisodeCount!.Value)
+        {
+            result.Skipped = true;
+            return result;
+        }
+
+        var gate = HydrationLocks.GetOrAdd(seasonKey.TmdbSeriesId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var seasonDetail = await _tmdbService.GetTvSeasonDetailsAsync(
+                    seasonKey.TmdbSeriesId,
+                    seasonKey.SeasonNumber,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (seasonDetail is null)
+            {
+                result.AddError($"{FormatSeasonLabel(seasonKey.SeasonNumber)} metadata 暂不可用。");
+                return result;
+            }
+
+            await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var series = await dbContext.TvSeries
+                .FirstAsync(x => x.Id == seasonKey.SeriesId, cancellationToken)
+                .ConfigureAwait(false);
+            var seasonResult = await UpsertSeasonAsync(
+                    dbContext,
+                    series,
+                    BuildSeasonSummaryFromDetail(seasonDetail),
+                    seasonDetail,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (seasonResult.IsAdded)
+            {
+                result.AddedSeasonCount++;
+            }
+            else
+            {
+                result.UpdatedSeasonCount++;
+            }
+
+            foreach (var episode in NormalizeEpisodeMetadata(seasonDetail.Episodes))
+            {
+                var episodeAdded = await UpsertEpisodeAsync(
+                        dbContext,
+                        seasonResult.Season,
+                        episode,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (episodeAdded)
+                {
+                    result.AddedEpisodeCount++;
+                }
+                else
+                {
+                    result.UpdatedEpisodeCount++;
+                }
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return result;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     private static async Task<int?> FindSeriesIdAsync(int tmdbSeriesId, CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -178,6 +378,57 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             .AsNoTracking()
             .Where(x => x.TmdbSeriesId == tmdbSeriesId)
             .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<bool> HasSeriesSummaryAsync(
+        int tvSeriesId,
+        IReadOnlyCollection<TmdbTvSeasonSummaryItem> seasonSummaries,
+        CancellationToken cancellationToken)
+    {
+        if (seasonSummaries.Count == 0)
+        {
+            return false;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var localSeasons = await dbContext.TvSeasons
+            .AsNoTracking()
+            .Where(x => x.TvSeriesId == tvSeriesId)
+            .Select(x => new { x.SeasonNumber, x.TmdbEpisodeCount })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var localByNumber = localSeasons
+            .GroupBy(x => x.SeasonNumber)
+            .ToDictionary(x => x.Key, x => x.First().TmdbEpisodeCount);
+        return seasonSummaries.All(
+            summary =>
+            {
+                if (!localByNumber.TryGetValue(summary.SeasonNumber, out var localEpisodeCount))
+                {
+                    return false;
+                }
+
+                return summary.EpisodeCount <= 0
+                       || localEpisodeCount.GetValueOrDefault() >= summary.EpisodeCount;
+            });
+    }
+
+    private static async Task<SeasonHydrationKey?> LoadSeasonHydrationKeyAsync(int tvSeasonId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        return await dbContext.TvSeasons
+            .AsNoTracking()
+            .Where(x => x.Id == tvSeasonId && x.Series!.TmdbSeriesId.HasValue)
+            .Select(
+                x => new SeasonHydrationKey(
+                    x.Id,
+                    x.TvSeriesId,
+                    x.Series!.TmdbSeriesId!.Value,
+                    x.SeasonNumber,
+                    x.TmdbEpisodeCount,
+                    x.Episodes.Count))
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -291,6 +542,21 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         return isAdded;
     }
 
+    private static TmdbTvSeasonSummaryItem BuildSeasonSummaryFromDetail(TmdbTvSeasonDetailResult detail)
+    {
+        return new TmdbTvSeasonSummaryItem
+        {
+            TmdbId = detail.TmdbId,
+            SeasonNumber = detail.SeasonNumber,
+            Name = detail.Name,
+            Overview = detail.Overview,
+            PosterRemoteUrl = detail.PosterRemoteUrl,
+            AirDate = detail.AirDate,
+            EpisodeCount = detail.EpisodeCount,
+            TmdbRating = detail.TmdbRating
+        };
+    }
+
     private static IReadOnlyList<TmdbTvSeasonSummaryItem> NormalizeSeasonSummaries(
         IReadOnlyList<TmdbTvSeasonSummaryItem> summaries)
     {
@@ -358,4 +624,12 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
     }
 
     private sealed record SeasonUpsertResult(TvSeason Season, bool IsAdded);
+
+    private sealed record SeasonHydrationKey(
+        int SeasonId,
+        int SeriesId,
+        int TmdbSeriesId,
+        int SeasonNumber,
+        int? TmdbEpisodeCount,
+        int ExistingEpisodeCount);
 }

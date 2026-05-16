@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
@@ -26,7 +27,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private const string PersonaPosterDefaultGender = "female";
     private const string PersonaPosterFallbackKey = "genre_explorer";
     private const string PersonaFrameDefaultColor = "gold";
-    private const string PersonaFrameDefaultUri = "pack://application:,,,/Assets/WatchPersonas/Frames/persona_card_frame_default.png";
+    private static readonly string PersonaFrameDefaultUri = BuildPersonaAssetUri("Frames", "persona_card_frame_default.png");
     private static readonly string[] PersonaPosterExtensions = [".png", ".jpg", ".jpeg", ".webp"];
     private static readonly IReadOnlyDictionary<string, string> PersonaTypeKeys =
         new Dictionary<string, string>(StringComparer.Ordinal)
@@ -910,18 +911,18 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
         foreach (var extension in PersonaPosterExtensions)
         {
-            yield return $"pack://application:,,,/Assets/WatchPersonas/default_{normalizedGender}{extension}";
+            yield return BuildPersonaAssetUri($"default_{normalizedGender}{extension}");
         }
 
         foreach (var extension in PersonaPosterExtensions)
         {
-            yield return $"pack://application:,,,/Assets/WatchPersonas/default{extension}";
+            yield return BuildPersonaAssetUri($"default{extension}");
         }
     }
 
     private static string BuildPersonaPosterUri(string personaKey, string gender, string extension)
     {
-        return $"pack://application:,,,/Assets/WatchPersonas/{personaKey}/{personaKey}_{gender}{extension}";
+        return BuildPersonaAssetUri(personaKey, $"{personaKey}_{gender}{extension}");
     }
 
     private static string ResolvePersonaFrameUri(string personaKey)
@@ -958,7 +959,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     private static string BuildPersonaFrameUri(string color)
     {
-        return $"pack://application:,,,/Assets/WatchPersonas/Frames/persona_card_frame_{color}.png";
+        return BuildPersonaAssetUri("Frames", $"persona_card_frame_{color}.png");
     }
 
     private static bool ResourceExists(string uri)
@@ -966,13 +967,24 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         try
         {
             var resourceUri = new Uri(uri, UriKind.Absolute);
-            using var stream = Application.GetResourceStream(resourceUri)?.Stream;
-            return stream is not null;
+            return resourceUri.IsFile && File.Exists(resourceUri.LocalPath);
         }
         catch
         {
             return false;
         }
+    }
+
+    private static string BuildPersonaAssetUri(string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "WatchPersonas", fileName);
+        return new Uri(path, UriKind.Absolute).AbsoluteUri;
+    }
+
+    private static string BuildPersonaAssetUri(string folder, string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "WatchPersonas", folder, fileName);
+        return new Uri(path, UriKind.Absolute).AbsoluteUri;
     }
 
     private void BuildWarningMessages(WatchStatisticsSnapshot snapshot)

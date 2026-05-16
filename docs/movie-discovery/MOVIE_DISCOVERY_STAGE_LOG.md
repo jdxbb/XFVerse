@@ -176,7 +176,20 @@
 - Hidden Movie / TV rows with active source or real current state restore to `Auto`; source-less no-state rows restore to `Visible`.
 - Explicit add-to-library remains `Visible` and remains separate from preference state.
 - SeriesOverview now keeps a series-level action area visible for one-season, partial, hidden, and all-visible series states.
-- TV Discovery navigation and hydration loading contention remains deferred to Phase 4.10.6.
+- TV Discovery navigation and hydration loading contention is superseded by Phase 4.10.6.
+- No new migration was added.
+- Database update was not executed.
+
+## Phase 4.10.6 TV Discovery Navigation And Hydration
+
+- TV search / ranking Series clicks now use summary-first metadata hydration before opening `SeriesOverviewPage`.
+- Summary-first hydration ensures `TvSeries` and TMDB Season summaries, including Season 0 / Specials, without blocking on every Season detail / Episode metadata request.
+- The summary path verifies all TMDB Season summaries exist locally before skipping, so stale one-season local Series can still be completed before navigation.
+- TV card repeat-click, TV search pagination, TV ranking pagination, and TV trend-time switching are disabled while a TV Series navigation request is active.
+- `SeriesOverviewPage` keeps full background hydration for eventual Episode metadata completion.
+- `TvSeasonDetailPage` can hydrate missing current-Season Episodes on demand and refresh the Episode list.
+- The deleted-Season reopen case from TV search / ranking is handled by recreating Series / Season summary metadata.
+- Discovery still does not write playback sources, preference state, TV AI rows, Watch Insights rows, or recommendation fingerprint input.
 - No new migration was added.
 - Database update was not executed.
 

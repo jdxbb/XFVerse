@@ -115,14 +115,22 @@
 - Discovery add-to-library does not set want-to-watch, favorite, not-interested, watched, or fake playback sources.
 - Discovery add-to-library does not create `MediaFile` and does not restore old `IsDeleted` source rows.
 - TV Discovery remains separate from `AiRecommendationItem`, Watch Insights, profile/persona inputs, and recommendation fingerprints.
-- Hydration performance optimization remains Phase 4.10.6.
+- Phase 4.10.6 implements summary-first TV navigation: Discovery opens `SeriesOverviewPage` after Series + Season summary hydration, while full Episode metadata completion is deferred to background / Season-detail hydration.
 
 ## Phase 4.10.5b Discovery Restore Notes
 
 - Restore-to-library no longer blindly writes `Visible`.
 - Hidden rows with active source or real current state restore to `Auto`; source-less no-state rows restore to `Visible`.
 - Automatic `Auto` invisibility is not shown in the removed-library management entry.
-- TV Discovery navigation / hydration loading remains Phase 4.10.6.
+- TV Discovery navigation / hydration loading is handled by Phase 4.10.6.
+
+## Phase 4.10.6 TV Discovery Navigation Notes
+
+- TV search / ranking Series clicks no longer require full Season Episode hydration before opening `SeriesOverviewPage`.
+- Discovery calls a summary-first TV metadata path that ensures `TvSeries` and all TMDB Season summaries, including Season 0 / Specials.
+- TV card repeat-click and TV pagination are guarded while a TV Series navigation request is in progress.
+- Full Episode metadata is completed by `SeriesOverviewPage` background hydration or by `TvSeasonDetailPage` on-demand Season hydration.
+- Discovery still does not create `MediaFile`, fake playback sources, TV AI items, or Watch Insights inputs.
 
 ## Phase 4.8 Bugfix TV Parity
 

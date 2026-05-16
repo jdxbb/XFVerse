@@ -284,7 +284,7 @@
                         </Style>
                     </Border.Style>
                     <TextBlock Style="{StaticResource BodyTextStyle}"
-                               Text="暂无已解析集。"
+                               Text="{Binding EpisodeEmptyText}"
                                TextWrapping="Wrap" />
                 </Border>
             </Grid>

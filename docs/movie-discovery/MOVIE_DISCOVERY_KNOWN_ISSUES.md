@@ -39,8 +39,15 @@
 - Movie add-to-library does not set want-to-watch, favorite, not-interested, watched, or `MediaFile`.
 - TV Series add-to-library writes `Visible` for all known Seasons, including Season 0 / Specials, after metadata is available.
 - Add-to-library does not restore old `IsDeleted` source rows.
-- TV Discovery navigation / hydration contention remains deferred to Phase 4.10.6.
 - TV Discovery remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
+- Phase 4.10.6 handles TV Discovery navigation / hydration contention with summary-first navigation and TV pagination guards.
+
+## Phase 4.10.6 TV Discovery Notes
+
+- TV search / ranking Series clicks only require Series + Season summary metadata before navigation.
+- Full Episode metadata is completed later by Series overview background hydration or by Season detail on-demand hydration.
+- TV pagination and repeated TV card clicks are guarded while a TV Series navigation request is active.
+- Discovery still does not create playback sources or TV AI / Watch Insights input.
 
 ## 搜索
 
