@@ -38,6 +38,14 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         IReadOnlyCollection<int> mediaFileIds,
         CancellationToken cancellationToken = default)
     {
+        return await IdentifyMediaFilesAsync(mediaFileIds, tmdbSearchCache: null, cancellationToken);
+    }
+
+    public async Task<IdentificationRunResult> IdentifyMediaFilesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        ScanTmdbSearchCache? tmdbSearchCache,
+        CancellationToken cancellationToken = default)
+    {
         var result = new IdentificationRunResult();
         var distinctIds = mediaFileIds
             .Where(x => x > 0)
@@ -125,7 +133,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             List<MetadataSearchCandidate> searchResults;
             try
             {
-                searchResults = (await _tmdbService.SearchMoviesAsync(candidateTitle, parsedName.ReleaseYear, cancellationToken)).ToList();
+                searchResults = (await SearchMoviesAsync(candidateTitle, parsedName.ReleaseYear, tmdbSearchCache, cancellationToken)).ToList();
             }
             catch (Exception exception)
             {
@@ -218,6 +226,31 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
         ScanIdentificationDiagnostics.Write(
             $"event=movie-identify-complete requested={distinctIds.Length} attempted={result.AttemptedCount} bound={result.BoundCount} placeholders={result.PlaceholderCount} warnings={result.WarningCount} errors={result.ErrorCount}");
+        return result;
+    }
+
+    private async Task<IReadOnlyList<MetadataSearchCandidate>> SearchMoviesAsync(
+        string query,
+        int? releaseYear,
+        ScanTmdbSearchCache? tmdbSearchCache,
+        CancellationToken cancellationToken)
+    {
+        if (tmdbSearchCache is not null
+            && tmdbSearchCache.TryGetMovieSearch(query, releaseYear, out var cachedResult))
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-movie-search-cache-hit query={ScanIdentificationDiagnostics.FormatValue(query)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(releaseYear)} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
+            return cachedResult;
+        }
+
+        if (tmdbSearchCache is not null)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-movie-search-cache-miss query={ScanIdentificationDiagnostics.FormatValue(query)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(releaseYear)} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries}");
+        }
+
+        var result = await _tmdbService.SearchMoviesAsync(query, releaseYear, cancellationToken);
+        tmdbSearchCache?.SetMovieSearch(query, releaseYear, result);
         return result;
     }
 

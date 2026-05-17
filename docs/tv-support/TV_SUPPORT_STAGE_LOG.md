@@ -1252,3 +1252,25 @@ Completed:
 13. Movie `NeedsReview` remains blocked from auto-apply.
 14. Media-library batch current-list select-all remains available.
 15. TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11f-perf-1 - Limit AI retry scope and cache TMDB searches
+
+Completed:
+
+- The post-AI TV retry no longer reprocesses the full scan set. It now retries only MediaFiles affected by accepted AI-on-uncertain hints.
+- When the AI affected file set is empty, the second TV pass is skipped and logged.
+- Added a per-scan runtime TMDB search cache for TV and Movie search calls. The cache is not persisted and does not require a migration.
+- TV and Movie caches are separated and keyed by media type, normalized query, and relevant search context such as language / page or release year.
+- Diagnostics now record first-pass TV counts, AI affected file count, second-pass TV scope, TMDB cache hits / misses, cache entries, and duplicate searches avoided.
+- This stage does not change TV parser rules, Movie fallback rules, AI prompt/schema, AI refined top1 behavior, safety gates, media-library visibility, or delete-record semantics.
+- Movie AI classification remains background best-effort and TV remains excluded from AI recommendations / Watch Insights.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.11f-perf-1 migration is created.
+3. Second-pass TV retry scope is `ai-affected-files`.
+4. Second-pass TV retry is skipped when no AI affected file exists.
+5. TMDB TV and Movie search caches are separate and per-scan only.
+6. Cache hit / miss and duplicate-search-avoided counters are logged.
+7. Scan identification behavior and auto-bind gates are unchanged.

@@ -76,7 +76,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         return result;
     }
 
-    public async Task<int> ApplyAiOnUncertainAsync(
+    public async Task<TvScanAiOnUncertainApplyResult> ApplyAiOnUncertainAsync(
         IReadOnlyCollection<int> mediaFileIds,
         TvScanDirectoryAnalysisResult analysis,
         CancellationToken cancellationToken = default)
@@ -92,7 +92,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         {
             ScanIdentificationDiagnostics.Write(
                 "event=ai-on-uncertain-skipped aiOnUncertainAttempted=false aiOnUncertainCandidateRanges=0 aiOnUncertainSkippedReason=no-ai-candidates aiAutoApply=false fallback=local-placeholders-preserved");
-            return 0;
+            return new TvScanAiOnUncertainApplyResult();
         }
 
         var ids = mediaFileIds
@@ -103,7 +103,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         {
             ScanIdentificationDiagnostics.Write(
                 $"event=ai-on-uncertain-skipped aiOnUncertainAttempted=false aiOnUncertainCandidateRanges={ranges.Count} aiOnUncertainSkippedReason=no-media-file-ids aiAutoApply=false fallback=local-placeholders-preserved");
-            return 0;
+            return new TvScanAiOnUncertainApplyResult();
         }
 
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -124,7 +124,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         {
             ScanIdentificationDiagnostics.Write(
                 $"event=ai-on-uncertain-skipped aiOnUncertainAttempted=false aiOnUncertainCandidateRanges={ranges.Count} aiOnUncertainSkippedReason=no-active-video-files aiAutoApply=false fallback=local-placeholders-preserved");
-            return 0;
+            return new TvScanAiOnUncertainApplyResult();
         }
 
         var inputRanges = ranges
@@ -167,11 +167,12 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             {
                 ScanIdentificationDiagnostics.Write(
                     $"event=ai-on-uncertain-complete requestId={requestId} aiOnUncertainSucceeded=false aiOnUncertainFailureReason=empty-or-not-configured fallback=local-placeholders-preserved aiAutoApply=false");
-                return 0;
+                return new TvScanAiOnUncertainApplyResult();
             }
 
             var parsed = ParseAiOnUncertainResponse(response);
             jsonParseSucceeded = true;
+            var runResult = new TvScanAiOnUncertainApplyResult();
             var inputById = inputRanges.ToDictionary(x => x.InputRangeId, StringComparer.OrdinalIgnoreCase);
             var appliedHints = 0;
             var appliedFiles = 0;
@@ -218,6 +219,8 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
 
                 appliedHints++;
                 appliedFiles += applyResult.AppliedFiles;
+                runResult.AppliedFiles += applyResult.AppliedFiles;
+                runResult.AddAffectedMediaFiles(applyResult.AppliedMediaFileIds);
                 if (string.Equals(applyResult.FilesResolvedBy, "mediaFileIds", StringComparison.OrdinalIgnoreCase))
                 {
                     appliedByMediaFileIds++;
@@ -232,8 +235,8 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             }
 
             ScanIdentificationDiagnostics.Write(
-                $"event=ai-on-uncertain-complete requestId={requestId} aiOnUncertainSucceeded=true aiOnUncertainDurationMs={stopwatch.ElapsedMilliseconds} aiOnUncertainResponseRanges={parsed.Ranges.Count} aiOnUncertainParsedHints={parsedHints} aiOnUncertainAppliedHints={appliedHints} aiOnUncertainIgnoredHints={ignoredHints} aiOnUncertainRangesWithFiles={rangesWithFiles} aiOnUncertainRangesWithoutFiles={rangesWithoutFiles} aiOnUncertainAppliedByMediaFileIds={appliedByMediaFileIds} aiOnUncertainAppliedByPathFallback={appliedByPathFallback} aiOnUncertainIgnoredNoMediaFileIds={ignoredNoMediaFileIds} aiOnUncertainIgnoredNoFilesInRange={ignoredNoFilesInRange} skippedNoOriginalOrSearchTitle={skippedNoOriginalOrSearchTitle} aiOnUncertainJsonParseSucceeded={jsonParseSucceeded.ToString().ToLowerInvariant()} aiHintApplied={(appliedHints > 0).ToString().ToLowerInvariant()} appliedHints={appliedHints} appliedFiles={appliedFiles} aiAutoApply=false fallback={(appliedHints > 0 ? "tmdb-validation-required" : "local-placeholders-preserved")}");
-            return appliedFiles;
+                $"event=ai-on-uncertain-complete requestId={requestId} aiOnUncertainSucceeded=true aiOnUncertainDurationMs={stopwatch.ElapsedMilliseconds} aiOnUncertainResponseRanges={parsed.Ranges.Count} aiOnUncertainParsedHints={parsedHints} aiOnUncertainAppliedHints={appliedHints} aiOnUncertainIgnoredHints={ignoredHints} aiOnUncertainRangesWithFiles={rangesWithFiles} aiOnUncertainRangesWithoutFiles={rangesWithoutFiles} aiOnUncertainAppliedByMediaFileIds={appliedByMediaFileIds} aiOnUncertainAppliedByPathFallback={appliedByPathFallback} aiOnUncertainIgnoredNoMediaFileIds={ignoredNoMediaFileIds} aiOnUncertainIgnoredNoFilesInRange={ignoredNoFilesInRange} skippedNoOriginalOrSearchTitle={skippedNoOriginalOrSearchTitle} aiOnUncertainJsonParseSucceeded={jsonParseSucceeded.ToString().ToLowerInvariant()} aiHintApplied={(appliedHints > 0).ToString().ToLowerInvariant()} appliedHints={appliedHints} appliedFiles={appliedFiles} aiAffectedMediaFiles={runResult.AffectedMediaFileIds.Count} aiAutoApply=false fallback={(appliedHints > 0 ? "tmdb-validation-required" : "local-placeholders-preserved")}");
+            return runResult;
         }
         catch (Exception exception)
         {
@@ -248,7 +251,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                 : "not-cancellation";
             ScanIdentificationDiagnostics.Write(
                 $"event=ai-on-uncertain-error requestId={requestId} aiOnUncertainSucceeded=false aiOnUncertainDurationMs={stopwatch.ElapsedMilliseconds} timeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} exceptionType={ScanIdentificationDiagnostics.FormatValue(exception.GetType().Name)} innerExceptionType={ScanIdentificationDiagnostics.FormatValue(exception.InnerException?.GetType().Name)} cancellationOrigin={ScanIdentificationDiagnostics.FormatValue(cancellationOrigin)} responseChars={responseChars} assistantContentChars={responseChars} aiOnUncertainJsonParseSucceeded={jsonParseSucceeded.ToString().ToLowerInvariant()} aiOnUncertainFailureReason=ai-failed fallback=local-placeholders-preserved aiAutoApply=false error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 180)}");
-            return 0;
+            return new TvScanAiOnUncertainApplyResult();
         }
     }
 
@@ -893,7 +896,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         var titleSelection = SelectAiOnUncertainSearchTitle(hint);
         if (string.IsNullOrWhiteSpace(titleSelection.Title))
         {
-            return new AiOnUncertainHintApplyResult(0, true, 0, "not-resolved", inputRange.MediaFileIds.Count, 0, "no-original-or-search-title");
+            return new AiOnUncertainHintApplyResult(0, [], true, 0, "not-resolved", inputRange.MediaFileIds.Count, 0, "no-original-or-search-title");
         }
 
         var evidence = FirstNonEmpty(FormatEvidence(hint.Evidence), "ai-on-uncertain");
@@ -919,7 +922,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             var ignoredReason = rangeMediaFileIds.Length == 0
                 ? "no-media-file-ids"
                 : "no-files-in-input-range";
-            return new AiOnUncertainHintApplyResult(0, true, 0, filesResolvedBy, rangeMediaFileIds.Length, 0, ignoredReason);
+            return new AiOnUncertainHintApplyResult(0, [], true, 0, filesResolvedBy, rangeMediaFileIds.Length, 0, ignoredReason);
         }
 
         var seasonNumberByFileId = new Dictionary<int, int?>();
@@ -947,6 +950,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         var directoryHintMismatch = folderHints.Count > 0 && directoryHintMatchCount == 0;
         var applied = 0;
         var seenFileIds = new HashSet<int>();
+        var appliedMediaFileIds = new List<int>();
         foreach (var pathItem in inputRangeFiles)
         {
             if (!seenFileIds.Add(pathItem.Id))
@@ -980,9 +984,10 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                     BlocksMovieFallback = true
                 });
             applied++;
+            appliedMediaFileIds.Add(pathItem.Id);
         }
 
-        return new AiOnUncertainHintApplyResult(applied, directoryHintMismatch, directoryHintMatchCount, filesResolvedBy, rangeMediaFileIds.Length, inputRangeFiles.Count, string.Empty);
+        return new AiOnUncertainHintApplyResult(applied, appliedMediaFileIds, directoryHintMismatch, directoryHintMatchCount, filesResolvedBy, rangeMediaFileIds.Length, inputRangeFiles.Count, string.Empty);
     }
 
     private static AiSearchTitleSelection SelectAiOnUncertainSearchTitle(AiOnUncertainRange hint)
@@ -1663,6 +1668,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
 
     private sealed record AiOnUncertainHintApplyResult(
         int AppliedFiles,
+        IReadOnlyCollection<int> AppliedMediaFileIds,
         bool DirectoryHintMismatch,
         int DirectoryHintMatchCount,
         string FilesResolvedBy,

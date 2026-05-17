@@ -251,6 +251,12 @@
 - English and localized title hints remain auxiliary fallback aliases; no specific title mapping table is added.
 - This remains scan-identification plumbing only: Movie Discovery UI, Movie recommendation AI, Watch Insights, and media-library visibility semantics are unchanged.
 
+## Phase 4.11f-perf-1 Scan Performance Note
+
+- The second TV identification pass after AI-on-uncertain is limited to AI affected `MediaFileIds`.
+- Same-run TMDB search caching deduplicates repeated TV and Movie search queries without persisting cache data.
+- The optimization does not change Movie Discovery UI, recommendation AI inputs, Watch Insights, media-library visibility, scan matching thresholds, or AI refined top1 behavior.
+
 ## Phase 4.8 Bugfix TV Parity
 
 - TV 榜单布局与电影榜单一致：第 1 名为大卡，第 2 名后为两列。

@@ -13,6 +13,12 @@ public interface ITvSeasonIdentificationService
         TvScanDirectoryAnalysisResult? directoryAnalysis,
         CancellationToken cancellationToken = default);
 
+    Task<TvSeasonIdentificationRunResult> IdentifyMediaFilesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        TvScanDirectoryAnalysisResult? directoryAnalysis,
+        ScanTmdbSearchCache? tmdbSearchCache,
+        CancellationToken cancellationToken = default);
+
     Task<int> ApplyManualMediaFileMatchAsync(
         int mediaFileId,
         int seriesTmdbId,

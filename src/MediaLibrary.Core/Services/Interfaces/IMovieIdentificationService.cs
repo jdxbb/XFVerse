@@ -8,6 +8,11 @@ public interface IMovieIdentificationService
         IReadOnlyCollection<int> mediaFileIds,
         CancellationToken cancellationToken = default);
 
+    Task<IdentificationRunResult> IdentifyMediaFilesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        ScanTmdbSearchCache? tmdbSearchCache,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<MetadataSearchCandidate>> SearchCandidatesAsync(
         string query,
         int? releaseYear,

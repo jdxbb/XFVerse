@@ -34,12 +34,21 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         IReadOnlyCollection<int> mediaFileIds,
         CancellationToken cancellationToken = default)
     {
-        return await IdentifyMediaFilesAsync(mediaFileIds, directoryAnalysis: null, cancellationToken);
+        return await IdentifyMediaFilesAsync(mediaFileIds, directoryAnalysis: null, tmdbSearchCache: null, cancellationToken);
     }
 
     public async Task<TvSeasonIdentificationRunResult> IdentifyMediaFilesAsync(
         IReadOnlyCollection<int> mediaFileIds,
         TvScanDirectoryAnalysisResult? directoryAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        return await IdentifyMediaFilesAsync(mediaFileIds, directoryAnalysis, tmdbSearchCache: null, cancellationToken);
+    }
+
+    public async Task<TvSeasonIdentificationRunResult> IdentifyMediaFilesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        TvScanDirectoryAnalysisResult? directoryAnalysis,
+        ScanTmdbSearchCache? tmdbSearchCache,
         CancellationToken cancellationToken = default)
     {
         var result = new TvSeasonIdentificationRunResult();
@@ -140,7 +149,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 {
                     ScanIdentificationDiagnostics.Write(
                         $"event=tv-search-start query={ScanIdentificationDiagnostics.FormatValue(query)} querySource={ScanIdentificationDiagnostics.FormatValue(queryAttempt.Source)} season={candidate.SeasonNumber} files={candidate.Files.Count} candidateSource={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateSource)}");
-                    searchPage = await _tmdbService.SearchTvSeriesAsync(query, 1, cancellationToken: cancellationToken);
+                    searchPage = await SearchTvSeriesAsync(query, 1, "zh-CN", tmdbSearchCache, cancellationToken);
                 }
                 catch (Exception exception)
                 {
@@ -394,6 +403,36 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         await transaction.CommitAsync(cancellationToken);
         await _metadataHydrationService.HydrateSeriesAsync(seriesTmdbId, force: true, cancellationToken);
         return tvEpisode.Id;
+    }
+
+    private async Task<TmdbTvSeriesSearchPage> SearchTvSeriesAsync(
+        string query,
+        int page,
+        string language,
+        ScanTmdbSearchCache? tmdbSearchCache,
+        CancellationToken cancellationToken)
+    {
+        if (tmdbSearchCache is not null
+            && tmdbSearchCache.TryGetTvSearch(query, page, language, out var cachedResult))
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-search-cache-hit query={ScanIdentificationDiagnostics.FormatValue(query)} page={page} language={ScanIdentificationDiagnostics.FormatValue(language)} tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
+            return cachedResult;
+        }
+
+        if (tmdbSearchCache is not null)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-search-cache-miss query={ScanIdentificationDiagnostics.FormatValue(query)} page={page} language={ScanIdentificationDiagnostics.FormatValue(language)} tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries}");
+        }
+
+        var result = await _tmdbService.SearchTvSeriesAsync(
+            query,
+            page,
+            language,
+            cancellationToken: cancellationToken);
+        tmdbSearchCache?.SetTvSearch(query, page, language, result);
+        return result;
     }
 
     private static void LogAiCandidateRange(

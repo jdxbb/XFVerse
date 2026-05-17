@@ -364,6 +364,13 @@
 - AI still does not receive TMDB top-N candidates, select TMDB candidates, return episodeFiles, or write records directly.
 - This is scan plumbing only; Movie Discovery, AI recommendations, Watch Insights, and media-library visibility are unchanged.
 
+## Phase 4.11f-perf-1 Scan Performance Update
+
+- The post-AI TV retry now runs only for AI affected `MediaFileIds`, not the full scan set.
+- A per-scan TMDB search cache deduplicates repeated TV and Movie search queries during scan identification.
+- TV and Movie caches are separate, runtime-only, and not persisted.
+- This is performance plumbing only. Movie Discovery UI, ranking cards, recommendation AI inputs, Watch Insights, and media-library visibility semantics are unchanged.
+
 ## FD-2.1 / FD-2.2 Closeout
 
 收尾检查与人工验收反馈修复：

@@ -57,6 +57,7 @@
 - Phase 4.11e-fix-2 binds scan AI candidate ranges to runtime `MediaFileIds`, so mapped AI hints no longer depend primarily on sanitized path parent/child matching to recover files. Discovery surfaces remain unchanged.
 - Phase 4.11f uses AI refined TV title hints for local scan TMDB lookup. It remains scan plumbing only and does not change Discovery cards, Movie AI recommendation inputs, Watch Insights, or TV exclusion from AI surfaces.
 - Phase 4.11f-fix-2 prefers original-language AI title hints for scan refined TV lookup, but English / localized fallback titles can still produce wrong TMDB top1 matches. These remain Phase 4.12 active correction / manual review work.
+- Phase 4.11f-perf-1 adds same-run TMDB search caching and limits post-AI TV retry scope. It does not change Discovery behavior or scan matching quality; remaining wrong top1 matches still require Phase 4.12 active correction / manual review.
 
 ## Phase 4.10.6 TV Discovery Notes
 

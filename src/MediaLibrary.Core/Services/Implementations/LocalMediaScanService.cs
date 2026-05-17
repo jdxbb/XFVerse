@@ -221,6 +221,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         var postStage = new PostScanStageResult();
         try
         {
+            var tmdbSearchCache = new ScanTmdbSearchCache();
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-identification-stage-start source=local videoIds={postProcessVideoMediaFileIds.Count}");
             var tvDirectoryAnalysis = await _tvScanDirectoryAnalysisService.AnalyzeAsync(
@@ -232,6 +233,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             var tvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
                 postProcessVideoMediaFileIds.ToArray(),
                 tvDirectoryAnalysis,
+                tmdbSearchCache,
                 cancellationToken);
             postStage.Absorb(tvIdentificationResult.Summary);
             var tvHandledMediaFileIds = new HashSet<int>(tvIdentificationResult.HandledMediaFileIds);
@@ -240,17 +242,24 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             var tvPlaceholderCount = tvIdentificationResult.Summary.PlaceholderCount;
             var tvWarningCount = tvIdentificationResult.Summary.WarningCount;
             var tvErrorCount = tvIdentificationResult.Summary.ErrorCount;
-            var aiOnUncertainAppliedFiles = await _tvScanDirectoryAnalysisService.ApplyAiOnUncertainAsync(
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-tv-first-pass-complete source=local tvIdentifyFirstPassRequested={postProcessVideoMediaFileIds.Count} handled={tvHandledMediaFileIds.Count} attempted={tvIdentificationResult.Summary.AttemptedCount} bound={tvIdentificationResult.Summary.BoundCount} placeholders={tvIdentificationResult.Summary.PlaceholderCount} warnings={tvIdentificationResult.Summary.WarningCount} errors={tvIdentificationResult.Summary.ErrorCount}");
+            var aiOnUncertainApplyResult = await _tvScanDirectoryAnalysisService.ApplyAiOnUncertainAsync(
                 postProcessVideoMediaFileIds.ToArray(),
                 tvDirectoryAnalysis,
                 cancellationToken);
-            if (aiOnUncertainAppliedFiles > 0)
+            var aiAffectedMediaFileIds = aiOnUncertainApplyResult.AffectedMediaFileIds
+                .Where(postProcessVideoMediaFileIds.Contains)
+                .Distinct()
+                .ToArray();
+            if (aiAffectedMediaFileIds.Length > 0)
             {
                 ScanIdentificationDiagnostics.Write(
-                    $"event=scan-tv-ai-on-uncertain-retry source=local appliedFiles={aiOnUncertainAppliedFiles} validation=tv-parser-tmdb-safety-gates");
+                    $"event=scan-tv-ai-on-uncertain-retry source=local appliedFiles={aiOnUncertainApplyResult.AppliedFiles} aiAffectedMediaFiles={aiAffectedMediaFileIds.Length} tvIdentifySecondPassRequested={aiAffectedMediaFileIds.Length} tvIdentifySecondPassScope=ai-affected-files validation=tv-parser-tmdb-safety-gates");
                 var aiTvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
-                    postProcessVideoMediaFileIds.ToArray(),
+                    aiAffectedMediaFileIds,
                     tvDirectoryAnalysis,
+                    tmdbSearchCache,
                     cancellationToken);
                 postStage.Absorb(aiTvIdentificationResult.Summary);
                 tvHandledMediaFileIds.UnionWith(aiTvIdentificationResult.HandledMediaFileIds);
@@ -259,6 +268,11 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 tvPlaceholderCount += aiTvIdentificationResult.Summary.PlaceholderCount;
                 tvWarningCount += aiTvIdentificationResult.Summary.WarningCount;
                 tvErrorCount += aiTvIdentificationResult.Summary.ErrorCount;
+            }
+            else
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=scan-tv-ai-on-uncertain-retry-skipped source=local appliedFiles={aiOnUncertainApplyResult.AppliedFiles} aiAffectedMediaFiles=0 tvIdentifySecondPassRequested=0 tvIdentifySecondPassScope=none tvIdentifySecondPassSkippedReason=no-ai-affected-files");
             }
 
             ScanIdentificationDiagnostics.WriteFinalAiCandidateRanges("local", tvDirectoryAnalysis);
@@ -273,10 +287,13 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 $"event=scan-movie-stage-start source=local requested={movieMediaFileIds.Length} movieFallbackBlockedByTvRisk={tvDirectoryAnalysis.MovieFallbackBlockedMediaFileIds.Count}");
             var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(
                 movieMediaFileIds,
+                tmdbSearchCache,
                 cancellationToken);
             postStage.Absorb(identificationResult);
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-movie-stage-complete source=local requested={movieMediaFileIds.Length} attempted={identificationResult.AttemptedCount} bound={identificationResult.BoundCount} placeholders={identificationResult.PlaceholderCount} warnings={identificationResult.WarningCount} errors={identificationResult.ErrorCount}");
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-search-cache-summary source=local tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbTvSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries} tmdbMovieSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
         }
         catch (Exception exception)
         {

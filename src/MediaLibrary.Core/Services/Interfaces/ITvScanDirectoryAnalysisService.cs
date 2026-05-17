@@ -8,7 +8,7 @@ public interface ITvScanDirectoryAnalysisService
         IReadOnlyCollection<int> mediaFileIds,
         CancellationToken cancellationToken = default);
 
-    Task<int> ApplyAiOnUncertainAsync(
+    Task<TvScanAiOnUncertainApplyResult> ApplyAiOnUncertainAsync(
         IReadOnlyCollection<int> mediaFileIds,
         TvScanDirectoryAnalysisResult analysis,
         CancellationToken cancellationToken = default);

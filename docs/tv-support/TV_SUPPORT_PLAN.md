@@ -822,3 +822,14 @@ Phase 4.11f-fix-2 changes AI refined lookup title priority to prefer original-la
 - The existing product choice remains: TMDB top1 from the selected refined query is accepted for the AI refined path when TMDB returns a result.
 - No title-specific alias table, TMDB top-N AI selection, second AI request, migration, or database update is introduced.
 - Phase 4.12 remains responsible for active AI-assisted correction / manual confirmation of any remaining wrong top1 matches.
+
+## Phase 4.11f-perf-1 Update
+
+Phase 4.11f-perf-1 is a scan performance pass with no recognition-policy change.
+
+- The second TV identification pass after AI-on-uncertain is scoped to AI affected `MediaFileIds` instead of the full scan set.
+- If AI affects no files, the second TV pass is skipped.
+- A per-scan TMDB search cache deduplicates repeated TV and Movie search queries during the same scan run.
+- TV and Movie search caches stay separate and are keyed with media type and relevant search context.
+- The cache is runtime-only, not persisted to the database, and does not require migration.
+- This phase does not change AI prompt/schema, refined-title top1 behavior, parser rules, fallback rules, safety gates, media-library visibility, Movie AI classification behavior, or Discovery surfaces.
