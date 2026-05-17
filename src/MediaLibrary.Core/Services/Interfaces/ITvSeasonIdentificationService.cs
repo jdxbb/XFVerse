@@ -8,6 +8,11 @@ public interface ITvSeasonIdentificationService
         IReadOnlyCollection<int> mediaFileIds,
         CancellationToken cancellationToken = default);
 
+    Task<TvSeasonIdentificationRunResult> IdentifyMediaFilesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        TvScanDirectoryAnalysisResult? directoryAnalysis,
+        CancellationToken cancellationToken = default);
+
     Task<int> ApplyManualMediaFileMatchAsync(
         int mediaFileId,
         int seriesTmdbId,

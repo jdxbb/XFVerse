@@ -1,4 +1,5 @@
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
@@ -11,6 +12,7 @@ namespace MediaLibrary.Core.Services.Implementations;
 public sealed class LocalMediaScanService : ILocalMediaScanService
 {
     private readonly ISettingsService _settingsService;
+    private readonly ITvScanDirectoryAnalysisService _tvScanDirectoryAnalysisService;
     private readonly ITvSeasonIdentificationService _tvSeasonIdentificationService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly ISubtitleBindingService _subtitleBindingService;
@@ -19,6 +21,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
     public LocalMediaScanService(
         ISettingsService settingsService,
+        ITvScanDirectoryAnalysisService tvScanDirectoryAnalysisService,
         ITvSeasonIdentificationService tvSeasonIdentificationService,
         IMovieIdentificationService movieIdentificationService,
         ISubtitleBindingService subtitleBindingService,
@@ -26,6 +29,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         IMediaProbeService mediaProbeService)
     {
         _settingsService = settingsService;
+        _tvScanDirectoryAnalysisService = tvScanDirectoryAnalysisService;
         _tvSeasonIdentificationService = tvSeasonIdentificationService;
         _movieIdentificationService = movieIdentificationService;
         _subtitleBindingService = subtitleBindingService;
@@ -217,18 +221,62 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         var postStage = new PostScanStageResult();
         try
         {
-            var tvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-identification-stage-start source=local videoIds={postProcessVideoMediaFileIds.Count}");
+            var tvDirectoryAnalysis = await _tvScanDirectoryAnalysisService.AnalyzeAsync(
                 postProcessVideoMediaFileIds.ToArray(),
                 cancellationToken);
+            var aiCandidateRangesWithFiles = tvDirectoryAnalysis.AiCandidateRanges.Count(x => x.MediaFileIds.Count > 0);
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-ai-candidate-ranges source=local count={tvDirectoryAnalysis.AiCandidateRanges.Count} uniqueAiCandidateDirs={tvDirectoryAnalysis.AiCandidateRanges.Count} mergedRangeCount={tvDirectoryAnalysis.AiCandidateRangeMergedCount} deduplicatedEntryCount={tvDirectoryAnalysis.AiCandidateRangeDeduplicatedEntryCount} rangesWithFiles={aiCandidateRangesWithFiles} rangesWithoutFiles={Math.Max(0, tvDirectoryAnalysis.AiCandidateRanges.Count - aiCandidateRangesWithFiles)} fullAiRangeAnalysis=disabled reason=deferred-to-ai-on-uncertain");
+            var tvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
+                postProcessVideoMediaFileIds.ToArray(),
+                tvDirectoryAnalysis,
+                cancellationToken);
             postStage.Absorb(tvIdentificationResult.Summary);
+            var tvHandledMediaFileIds = new HashSet<int>(tvIdentificationResult.HandledMediaFileIds);
+            var tvAttemptedCount = tvIdentificationResult.Summary.AttemptedCount;
+            var tvBoundCount = tvIdentificationResult.Summary.BoundCount;
+            var tvPlaceholderCount = tvIdentificationResult.Summary.PlaceholderCount;
+            var tvWarningCount = tvIdentificationResult.Summary.WarningCount;
+            var tvErrorCount = tvIdentificationResult.Summary.ErrorCount;
+            var aiOnUncertainAppliedFiles = await _tvScanDirectoryAnalysisService.ApplyAiOnUncertainAsync(
+                postProcessVideoMediaFileIds.ToArray(),
+                tvDirectoryAnalysis,
+                cancellationToken);
+            if (aiOnUncertainAppliedFiles > 0)
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=scan-tv-ai-on-uncertain-retry source=local appliedFiles={aiOnUncertainAppliedFiles} validation=tv-parser-tmdb-safety-gates");
+                var aiTvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
+                    postProcessVideoMediaFileIds.ToArray(),
+                    tvDirectoryAnalysis,
+                    cancellationToken);
+                postStage.Absorb(aiTvIdentificationResult.Summary);
+                tvHandledMediaFileIds.UnionWith(aiTvIdentificationResult.HandledMediaFileIds);
+                tvAttemptedCount += aiTvIdentificationResult.Summary.AttemptedCount;
+                tvBoundCount += aiTvIdentificationResult.Summary.BoundCount;
+                tvPlaceholderCount += aiTvIdentificationResult.Summary.PlaceholderCount;
+                tvWarningCount += aiTvIdentificationResult.Summary.WarningCount;
+                tvErrorCount += aiTvIdentificationResult.Summary.ErrorCount;
+            }
+
+            ScanIdentificationDiagnostics.WriteFinalAiCandidateRanges("local", tvDirectoryAnalysis);
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-tv-stage-complete source=local requested={postProcessVideoMediaFileIds.Count} handled={tvHandledMediaFileIds.Count} attempted={tvAttemptedCount} bound={tvBoundCount} placeholders={tvPlaceholderCount} warnings={tvWarningCount} errors={tvErrorCount}");
 
             var movieMediaFileIds = postProcessVideoMediaFileIds
-                .Except(tvIdentificationResult.HandledMediaFileIds)
+                .Except(tvHandledMediaFileIds)
+                .Except(tvDirectoryAnalysis.MovieFallbackBlockedMediaFileIds)
                 .ToArray();
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-movie-stage-start source=local requested={movieMediaFileIds.Length} movieFallbackBlockedByTvRisk={tvDirectoryAnalysis.MovieFallbackBlockedMediaFileIds.Count}");
             var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(
                 movieMediaFileIds,
                 cancellationToken);
             postStage.Absorb(identificationResult);
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-movie-stage-complete source=local requested={movieMediaFileIds.Length} attempted={identificationResult.AttemptedCount} bound={identificationResult.BoundCount} placeholders={identificationResult.PlaceholderCount} warnings={identificationResult.WarningCount} errors={identificationResult.ErrorCount}");
         }
         catch (Exception exception)
         {
@@ -242,15 +290,6 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         catch (Exception exception)
         {
             postStage.AddWarning("Local.DefaultSource", FormatExceptionType(exception));
-        }
-
-        try
-        {
-            await ClassifyAffectedMoviesAsync(postProcessVideoMediaFileIds, cancellationToken);
-        }
-        catch (Exception exception)
-        {
-            postStage.AddWarning("AI.Classify", FormatExceptionType(exception));
         }
 
         try
@@ -278,9 +317,12 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             await UpdateConnectionLastScanAtAsync(sourceConnectionId, completedAt, cancellationToken);
         }
 
+        QueueMovieClassification(postProcessVideoMediaFileIds);
         QueueMediaProbe(postProcessVideoMediaFileIds);
 
         totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
+        ScanIdentificationDiagnostics.Write(
+            $"event=scan-run-complete source=local scanned={totalResult.TotalScannedCount} new={totalResult.NewFileCount} updated={totalResult.UpdatedFileCount} ignored={totalResult.IgnoredFileCount} errors={totalResult.ErrorCount} backgroundAiClassification=queued");
         return totalResult;
     }
 
@@ -682,7 +724,13 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         var movieIds = await dbContext.MediaFiles
             .AsNoTracking()
-            .Where(x => mediaFileIds.Contains(x.Id) && x.MovieId.HasValue)
+            .Where(
+                x => mediaFileIds.Contains(x.Id)
+                     && x.MovieId.HasValue
+                     && x.Movie != null
+                     && x.Movie.TmdbId.HasValue
+                     && (x.Movie.IdentificationStatus == IdentificationStatus.Matched
+                         || x.Movie.IdentificationStatus == IdentificationStatus.ManualConfirmed))
             .Select(x => x.MovieId!.Value)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -693,6 +741,9 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 .AsNoTracking()
                 .AnyAsync(
                     x => x.Id == movieId
+                         && x.TmdbId.HasValue
+                         && (x.IdentificationStatus == IdentificationStatus.Matched
+                             || x.IdentificationStatus == IdentificationStatus.ManualConfirmed)
                          && (string.IsNullOrWhiteSpace(x.AiTagsText)
                              || string.IsNullOrWhiteSpace(x.EmotionTagsText)
                              || string.IsNullOrWhiteSpace(x.SceneTagsText)),
@@ -723,6 +774,38 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 catch
                 {
                     // Media probing is best-effort and must not affect scan results.
+                }
+            });
+    }
+
+    private void QueueMovieClassification(IReadOnlyCollection<int> mediaFileIds)
+    {
+        if (mediaFileIds.Count == 0)
+        {
+            return;
+        }
+
+        var ids = mediaFileIds.ToArray();
+        ScanIdentificationDiagnostics.Write(
+            $"event=scan-ai-classify-queued source=local mediaFiles={ids.Length} mode=background reason=non-blocking-scan-completion");
+        _ = Task.Run(
+            async () =>
+            {
+                var startedAt = DateTime.UtcNow;
+                try
+                {
+                    ScanIdentificationDiagnostics.Write(
+                        $"event=scan-ai-classify-start source=local mediaFiles={ids.Length}");
+                    await ClassifyAffectedMoviesAsync(ids, CancellationToken.None);
+                    var durationMs = (long)(DateTime.UtcNow - startedAt).TotalMilliseconds;
+                    ScanIdentificationDiagnostics.Write(
+                        $"event=scan-ai-classify-complete source=local mediaFiles={ids.Length} durationMs={durationMs}");
+                }
+                catch (Exception exception)
+                {
+                    var durationMs = (long)(DateTime.UtcNow - startedAt).TotalMilliseconds;
+                    ScanIdentificationDiagnostics.Write(
+                        $"event=scan-ai-classify-error source=local mediaFiles={ids.Length} durationMs={durationMs} error={ScanIdentificationDiagnostics.FormatValue(FormatExceptionType(exception), 180)}");
                 }
             });
     }

@@ -283,6 +283,14 @@
                                Text="{Binding SelectedCount, StringFormat=已选 {0} 项}"
                                Style="{StaticResource BodyTextStyle}" />
                     <Button Margin="0,0,10,10"
+                            Content="&#x5168;&#x9009;&#x5F53;&#x524D;&#x5217;&#x8868;"
+                            Command="{Binding SelectVisibleItemsCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
+                            Content="&#x6E05;&#x7A7A;&#x9009;&#x62E9;"
+                            Command="{Binding ClearBatchSelectionCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
                             Content="标记为已看"
                             Command="{Binding BatchMarkWatchedCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />

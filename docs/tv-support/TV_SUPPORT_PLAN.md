@@ -568,5 +568,257 @@ Phase 4.10.6 optimizes TV Discovery navigation and metadata hydration without ch
 - TV search / ranking pagination and repeated TV card clicks are guarded while a TV Series detail navigation is in progress.
 - Deleting a TV Season record and reopening the Series from TV search / ranking must still recreate the Series / Season summary and open `SeriesOverviewPage`.
 - Hydration still does not create `MediaFile`, fabricate playback sources, write collection state, or include TV in AI / Watch Insights / fingerprints.
-- Phase 4.11 remains TV correction entry UI.
-- Phase 4.12 remains TV scan / rescan / history-location hardening.
+- Phase 4.11 is rebased to TV scan identification hardening before correction UI.
+- Phase 4.12 becomes the AI-assisted correction / cross-type correction entry phase.
+
+## Phase 4.11 Goal
+
+Phase 4.11 hardens TV scan identification and adds lightweight AI directory hints for default scan.
+
+- Default scan can call the configured AI service with a sanitized path tree, but AI only suggests likely TV ranges.
+- AI results do not write the database, do not request TMDB, and do not decide the final match.
+- Local parser and TMDB confidence checks remain the final gate.
+- AI failure, timeout, or invalid JSON falls back to local rules.
+- Files inside an AI or local strong TV range go through TV identification first; if TV cannot match safely, they stay in TV placeholder / unrecognized TV handling and are not silently sent to Movie fallback.
+- Files outside TV ranges keep the existing Movie identification path.
+- Parser support is extended for strong TV contexts: bare numeric episodes, Chinese episode markers, Chinese season folders, and title-plus-number filenames.
+- TV query generation now tries multiple cleaned candidates and rejects generic season / quality / codec-only queries.
+- Diagnostic scan logs record sanitized paths, TV range source, parser pattern, candidate source, query attempts, reject reason, and final decision.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11 Boundaries
+
+- No migration is added.
+- No database update is executed.
+- Default scan AI does not perform full Movie / TV correction.
+- Complex mixed folders and cross-type corrections move to Phase 4.12.
+- TV AI recommendation remains a Phase 5 candidate, not part of Phase 4.
+
+## Phase 4.11b Goal
+
+Phase 4.11b corrects the default-scan AI responsibility boundary after diagnostics showed the old `episode-files-v1` prompt was too heavy.
+
+- Default scan AI now uses `directory-ranges-v1`.
+- AI returns Series / Season directory ranges only: `seriesFolder`, `seriesTitleHint`, `seasonFolders`, `seasonNumberHint`, `confidence`, and a compact reason.
+- AI is explicitly instructed not to return `episodeFiles` and not to map files to episode numbers.
+- Local TV parsing remains responsible for Season / Episode numbers inside AI TV ranges.
+- AI range results still do not write database rows, do not call TMDB, and do not decide final Series matches.
+- Low-confidence ranges are logged but not applied.
+- Invalid JSON, timeout, or AI failure still falls back to local rules.
+- Diagnostics record schema, prompt size, token estimate, sample file count, response size, duration, parsed range count, applied range count, ignored low-confidence count, and fallback reason.
+- A long-timeout probe against the same active-video set showed the new schema reduced assistant output from about 43.3k chars to about 13.8k chars and duration from about 156.7s to about 100.2s, but the request can still exceed the production 18s timeout.
+- Budget-driven directory summary / batch remains a follow-up if default scan AI still times out.
+- Phase 4.12 remains the active AI-assisted correction / cross-type correction entry phase.
+
+## Phase 4.11c Goal
+
+Phase 4.11c optimizes the `directory-ranges-v1` prompt without changing scan matching rules or adding batching.
+
+- Directory summaries now describe direct video files only.
+- `sampleVideoFiles` are selected only from the current directory's direct videos; child folders are listed separately as `childFolders`.
+- Sample count is `ceil(directVideoCount * 10%)`, clamped to 1-5; directories with no direct videos use zero samples.
+- Sample selection favors episode-like names, bare numeric names, title-plus-number names, then ordinary videos, and spreads samples across the directory instead of taking only adjacent files.
+- AI output uses short `evidence` values instead of natural-language reasons.
+- The parser does not require evidence and ignores unexpected `episodeFiles`.
+- Long-timeout probing against the same active-video set showed the prompt was reduced from about 23.1k chars to about 20.5k chars and duration from about 100.2s to about 92.7s.
+- The result is acceptable for one-off large-directory diagnosis, but it can still exceed the production short timeout; batch remains deferred until real scans prove it is required.
+- No production timeout decision is made in this phase.
+
+## Phase 4.11d Goal
+
+Phase 4.11d tightens TV scan generalization and match validation without adding a migration.
+
+- Strong TV context now requires multiple independent evidence signals instead of a single weak hint.
+- Single title-plus-number, bare numeric, or explicit episode-like filenames are treated as weak TV context unless supported by directory / sibling / sequential evidence.
+- TV risk can block silent Movie fallback without enabling broad title-plus-number parsing.
+- Chinese season / episode / count structures are retained as structure hints and rejected as standalone title queries.
+- TV query attempts carry a `querySource`, and rejected queries log a concrete bad-query reason.
+- TV TMDB search logs selected query source and downgrades close / conflicting top candidates to placeholder instead of auto-binding.
+- Diagnostics record strong evidence, weak reason, fallback-risk count, selected query, query source, and candidate conflict reason.
+- This phase optimizes for lower wrong auto-bind risk, not higher bound count.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11d Deferred
+
+- Disabling default full AI and introducing local pre-analysis / `aiCandidateRanges` / AI-on-uncertain remains the next scan phase.
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- Episode detail pages and Episode multi-source management remain deferred.
+
+## Phase 4.11e-prep Goal
+
+Phase 4.11e-prep disables default production full AI range analysis and prepares local `aiCandidateRanges` diagnostics for a later AI-on-uncertain scan phase.
+
+- Default WebDAV and Local scans no longer call the full AI directory range request by default.
+- `TvScanDirectoryAnalysisService` and the directory-range AI code remain available as a diagnostic / optional experiment path.
+- Local scan pre-analysis now emits `aiCandidateRanges` from TV risk signals such as weak TV context, title-number / numeric uncertainty, generic season queries, fallback-blocked directories, placeholders, and candidate conflicts.
+- `aiCandidateRanges` are log-only and are not persisted to the database.
+- `aiCandidateRanges` include sanitized path, risk tags, sample direct video files, suspected Series / Season folder, candidate query, blocked Movie fallback count, and conflict count where available.
+- This phase does not actually call AI for uncertain ranges.
+- Phase 4.11d local tightening, query rejection, candidate conflict downgrade, and Movie fallback risk interception remain in place.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11e-prep Deferred
+
+- AI-on-uncertain directory assistance remains the next scan phase.
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- No production long timeout, batch, or concurrent batch policy is introduced in this phase.
+
+## Phase 4.11e-prep-2 Goal
+
+Phase 4.11e-prep-2 improves the quality of scan candidate ranges before AI-on-uncertain is enabled.
+
+- Movie identification rejects numeric-only, metadata-only, and otherwise low-information queries from automatic binding.
+- Low-information Movie queries become placeholders instead of high-confidence wrong auto-binds.
+- Generic TV structure risk is extended to total-count / season-range hints with multiple sequential numeric direct videos.
+- TV-risk folders can still block Movie fallback without becoming automatic TV matches.
+- `aiCandidateRanges` only represent unresolved, conflicting, weak-risk, or fallback-blocked ranges; successful strong TV matches without unresolved risk are not emitted as AI candidates.
+- Candidate ranges are merged by sanitized directory and keep combined risk tags, direct-video samples, query buckets, conflict counts, and fallback-block counts.
+- Candidate queries are classified as usable, rejected, or noisy for later AI-on-uncertain prompts.
+- Local directory hints use local / directory diagnostic names; AI names are reserved for real AI responses.
+- Default full AI range analysis remains disabled and this phase does not call AI for candidate ranges.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11e-prep-2 Deferred
+
+- Formal AI-on-uncertain directory assistance remains the next scan phase after another real scan log audit.
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- Movie title cleaning may still need broader release-token refinement after real Movie scan samples are reviewed.
+
+## Phase 4.11e-prep-3 Goal
+
+Phase 4.11e-prep-3 finalizes scan candidate input before enabling AI-on-uncertain.
+
+- Movie scan title cleaning removes generic release / audio / source metadata before TMDB Movie search.
+- Movie cleanup stays pattern-based and does not add specific movie, release group, folder, or TMDB ID special cases.
+- Candidate query diagnostics are split into usable, noisy, and rejected buckets so later AI prompts do not treat dirty strings as primary title hints.
+- TV placeholder, conflict, dirty-query, low-confidence, and fallback-blocked paths are merged into a final run-level `aiCandidateRanges` summary.
+- Final candidate range summaries are log-only, sanitized, merged by directory, and do not write database rows.
+- Same-name / version conflicts remain downgrade-only; local scan does not force a version decision.
+- Default full AI range analysis remains disabled and no AI-on-uncertain call is made in this phase.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11e-prep-3 Deferred
+
+- Formal AI-on-uncertain directory assistance remains the next scan phase.
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- Episode detail pages and Episode multi-source management remain deferred.
+
+## Phase 4.11e-prep-4 Goal
+
+Phase 4.11e-prep-4 adds final scan auto-bind validation gates before enabling AI-on-uncertain.
+
+- Movie scan auto-binding is limited to clear `Matched` results. `NeedsReview` and other uncertain Movie results become placeholders / future AI-candidate diagnostics.
+- TV scan auto-binding is limited to clear `Matched` results. `NeedsReview`-level TV candidates are not written as matched Seasons.
+- Localized-title exact matches are no longer enough by themselves when a generic version qualifier / original-title conflict is detected.
+- Movie title cleanup gets only small generic release/source/audio/subtitle improvements; no specific movie title, release group, directory, or TMDB ID special cases are introduced.
+- Diagnostics expose `movieAutoApply`, `tvAutoApply`, and blocked reasons so scan logs can prove when uncertain candidates were not written.
+- Default full AI range analysis remains disabled and no AI-on-uncertain call is made in this phase.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11e-prep-4 Deferred
+
+- Formal AI-on-uncertain directory assistance remains the next scan phase if real scan logs show no remaining wrong auto-bind blocker.
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- Episode detail pages and Episode multi-source management remain deferred.
+
+## Phase 4.11e Goal
+
+Phase 4.11e enables AI-on-uncertain scan assistance for final `aiCandidateRanges` only.
+
+- Default full AI range analysis remains disabled.
+- AI-on-uncertain input is built only from the final sanitized `aiCandidateRanges` summary.
+- AI returns directory / title / season hints only. It does not return `episodeFiles` and does not map individual files to Season / Episode numbers.
+- AI hints are diagnostic inputs to the existing TV parser, TMDB query, conflict downgrade, and auto-bind safety gates.
+- AI never writes database records directly. Only local validation can apply clear `Matched` and no-conflict results.
+- `NeedsReview`, conflict, low confidence, dirty query, and weak-source results remain placeholders / AI-candidate diagnostics.
+- AI failure, timeout, empty response, or invalid JSON falls back to the pre-existing placeholders / candidate ranges.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11e Deferred
+
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- Episode detail pages and Episode multi-source management remain deferred.
+- Complex mixed Movie / TV folders that still cannot be resolved safely remain `NeedsReview` / placeholder until active correction.
+
+## Phase 4.11e-fix-1 Goal
+
+Phase 4.11e-fix-1 fixes AI-on-uncertain hint mapping and adds a small media-library batch selection helper.
+
+- AI-on-uncertain maps hints back to local candidate ranges by `inputRangeId` first.
+- AI-returned `seriesFolderHint` / `seasonFolderHint` values are auxiliary hints, not hard path selectors.
+- Directory hint mismatch is logged as a warning-style diagnostic and does not discard an otherwise mapped hint.
+- Fuzzy sanitized-path matching remains only as fallback for missing / unknown `inputRangeId`.
+- AI hints remain hint-only and still flow through local parser, TMDB validation, candidate conflict downgrade, and scan auto-bind gates.
+- Media-library batch mode can select the current filtered / loaded list and clear the current selection.
+- Remove-from-library and delete-record semantics are unchanged.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11e-fix-1 Deferred
+
+- Full active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- Further scan match-quality tuning should be driven by a fresh rescan log after the mapping fix.
+- Episode detail pages and Episode multi-source management remain deferred.
+
+## Phase 4.11e-fix-2 Goal
+
+Phase 4.11e-fix-2 fixes AI-on-uncertain candidate range file binding.
+
+- Candidate ranges carry runtime `MediaFileIds` for the files covered by each uncertain directory range.
+- Candidate range merge / dedupe preserves and merges `MediaFileIds`.
+- AI hint application maps by `inputRangeId`, then resolves files by `MediaFileIds`.
+- `SanitizedPath` is retained for logs, prompt context, and fallback only.
+- Diagnostics expose range file counts, file resolution method, and aggregate no-file counters.
+- AI hints remain hint-only and still require local parser, TMDB validation, and safety gates.
+- Phase 4.11e-fix-1 current-list batch select-all remains available.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11e-fix-2 Deferred
+
+- Fresh real scan validation should verify that `no-files-in-input-range` drops and applied hints increase.
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- Episode detail pages and Episode multi-source management remain deferred.
+
+## Phase 4.11f Goal
+
+Phase 4.11f upgrades AI-on-uncertain from generic directory/title hints to refined title lookup hints while keeping local validation in control.
+
+- Default full AI range analysis remains disabled.
+- AI-on-uncertain still processes only final `aiCandidateRanges`.
+- AI returns `refinedSeriesTitle`, optional `originalTitleHint`, `yearHint`, `seasonNumberHint`, confidence, `needsReview`, and short evidence.
+- AI does not receive TMDB top-N candidates, does not choose TMDB candidates, does not return `episodeFiles`, and does not write records.
+- Local TV identification uses `refinedSeriesTitle` as an `ai-refined-title` TMDB TV search query and takes the TMDB top1 only after a lightweight safety gate.
+- The lightweight safety gate rejects low confidence, `needsReview`, no-result, title mismatch, year conflict, original-title conflict, and unresolved top-candidate conflict.
+- Safety-gate failures preserve placeholder / `NeedsReview` / `ai-candidate` results.
+- `inputRangeId -> MediaFileIds`, local parser ownership of Episode parsing, and all auto-bind safety gates remain in force.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11f Deferred
+
+- Active AI-assisted correction and cross-type correction UI remains Phase 4.12.
+- AI-based TMDB candidate selection / second-pass disambiguation is not introduced in Phase 4.11f.
+- Episode detail pages and Episode multi-source management remain deferred.
+
+## Phase 4.11f-fix-1 Update
+
+Phase 4.11f-fix-1 supersedes the Phase 4.11f refined lookup safety-gate behavior for AI-on-uncertain ranges.
+
+- AI-on-uncertain still processes only final `aiCandidateRanges`; full AI range analysis remains disabled.
+- AI is asked to return the cleanest likely `refinedSeriesTitle` for local TMDB TV search, even when the range is uncertain.
+- `needsReview=true` and low confidence no longer block TMDB lookup when `refinedSeriesTitle` is present.
+- Local code searches TMDB TV with `refinedSeriesTitle` and accepts top1 for the AI refined lookup path.
+- Original-title, localized-title, year, version, and top-candidate conflict gates no longer block this AI refined top1 path.
+- AI still does not receive TMDB top-N candidates, does not choose TMDB candidates, does not return `episodeFiles`, and does not write records directly.
+- Empty `refinedSeriesTitle`, no TMDB result, missing `inputRangeId`, missing `MediaFileIds`, or unparseable episode files still preserve placeholder / `ai-candidate` behavior.
+- Possible wrong top1 matches are a known product tradeoff and should be corrected through Phase 4.12 active AI-assisted correction / manual confirmation.
+
+## Phase 4.11f-fix-2 Update
+
+Phase 4.11f-fix-2 changes AI refined lookup title priority to prefer original-language titles.
+
+- AI-on-uncertain prompt/schema now asks for `originalLanguageTitle`, `englishTitleHint`, `localizedTitleHint`, and `searchTitle`.
+- For non-English series, the AI is instructed to return the original-language title as the primary TMDB search query instead of the English/international title when it can infer one.
+- Local refined lookup query priority is `originalLanguageTitle`, then `searchTitle`, then `englishTitleHint`, then localized / legacy refined fallback.
+- English and localized titles are retained as fallback / auxiliary aliases only.
+- The existing product choice remains: TMDB top1 from the selected refined query is accepted for the AI refined path when TMDB returns a result.
+- No title-specific alias table, TMDB top-N AI selection, second AI request, migration, or database update is introduced.
+- Phase 4.12 remains responsible for active AI-assisted correction / manual confirmation of any remaining wrong top1 matches.

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
@@ -10,8 +12,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MediaLibrary.Core.Services.Implementations;
 
-public sealed class MovieIdentificationService : IMovieIdentificationService
+public sealed partial class MovieIdentificationService : IMovieIdentificationService
 {
+    private const double MinimumAutoMatchConfidence = 0.55d;
+    private const double MatchedConfidence = 0.80d;
+
     private readonly ISettingsService _settingsService;
     private readonly ITmdbService _tmdbService;
     private readonly IOmdbService _omdbService;
@@ -39,8 +44,10 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             .Distinct()
             .ToArray();
 
+        ScanIdentificationDiagnostics.Write($"event=movie-identify-start requested={distinctIds.Length}");
         if (distinctIds.Length == 0)
         {
+            ScanIdentificationDiagnostics.Write("event=movie-identify-complete requested=0 reason=no-media-file-ids");
             return result;
         }
 
@@ -64,11 +71,15 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
 
             if (mediaFile is null)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-skip mediaFileId={mediaFileId} reason=missing-or-deleted-video");
                 continue;
             }
 
             if (mediaFile.EpisodeId.HasValue)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-skip mediaFileId={mediaFileId} reason=already-bound-tv-episode episodeId={mediaFile.EpisodeId.Value}");
                 continue;
             }
 
@@ -77,6 +88,8 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
                 && mediaFile.Movie.TmdbId.HasValue
                 && mediaFile.Movie.IdentificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-skip mediaFileId={mediaFileId} reason=already-stable-movie movieId={mediaFile.MovieId.Value} tmdbId={mediaFile.Movie.TmdbId.Value}");
                 continue;
             }
 
@@ -84,9 +97,24 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             var candidateTitle = string.IsNullOrWhiteSpace(parsedName.CleanTitle)
                 ? Path.GetFileNameWithoutExtension(mediaFile.FileName)
                 : parsedName.CleanTitle;
+            var lowInformationReason = GetLowInformationMovieQueryReason(candidateTitle, parsedName.ReleaseYear);
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-candidate mediaFileId={mediaFileId} path={ScanIdentificationDiagnostics.FormatPath(mediaFile.FilePath)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} rawMovieTitle={ScanIdentificationDiagnostics.FormatValue(Path.GetFileNameWithoutExtension(mediaFile.FileName))} cleanedMovieTitle={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} removedNoiseCategory={ScanIdentificationDiagnostics.FormatValue(string.Join('|', parsedName.RemovedNoiseCategories))} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} existingMovieId={ScanIdentificationDiagnostics.FormatNullable(mediaFile.MovieId)} movieQueryQuality={ScanIdentificationDiagnostics.FormatValue(string.IsNullOrWhiteSpace(lowInformationReason) ? "usable" : "low-information")} movieLowInformationQuery={(!string.IsNullOrWhiteSpace(lowInformationReason)).ToString().ToLowerInvariant()} movieAutoMatchBlockedReason={ScanIdentificationDiagnostics.FormatValue(lowInformationReason)}");
+
+            if (!string.IsNullOrWhiteSpace(lowInformationReason))
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} reason=movie-low-information-query movieLowInformationQuery=true movieAutoMatchBlockedReason={ScanIdentificationDiagnostics.FormatValue(lowInformationReason)} finalDecision=movie-placeholder");
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                result.PlaceholderCount++;
+                continue;
+            }
 
             if (!hasTmdbCredential)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} reason=missing-tmdb-credential");
                 await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
@@ -101,6 +129,8 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             }
             catch (Exception exception)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-search-error mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
                 await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
@@ -118,8 +148,22 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
                 .OrderByDescending(candidate => candidate.Confidence)
                 .FirstOrDefault();
 
-            if (bestCandidate is null || bestCandidate.Confidence < 0.55d)
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-search-complete mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} resultCount={searchResults.Count} topTitle={ScanIdentificationDiagnostics.FormatValue(bestCandidate?.Title)} topOriginal={ScanIdentificationDiagnostics.FormatValue(bestCandidate?.OriginalTitle)} topTmdbId={ScanIdentificationDiagnostics.FormatNullable(bestCandidate?.TmdbId)} topYear={ScanIdentificationDiagnostics.FormatNullable(bestCandidate?.ReleaseYear)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(bestCandidate?.Confidence)} movieLowInformationQuery=false movieResultStatus={ScanIdentificationDiagnostics.FormatValue(GetMovieResultStatus(bestCandidate))} movieAutoApply={(bestCandidate?.Confidence >= MatchedConfidence).ToString().ToLowerInvariant()} movieAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(GetMovieAutoApplyBlockedReason(bestCandidate))} decision={ScanIdentificationDiagnostics.FormatValue(GetMovieSearchDecision(bestCandidate))}");
+            if (bestCandidate is null || bestCandidate.Confidence < MinimumAutoMatchConfidence)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} reason={(bestCandidate is null ? "movie-no-result" : "movie-low-confidence")} movieResultStatus={ScanIdentificationDiagnostics.FormatValue(GetMovieResultStatus(bestCandidate))} movieAutoApply=false movieAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(GetMovieAutoApplyBlockedReason(bestCandidate))} finalDecision=movie-placeholder");
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                result.PlaceholderCount++;
+                continue;
+            }
+
+            if (bestCandidate.Confidence < MatchedConfidence)
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} topTmdbId={bestCandidate.TmdbId} topTitle={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Title)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(bestCandidate.Confidence)} reason=movie-needs-review movieResultStatus=NeedsReview movieAutoApply=false movieAutoApplyBlockedReason=needs-review-not-auto-applied finalDecision=movie-placeholder");
                 await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
@@ -137,28 +181,34 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
                 }
                 else
                 {
+                    ScanIdentificationDiagnostics.Write(
+                        $"event=movie-detail-empty mediaFileId={mediaFileId} tmdbId={bestCandidate.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Title)}");
                     result.AddWarning("TMDB.Detail", $"TMDB 详情为空：{bestCandidate.Title}，已使用搜索结果继续绑定。");
                 }
             }
             catch (Exception exception)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-detail-error mediaFileId={mediaFileId} tmdbId={bestCandidate.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Title)} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
                 result.AddWarning(
                     "TMDB.Detail",
                     $"{bestCandidate.Title} 详情读取失败，已退回搜索结果继续绑定：{TrimMessage(exception.Message)}");
             }
 
-            var status = effectiveCandidate.Confidence >= 0.80d
-                ? IdentificationStatus.Matched
-                : IdentificationStatus.NeedsReview;
+            var status = IdentificationStatus.Matched;
 
             try
             {
                 await ApplyCandidateAsync(dbContext, mediaFile, effectiveCandidate, status, result, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.BoundCount++;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-apply-complete mediaFileId={mediaFileId} tmdbId={effectiveCandidate.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(effectiveCandidate.Title)} status={status} movieResultStatus={status} movieAutoApply=true movieAutoApplyBlockedReason=(none)");
             }
             catch (Exception exception)
             {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-apply-error mediaFileId={mediaFileId} tmdbId={effectiveCandidate.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(effectiveCandidate.Title)} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
                 await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
@@ -166,6 +216,8 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             }
         }
 
+        ScanIdentificationDiagnostics.Write(
+            $"event=movie-identify-complete requested={distinctIds.Length} attempted={result.AttemptedCount} bound={result.BoundCount} placeholders={result.PlaceholderCount} warnings={result.WarningCount} errors={result.ErrorCount}");
         return result;
     }
 
@@ -1050,6 +1102,140 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
         return Math.Clamp((bestTitleScore * 0.8d) + (yearScore * 0.2d), 0d, 1d);
     }
 
+    private static string GetMovieSearchDecision(MetadataSearchCandidate? candidate)
+    {
+        if (candidate is null)
+        {
+            return "placeholder-no-result";
+        }
+
+        if (candidate.Confidence < MinimumAutoMatchConfidence)
+        {
+            return "placeholder-low-confidence";
+        }
+
+        return candidate.Confidence >= MatchedConfidence
+            ? "match"
+            : "placeholder-needs-review";
+    }
+
+    private static string GetMovieResultStatus(MetadataSearchCandidate? candidate)
+    {
+        if (candidate is null || candidate.Confidence < MinimumAutoMatchConfidence)
+        {
+            return "none";
+        }
+
+        return candidate.Confidence >= MatchedConfidence
+            ? nameof(IdentificationStatus.Matched)
+            : nameof(IdentificationStatus.NeedsReview);
+    }
+
+    private static string GetMovieAutoApplyBlockedReason(MetadataSearchCandidate? candidate)
+    {
+        if (candidate is null)
+        {
+            return "no-result";
+        }
+
+        if (candidate.Confidence < MinimumAutoMatchConfidence)
+        {
+            return "low-confidence";
+        }
+
+        return candidate.Confidence >= MatchedConfidence
+            ? string.Empty
+            : "needs-review-not-auto-applied";
+    }
+
+    private static string GetLowInformationMovieQueryReason(string candidateTitle, int? releaseYear)
+    {
+        var normalized = NormalizeQueryToken(candidateTitle);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "empty-or-too-short-query";
+        }
+
+        if (PureNumberQueryRegex().IsMatch(normalized))
+        {
+            return "numeric-only-title";
+        }
+
+        var tokens = normalized
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length == 0)
+        {
+            return "empty-or-too-short-query";
+        }
+
+        var titleTokens = tokens
+            .Where(token => !IsLowInformationMovieToken(token, releaseYear))
+            .ToArray();
+        if (titleTokens.Length == 0)
+        {
+            return "release-metadata-only-query";
+        }
+
+        var hasCjk = titleTokens.Any(token => token.Any(IsCjk));
+        var hasMeaningfulLatin = titleTokens.Any(token => token.Count(char.IsLetter) >= 3);
+        var hasMeaningfulToken = hasCjk || hasMeaningfulLatin || titleTokens.Any(token => token.Length >= 3 && token.Any(char.IsLetter));
+        if (!hasMeaningfulToken)
+        {
+            return "low-information-title";
+        }
+
+        if (normalized.Length <= 2 && !hasCjk)
+        {
+            return "empty-or-too-short-query";
+        }
+
+        return string.Empty;
+    }
+
+    private static bool IsLowInformationMovieToken(string token, int? releaseYear)
+    {
+        var normalized = token.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return true;
+        }
+
+        if (releaseYear.HasValue && normalized == releaseYear.Value.ToString(CultureInfo.InvariantCulture))
+        {
+            return true;
+        }
+
+        return LowInformationMovieTokenRegex().IsMatch(normalized);
+    }
+
+    private static string NormalizeQueryToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new System.Text.StringBuilder(value.Length);
+        foreach (var ch in value.Trim())
+        {
+            if (char.IsLetterOrDigit(ch) || IsCjk(ch))
+            {
+                builder.Append(ch);
+            }
+            else
+            {
+                builder.Append(' ');
+            }
+        }
+
+        return System.Text.RegularExpressions.Regex.Replace(builder.ToString(), @"\s+", " ").Trim();
+    }
+
+    private static bool IsCjk(char ch)
+    {
+        return ch is >= '\u4e00' and <= '\u9fff';
+    }
+
     private static async Task<Movie?> LoadMovieAggregateAsync(
         AppDbContext dbContext,
         int movieId,
@@ -1185,4 +1371,10 @@ public sealed class MovieIdentificationService : IMovieIdentificationService
             ? int.MaxValue
             : Math.Abs(candidateYear.Value - expectedYear);
     }
+
+    [GeneratedRegex(@"^\d{1,4}$", RegexOptions.CultureInvariant)]
+    private static partial Regex PureNumberQueryRegex();
+
+    [GeneratedRegex(@"^(?:\d{1,4}|19\d{2}|20\d{2}|part|pt|disc|disk|cd|sample|trailer|teaser|preview|extras?|bonus|4k|8k|1080p|2160p|720p|480p|uhd|fhd|sd|hq|hdr|hdr10|dv|x264|x265|h264|h265|hevc|av1|bluray|blu|ray|brrip|webrip|webdl|web|dl|hdrip|dvdrip|bdrip|hdtv|remux|aac|ac3|eac3|dts|truehd|atmos|ddp\d?|flac|lpcm|pcm|ma|hd|fg[tm]|10bit|8bit|proper|repack|extended|limited|multi|subs?|subbed|dubbed|dual|audio|japanese|english|chinese|mandarin|cantonese|korean|amzn|nf|dsnp|hmax|itunes|group|team)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LowInformationMovieTokenRegex();
 }

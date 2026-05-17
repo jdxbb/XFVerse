@@ -130,6 +130,8 @@ public sealed class LibraryViewModel : PageViewModelBase
         OpenOrToggleSelectionCommand = new RelayCommand(OpenOrToggleSelection);
         ToggleItemSelectionCommand = new RelayCommand(ToggleItemSelection);
         ToggleBatchSelectionModeCommand = new RelayCommand(ToggleBatchSelectionMode, () => !IsBatchOperationRunning);
+        SelectVisibleItemsCommand = new RelayCommand(SelectVisibleItems, () => CanSelectVisibleItems);
+        ClearBatchSelectionCommand = new RelayCommand(ClearBatchSelection, () => CanClearBatchSelection);
         BatchMarkWatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(true), () => CanBatchMarkWatched);
         BatchMarkUnwatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(false), () => CanBatchMarkUnwatched);
         BatchAutoIdentifyCommand = new AsyncRelayCommand(BatchAutoIdentifyAsync, () => CanBatchAutoIdentify);
@@ -198,6 +200,10 @@ public sealed class LibraryViewModel : PageViewModelBase
     public RelayCommand ToggleItemSelectionCommand { get; }
 
     public RelayCommand ToggleBatchSelectionModeCommand { get; }
+
+    public RelayCommand SelectVisibleItemsCommand { get; }
+
+    public RelayCommand ClearBatchSelectionCommand { get; }
 
     public AsyncRelayCommand BatchMarkWatchedCommand { get; }
 
@@ -457,6 +463,10 @@ public sealed class LibraryViewModel : PageViewModelBase
     public bool HasSelection => SelectedCount > 0;
 
     public string BatchSelectionButtonText => IsBatchSelectionMode ? "完成" : "批量选择";
+
+    public bool CanSelectVisibleItems => IsBatchSelectionMode && Movies.Count > 0 && !IsBatchOperationRunning;
+
+    public bool CanClearBatchSelection => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
     public bool CanBatchMarkWatched => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
@@ -1087,6 +1097,35 @@ public sealed class LibraryViewModel : PageViewModelBase
         RefreshBatchCommandState();
     }
 
+    private void SelectVisibleItems()
+    {
+        if (!IsBatchSelectionMode || IsBatchOperationRunning || Movies.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var item in Movies)
+        {
+            _selectedItemKeys.Add(item.SelectionKey);
+            item.IsSelected = true;
+        }
+
+        BatchResultSummary = $"\u5DF2\u9009\u4E2D\u5F53\u524D\u5217\u8868 {Movies.Count} \u9879\u3002";
+        WriteLibraryBatchEvent($"event=library-select-visible-items count={Movies.Count}");
+        RefreshBatchCommandState();
+    }
+
+    private void ClearBatchSelection()
+    {
+        if (!IsBatchSelectionMode || IsBatchOperationRunning || _selectedItemKeys.Count == 0)
+        {
+            return;
+        }
+
+        ClearSelection();
+        BatchResultSummary = "\u5DF2\u6E05\u7A7A\u9009\u62E9\u3002";
+    }
+
     private async Task BatchSetWatchedAsync(bool isWatched)
     {
         var selectedItems = GetSelectedVisibleItems();
@@ -1527,6 +1566,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(CanSelectVisibleItems));
+        OnPropertyChanged(nameof(CanClearBatchSelection));
         OnPropertyChanged(nameof(CanBatchMarkWatched));
         OnPropertyChanged(nameof(CanBatchMarkUnwatched));
         OnPropertyChanged(nameof(CanBatchAutoIdentify));
@@ -1540,6 +1581,8 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         ToggleBatchSelectionModeCommand.RaiseCanExecuteChanged();
+        SelectVisibleItemsCommand.RaiseCanExecuteChanged();
+        ClearBatchSelectionCommand.RaiseCanExecuteChanged();
         BatchMarkWatchedCommand.RaiseCanExecuteChanged();
         BatchMarkUnwatchedCommand.RaiseCanExecuteChanged();
         BatchAutoIdentifyCommand.RaiseCanExecuteChanged();

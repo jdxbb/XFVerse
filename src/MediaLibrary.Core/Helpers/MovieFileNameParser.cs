@@ -11,6 +11,7 @@ public static partial class MovieFileNameParser
         "2160p",
         "720p",
         "480p",
+        "hq",
         "4k",
         "hdr",
         "hdr10",
@@ -39,7 +40,6 @@ public static partial class MovieFileNameParser
         "ddp5",
         "10bit",
         "8bit",
-        "yify",
         "proper",
         "repack",
         "extended",
@@ -63,22 +63,64 @@ public static partial class MovieFileNameParser
     public static ParsedMovieName Parse(string fileName)
     {
         var nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName).Trim();
-        var yearMatch = YearRegex().Match(nameWithoutExtension);
+        var yearMatch = FindLikelyReleaseYearMatch(nameWithoutExtension);
         var year = ExtractYear(yearMatch);
+        var removedNoiseCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var normalized = nameWithoutExtension;
+        if (yearMatch.Success && HasLikelyTitleBeforeYear(nameWithoutExtension, yearMatch))
+        {
+            normalized = nameWithoutExtension[..yearMatch.Index];
+            removedNoiseCategories.Add("release-year-tail");
+        }
+
         normalized = BracketedContentRegex().Replace(normalized, " ");
         normalized = CleanupSeparatorsRegex().Replace(normalized, " ");
+        normalized = AudioCodecPhraseRegex().Replace(normalized, match =>
+        {
+            removedNoiseCategories.Add("audio-codec");
+            return " ";
+        });
+        normalized = AudioChannelLayoutRegex().Replace(normalized, match =>
+        {
+            removedNoiseCategories.Add("channel-layout");
+            return " ";
+        });
+        normalized = VideoCodecPhraseRegex().Replace(normalized, match =>
+        {
+            removedNoiseCategories.Add("video-codec");
+            return " ";
+        });
+        normalized = SourceQualityPhraseRegex().Replace(normalized, match =>
+        {
+            removedNoiseCategories.Add("release-source");
+            return " ";
+        });
+        normalized = TrailingSymbolReleaseTokenRegex().Replace(normalized, match =>
+        {
+            removedNoiseCategories.Add("release-tail");
+            return " ";
+        });
+        normalized = LanguageSubtitlePhraseRegex().Replace(normalized, match =>
+        {
+            removedNoiseCategories.Add("language-subtitle");
+            return " ";
+        });
         normalized = SeasonEpisodeRegex().Replace(normalized, " ");
         normalized = ReleaseGroupRegex().Replace(normalized, " ");
 
         foreach (var token in NoiseTokens)
         {
-            normalized = Regex.Replace(
+            var updated = Regex.Replace(
                 normalized,
                 $@"\b{Regex.Escape(token)}\b",
                 " ",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (!string.Equals(updated, normalized, StringComparison.Ordinal))
+            {
+                removedNoiseCategories.Add("release-token");
+                normalized = updated;
+            }
         }
 
         if (year.HasValue)
@@ -95,7 +137,10 @@ public static partial class MovieFileNameParser
         return new ParsedMovieName
         {
             CleanTitle = normalized,
-            ReleaseYear = year
+            ReleaseYear = year,
+            RemovedNoiseCategories = removedNoiseCategories
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToArray()
         };
     }
 
@@ -220,6 +265,36 @@ public static partial class MovieFileNameParser
         return Math.Clamp(Math.Max(subsetScore, (tokenScore * 0.6d) + (charScore * 0.4d)), 0d, 1d);
     }
 
+    private static Match FindLikelyReleaseYearMatch(string value)
+    {
+        return YearRegex()
+                   .Matches(value)
+                   .Cast<Match>()
+                   .LastOrDefault()
+               ?? Match.Empty;
+    }
+
+    private static bool HasLikelyTitleBeforeYear(string value, Match yearMatch)
+    {
+        if (!yearMatch.Success || yearMatch.Index <= 0)
+        {
+            return false;
+        }
+
+        var prefix = value[..yearMatch.Index];
+        var normalized = NormalizeTitle(
+            CleanupSeparatorsRegex().Replace(
+                BracketedContentRegex().Replace(prefix, " "),
+                " "));
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        return normalized.Any(IsCjk)
+               || normalized.Count(char.IsLetter) >= 3;
+    }
+
     private static int? ExtractYear(Match match)
     {
         if (!match.Success)
@@ -268,14 +343,32 @@ public static partial class MovieFileNameParser
     [GeneratedRegex(@"[.\-_·•]+", RegexOptions.CultureInvariant)]
     private static partial Regex CleanupSeparatorsRegex();
 
-    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|（[^）]+）|【[^】]+】", RegexOptions.CultureInvariant)]
     private static partial Regex BracketedContentRegex();
 
     [GeneratedRegex(@"\bS\d{1,2}E\d{1,2}\b|\b\d{1,2}x\d{1,2}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SeasonEpisodeRegex();
 
-    [GeneratedRegex(@"-\s*[A-Za-z0-9]+$|\b(?:GROUP|TEAM|RARBG|YTS|CMCTV|CHD|MNNHD)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"-\s*[A-Za-z0-9]+$|\b(?:GROUP|TEAM)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ReleaseGroupRegex();
+
+    [GeneratedRegex(@"\b(?:DTS(?:\s+(?:HD|MA|X|ES))*|TRUEHD|ATMOS|DDP|EAC3|AC3|AAC|FLAC|LPCM|PCM)(?:\s+(?:HD|MA|X|ES|ATMOS))*\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AudioCodecPhraseRegex();
+
+    [GeneratedRegex(@"(?:^|\s)(?:[257]\s+[01]|[257]\s*\.\s*[01])(?:\s|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AudioChannelLayoutRegex();
+
+    [GeneratedRegex(@"\b(?:X\s*26[45]|H\s*\.?\s*26[45]|HEVC|AV1|VC\s*1|MPEG\s*2|10\s*BIT|8\s*BIT)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex VideoCodecPhraseRegex();
+
+    [GeneratedRegex(@"\b(?:4K|8K|UHD|FHD|HD|SD|HQ|HDR|HDR10|DV|DOLBY\s+VISION|BLU\s*RAY|BLURAY|BD\s*REMUX|BDRIP|BRRIP|WEB(?:\s*[- ]?\s*(?:DL|RIP))?|WEBDL|WEBRIP|HDRIP|DVDRIP|HDTV|REMUX|PROPER|REPACK|EXTENDED|LIMITED|DIRECTORS?\s+CUT|THEATRICAL|IMAX|AMZN|NF|DSNP|HMAX|ITUNES)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SourceQualityPhraseRegex();
+
+    [GeneratedRegex(@"\b(?:JAPANESE|ENGLISH|CHINESE|MANDARIN|CANTONESE|KOREAN|FRENCH|GERMAN|SPANISH|MULTI|SUBS?|SUBBED|DUBBED|DUAL\s+AUDIO)\b|(?:\u4e2d\u5b57|\u4e2d\u82f1\u5b57\u5e55|\u5b57\u5e55|\u56fd\u8bed|\u7ca4\u8bed|\u914d\u97f3|\u516c\u6620\u4e2d\u5b57|\u51c0\u7248)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LanguageSubtitlePhraseRegex();
+
+    [GeneratedRegex(@"(?:^|\s)[\p{Sc}\p{P}\p{S}]*[A-Za-z0-9]{2,}[A-Za-z0-9\p{Sc}\p{P}\p{S}]*[\p{Sc}\p{P}\p{S}]+[A-Za-z0-9\p{Sc}\p{P}\p{S}]*\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TrailingSymbolReleaseTokenRegex();
 
     [GeneratedRegex(@"[\p{IsCJKUnifiedIdeographs}]{2,}|[A-Za-z][A-Za-z0-9'’&\s:]{2,}", RegexOptions.CultureInvariant)]
     private static partial Regex TitleSegmentRegex();

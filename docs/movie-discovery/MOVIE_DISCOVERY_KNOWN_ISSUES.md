@@ -41,6 +41,22 @@
 - Add-to-library does not restore old `IsDeleted` source rows.
 - TV Discovery remains excluded from AI recommendations, Watch Insights, profile/persona inputs, and recommendation fingerprints.
 - Phase 4.10.6 handles TV Discovery navigation / hydration contention with summary-first navigation and TV pagination guards.
+- Phase 4.11 default scan AI is limited to sanitized TV range hints and does not affect Discovery AI recommendation semantics.
+- Phase 4.11 protects strong TV ranges from silent Movie fallback; mixed-folder corrections are deferred to Phase 4.12.
+- Phase 4.11b changes default scan AI to directory-range output only. It no longer asks for `episodeFiles`, but large scan trees may still need budget-driven summary batching if the short production timeout is exceeded.
+- Phase 4.11c optimizes scan AI summaries with direct-video samples and short evidence fields. Discovery behavior is unchanged, and batch is still deferred unless real scans require it.
+- Phase 4.11d tightens TV scan generalization: strong TV context now requires multiple evidence signals, weak TV risk blocks silent Movie fallback only when appropriate, and TMDB candidate conflicts should downgrade to placeholder / review instead of chasing bound counts.
+- Phase 4.11e-prep disables default production full AI range calls and only emits log-only `aiCandidateRanges`; Discovery behavior remains unchanged.
+- Phase 4.11e-prep-2 keeps scan candidate range fixes out of Discovery surfaces: Movie low-information query blocking and TV-risk fallback protection only affect scan identification plumbing.
+- Numeric-only / low-information Movie scan queries now become placeholders instead of automatic TMDB binds; users can still correct them through later manual / AI-assisted correction flows.
+- Phase 4.11e-prep-3 broadens generic Movie release/audio/source cleanup and emits final scan candidate summaries, but it still does not enable AI-on-uncertain or change Discovery surfaces.
+- Phase 4.11e-prep-4 blocks Movie `NeedsReview` scan candidates from automatic binding and keeps them as placeholders / future AI-candidate diagnostics.
+- Phase 4.11e-prep-4 also downgrades TV localized-title version conflicts and still does not enable AI-on-uncertain or change Discovery surfaces.
+- Phase 4.11e enables scan AI-on-uncertain only for final sanitized candidate ranges. It is still scan plumbing and does not change Discovery ranking cards, Movie AI recommendation inputs, Watch Insights, or TV exclusion from AI surfaces.
+- Phase 4.11e-fix-1 changes scan AI hint application to `inputRangeId`-first mapping. It should reduce dropped AI hints caused by sanitized directory text mismatch, but Discovery surfaces remain unchanged.
+- Phase 4.11e-fix-2 binds scan AI candidate ranges to runtime `MediaFileIds`, so mapped AI hints no longer depend primarily on sanitized path parent/child matching to recover files. Discovery surfaces remain unchanged.
+- Phase 4.11f uses AI refined TV title hints for local scan TMDB lookup. It remains scan plumbing only and does not change Discovery cards, Movie AI recommendation inputs, Watch Insights, or TV exclusion from AI surfaces.
+- Phase 4.11f-fix-2 prefers original-language AI title hints for scan refined TV lookup, but English / localized fallback titles can still produce wrong TMDB top1 matches. These remain Phase 4.12 active correction / manual review work.
 
 ## Phase 4.10.6 TV Discovery Notes
 
@@ -48,6 +64,12 @@
 - Full Episode metadata is completed later by Series overview background hydration or by Season detail on-demand hydration.
 - TV pagination and repeated TV card clicks are guarded while a TV Series navigation request is active.
 - Discovery still does not create playback sources or TV AI / Watch Insights input.
+
+## Phase 4.11f-fix-1 Scan AI Refined Title Risk
+
+- AI refined title lookup now accepts TMDB TV top1 directly for uncertain scan ranges when `refinedSeriesTitle` is non-empty and TMDB returns a result.
+- This intentionally removes the previous original/year/version refined safety gate for this path; wrong top1 matches should be handled by Phase 4.12 active correction / manual confirmation.
+- Movie Discovery, Movie recommendation AI, Watch Insights, and media-library visibility are unchanged.
 
 ## 搜索
 

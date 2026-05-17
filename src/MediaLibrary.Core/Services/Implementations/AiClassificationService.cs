@@ -27,6 +27,12 @@ public sealed class AiClassificationService : IAiClassificationService
             return;
         }
 
+        if (!movie.TmdbId.HasValue
+            || movie.IdentificationStatus is not (IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed))
+        {
+            return;
+        }
+
         var local = BuildLocalTags(movie.GenresText, movie.Overview);
         movie.AiTagsText = null;
         movie.EmotionTagsText = null;

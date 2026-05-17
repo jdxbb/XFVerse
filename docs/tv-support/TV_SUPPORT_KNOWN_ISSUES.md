@@ -21,6 +21,7 @@
 - No known Phase 4.10.5 blocker after adding explicit add / restore visibility actions; build verification remains the gate.
 - No known Phase 4.10.5b blocker after source / state-aware restore and SeriesOverview action consistency fixes; build verification remains the gate.
 - No known Phase 4.10.6 blocker after summary-first TV Discovery navigation and Season-level Episode hydration; build verification remains the gate.
+- No known Phase 4.11 blocker after TV scan identification hardening; build verification remains the gate.
 
 ## Deferred
 
@@ -47,6 +48,18 @@
 - Automatic cleanup for metadata-only TV rows created by discovery browsing remains deferred after Phase 4.10.1.
 - More granular metadata-only TV library filters remain deferred; Phase 4.10.1 keeps default visibility conservative.
 - A future explicit remove-source action may be needed if users need to detach playback sources without deleting full software records.
+- Complex mixed Movie files inside AI-detected TV folders can become TV placeholders by design in Phase 4.11; Phase 4.12 should provide AI-assisted correction.
+- Default scan AI only provides TV range hints. It is not a TV recommendation feature and does not enter Watch Insights or recommendation fingerprints.
+- Phase 4.11b reduced the default scan AI schema from episode-file mapping to directory ranges, but large directory trees can still exceed the current short production timeout. Budget-driven directory batching / stronger summarization remains deferred.
+- Phase 4.11c further reduces prompt size with direct-video directory summaries and short evidence fields, but large scans can still exceed the short production timeout. Batch remains deferred until needed by real scan results.
+- Phase 4.11d tightens strong TV context and candidate conflict handling, but it still relies on default local/TMDB evidence. Uncertain mixed folders should remain candidates for the next local pre-analysis / AI-on-uncertain phase rather than being forced into automatic matches.
+- Phase 4.11e-prep disables default full AI range analysis in production scans. The AI range implementation is retained for diagnostics, while log-only `aiCandidateRanges` prepare uncertain directories for a later AI-on-uncertain phase.
+- Phase 4.11e-prep-2 blocks low-information Movie auto-binds and improves `aiCandidateRanges` quality, but another real scan log audit is still required before enabling AI-on-uncertain.
+- Movie title cleaning may still leave some release/audio/source metadata in candidate queries; broad Movie cleaner refinement should be driven by additional real Movie samples, not by one-off title special cases.
+- Phase 4.11e-prep-3 improves generic Movie release/audio/source cleanup and emits final run-level `aiCandidateRanges`; another real scan should verify whether Movie placeholders now reflect real ambiguity instead of leftover metadata noise.
+- Formal AI-on-uncertain is still not enabled after Phase 4.11e-prep-3; uncertain ranges remain diagnostics until the next scan phase.
+- Phase 4.11e-prep-4 blocks Movie / TV `NeedsReview` scan results from automatic binding. A real rescan should verify that wrong auto-bind count drops before enabling AI-on-uncertain.
+- TV localized-title version conflicts are downgraded by generic qualifier/original-title checks, but deeper country / remake / same-name adjudication remains for AI-on-uncertain or manual correction.
 
 ## Noise
 
@@ -76,3 +89,17 @@
 - Phase 4.10.5 add-to-library writes `Visible` as media-library visibility only; it intentionally does not create playback sources, set preference state, restore old `IsDeleted` rows, or include TV in AI / Watch Insights.
 - Phase 4.10.5b supersedes Phase 4.10.5 restore behavior: removed-library restore writes `Auto` when active source or real current state exists, and writes `Visible` only for source-less no-state rows.
 - Phase 4.10.6 changes TV Discovery navigation to summary-first hydration. Full Episode metadata can complete later in `SeriesOverviewPage` background hydration or on demand in `TvSeasonDetailPage`.
+- Phase 4.11 scan diagnostics intentionally keep only sanitized tail paths and filenames; they are for rule tuning, not full private path reconstruction.
+- Phase 4.11b long-timeout probing is diagnostic only; production default scan still uses the configured short AI range timeout and falls back to local rules on timeout.
+- Phase 4.11c does not set a production timeout. Long-timeout probing remains diagnostic and must not be treated as a user-facing scan wait target.
+- Phase 4.11d intentionally prioritizes lower wrong auto-bind risk over higher bound count. Manual scan validation should track wrong auto-bind count and candidate conflicts, not only the number of bound TV seasons.
+- Phase 4.11e-prep does not run AI against uncertain ranges yet. `aiCandidateRanges` are diagnostic hints only and should not be interpreted as persisted scan results.
+- Phase 4.11e-prep-2 keeps `aiCandidateRanges` diagnostic-only. Candidate range counts should be read as review workload, not as successful identification counts.
+- Phase 4.11e-prep-3 final `aiCandidateRanges` summaries are still diagnostic-only. They are input candidates for later AI-on-uncertain, not successful scan bindings.
+- Phase 4.11e AI-on-uncertain can improve uncertain range title / season hints, but it remains hint-only. Any unresolved, conflicting, low-confidence, or dirty result must stay placeholder / `NeedsReview` until active correction.
+- Phase 4.11e-fix-1 changes AI-on-uncertain mapping from directory-hint hard matching to `inputRangeId`-first mapping. A fresh scan should verify that hints are no longer dropped primarily as `no-matching-sanitized-directory`.
+- Phase 4.11e-fix-2 changes candidate range file recovery from sanitized-path matching to runtime `MediaFileIds`. A fresh scan should verify that mapped hints are no longer dropped primarily as `no-files-in-input-range`.
+- Phase 4.11f uses AI refined title hints for local TMDB top1 lookup, but it still does not ask AI to choose among TMDB candidates. Ambiguous same-title / remake / version cases that fail the lightweight safety gate remain placeholder / `NeedsReview` / `ai-candidate` until Phase 4.12 active correction.
+- Phase 4.11f-fix-1 removes the AI refined lookup original/year/version safety gate and accepts TMDB top1 when `refinedSeriesTitle` returns a result. This may increase wrong top1 risk by product choice; Phase 4.12 active correction / manual confirmation is the intended mitigation.
+- Phase 4.11f-fix-2 prefers AI-provided original-language titles for refined TMDB lookup. If AI cannot infer an original-language title and falls back to English / localized aliases, wrong top1 matches can still occur and remain Phase 4.12 active correction work.
+- Current-list batch select-all is intentionally scoped to loaded / filtered media-library items. It is not a hidden global delete helper and should not select removed-library or unloaded items.
