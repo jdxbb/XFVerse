@@ -292,6 +292,9 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             postStage.Absorb(identificationResult);
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-movie-stage-complete source=local requested={movieMediaFileIds.Length} attempted={identificationResult.AttemptedCount} bound={identificationResult.BoundCount} placeholders={identificationResult.PlaceholderCount} warnings={identificationResult.WarningCount} errors={identificationResult.ErrorCount}");
+            await _movieIdentificationService.AggregateUnidentifiedMediaFilesAsync(
+                scanPaths.Select(x => x.Id).ToArray(),
+                cancellationToken);
             ScanIdentificationDiagnostics.Write(
                 $"event=tmdb-search-cache-summary source=local tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbTvSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries} tmdbMovieSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
         }
@@ -385,6 +388,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         catch
         {
             result.ErrorCount++;
+            result.IgnoredFiles.WriteDiagnostics("local", result.IgnoredFileCount);
             await CompletePathLogAsync(
                 log,
                 result,
@@ -397,6 +401,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
         if (!result.RootWasReadable)
         {
+            result.IgnoredFiles.WriteDiagnostics("local", result.IgnoredFileCount);
             await CompletePathLogAsync(
                 log,
                 result,
@@ -422,7 +427,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             {
                 if (!seenFilePaths.Add(entry.FilePath))
                 {
-                    result.IgnoredFileCount++;
+                    result.RecordIgnored("duplicate-path", entry.FileName);
                     continue;
                 }
 
@@ -508,6 +513,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
             result.IsCompleted = true;
             result.CanMarkMissing = result.ErrorCount == 0;
+            result.IgnoredFiles.WriteDiagnostics("local", result.IgnoredFileCount);
             await CompletePathLogAsync(
                 log,
                 result,
@@ -524,6 +530,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         catch
         {
             result.ErrorCount++;
+            result.IgnoredFiles.WriteDiagnostics("local", result.IgnoredFileCount);
             await CompletePathLogAsync(
                 log,
                 result,
@@ -575,14 +582,14 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 {
                     if (ShouldSkipFile(file))
                     {
-                        result.IgnoredFileCount++;
+                        result.RecordIgnored("other", file.Name);
                         continue;
                     }
 
                     var mediaType = MediaFileRules.GetMediaType(file.Name);
                     if (mediaType == MediaType.Other)
                     {
-                        result.IgnoredFileCount++;
+                        result.RecordIgnored("unsupported-extension", file.Name);
                         continue;
                     }
 
@@ -621,7 +628,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             {
                 if (ShouldSkipDirectory(child))
                 {
-                    result.IgnoredFileCount++;
+                    result.RecordIgnored("other", child.Name);
                     continue;
                 }
 
@@ -1094,6 +1101,14 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         public int IgnoredFileCount { get; set; }
 
         public int ErrorCount { get; set; }
+
+        public ScanIgnoredFileStats IgnoredFiles { get; } = new();
+
+        public void RecordIgnored(string reason, string fileNameOrPath)
+        {
+            IgnoredFileCount++;
+            IgnoredFiles.Add(reason, fileNameOrPath);
+        }
     }
 
     private sealed class PostScanStageResult

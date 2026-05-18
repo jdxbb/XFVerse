@@ -117,7 +117,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         LibraryScopeOptions = [LibraryScopeAll, LibraryScopeWithSource, LibraryScopeWithoutSource];
         SourceFilterOptions = [SourceFilterAll, SourceFilterLocal, SourceFilterWebDav];
         CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested];
-        ContentTypeOptions = ["全部", "电影", "电视剧"];
+        ContentTypeOptions = ["全部", "电影", "电视剧", "其他"];
         SwitchToPosterViewCommand = new RelayCommand(() => IsPosterView = true);
         SwitchToListViewCommand = new RelayCommand(() => IsPosterView = false);
         SelectLibraryScopeCommand = new RelayCommand(SelectLibraryScope);
@@ -589,14 +589,18 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         try
         {
-            if (item.IsSeason && item.SeasonId > 0)
-            {
-                await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(item.SeasonId);
-            }
-            else if (item.IsMovie && item.MovieId > 0)
-            {
-                await _movieManagementService.RestoreToLibraryAsync(item.MovieId);
-            }
+                    if (IsGroupedPlaceholder(item.Movie))
+                    {
+                        await _movieManagementService.RestoreGroupedPlaceholderRangeToLibraryAsync(item.Movie.GroupedRangeMediaFileIds);
+                    }
+                    else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
+                    {
+                        await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(item.SeasonId);
+                    }
+                    else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
+                    {
+                        await _movieManagementService.RestoreToLibraryAsync(item.MovieId);
+                    }
             else if (item.IsMovie)
             {
                 await _userCollectionService.RestoreToLibraryAsync(BuildRecommendationItem(item.Movie), changeSource: "RemovedLibrary");
@@ -638,11 +642,15 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         try
         {
-            if (item.IsSeason && item.SeasonId > 0)
+            if (IsGroupedPlaceholder(item.Movie))
+            {
+                await _movieManagementService.DeleteGroupedPlaceholderRangeRecordAsync(item.Movie.GroupedRangeMediaFileIds);
+            }
+            else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
             {
                 await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.SeasonId);
             }
-            else if (item.IsMovie && item.MovieId > 0)
+            else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
             {
                 await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
             }
@@ -863,6 +871,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             "电影" => query.Where(item => item.IsMovie),
             "电视剧" => query.Where(item => item.IsSeries || item.IsSeason),
+            "其他" => query.Where(item => item.IsOther),
             _ => query
         };
 
@@ -1147,7 +1156,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 try
                 {
-                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
+                    if ((item.Movie.IsSeason || item.Movie.IsOther) && item.Movie.SeasonId > 0)
                     {
                         await _tvSeasonCollectionService.SetWatchedAsync(item.Movie.SeasonId, isWatched, changeSource: "Batch");
                     }
@@ -1231,12 +1240,17 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 try
                 {
-                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
+                    if (IsGroupedPlaceholder(item.Movie))
+                    {
+                        hiddenCount++;
+                        await _movieManagementService.RemoveGroupedPlaceholderRangeFromLibraryAsync(item.Movie.GroupedRangeMediaFileIds);
+                    }
+                    else if ((item.Movie.IsSeason || item.Movie.IsOther) && item.Movie.SeasonId > 0)
                     {
                         hiddenCount++;
                         await _tvSeasonCollectionService.RemoveFromLibraryAsync(item.Movie.SeasonId);
                     }
-                    else if (item.Movie.IsMovie && item.MovieId > 0)
+                    else if ((item.Movie.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
                     {
                         hiddenCount++;
                         await _movieManagementService.RemoveFromLibraryAsync(item.MovieId);
@@ -1319,11 +1333,15 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 try
                 {
-                    if (item.Movie.IsSeason && item.Movie.SeasonId > 0)
+                    if (IsGroupedPlaceholder(item.Movie))
+                    {
+                        await _movieManagementService.DeleteGroupedPlaceholderRangeRecordAsync(item.Movie.GroupedRangeMediaFileIds);
+                    }
+                    else if ((item.Movie.IsSeason || item.Movie.IsOther) && item.Movie.SeasonId > 0)
                     {
                         await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.Movie.SeasonId);
                     }
-                    else if (item.Movie.IsMovie && item.MovieId > 0)
+                    else if ((item.Movie.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
                     {
                         await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
                     }
@@ -1644,13 +1662,19 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        if (IsGroupedPlaceholder(movie))
+        {
+            StatusMessage = "该项目是未识别剧集候选，后续可通过批量修正或人工聚合为季处理。";
+            return;
+        }
+
         if (movie.IsSeries && movie.SeriesId > 0)
         {
             _navigationStateService.RequestTvSeriesOverview(movie.SeriesId);
             return;
         }
 
-        if (movie.IsSeason && movie.SeasonId > 0)
+        if ((movie.IsSeason || movie.IsOther) && movie.SeasonId > 0)
         {
             _navigationStateService.RequestTvSeasonDetail(movie.SeasonId);
             return;
@@ -1659,6 +1683,12 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (movie.MovieId > 0)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId);
+            return;
+        }
+
+        if (movie.IsOther)
+        {
+            StatusMessage = "该项目是未识别 / 待修正项目，当前没有可打开的详情。";
             return;
         }
 
@@ -1706,14 +1736,26 @@ public sealed class LibraryViewModel : PageViewModelBase
         };
     }
 
+    private static bool IsGroupedPlaceholder(LibraryMovieListItem item)
+    {
+        return item.IsOther
+               && !string.IsNullOrWhiteSpace(item.GroupedRangeKey)
+               && item.GroupedRangeMediaFileIds.Count > 0;
+    }
+
     private static string BuildSelectionKey(LibraryMovieListItem item)
     {
-        if (item.IsSeason && item.SeasonId > 0)
+        if (item.IsOther && !string.IsNullOrWhiteSpace(item.GroupedRangeKey))
+        {
+            return $"other:{item.GroupedRangeKey}";
+        }
+
+        if (item.SeasonId > 0)
         {
             return $"season:{item.SeasonId}";
         }
 
-        if (item.IsSeries && item.SeriesId > 0)
+        if (item.SeriesId > 0)
         {
             return $"series:{item.SeriesId}";
         }

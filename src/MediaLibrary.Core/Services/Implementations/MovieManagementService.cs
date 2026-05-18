@@ -11,6 +11,8 @@ namespace MediaLibrary.Core.Services.Implementations;
 
 public sealed class MovieManagementService : IMovieManagementService
 {
+    private const int MovieTitleMaxLength = 300;
+
     public async Task SetDefaultMediaFileAsync(
         int movieId,
         int mediaFileId,
@@ -324,6 +326,51 @@ public sealed class MovieManagementService : IMovieManagementService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task RemoveGroupedPlaceholderRangeFromLibraryAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken = default)
+    {
+        var movieIds = await ResolveMovieIdsForMediaFilesAsync(mediaFileIds, cancellationToken);
+        foreach (var movieId in movieIds)
+        {
+            await RemoveFromLibraryAsync(movieId, cancellationToken);
+        }
+
+        var orphanMediaFiles = await MarkUnassociatedMediaFilesDeletedAsync(mediaFileIds, cancellationToken);
+        AiPerfDiagnostics.WriteEvent(
+            $"event=library-grouped-placeholder-remove-from-library mediaFiles={mediaFileIds.Count} movies={movieIds.Count} orphanMediaFiles={orphanMediaFiles}");
+    }
+
+    public async Task RestoreGroupedPlaceholderRangeToLibraryAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken = default)
+    {
+        var movieIds = await ResolveMovieIdsForMediaFilesAsync(mediaFileIds, cancellationToken);
+        foreach (var movieId in movieIds)
+        {
+            await RestoreToLibraryAsync(movieId, cancellationToken);
+        }
+
+        AiPerfDiagnostics.WriteEvent(
+            $"event=library-grouped-placeholder-restore-to-library mediaFiles={mediaFileIds.Count} movies={movieIds.Count} orphanMediaFiles=0");
+    }
+
+    public async Task SetGroupedPlaceholderRangeWatchedAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        bool isWatched,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        var movieIds = await ResolveMovieIdsForMediaFilesAsync(mediaFileIds, cancellationToken);
+        foreach (var movieId in movieIds)
+        {
+            await SetWatchedAsync(movieId, isWatched, cancellationToken, changeSource);
+        }
+
+        AiPerfDiagnostics.WriteEvent(
+            $"event=library-grouped-placeholder-set-watched mediaFiles={mediaFileIds.Count} movies={movieIds.Count} isWatched={isWatched.ToString().ToLowerInvariant()}");
+    }
+
     private static void PreserveRemovedLibraryState(
         AppDbContext dbContext,
         Movie movie,
@@ -508,6 +555,21 @@ public sealed class MovieManagementService : IMovieManagementService
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task DeleteGroupedPlaceholderRangeRecordAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken = default)
+    {
+        var movieIds = await ResolveMovieIdsForMediaFilesAsync(mediaFileIds, cancellationToken);
+        foreach (var movieId in movieIds)
+        {
+            await DeleteMovieRecordAsync(movieId, cancellationToken);
+        }
+
+        var orphanMediaFiles = await DeleteUnassociatedMediaFileRecordsAsync(mediaFileIds, cancellationToken);
+        AiPerfDiagnostics.WriteEvent(
+            $"event=library-grouped-placeholder-delete-record mediaFiles={mediaFileIds.Count} movies={movieIds.Count} orphanMediaFiles={orphanMediaFiles}");
+    }
+
     public async Task<ResetSourceResult> ResetMediaFileToUnidentifiedAsync(
         int movieId,
         int mediaFileId,
@@ -534,9 +596,7 @@ public sealed class MovieManagementService : IMovieManagementService
             ?? throw new InvalidOperationException("要重置的播放源不存在，或不属于当前影片。");
 
         var parsedName = MovieFileNameParser.Parse(mediaFile.FileName);
-        var placeholderTitle = string.IsNullOrWhiteSpace(parsedName.CleanTitle)
-            ? Path.GetFileNameWithoutExtension(mediaFile.FileName)
-            : parsedName.CleanTitle;
+        var placeholderTitle = BuildUnidentifiedMovieTitle(mediaFile.FileName);
         var now = DateTime.UtcNow;
         var remainingSourceCount = movie.MediaFiles
             .Count(x => x.Id != mediaFile.Id && x.MediaType == MediaType.Video && !x.IsDeleted);
@@ -611,6 +671,14 @@ public sealed class MovieManagementService : IMovieManagementService
         };
     }
 
+    private static string BuildUnidentifiedMovieTitle(string fileName)
+    {
+        var title = string.IsNullOrWhiteSpace(fileName)
+            ? "-"
+            : fileName.Trim();
+        return title.Length <= MovieTitleMaxLength ? title : title[..MovieTitleMaxLength];
+    }
+
     private static async Task CleanupMovieIfOrphanedAsync(
         AppDbContext dbContext,
         int movieId,
@@ -657,6 +725,124 @@ public sealed class MovieManagementService : IMovieManagementService
             .GroupBy(x => x.Id)
             .Select(group => group.First())
             .ToList();
+    }
+
+    private static async Task<IReadOnlyList<int>> ResolveMovieIdsForMediaFilesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = mediaFileIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        return await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.Id) && x.MovieId.HasValue)
+            .Select(x => x.MovieId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<int> MarkUnassociatedMediaFilesDeletedAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = mediaFileIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+        if (ids.Length == 0)
+        {
+            return 0;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var now = DateTime.UtcNow;
+        var mediaFiles = await dbContext.MediaFiles
+            .Where(
+                x => ids.Contains(x.Id)
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted
+                     && !x.MovieId.HasValue
+                     && !x.EpisodeId.HasValue)
+            .ToListAsync(cancellationToken);
+        foreach (var mediaFile in mediaFiles)
+        {
+            mediaFile.IsDeleted = true;
+            mediaFile.UpdatedAt = now;
+        }
+
+        if (mediaFiles.Count > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return mediaFiles.Count;
+    }
+
+    private static async Task<int> DeleteUnassociatedMediaFileRecordsAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = mediaFileIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+        if (ids.Length == 0)
+        {
+            return 0;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var now = DateTime.UtcNow;
+        var mediaFiles = await dbContext.MediaFiles
+            .Where(
+                x => ids.Contains(x.Id)
+                     && x.MediaType == MediaType.Video
+                     && !x.MovieId.HasValue
+                     && !x.EpisodeId.HasValue)
+            .ToListAsync(cancellationToken);
+        if (mediaFiles.Count == 0)
+        {
+            return 0;
+        }
+
+        var mediaFileIdSet = mediaFiles.Select(x => x.Id).ToHashSet();
+        var subtitleBindings = await dbContext.SubtitleBindings
+            .Where(x => mediaFileIdSet.Contains(x.MediaFileId)
+                        || mediaFileIdSet.Contains(x.SubtitleMediaFileId))
+            .ToListAsync(cancellationToken);
+        if (subtitleBindings.Count > 0)
+        {
+            dbContext.SubtitleBindings.RemoveRange(subtitleBindings);
+        }
+
+        var retainedMediaFileIds = await dbContext.WatchHistories
+            .Where(x => mediaFileIdSet.Contains(x.MediaFileId))
+            .Select(x => x.MediaFileId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var retainedMediaFileIdSet = retainedMediaFileIds.ToHashSet();
+        foreach (var mediaFile in mediaFiles)
+        {
+            if (retainedMediaFileIdSet.Contains(mediaFile.Id))
+            {
+                mediaFile.IsDeleted = true;
+                mediaFile.UpdatedAt = now;
+                continue;
+            }
+
+            dbContext.MediaFiles.Remove(mediaFile);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return mediaFiles.Count;
     }
 
     private static void CleanupCollectionEntityIfEmpty(AppDbContext dbContext, UserMovieCollectionItem entity)

@@ -16,6 +16,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 {
     private const double MinimumAutoMatchConfidence = 0.55d;
     private const double MatchedConfidence = 0.80d;
+    private const int MovieTitleMaxLength = 300;
+    private const string UnidentifiedTvSeriesCandidateTitle = "未识别剧集候选";
+    private const string UnidentifiedTvSeasonCandidateTitle = "未识别电视剧季";
 
     private readonly ISettingsService _settingsService;
     private readonly ITmdbService _tmdbService;
@@ -62,6 +65,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         var settings = await _settingsService.GetApplicationSettingAsync(cancellationToken);
         var hasTmdbCredential = !string.IsNullOrWhiteSpace(settings.TmdbReadAccessToken)
                                 || !string.IsNullOrWhiteSpace(settings.TmdbApiKey);
+        var placeholderGroupingCandidates = new List<MoviePlaceholderGroupingInput>();
 
         foreach (var mediaFileId in distinctIds)
         {
@@ -105,6 +109,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             var candidateTitle = string.IsNullOrWhiteSpace(parsedName.CleanTitle)
                 ? Path.GetFileNameWithoutExtension(mediaFile.FileName)
                 : parsedName.CleanTitle;
+            var placeholderTitle = BuildUnidentifiedMovieTitle(mediaFile.FileName);
             var lowInformationReason = GetLowInformationMovieQueryReason(candidateTitle, parsedName.ReleaseYear);
             ScanIdentificationDiagnostics.Write(
                 $"event=movie-candidate mediaFileId={mediaFileId} path={ScanIdentificationDiagnostics.FormatPath(mediaFile.FilePath)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} rawMovieTitle={ScanIdentificationDiagnostics.FormatValue(Path.GetFileNameWithoutExtension(mediaFile.FileName))} cleanedMovieTitle={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} removedNoiseCategory={ScanIdentificationDiagnostics.FormatValue(string.Join('|', parsedName.RemovedNoiseCategories))} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} existingMovieId={ScanIdentificationDiagnostics.FormatNullable(mediaFile.MovieId)} movieQueryQuality={ScanIdentificationDiagnostics.FormatValue(string.IsNullOrWhiteSpace(lowInformationReason) ? "usable" : "low-information")} movieLowInformationQuery={(!string.IsNullOrWhiteSpace(lowInformationReason)).ToString().ToLowerInvariant()} movieAutoMatchBlockedReason={ScanIdentificationDiagnostics.FormatValue(lowInformationReason)}");
@@ -112,8 +117,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             if (!string.IsNullOrWhiteSpace(lowInformationReason))
             {
                 ScanIdentificationDiagnostics.Write(
-                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} reason=movie-low-information-query movieLowInformationQuery=true movieAutoMatchBlockedReason={ScanIdentificationDiagnostics.FormatValue(lowInformationReason)} finalDecision=movie-placeholder");
-                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} placeholderTitle={ScanIdentificationDiagnostics.FormatFileName(placeholderTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} reason=movie-low-information-query movieLowInformationQuery=true movieAutoMatchBlockedReason={ScanIdentificationDiagnostics.FormatValue(lowInformationReason)} finalDecision=movie-placeholder");
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, placeholderTitle, parsedName.ReleaseYear, cancellationToken);
+                AddMoviePlaceholderGroupingCandidate(placeholderGroupingCandidates, mediaFile, candidateTitle, "movie-low-information-query");
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
                 continue;
@@ -122,8 +128,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             if (!hasTmdbCredential)
             {
                 ScanIdentificationDiagnostics.Write(
-                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} reason=missing-tmdb-credential");
-                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} placeholderTitle={ScanIdentificationDiagnostics.FormatFileName(placeholderTitle)} reason=missing-tmdb-credential");
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, placeholderTitle, parsedName.ReleaseYear, cancellationToken);
+                AddMoviePlaceholderGroupingCandidate(placeholderGroupingCandidates, mediaFile, candidateTitle, "missing-tmdb-credential");
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
                 result.AddWarning("TMDB.Auth", "TMDB 认证未配置，资源已保留为识别失败，可后续重试。");
@@ -139,7 +146,8 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             {
                 ScanIdentificationDiagnostics.Write(
                     $"event=movie-search-error mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
-                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, placeholderTitle, parsedName.ReleaseYear, cancellationToken);
+                AddMoviePlaceholderGroupingCandidate(placeholderGroupingCandidates, mediaFile, candidateTitle, "movie-search-error");
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
                 result.AddError("TMDB.Search", TrimMessage(exception.Message));
@@ -161,8 +169,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             if (bestCandidate is null || bestCandidate.Confidence < MinimumAutoMatchConfidence)
             {
                 ScanIdentificationDiagnostics.Write(
-                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} reason={(bestCandidate is null ? "movie-no-result" : "movie-low-confidence")} movieResultStatus={ScanIdentificationDiagnostics.FormatValue(GetMovieResultStatus(bestCandidate))} movieAutoApply=false movieAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(GetMovieAutoApplyBlockedReason(bestCandidate))} finalDecision=movie-placeholder");
-                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} placeholderTitle={ScanIdentificationDiagnostics.FormatFileName(placeholderTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} reason={(bestCandidate is null ? "movie-no-result" : "movie-low-confidence")} movieResultStatus={ScanIdentificationDiagnostics.FormatValue(GetMovieResultStatus(bestCandidate))} movieAutoApply=false movieAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(GetMovieAutoApplyBlockedReason(bestCandidate))} finalDecision=movie-placeholder");
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, placeholderTitle, parsedName.ReleaseYear, cancellationToken);
+                AddMoviePlaceholderGroupingCandidate(placeholderGroupingCandidates, mediaFile, candidateTitle, bestCandidate is null ? "movie-no-result" : "movie-low-confidence");
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
                 continue;
@@ -171,8 +180,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             if (bestCandidate.Confidence < MatchedConfidence)
             {
                 ScanIdentificationDiagnostics.Write(
-                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} topTmdbId={bestCandidate.TmdbId} topTitle={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Title)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(bestCandidate.Confidence)} reason=movie-needs-review movieResultStatus=NeedsReview movieAutoApply=false movieAutoApplyBlockedReason=needs-review-not-auto-applied finalDecision=movie-placeholder");
-                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                    $"event=movie-placeholder mediaFileId={mediaFileId} candidate={ScanIdentificationDiagnostics.FormatValue(candidateTitle)} placeholderTitle={ScanIdentificationDiagnostics.FormatFileName(placeholderTitle)} releaseYear={ScanIdentificationDiagnostics.FormatNullable(parsedName.ReleaseYear)} topTmdbId={bestCandidate.TmdbId} topTitle={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Title)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(bestCandidate.Confidence)} reason=movie-needs-review movieResultStatus=NeedsReview movieAutoApply=false movieAutoApplyBlockedReason=needs-review-not-auto-applied finalDecision=movie-placeholder");
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, placeholderTitle, parsedName.ReleaseYear, cancellationToken);
+                AddMoviePlaceholderGroupingCandidate(placeholderGroupingCandidates, mediaFile, candidateTitle, "movie-needs-review");
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
                 continue;
@@ -217,16 +227,495 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             {
                 ScanIdentificationDiagnostics.Write(
                     $"event=movie-apply-error mediaFileId={mediaFileId} tmdbId={effectiveCandidate.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(effectiveCandidate.Title)} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
-                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, candidateTitle, parsedName.ReleaseYear, cancellationToken);
+                await UpsertFailurePlaceholderAsync(dbContext, mediaFile, placeholderTitle, parsedName.ReleaseYear, cancellationToken);
+                AddMoviePlaceholderGroupingCandidate(placeholderGroupingCandidates, mediaFile, candidateTitle, "movie-apply-error");
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.PlaceholderCount++;
                 result.AddError("Identify.Apply", TrimMessage(exception.Message));
             }
         }
 
+        await PersistMoviePlaceholderGroupingAsync(placeholderGroupingCandidates, cancellationToken);
         ScanIdentificationDiagnostics.Write(
             $"event=movie-identify-complete requested={distinctIds.Length} attempted={result.AttemptedCount} bound={result.BoundCount} placeholders={result.PlaceholderCount} warnings={result.WarningCount} errors={result.ErrorCount}");
         return result;
+    }
+
+    public async Task AggregateUnidentifiedMediaFilesAsync(
+        IReadOnlyCollection<int> scanPathIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = scanPathIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+        if (ids.Length == 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                "event=orphan-grouping-summary orphanGroupingAttempted=false orphanGroupingMediaFileCount=0 orphanGroupingCreatedSeasonCount=0 orphanGroupingSkippedReason=no-scan-paths");
+            return;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var candidates = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Include(x => x.Movie)
+            .Where(
+                x => x.ScanPathId.HasValue
+                     && ids.Contains(x.ScanPathId.Value)
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted
+                     && !x.EpisodeId.HasValue
+                     && (!x.MovieId.HasValue || (x.Movie != null && x.Movie.IdentificationStatus == IdentificationStatus.Failed)))
+            .Select(
+                x => new MoviePlaceholderGroupingInput(
+                    x.Id,
+                    x.FileName,
+                    x.FilePath,
+                    MoviePlaceholderGroupingHelper.GetDirectParentPath(x.FilePath),
+                    Path.GetFileNameWithoutExtension(x.FileName),
+                    x.MovieId.HasValue ? "movie-placeholder-existing" : "orphan-media-file"))
+            .ToListAsync(cancellationToken);
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=orphan-grouping-start orphanGroupingAttempted=true scanPaths={ids.Length} orphanGroupingMediaFileCount={candidates.Count}");
+        var summary = await PersistMoviePlaceholderGroupingAsync(candidates, cancellationToken);
+        ScanIdentificationDiagnostics.Write(
+            $"event=orphan-grouping-summary orphanGroupingAttempted=true orphanGroupingMediaFileCount={summary.CandidateFiles} orphanGroupingCreatedSeasonCount={summary.PersistedRanges} orphanGroupingGroupedMediaFileCount={summary.PersistedFiles} orphanGroupingSkippedReason={ScanIdentificationDiagnostics.FormatValue(summary.SkippedReasons)}");
+    }
+
+    private static void AddMoviePlaceholderGroupingCandidate(
+        ICollection<MoviePlaceholderGroupingInput> candidates,
+        MediaFile mediaFile,
+        string candidateTitle,
+        string placeholderReason)
+    {
+        candidates.Add(
+            new MoviePlaceholderGroupingInput(
+                mediaFile.Id,
+                mediaFile.FileName,
+                mediaFile.FilePath,
+                MoviePlaceholderGroupingHelper.GetDirectParentPath(mediaFile.FilePath),
+                candidateTitle,
+                placeholderReason));
+    }
+
+    private static string BuildUnidentifiedMovieTitle(string fileName)
+    {
+        var title = string.IsNullOrWhiteSpace(fileName)
+            ? "-"
+            : fileName.Trim();
+        return title.Length <= MovieTitleMaxLength ? title : title[..MovieTitleMaxLength];
+    }
+
+    private static async Task<MoviePlaceholderGroupingPersistenceSummary> PersistMoviePlaceholderGroupingAsync(
+        IReadOnlyCollection<MoviePlaceholderGroupingInput> placeholders,
+        CancellationToken cancellationToken)
+    {
+        var groupingResult = MoviePlaceholderGroupingHelper.BuildRanges(placeholders);
+        if (groupingResult.CandidateFiles == 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                "event=movie-placeholder-grouping-summary moviePlaceholderGroupingAttempted=false moviePlaceholderGroupingCandidateFiles=0 groupedMoviePlaceholdersCount=0 groupedTvLikePlaceholderRangesCount=0 groupedPlaceholdersHiddenFromMovieList=0 groupedRangesVisibleToLibrary=0 groupedRangeProjectionMode=unidentified-tv-season moviePlaceholderGroupingPersistence=unidentified-tv-season groupingSkippedReasons=(none)");
+            return new MoviePlaceholderGroupingPersistenceSummary(0, 0, 0, "(none)");
+        }
+
+        var persistedRanges = 0;
+        var persistedFiles = 0;
+        var skippedRanges = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        await using (var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create()))
+        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+        {
+            foreach (var range in groupingResult.Ranges)
+            {
+                var persistenceResult = await PersistGroupedTvLikePlaceholderRangeAsync(dbContext, range, cancellationToken);
+                if (persistenceResult.Created)
+                {
+                    persistedRanges++;
+                    persistedFiles += persistenceResult.FileCount;
+                }
+                else
+                {
+                    AddCount(skippedRanges, persistenceResult.SkippedReason);
+                }
+
+                LogMoviePlaceholderGroupingRange(range, persistenceResult);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        var allSkippedReasons = groupingResult.SkippedReasons
+            .Concat(skippedRanges)
+            .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.Sum(y => y.Value), StringComparer.OrdinalIgnoreCase);
+        var skippedText = allSkippedReasons.Count == 0
+            ? "(none)"
+            : string.Join("|", allSkippedReasons.OrderBy(x => x.Key).Select(x => $"{x.Key}:{x.Value}"));
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=movie-placeholder-grouping-summary moviePlaceholderGroupingAttempted=true moviePlaceholderGroupingCandidateFiles={groupingResult.CandidateFiles} parsedEpisodeLikePlaceholderFiles={groupingResult.ParsedEpisodeLikeFiles} groupedMoviePlaceholdersCount={persistedFiles} groupedTvLikePlaceholderRangesCount={persistedRanges} groupedPlaceholdersHiddenFromMovieList={persistedFiles} groupedRangesVisibleToLibrary={persistedRanges} groupedRangeProjectionMode=unidentified-tv-season moviePlaceholderGroupingPersistence=unidentified-tv-season groupingSkippedReasons={ScanIdentificationDiagnostics.FormatValue(skippedText)}");
+        return new MoviePlaceholderGroupingPersistenceSummary(
+            groupingResult.CandidateFiles,
+            persistedRanges,
+            persistedFiles,
+            skippedText);
+    }
+
+    private static void LogMoviePlaceholderGroupingRange(
+        MoviePlaceholderGroupingRange range,
+        GroupedTvLikePlaceholderPersistenceResult result)
+    {
+        var sampleFiles = string.Join(
+            "|",
+            range.SampleFileNames.Select(ScanIdentificationDiagnostics.FormatFileName));
+        var reasons = string.Join("|", range.PlaceholderReasons);
+        var isMixedPattern = string.Equals(range.PatternKey, "mixed-episode-sequence", StringComparison.OrdinalIgnoreCase);
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=movie-placeholder-grouping parentDir={ScanIdentificationDiagnostics.FormatPath(range.ParentPath)} moviePlaceholderGroupingAttempted=true moviePlaceholderGroupingFileCount={range.FileCount} groupedRangeMediaFileCount={range.MediaFileIds.Count} moviePlaceholderGroupingPattern={ScanIdentificationDiagnostics.FormatValue(range.Pattern)} moviePlaceholderGroupingPatternKey={ScanIdentificationDiagnostics.FormatValue(range.PatternKey)} mixedPatternGrouping={isMixedPattern.ToString().ToLowerInvariant()} patterns={ScanIdentificationDiagnostics.FormatValue(range.Pattern)} moviePlaceholderGroupingStartNumber={range.StartNumber} moviePlaceholderGroupingEndNumber={range.EndNumber} groupedRangeNumberStart={range.StartNumber} groupedRangeNumberEnd={range.EndNumber} groupedRangeParentDisplay={ScanIdentificationDiagnostics.FormatValue(MoviePlaceholderGroupingHelper.GetParentFolderDisplay(range.ParentPath))} moviePlaceholderGroupingCreated={result.Created.ToString().ToLowerInvariant()} moviePlaceholderGroupingPersistence=unidentified-tv-season moviePlaceholderGroupingSkippedReason={ScanIdentificationDiagnostics.FormatValue(result.SkippedReason)} groupedMoviePlaceholdersCount={result.FileCount} groupedTvLikePlaceholderRangesCount={(result.Created ? 1 : 0)} persistedTvSeriesId={ScanIdentificationDiagnostics.FormatNullable(result.TvSeriesId)} persistedTvSeasonId={ScanIdentificationDiagnostics.FormatNullable(result.TvSeasonId)} persistedTvEpisodes={result.EpisodeCount} placeholderReasons={ScanIdentificationDiagnostics.FormatValue(reasons)} sampleDirectVideoFiles={ScanIdentificationDiagnostics.FormatValue(sampleFiles)} finalDecision={(result.Created ? "tv-like-placeholder-season-persisted" : "tv-like-placeholder-season-skipped")}");
+    }
+
+    private static async Task<GroupedTvLikePlaceholderPersistenceResult> PersistGroupedTvLikePlaceholderRangeAsync(
+        AppDbContext dbContext,
+        MoviePlaceholderGroupingRange range,
+        CancellationToken cancellationToken)
+    {
+        var requestedIds = range.MediaFileIds.Where(x => x > 0).Distinct().ToArray();
+        if (requestedIds.Length < 3)
+        {
+            return GroupedTvLikePlaceholderPersistenceResult.Skipped("range-too-small");
+        }
+
+        var mediaFiles = await dbContext.MediaFiles
+            .Include(x => x.Movie)
+            .Where(x => requestedIds.Contains(x.Id))
+            .Where(x => x.MediaType == MediaType.Video && !x.IsDeleted)
+            .ToListAsync(cancellationToken);
+        var mediaFileIndex = mediaFiles.ToDictionary(x => x.Id);
+        var orderedItems = range.Items
+            .Select((item, index) => new GroupedTvLikePlaceholderEpisodeCandidate(item, range.StartNumber + index))
+            .Where(x => mediaFileIndex.TryGetValue(x.Input.MediaFileId, out var mediaFile)
+                        && mediaFile.EpisodeId is null
+                        && (!mediaFile.MovieId.HasValue
+                            || mediaFile.Movie?.IdentificationStatus == IdentificationStatus.Failed))
+            .ToList();
+        if (orderedItems.Count < 3)
+        {
+            return GroupedTvLikePlaceholderPersistenceResult.Skipped("not-enough-eligible-unidentified-sources");
+        }
+
+        var now = DateTime.UtcNow;
+        var parentDisplay = MoviePlaceholderGroupingHelper.GetParentFolderDisplay(range.ParentPath);
+        var seriesName = TruncateRequired(
+            string.IsNullOrWhiteSpace(parentDisplay) ? UnidentifiedTvSeriesCandidateTitle : parentDisplay,
+            300);
+        var tvSeries = await dbContext.TvSeries
+            .FirstOrDefaultAsync(
+                x => !x.TmdbSeriesId.HasValue
+                     && x.Name == seriesName,
+                cancellationToken);
+        if (tvSeries is null)
+        {
+            tvSeries = new TvSeries
+            {
+                Name = seriesName,
+                CreatedAt = now
+            };
+            dbContext.TvSeries.Add(tvSeries);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        tvSeries.OriginalName = null;
+        tvSeries.Overview = "连续编号未识别文件聚合生成的剧集候选。";
+        tvSeries.PosterRemoteUrl = null;
+        tvSeries.Country = null;
+        tvSeries.Language = null;
+        tvSeries.FirstAirDate = null;
+        tvSeries.FirstAirYear = null;
+        tvSeries.GenresText = null;
+        tvSeries.UpdatedAt = now;
+
+        var seasonNumber = await ResolveGroupedPlaceholderSeasonNumberAsync(dbContext, tvSeries.Id, cancellationToken);
+        var tvSeason = new TvSeason
+        {
+            TvSeriesId = tvSeries.Id,
+            SeasonNumber = seasonNumber,
+            CreatedAt = now
+        };
+        dbContext.TvSeasons.Add(tvSeason);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        tvSeason.TmdbSeasonId = null;
+        tvSeason.Name = TruncateRequired(UnidentifiedTvSeasonCandidateTitle, 300);
+        tvSeason.Overview = "由同一目录下严格连续编号的未识别文件聚合生成，尚未绑定 TMDB。";
+        tvSeason.PosterRemoteUrl = null;
+        tvSeason.AirDate = null;
+        tvSeason.TmdbEpisodeCount = orderedItems.Count;
+        tvSeason.IdentifiedConfidence = null;
+        tvSeason.IdentificationStatus = IdentificationStatus.Failed;
+        tvSeason.UpdatedAt = now;
+
+        var oldMovieIds = new HashSet<int>();
+        var movedMediaFileIds = new HashSet<int>();
+        foreach (var item in orderedItems)
+        {
+            var mediaFile = mediaFileIndex[item.Input.MediaFileId];
+            if (mediaFile.MovieId.HasValue)
+            {
+                oldMovieIds.Add(mediaFile.MovieId.Value);
+            }
+
+            var episode = await UpsertGroupedPlaceholderEpisodeAsync(
+                dbContext,
+                tvSeason,
+                item.EpisodeNumber,
+                item.Input.FileName,
+                now,
+                cancellationToken);
+            mediaFile.MovieId = null;
+            mediaFile.Movie = null;
+            mediaFile.Episode = episode;
+            mediaFile.EpisodeId = episode.Id;
+            mediaFile.UpdatedAt = now;
+            movedMediaFileIds.Add(mediaFile.Id);
+        }
+
+        await ReconcileMovieDefaultsAfterMovingFilesAsync(dbContext, oldMovieIds, movedMediaFileIds, now, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        foreach (var movieId in oldMovieIds)
+        {
+            await CleanupMovieIfOrphanedAsync(dbContext, movieId, cancellationToken);
+        }
+
+        return new GroupedTvLikePlaceholderPersistenceResult(
+            true,
+            string.Empty,
+            tvSeries.Id,
+            tvSeason.Id,
+            orderedItems.Count,
+            orderedItems.Count);
+    }
+
+    private static async Task<TvEpisode> UpsertGroupedPlaceholderEpisodeAsync(
+        AppDbContext dbContext,
+        TvSeason tvSeason,
+        int episodeNumber,
+        string fileName,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var episode = await dbContext.TvEpisodes
+            .FirstOrDefaultAsync(
+                x => x.TvSeasonId == tvSeason.Id
+                     && x.EpisodeNumber == episodeNumber,
+                cancellationToken);
+        if (episode is null)
+        {
+            episode = new TvEpisode
+            {
+                TvSeasonId = tvSeason.Id,
+                EpisodeNumber = episodeNumber,
+                CreatedAt = now
+            };
+            dbContext.TvEpisodes.Add(episode);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        episode.TmdbEpisodeId = null;
+        episode.Title = TruncateRequired(string.IsNullOrWhiteSpace(fileName) ? $"Episode {episodeNumber}" : fileName.Trim(), 300);
+        episode.Overview = null;
+        episode.StillRemoteUrl = null;
+        episode.AirDate = null;
+        episode.RuntimeMinutes = null;
+        episode.UpdatedAt = now;
+        return episode;
+    }
+
+    private static async Task<int> ResolveGroupedPlaceholderSeasonNumberAsync(
+        AppDbContext dbContext,
+        int tvSeriesId,
+        CancellationToken cancellationToken)
+    {
+        var usedSeasonNumbers = await dbContext.TvSeasons
+            .Where(x => x.TvSeriesId == tvSeriesId)
+            .Select(x => x.SeasonNumber)
+            .ToListAsync(cancellationToken);
+        return usedSeasonNumbers.Count == 0 ? 1 : usedSeasonNumbers.Max() + 1;
+    }
+
+    private static async Task ReconcileMovieDefaultsAfterMovingFilesAsync(
+        AppDbContext dbContext,
+        IReadOnlyCollection<int> movieIds,
+        IReadOnlySet<int> movedMediaFileIds,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (movieIds.Count == 0 || movedMediaFileIds.Count == 0)
+        {
+            return;
+        }
+
+        var movies = await dbContext.Movies
+            .Include(x => x.MediaFiles)
+            .Where(x => movieIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+        foreach (var movie in movies)
+        {
+            if (!movie.DefaultMediaFileId.HasValue || !movedMediaFileIds.Contains(movie.DefaultMediaFileId.Value))
+            {
+                continue;
+            }
+
+            movie.DefaultMediaFileId = movie.MediaFiles
+                .Where(x => !movedMediaFileIds.Contains(x.Id) && x.MediaType == MediaType.Video && !x.IsDeleted)
+                .OrderBy(x => x.FileName)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefault();
+            movie.UpdatedAt = now;
+        }
+    }
+
+    private static IReadOnlyList<List<MoviePlaceholderGroupingParsedCandidate>> BuildStrictContinuousRuns(
+        IReadOnlyList<MoviePlaceholderGroupingParsedCandidate> ordered)
+    {
+        var runs = new List<List<MoviePlaceholderGroupingParsedCandidate>>();
+        var current = new List<MoviePlaceholderGroupingParsedCandidate>();
+        foreach (var item in ordered)
+        {
+            if (current.Count == 0 || item.Pattern.Number == current[^1].Pattern.Number + 1)
+            {
+                current.Add(item);
+                continue;
+            }
+
+            runs.Add(current);
+            current = [item];
+        }
+
+        if (current.Count > 0)
+        {
+            runs.Add(current);
+        }
+
+        return runs;
+    }
+
+    private static bool TryParseMoviePlaceholderEpisodePattern(
+        string fileName,
+        out MoviePlaceholderEpisodePattern pattern,
+        out string skippedReason)
+    {
+        pattern = new MoviePlaceholderEpisodePattern(string.Empty, string.Empty, 0);
+        skippedReason = string.Empty;
+
+        var name = System.Net.WebUtility.HtmlDecode(Path.GetFileNameWithoutExtension(fileName)).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            skippedReason = "empty-name";
+            return false;
+        }
+
+        if (MoviePlaceholderExcludedTokenRegex().IsMatch(name))
+        {
+            skippedReason = "excluded-non-episode-token";
+            return false;
+        }
+
+        var bareNumberMatch = MoviePlaceholderBareNumberRegex().Match(name);
+        if (bareNumberMatch.Success && TryReadPositiveEpisodeNumber(bareNumberMatch.Groups["episode"].Value, out var bareNumber))
+        {
+            pattern = new MoviePlaceholderEpisodePattern("bare-number", "bare-number", bareNumber);
+            return true;
+        }
+
+        var markerMatch = MoviePlaceholderMarkerEpisodeRegex().Match(name);
+        if (markerMatch.Success && TryReadPositiveEpisodeNumber(markerMatch.Groups["episode"].Value, out var markerNumber))
+        {
+            pattern = new MoviePlaceholderEpisodePattern("episode-marker", "episode-marker", markerNumber);
+            return true;
+        }
+
+        var chineseMatch = MoviePlaceholderChineseEpisodeRegex().Match(name);
+        if (chineseMatch.Success && TryReadPositiveEpisodeNumber(chineseMatch.Groups["episode"].Value, out var chineseNumber))
+        {
+            pattern = new MoviePlaceholderEpisodePattern("chinese-episode-marker", "chinese-episode-marker", chineseNumber);
+            return true;
+        }
+
+        var titleNumberName = MoviePlaceholderWhitespaceRegex()
+            .Replace(
+                MoviePlaceholderSeparatorRegex().Replace(
+                    MoviePlaceholderBracketedContentRegex().Replace(name, " "),
+                    " "),
+                " ")
+            .Trim();
+        var titleNumberMatch = MoviePlaceholderTitleNumberRegex().Match(titleNumberName);
+        if (titleNumberMatch.Success
+            && TryReadPositiveEpisodeNumber(titleNumberMatch.Groups["episode"].Value, out var titleNumber)
+            && TryNormalizeMoviePlaceholderTitlePrefix(titleNumberMatch.Groups["prefix"].Value, out var prefixKey))
+        {
+            pattern = new MoviePlaceholderEpisodePattern($"title-number:{prefixKey}", "title-number", titleNumber);
+            return true;
+        }
+
+        skippedReason = "no-supported-episode-number";
+        return false;
+    }
+
+    private static bool TryNormalizeMoviePlaceholderTitlePrefix(string value, out string prefixKey)
+    {
+        prefixKey = string.Empty;
+        var normalized = NormalizeQueryToken(value);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        var meaningfulTokens = normalized
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(token => !IsLowInformationMovieToken(token, null))
+            .ToArray();
+        if (meaningfulTokens.Length == 0)
+        {
+            return false;
+        }
+
+        var meaningfulText = string.Join(' ', meaningfulTokens);
+        if (!meaningfulText.Any(IsCjk) && meaningfulText.Count(char.IsLetter) < 3)
+        {
+            return false;
+        }
+
+        prefixKey = meaningfulText.ToLowerInvariant();
+        return true;
+    }
+
+    private static bool TryReadPositiveEpisodeNumber(string value, out int number)
+    {
+        return int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out number)
+               && number > 0;
+    }
+
+    private static string GetDirectParentPath(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return string.Empty;
+        }
+
+        var normalized = filePath.Replace('\\', '/').TrimEnd('/');
+        var index = normalized.LastIndexOf('/');
+        return index > 0 ? normalized[..index] : string.Empty;
+    }
+
+    private static void AddCount(IDictionary<string, int> counts, string key)
+    {
+        key = string.IsNullOrWhiteSpace(key) ? "unknown" : key;
+        counts.TryGetValue(key, out var current);
+        counts[key] = current + 1;
     }
 
     private async Task<IReadOnlyList<MetadataSearchCandidate>> SearchMoviesAsync(
@@ -1363,6 +1852,13 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
     {
         return string.IsNullOrWhiteSpace(message) ? "未知错误" : message.Trim();
     }
+
+    private static string TruncateRequired(string? value, int maxLength)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
     private static DateTime? MaxDate(DateTime? left, DateTime? right)
     {
         if (!left.HasValue)
@@ -1410,4 +1906,66 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
     [GeneratedRegex(@"^(?:\d{1,4}|19\d{2}|20\d{2}|part|pt|disc|disk|cd|sample|trailer|teaser|preview|extras?|bonus|4k|8k|1080p|2160p|720p|480p|uhd|fhd|sd|hq|hdr|hdr10|dv|x264|x265|h264|h265|hevc|av1|bluray|blu|ray|brrip|webrip|webdl|web|dl|hdrip|dvdrip|bdrip|hdtv|remux|aac|ac3|eac3|dts|truehd|atmos|ddp\d?|flac|lpcm|pcm|ma|hd|fg[tm]|10bit|8bit|proper|repack|extended|limited|multi|subs?|subbed|dubbed|dual|audio|japanese|english|chinese|mandarin|cantonese|korean|amzn|nf|dsnp|hmax|itunes|group|team)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex LowInformationMovieTokenRegex();
+
+    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}", RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderBracketedContentRegex();
+
+    [GeneratedRegex(@"[._\-]+", RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderSeparatorRegex();
+
+    [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderWhitespaceRegex();
+
+    [GeneratedRegex(@"^\s*(?<episode>\d{1,4})\s*$", RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderBareNumberRegex();
+
+    [GeneratedRegex(@"(?:^|[\s._\-\[\(])(?:E|EP)(?<episode>\d{1,4})(?:$|[\s._\-\]\)])|\bEpisode\s*(?<episode>\d{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderMarkerEpisodeRegex();
+
+    [GeneratedRegex(@"\u7b2c\s*(?<episode>\d{1,4})\s*[\u96c6\u8bdd]", RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderChineseEpisodeRegex();
+
+    [GeneratedRegex(@"^(?<prefix>.*?[\p{L}\u4e00-\u9fff].*?)[\s._-]*(?<episode>\d{1,4})\s*$", RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderTitleNumberRegex();
+
+    [GeneratedRegex(@"(?:^|[\s._\-\[\(])(?:cd|disc|disk|part|sample|trailer|teaser|preview|extras?|bonus|featurette)\s*\d*(?:$|[\s._\-\]\)])|\u82b1\u7d6e|\u9884\u544a|\u7279\u5178|\u5e55\u540e|\u8bbf\u8c08|\u6837\u7247|\u7247\u6bb5|(?:^|[\s._\-\[\(])[\u4e0a\u4e0b](?:$|[\s._\-\]\)])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex MoviePlaceholderExcludedTokenRegex();
+
+    private sealed record MoviePlaceholderGroupingCandidate(
+        int MediaFileId,
+        string FileName,
+        string FilePath,
+        string ParentPath,
+        string CandidateTitle,
+        string PlaceholderReason);
+
+    private sealed record MoviePlaceholderEpisodePattern(string PatternKey, string Pattern, int Number);
+
+    private sealed record MoviePlaceholderGroupingParsedCandidate(
+        MoviePlaceholderGroupingCandidate Placeholder,
+        MoviePlaceholderEpisodePattern Pattern);
+
+    private sealed record GroupedTvLikePlaceholderEpisodeCandidate(
+        MoviePlaceholderGroupingInput Input,
+        int EpisodeNumber);
+
+    private sealed record GroupedTvLikePlaceholderPersistenceResult(
+        bool Created,
+        string SkippedReason,
+        int? TvSeriesId,
+        int? TvSeasonId,
+        int FileCount,
+        int EpisodeCount)
+    {
+        public static GroupedTvLikePlaceholderPersistenceResult Skipped(string reason)
+        {
+            return new GroupedTvLikePlaceholderPersistenceResult(false, reason, null, null, 0, 0);
+        }
+    }
+
+    private sealed record MoviePlaceholderGroupingPersistenceSummary(
+        int CandidateFiles,
+        int PersistedRanges,
+        int PersistedFiles,
+        string SkippedReasons);
 }

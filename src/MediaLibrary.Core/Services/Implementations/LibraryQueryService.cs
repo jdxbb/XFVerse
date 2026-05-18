@@ -1,4 +1,6 @@
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
+using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
@@ -13,15 +15,28 @@ public sealed class LibraryQueryService : ILibraryQueryService
         CancellationToken cancellationToken = default)
     {
         var movies = await GetLibraryMoviesAsync(cancellationToken);
-        var tvItems = expandSeriesToSeasons
-            ? await GetTvSeasonLibraryItemsAsync(cancellationToken)
-            : await GetTvSeriesLibraryItemsAsync(cancellationToken);
+        IReadOnlyList<LibraryMovieListItem> tvItems;
+        if (expandSeriesToSeasons)
+        {
+            tvItems = await GetTvSeasonLibraryItemsAsync(cancellationToken);
+        }
+        else
+        {
+            var seriesItems = await GetTvSeriesLibraryItemsAsync(cancellationToken);
+            var unidentifiedSeasonItems = (await GetTvSeasonLibraryItemsAsync(cancellationToken))
+                .Where(x => x.IsOther)
+                .ToList();
+            tvItems = seriesItems.Concat(unidentifiedSeasonItems).ToList();
+        }
 
-        return movies
+        var items = movies
             .Concat(tvItems)
             .OrderByDescending(x => x.UpdatedAt)
             .ThenBy(x => x.Title)
             .ToList();
+        LogLibraryContentCategorySummary(items);
+
+        return items;
     }
 
     public async Task<IReadOnlyList<LibraryMovieListItem>> GetHiddenLibraryItemsAsync(
@@ -101,6 +116,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.IsWatched,
                     x.UserRating,
                     x.UpdatedAt,
+                    DefaultMediaFileName = x.MediaFiles
+                        .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                        .OrderBy(mediaFile => mediaFile.FileName)
+                        .Select(mediaFile => mediaFile.FileName)
+                        .FirstOrDefault(),
                     HasWatchHistory = x.WatchHistories.Any(),
                     SourceCount = x.MediaFiles.Count(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video),
                     HasLocalSource = x.MediaFiles.Any(
@@ -128,7 +148,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 })
             .ToListAsync(cancellationToken);
 
-        return movies
+        var orphanItems = await GetOrphanMediaFileLibraryItemsAsync(dbContext, cancellationToken);
+        var items = movies
             .Select(
                 x =>
                 {
@@ -156,9 +177,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
 
                     return new LibraryMovieListItem
                     {
+                        ItemKind = ResolveMovieItemKind(x.IdentificationStatus),
                         MovieId = x.Id,
                         TmdbId = x.TmdbId,
-                        Title = x.Title,
+                        Title = ResolveUnidentifiedMovieDisplayTitle(x.IdentificationStatus, x.Title, x.DefaultMediaFileName),
                         OriginalTitle = x.OriginalTitle ?? string.Empty,
                         ReleaseYear = x.ReleaseYear,
                         PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
@@ -203,11 +225,79 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     };
                 })
             .Where(x => x.IsVisibleInLibrary)
+            .Concat(orphanItems)
             .Concat(await GetExternalCollectionMoviesAsync(dbContext, cancellationToken))
             .GroupBy(BuildLibraryItemKey, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(x => x.HasActiveSource).ThenByDescending(x => x.IsVisibleInLibrary).ThenByDescending(x => x.UpdatedAt).First())
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
+
+        return items;
+    }
+
+    private static async Task<IReadOnlyList<LibraryMovieListItem>> GetOrphanMediaFileLibraryItemsAsync(
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var rows = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(
+                x => !x.IsDeleted
+                     && x.MediaType == MediaType.Video
+                     && !x.MovieId.HasValue
+                     && !x.EpisodeId.HasValue)
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.FileName,
+                    x.FilePath,
+                    x.Extension,
+                    x.CreatedAt,
+                    x.UpdatedAt,
+                    x.LastSeenAt,
+                    ProtocolType = x.SourceConnection != null
+                        ? (ProtocolType?)x.SourceConnection.ProtocolType
+                        : null
+                })
+            .ToListAsync(cancellationToken);
+
+        var items = rows
+            .Select(
+                x =>
+                {
+                    var parentPath = MoviePlaceholderGroupingHelper.GetDirectParentPath(x.FilePath);
+                    var parentDisplay = MoviePlaceholderGroupingHelper.GetParentFolderDisplay(parentPath);
+                    var updatedAt = x.LastSeenAt ?? x.UpdatedAt;
+                    return new LibraryMovieListItem
+                    {
+                        ItemKind = LibraryMediaItemKind.Other,
+                        OrphanMediaFileId = x.Id,
+                        GroupedRangeKey = $"orphan-media-file:{x.Id}",
+                        GroupedRangeMediaFileIds = [x.Id],
+                        GroupedRangeParentDisplay = parentDisplay,
+                        GroupedRangeSampleFilesText = x.FileName,
+                        GroupedRangeReasonTagsText = "orphan-media-file",
+                        Title = string.IsNullOrWhiteSpace(x.FileName) ? "-" : x.FileName.Trim(),
+                        OriginalTitle = string.Empty,
+                        Overview = string.IsNullOrWhiteSpace(parentDisplay) ? string.Empty : parentDisplay,
+                        IdentificationStatus = IdentificationStatus.Failed,
+                        SourceCount = 1,
+                        ActiveSourceCount = 1,
+                        HasActiveSource = true,
+                        HasLocalSource = x.ProtocolType == ProtocolType.Local,
+                        HasWebDavSource = x.ProtocolType == ProtocolType.WebDav,
+                        IsVisibleInLibrary = true,
+                        HasLibraryContext = true,
+                        IsInLibrary = true,
+                        UpdatedAt = updatedAt == default ? x.CreatedAt : updatedAt
+                    };
+                })
+            .ToList();
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=library-orphan-media-projection orphanMediaFilesProjectedToOther={items.Count} orphanMediaFilesHiddenBecauseGrouped=0 orphanMediaFilesWithoutProjection=0 unknownFileItemsCount={items.Count}");
+        return items;
     }
 
     private static async Task<IReadOnlyList<LibraryMovieListItem>> GetHiddenMovieItemsAsync(
@@ -285,6 +375,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         x.IsFavorite,
                         x.IsWatched,
                         x.UpdatedAt,
+                        DefaultMediaFileName = x.MediaFiles
+                            .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                            .OrderBy(mediaFile => mediaFile.FileName)
+                            .Select(mediaFile => mediaFile.FileName)
+                            .FirstOrDefault(),
                         SourceCount = x.MediaFiles.Count(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video),
                         HasLocalSource = x.MediaFiles.Any(
                             mediaFile => !mediaFile.IsDeleted
@@ -308,10 +403,13 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var sourceCount = movie?.SourceCount ?? 0;
                     return new LibraryMovieListItem
                     {
-                        ItemKind = LibraryMediaItemKind.Movie,
+                        ItemKind = ResolveMovieItemKind(movie?.IdentificationStatus ?? IdentificationStatus.Pending),
                         MovieId = movie?.Id ?? row.MovieId.GetValueOrDefault(),
                         TmdbId = movie?.TmdbId ?? row.TmdbId,
-                        Title = FirstNonEmpty(movie?.Title, row.Title),
+                        Title = ResolveUnidentifiedMovieDisplayTitle(
+                            movie?.IdentificationStatus ?? IdentificationStatus.Pending,
+                            FirstNonEmpty(movie?.Title, row.Title),
+                            movie?.DefaultMediaFileName),
                         OriginalTitle = FirstNonEmpty(movie?.OriginalTitle, row.OriginalTitle),
                         ReleaseYear = movie?.ReleaseYear ?? row.ReleaseYear,
                         PosterRemoteUrl = FirstNonEmpty(movie?.PosterRemoteUrl, row.PosterRemoteUrl),
@@ -448,7 +546,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
                     return new LibraryMovieListItem
                     {
-                        ItemKind = LibraryMediaItemKind.Season,
+                        ItemKind = ResolveTvSeasonItemKind(season.IdentificationStatus),
                         SeriesId = season.SeriesId,
                         SeasonId = season.SeasonId,
                         SeasonNumber = season.SeasonNumber,
@@ -581,8 +679,66 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .ToList();
     }
 
+    private static string ResolveUnidentifiedMovieDisplayTitle(
+        IdentificationStatus identificationStatus,
+        string storedTitle,
+        string? defaultMediaFileName)
+    {
+        if (identificationStatus == IdentificationStatus.Failed
+            && !string.IsNullOrWhiteSpace(defaultMediaFileName))
+        {
+            return defaultMediaFileName.Trim();
+        }
+
+        return storedTitle;
+    }
+
+    private static LibraryMediaItemKind ResolveMovieItemKind(IdentificationStatus identificationStatus)
+    {
+        return identificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed
+            ? LibraryMediaItemKind.Movie
+            : LibraryMediaItemKind.Other;
+    }
+
+    private static LibraryMediaItemKind ResolveTvSeasonItemKind(IdentificationStatus identificationStatus)
+    {
+        return identificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed
+            ? LibraryMediaItemKind.Season
+            : LibraryMediaItemKind.Other;
+    }
+
+    private static void LogLibraryContentCategorySummary(IReadOnlyCollection<LibraryMovieListItem> items)
+    {
+        var movieCount = items.Count(x => x.IsMovie);
+        var tvCount = items.Count(x => x.IsSeries || x.IsSeason);
+        var otherCount = items.Count(x => x.IsOther);
+        var groupedCount = items.Count(x => x.IsOther
+                                            && x.OrphanMediaFileId == 0
+                                            && (x.SeasonId > 0 && x.IdentificationStatus == IdentificationStatus.Failed
+                                                || !string.IsNullOrWhiteSpace(x.GroupedRangeKey)));
+        var unknownMoviePlaceholders = items.Count(x => x.IsOther && x.MovieId > 0 && string.IsNullOrWhiteSpace(x.GroupedRangeKey));
+        var unknownFileItems = items.Count(x => x.IsOther && x.OrphanMediaFileId > 0);
+        ScanIdentificationDiagnostics.Write(
+            $"event=library-content-category-summary movie={movieCount} tv={tvCount} other={otherCount} groupedTvLikePlaceholders={groupedCount} unknownMoviePlaceholders={unknownMoviePlaceholders} unknownFileItemsCount={unknownFileItems} otherCategoryCounts={otherCount} groupedRangesSelectable={groupedCount} groupedRangeDetailNavigationAvailable=true recognitionStatusFilterUiVisible=false");
+    }
+
     private static string BuildLibraryItemKey(LibraryMovieListItem item)
     {
+        if (item.IsOther && !string.IsNullOrWhiteSpace(item.GroupedRangeKey))
+        {
+            return $"other:{item.GroupedRangeKey}";
+        }
+
+        if (item.SeasonId > 0)
+        {
+            return $"season:{item.SeasonId}";
+        }
+
+        if (item.SeriesId > 0 && item.SeasonId == 0)
+        {
+            return $"series:{item.SeriesId}";
+        }
+
         if (item.HasActiveSource && item.MovieId > 0)
         {
             if (item.TmdbId.HasValue)
@@ -724,6 +880,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 series =>
                 {
                     var seasons = seasonsBySeries.GetValueOrDefault(series.Id) ?? [];
+                    var hasRecognizedSeason = seasons.Any(
+                        season => season.IdentificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed);
                     var sources = seasons
                         .SelectMany(season => sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
                         .ToList();
@@ -751,7 +909,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .Where(x => visibleSeasonIds.Contains(x.SeasonId))
                         .ToList();
                     var hasActiveSource = visibleSources.Count > 0;
-                    var isVisibleInLibrary = visibleSeasonCount > 0;
+                    var isVisibleInLibrary = visibleSeasonCount > 0 && hasRecognizedSeason;
                     var inLibraryEpisodeCount = visibleSources.Select(x => x.EpisodeId).Distinct().Count();
                     var watchedEpisodeCount = seasons
                         .SelectMany(season => episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
@@ -888,7 +1046,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var isVisibleInLibrary = ResolveIsVisibleInLibrary(hasActiveSource, visibilityState, hasUserState);
                     return new LibraryMovieListItem
                     {
-                        ItemKind = LibraryMediaItemKind.Season,
+                        ItemKind = ResolveTvSeasonItemKind(season.IdentificationStatus),
                         SeriesId = season.SeriesId,
                         SeasonId = season.SeasonId,
                         SeasonNumber = season.SeasonNumber,
@@ -1249,4 +1407,5 @@ public sealed class LibraryQueryService : ILibraryQueryService
 
         public DateTime UpdatedAt { get; set; }
     }
+
 }

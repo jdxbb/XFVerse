@@ -104,3 +104,61 @@
 - Phase 4.11f-fix-2 prefers AI-provided original-language titles for refined TMDB lookup. If AI cannot infer an original-language title and falls back to English / localized aliases, wrong top1 matches can still occur and remain Phase 4.12 active correction work.
 - Current-list batch select-all is intentionally scoped to loaded / filtered media-library items. It is not a hidden global delete helper and should not select removed-library or unloaded items.
 - Phase 4.11f-perf-1 reduces duplicated scan work by limiting post-AI TV retry to AI affected files and caching TMDB searches for one scan run only. It is not a recognition quality change, and any remaining wrong top1 matches remain Phase 4.12 active correction / manual review work.
+- Phase 4.11f-fix-3 blocks only obvious AI refined top1 Series-year conflicts. It intentionally does not solve same-title / remake / folk-season-numbering conflicts without a clear `seriesYearHint`.
+- Phase 4.11f-fix-3 Movie placeholder grouping is log-only. It identifies consecutive episode-like failed Movie placeholders as TV-like ranges for later correction, but it does not create Series / Season / Episode rows or remove all such items from current UI surfaces yet.
+- Phase 4.11f-fix-5 stores grouped TV-like placeholders as unidentified `TvSeason` / `TvEpisode` rows so they can play, be batch marked, and use Season detail. They remain unresolved / pending correction and are not TMDB-bound successful TV matches.
+- Follow-up fixes route failed unidentified Seasons into `Other` in normal media-library mode and add conservative bracketed episode-number grouping. Remaining ungrouped files are expected when they fail the same-parent, strict-contiguous, minimum-three-file, or excluded-token rules.
+- Active correction, manual regrouping, full Episode detail management, and multi-source episode handling remain deferred.
+- Anime OAD / SP / OVA / special mapping, course / extras classification, folk season numbering vs TMDB season numbering, and multi-source Episode handling remain deferred to active correction, Episode management, or future anime-specialty work.
+
+## Phase 4.11f-fix-6 Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- `01: title` / leading-number-colon-title episode parsing remains deferred because it has higher movie / course false-positive risk.
+- Movie collections, theatrical collections, course folders, extras, anime SP/OAD/OVA/special mapping, multi-episode file splitting, and manual regrouping remain active-correction / Episode-management work.
+- Title+number sequence candidates are intentionally uncertain. They enter AI-on-uncertain or unresolved placeholders, but they do not directly auto-bind TV.
+
+Noise:
+
+- Unsupported sample diagnostics are sanitized and truncated. They are sufficient for pattern review but not a full private path reconstruction tool.
+- Four-digit episode numbers are supported only under explicit episode markers. Bare four-digit filenames remain conservative by design.
+
+## Phase 4.11f-fix-7 Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- `01: title` / leading-number-colon-title parsing remains deferred.
+- Movie collections, course folders, theatrical collections, anime SP/OAD/OVA mapping, and multi-episode file splitting remain active-correction / Episode-management work.
+- Ignored scan file extension logs are evidence only. Potential video formats such as `.m4v`, `.webm`, `.ts`, `.m2ts`, `.wmv`, `.flv`, `.rmvb`, `.mpg`, or `.mpeg` should be reviewed before any whitelist change.
+
+Noise:
+
+- Verified title+number parsing is scoped to prevalidated same-parent sequences. Standalone title+number files can still remain unresolved by design.
+- Ignored-file samples are sanitized and capped per extension; they are not a full inventory of skipped files.
+
+## Phase 4.11f-fix-8 Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- `.sup` files are now accepted as subtitle candidates, but actual playback / renderer support still needs validation.
+- `01: title` / leading-number-colon-title parsing remains deferred because it has higher movie / course false-positive risk.
+- Movie collections, course folders, theatrical collections, anime SP/OAD/OVA mapping, multi-episode file splitting, and manual regrouping remain active-correction / Episode-management work.
+- Orphan scatter items are a visibility fallback. Correcting them into known Movie / TV metadata still belongs to active correction or later regrouping workflows.
+
+Noise:
+
+- Orphan grouping remains conservative: same direct parent, strict contiguous episode-like numbers, and no cross-directory merge.
+- `.rmvb` scan admission does not guarantee every file is playable; playback capability depends on the player stack.

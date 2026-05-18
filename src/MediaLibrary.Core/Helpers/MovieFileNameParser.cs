@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Net;
 
 namespace MediaLibrary.Core.Helpers;
 
@@ -62,10 +63,16 @@ public static partial class MovieFileNameParser
 
     public static ParsedMovieName Parse(string fileName)
     {
-        var nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName).Trim();
+        var removedNoiseCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rawNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName).Trim();
+        var nameWithoutExtension = WebUtility.HtmlDecode(rawNameWithoutExtension).Trim();
+        if (!string.Equals(rawNameWithoutExtension, nameWithoutExtension, StringComparison.Ordinal))
+        {
+            removedNoiseCategories.Add("html-entity");
+        }
+
         var yearMatch = FindLikelyReleaseYearMatch(nameWithoutExtension);
         var year = ExtractYear(yearMatch);
-        var removedNoiseCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var normalized = nameWithoutExtension;
         if (yearMatch.Success && HasLikelyTitleBeforeYear(nameWithoutExtension, yearMatch))
@@ -96,6 +103,11 @@ public static partial class MovieFileNameParser
             removedNoiseCategories.Add("release-source");
             return " ";
         });
+        normalized = LeadingReleasePrefixRegex().Replace(normalized, match =>
+        {
+            removedNoiseCategories.Add("release-prefix");
+            return string.Empty;
+        });
         normalized = TrailingSymbolReleaseTokenRegex().Replace(normalized, match =>
         {
             removedNoiseCategories.Add("release-tail");
@@ -123,6 +135,15 @@ public static partial class MovieFileNameParser
             }
         }
 
+        if (HasReleaseCleanupContext(removedNoiseCategories))
+        {
+            normalized = EditionTailRegex().Replace(normalized, match =>
+            {
+                removedNoiseCategories.Add("edition-tail");
+                return " ";
+            });
+        }
+
         if (year.HasValue)
         {
             normalized = Regex.Replace(
@@ -133,6 +154,12 @@ public static partial class MovieFileNameParser
         }
 
         normalized = WhitespaceRegex().Replace(normalized, " ").Trim();
+        var titleBeforeTrailingCleanup = normalized;
+        normalized = TrimTrailingTitleNoise(normalized);
+        if (!string.Equals(titleBeforeTrailingCleanup, normalized, StringComparison.Ordinal))
+        {
+            removedNoiseCategories.Add("trailing-punctuation");
+        }
 
         return new ParsedMovieName
         {
@@ -332,6 +359,31 @@ public static partial class MovieFileNameParser
         return matrix[left.Length, right.Length];
     }
 
+    private static string TrimTrailingTitleNoise(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return WhitespaceRegex()
+            .Replace(TrailingDanglingTitleNoiseRegex().Replace(value.Trim(), " "), " ")
+            .Trim();
+    }
+
+    private static bool HasReleaseCleanupContext(IReadOnlySet<string> removedNoiseCategories)
+    {
+        return removedNoiseCategories.Contains("release-year-tail")
+               || removedNoiseCategories.Contains("release-source")
+               || removedNoiseCategories.Contains("release-tail")
+               || removedNoiseCategories.Contains("language-subtitle")
+               || removedNoiseCategories.Contains("audio-codec")
+               || removedNoiseCategories.Contains("channel-layout")
+               || removedNoiseCategories.Contains("video-codec")
+               || removedNoiseCategories.Contains("release-token")
+               || removedNoiseCategories.Contains("html-entity");
+    }
+
     private static bool IsCjk(char ch)
     {
         return ch >= 0x4E00 && ch <= 0x9FFF;
@@ -361,14 +413,23 @@ public static partial class MovieFileNameParser
     [GeneratedRegex(@"\b(?:X\s*26[45]|H\s*\.?\s*26[45]|HEVC|AV1|VC\s*1|MPEG\s*2|10\s*BIT|8\s*BIT)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex VideoCodecPhraseRegex();
 
-    [GeneratedRegex(@"\b(?:4K|8K|UHD|FHD|HD|SD|HQ|HDR|HDR10|DV|DOLBY\s+VISION|BLU\s*RAY|BLURAY|BD\s*REMUX|BDRIP|BRRIP|WEB(?:\s*[- ]?\s*(?:DL|RIP))?|WEBDL|WEBRIP|HDRIP|DVDRIP|HDTV|REMUX|PROPER|REPACK|EXTENDED|LIMITED|DIRECTORS?\s+CUT|THEATRICAL|IMAX|AMZN|NF|DSNP|HMAX|ITUNES)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:3D|4K|8K|UHD|FHD|HD|SD|HQ|HDR|HDR10|DV|DOLBY\s+VISION|BLU\s*RAY|BLURAY|BD|BD\s*REMUX|BDRIP|BRRIP|WEB(?:\s*[- ]?\s*(?:DL|RIP))?|WEBDL|WEBRIP|HDRIP|DVDRIP|HDTV|REMUX|PROPER|REPACK|EXTENDED|LIMITED|SPECIAL\s+EDITION|ULTIMATE\s+EDITION|COLLECTORS?\s+EDITION|DIRECTORS?\s+CUT|THEATRICAL|IMAX|AMZN|NF|DSNP|HMAX|ITUNES)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SourceQualityPhraseRegex();
+
+    [GeneratedRegex(@"^\s*(?:3\s*D|4\s*K|8\s*K)\s*(?=[\u4e00-\u9fff])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LeadingReleasePrefixRegex();
+
+    [GeneratedRegex(@"\s*(?:\u5b8c\u7f8e)?(?:\u7ec8\u6781\u7248|\u5b8c\u7f8e\u7248|\u6536\u85cf\u7248|\u5178\u85cf\u7248)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex EditionTailRegex();
 
     [GeneratedRegex(@"\b(?:JAPANESE|ENGLISH|CHINESE|MANDARIN|CANTONESE|KOREAN|FRENCH|GERMAN|SPANISH|MULTI|SUBS?|SUBBED|DUBBED|DUAL\s+AUDIO)\b|(?:\u4e2d\u5b57|\u4e2d\u82f1\u5b57\u5e55|\u5b57\u5e55|\u56fd\u8bed|\u7ca4\u8bed|\u914d\u97f3|\u516c\u6620\u4e2d\u5b57|\u51c0\u7248)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex LanguageSubtitlePhraseRegex();
 
     [GeneratedRegex(@"(?:^|\s)[\p{Sc}\p{P}\p{S}]*[A-Za-z0-9]{2,}[A-Za-z0-9\p{Sc}\p{P}\p{S}]*[\p{Sc}\p{P}\p{S}]+[A-Za-z0-9\p{Sc}\p{P}\p{S}]*\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TrailingSymbolReleaseTokenRegex();
+
+    [GeneratedRegex(@"[\s\(\[\{（【《「『,，.。:：;；_\-]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex TrailingDanglingTitleNoiseRegex();
 
     [GeneratedRegex(@"[\p{IsCJKUnifiedIdeographs}]{2,}|[A-Za-z][A-Za-z0-9'’&\s:]{2,}", RegexOptions.CultureInvariant)]
     private static partial Regex TitleSegmentRegex();

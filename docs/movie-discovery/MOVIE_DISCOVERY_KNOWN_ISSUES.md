@@ -58,6 +58,46 @@
 - Phase 4.11f uses AI refined TV title hints for local scan TMDB lookup. It remains scan plumbing only and does not change Discovery cards, Movie AI recommendation inputs, Watch Insights, or TV exclusion from AI surfaces.
 - Phase 4.11f-fix-2 prefers original-language AI title hints for scan refined TV lookup, but English / localized fallback titles can still produce wrong TMDB top1 matches. These remain Phase 4.12 active correction / manual review work.
 - Phase 4.11f-perf-1 adds same-run TMDB search caching and limits post-AI TV retry scope. It does not change Discovery behavior or scan matching quality; remaining wrong top1 matches still require Phase 4.12 active correction / manual review.
+- Phase 4.11f-fix-3 adds only a narrow AI refined Series-year gate. Wrong top1 matches without a clear `seriesYearHint` conflict still remain Phase 4.12 active correction / manual review work.
+- Phase 4.11f-fix-3 groups consecutive numbered Movie placeholders as TV-like ranges for later correction. Phase 4.11f-fix-4 / fix-5 surface those ranges through `Other`, but they remain unresolved data.
+- Phase 4.11f-fix-5 moves ordinary unrecognized Movie placeholders into `Other` and stores grouped TV-like placeholders as unidentified `TvSeason` / `TvEpisode` rows. They can play and use Season detail, but remain unresolved and unbound to TMDB.
+- Follow-up fixes ensure those failed unidentified Seasons are included in `Other` during normal media-library mode. Bracketed episode-number segments are grouped only under the existing conservative same-parent / strict-contiguous / minimum-three-file rules.
+- Active correction, manual regrouping, full Episode detail management, and multi-source episode handling remain deferred.
+- Anime specials, folk season splits, course / extras folders, and multi-source Episode cases are intentionally not solved in default scan.
+
+## Phase 4.11f-fix-6 Scan Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- `01: title` / leading-number-colon-title, movie collections, courses, theatrical collections, anime specials, SP/OAD/OVA mapping, and multi-episode file splitting remain outside default scan.
+- Title+number sequence candidates are TV-like uncertain inputs, not successful bindings. Active correction or manual grouping still owns ambiguous results.
+
+Noise:
+
+- Movie placeholder grouping now accepts numeric quality tails and mixed episode patterns, but only for already failed Movie placeholders in one direct parent folder with strict contiguous numbering.
+- Bare four-digit numbers are intentionally not treated as episodes unless an explicit episode marker exists.
+- Phase 4.11f-fix-7 ignored-file extension summaries are diagnostic evidence only; they do not imply that skipped extensions should immediately enter the video whitelist.
+
+## Phase 4.11f-fix-8 Scan Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- `.sup` is accepted as a subtitle candidate, but playback / renderer support still needs validation.
+- `.rmvb` is accepted by scan discovery; playback quality depends on the player stack and codec support.
+- Orphan `Other` rows remain unresolved until active correction, manual regrouping, or later metadata binding.
+- `01: title`, movie collections, courses, theatrical collections, anime specials, SP/OAD/OVA mapping, and multi-episode splitting remain outside default scan.
+
+Noise:
+
+- Orphan and placeholder grouping remains strict and may leave scatter items when numbering has gaps, crosses directories, or includes excluded extras / trailer tokens.
 
 ## Phase 4.10.6 TV Discovery Notes
 

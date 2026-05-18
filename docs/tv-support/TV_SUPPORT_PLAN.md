@@ -833,3 +833,78 @@ Phase 4.11f-perf-1 is a scan performance pass with no recognition-policy change.
 - TV and Movie search caches stay separate and are keyed with media type and relevant search context.
 - The cache is runtime-only, not persisted to the database, and does not require migration.
 - This phase does not change AI prompt/schema, refined-title top1 behavior, parser rules, fallback rules, safety gates, media-library visibility, Movie AI classification behavior, or Discovery surfaces.
+
+## Phase 4.11f-fix-3 Update
+
+Phase 4.11f-fix-3 is a scan closeout guard pass, not a broader recognition expansion.
+
+- AI refined TMDB top1 now has a minimal series-year gate: only `seriesYearHint` is compared with the TMDB Series first-air year, and only a difference greater than two years blocks auto-apply.
+- `seasonYearHint` is not used for Series year gating because later seasons naturally air years after the Series first-air year.
+- Missing AI series year or missing TMDB first-air year does not block the refined lookup; it is only logged.
+- Blocked refined matches remain placeholder / `ai-candidate`; no second AI request, top-N AI selection, or local special-case adjudication is added.
+- Movie title cleanup receives small generic release/source/audio/subtitle cleanup for HTML entities, trailing dangling punctuation, `3D` quality tokens, and conservative source / edition tokens.
+- TV parser rules are not expanded in this phase; unsupported OAD / SP / OVA / special mapping remains deferred.
+- Movie placeholders with at least three strictly consecutive episode-like numbers in the same direct parent folder are grouped as log-only TV-like placeholder ranges. The grouping does not auto-bind TV and does not create Series, Season, or Episode rows.
+- Complex anime season mapping, folk season numbering vs TMDB season numbering, multi-source episode management, course / extras classification, and manual aggregation remain Phase 4.12 / Phase 4.13 or future anime-specialty work.
+- TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11f-fix-4 Update
+
+Phase 4.11f-fix-4 turns grouped TV-like placeholders into media-library read-model data without adding schema.
+
+- Consecutive numbered Movie placeholder failures are projected as `Other` / TV-like placeholder ranges at query time.
+- Grouped ranges retain runtime `MediaFileIds`, file count, parent-folder display, number span, sample filenames, and reason tags.
+- Grouped placeholder files are hidden from the regular Movie scatter list, but ungrouped Movie placeholders continue to display normally.
+- Grouped ranges remain unresolved: they do not bind TMDB, create Series / Season / Episode rows, or count as successful recognition.
+- The projection provides the data base for the `Other` category, batch AI correction, and manual aggregation into seasons.
+
+## Phase 4.11f-fix-5 Update
+
+Phase 4.11f-fix-5 completes the early `Other` category surface without adding schema.
+
+- `Other` now covers unrecognized / placeholder / NeedsReview / type-uncertain media-library rows.
+- Recognized Movie and recognized TV remain in their own categories; grouped TV-like placeholders are stored as unidentified `TvSeason` / `TvEpisode` rows and remain in `Other` until corrected.
+- The recognition-status filter is hidden from the main UI, while backend status data remains available for future correction and diagnostics.
+- Grouped TV-like placeholders use existing Season / Episode infrastructure: the scan creates no-TMDB `TvSeries`, failed `TvSeason`, and failed `TvEpisode` rows, then attaches grouped `MediaFile` rows to those Episodes.
+- Normal media-library mode now appends unidentified failed Seasons into `Other`; all-failed placeholder Series are not shown as recognized TV summaries.
+- Unidentified Episode display titles use original file names, so unknown rows remain traceable to source files.
+- The detail page is the normal Season detail in unidentified / pending-correction mode. It can play Episode sources and mark Season / Episode watched state, but it does not bind TMDB or mark recognition successful.
+- Movie placeholder grouping also recognizes conservative bracketed episode-number segments, such as bracket blocks that start with an episode number and are grouped only when the same direct parent has at least three strictly consecutive failures.
+- Phase 4.12 / 4.13 continue to own active correction, episode details, multi-source management, and manual aggregation into seasons.
+- AI refined year-gate logs are made consistent with blocked results, and Movie cleaner receives only a small generic release-context cleanup.
+- No migration, database update, full AI range restoration, or TV recommendation / Watch Insights integration is introduced.
+
+## Phase 4.11f-fix-6 Update
+
+Phase 4.11f-fix-6 relaxes only the uncertain-candidate boundary for repeated title+number episode directories.
+
+- Same-parent title+number files can enter TV-like uncertain / `aiCandidateRanges` when there are at least three strictly contiguous numbers and a shared normalized title prefix.
+- A single title+number file still does not create strong TV context or an automatic TV bind.
+- The candidate is emitted before Movie fallback so AI-on-uncertain can see these directories instead of waiting for Movie placeholder grouping.
+- Multi-episode detection is tightened to explicit plausible ranges only; years, quality numbers, audio channel numbers, and ordinary title numbers after `SxxEyy` no longer count as multi-episode ranges.
+- Explicit episode markers now allow four-digit episode numbers, while bare four-digit numbers remain conservative and are not global TV evidence.
+- Movie placeholder grouping can group numeric quality-tail failures and merge same-parent mixed episode patterns when the parsed episode numbers form one strict contiguous run.
+- `01: title`, movie collections, course folders, theatrical collections, anime-specific special mapping, and performance optimization remain deferred.
+- TV stays excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11f-fix-7 Update
+
+Phase 4.11f-fix-7 applies already-verified title+number sequence context during TV episode parsing and adds ignored-file scan diagnostics.
+
+- Title+number sequences admitted by preanalysis can now parse as Episodes during TV apply when the file belongs to the same verified range.
+- The rule is still range-scoped and conservative: no single-file title+number auto-bind, no cross-directory sequence reuse, and no recursive child-directory mixing.
+- Explicit `S2` / `S02` / `Season 2` tokens can supply season number in the verified context. Final-season wording is logged as context but is not hard-mapped to a numeric season.
+- Unsupported TV logs now distinguish true multi-episode ranges from ordinary parse failures.
+- Local and WebDAV scan discovery now logs ignored file counts by reason and extension with sanitized samples, so future whitelist changes can be evidence-based.
+- The video whitelist is not expanded in this phase, and TV remains excluded from AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+## Phase 4.11f-fix-8 Update
+
+Phase 4.11f-fix-8 closes the media-library visibility gap for unresolved scan sources.
+
+- Active orphan video `MediaFile` rows with no Movie binding and no Episode binding are projected into `Other` as unrecognized file items.
+- Orphan display titles use original safe file names, not cleaned Movie query titles.
+- After Movie identification, scanned paths run a conservative unresolved-source grouping pass. Historical orphan rows and newly produced unresolved rows can become unidentified `TvSeason` / `TvEpisode` rows when they form strict same-parent contiguous episode-like sequences.
+- Bracketed episode segment sequences are admitted to TV-like uncertain `aiCandidateRanges` before Movie fallback.
+- `.rmvb` is included in the video whitelist and `.sup` is included in the subtitle whitelist. `.sup` rendering remains a validation item.
+- No third AI pass, no schema migration, no database update, no Watch Insights TV input, and no TV recommendation input are introduced.

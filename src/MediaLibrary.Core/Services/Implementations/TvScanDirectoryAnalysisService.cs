@@ -358,7 +358,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                     allDirectoryPaths);
                 result.AddAiCandidateRange(aiCandidateRange);
                 ScanIdentificationDiagnostics.Write(
-                    $"event=ai-candidate-range directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} rangeType={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.RangeType)} riskTags={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RiskTags))} sourceFiles={aiCandidateRange.SourceFileCount} directVideoCount={aiCandidateRange.DirectVideoCount} childFolderCount={aiCandidateRange.ChildFolderCount} rangeMediaFileCount={aiCandidateRange.MediaFileIds.Count} rangeHasMediaFiles={(aiCandidateRange.MediaFileIds.Count > 0).ToString().ToLowerInvariant()} sampleDirectVideoFiles={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.SampleDirectVideoFiles))} suspectedSeriesFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeriesFolder)} suspectedSeasonFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeasonFolder)} usableCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.UsableCandidateQueries))} rejectedCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RejectedCandidateQueries))} noisyCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.NoisyCandidateQueries))} candidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.CandidateQueries))} blockedMovieFallbackCount={aiCandidateRange.BlockedMovieFallbackCount} candidateConflictsCount={aiCandidateRange.CandidateConflictsCount} chineseStructureHints={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.ChineseStructureHints))}");
+                    $"event=ai-candidate-range directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} rangeType={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.RangeType)} riskTags={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RiskTags))} sourceFiles={aiCandidateRange.SourceFileCount} directVideoCount={aiCandidateRange.DirectVideoCount} childFolderCount={aiCandidateRange.ChildFolderCount} rangeMediaFileCount={aiCandidateRange.MediaFileIds.Count} rangeHasMediaFiles={(aiCandidateRange.MediaFileIds.Count > 0).ToString().ToLowerInvariant()} sampleDirectVideoFiles={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.SampleDirectVideoFiles))} suspectedSeriesFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeriesFolder)} suspectedSeasonFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeasonFolder)} usableCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.UsableCandidateQueries))} rejectedCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RejectedCandidateQueries))} noisyCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.NoisyCandidateQueries))} candidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.CandidateQueries))} blockedMovieFallbackCount={aiCandidateRange.BlockedMovieFallbackCount} candidateConflictsCount={aiCandidateRange.CandidateConflictsCount} chineseStructureHints={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.ChineseStructureHints))} titleNumberSequenceCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentAddedToAiCandidateRanges={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} titleNumberSequenceCandidateRange={(directoryContext.TitleNumberSequence.IsSequence ? $"{directoryContext.TitleNumberSequence.StartNumber}-{directoryContext.TitleNumberSequence.EndNumber}" : "(none)")} titleNumberSequencePrefix={ScanIdentificationDiagnostics.FormatValue(directoryContext.TitleNumberSequence.PrefixKey)} titleNumberSequenceStart={directoryContext.TitleNumberSequence.StartNumber} titleNumberSequenceEnd={directoryContext.TitleNumberSequence.EndNumber} titleNumberSequenceFiles={directoryContext.TitleNumberSequence.FileCount} addedToAiCandidateRanges=true aiCandidateRangeReason={(directoryContext.TitleNumberSequence.IsSequence ? directoryContext.TitleNumberSequence.Pattern : "local-tv-risk")}");
             }
             else if (directoryContext.BlocksMovieFallback)
             {
@@ -381,7 +381,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             }
 
             ScanIdentificationDiagnostics.Write(
-                $"event=tv-range-local directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} titleHint={ScanIdentificationDiagnostics.FormatValue(titleHint)} strong={directoryContext.IsStrong.ToString().ToLowerInvariant()} blocksMovieFallback={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} seasonFolder={isSeasonFolder.ToString().ToLowerInvariant()} siblingSeason={hasSiblingSeasonDirectory.ToString().ToLowerInvariant()} explicitEpisodes={directoryContext.ExplicitEpisodeCount} contextEpisodes={directoryContext.ContextEpisodeCount} strongFallbackEpisodes={directoryContext.StrongFallbackEpisodeCount} validEpisodes={validEpisodeCount} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)}");
+                $"event=tv-range-local directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} titleHint={ScanIdentificationDiagnostics.FormatValue(titleHint)} strong={directoryContext.IsStrong.ToString().ToLowerInvariant()} blocksMovieFallback={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} seasonFolder={isSeasonFolder.ToString().ToLowerInvariant()} siblingSeason={hasSiblingSeasonDirectory.ToString().ToLowerInvariant()} explicitEpisodes={directoryContext.ExplicitEpisodeCount} contextEpisodes={directoryContext.ContextEpisodeCount} strongFallbackEpisodes={directoryContext.StrongFallbackEpisodeCount} validEpisodes={validEpisodeCount} titleNumberSequenceCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} titleNumberSequencePrefix={ScanIdentificationDiagnostics.FormatValue(directoryContext.TitleNumberSequence.PrefixKey)} titleNumberSequenceStart={directoryContext.TitleNumberSequence.StartNumber} titleNumberSequenceEnd={directoryContext.TitleNumberSequence.EndNumber} titleNumberSequenceFiles={directoryContext.TitleNumberSequence.FileCount} addedToAiCandidateRanges={(ShouldEmitAiCandidateRange(directoryContext)).ToString().ToLowerInvariant()} aiCandidateRangeReason={(directoryContext.TitleNumberSequence.IsSequence ? directoryContext.TitleNumberSequence.Pattern : "(none)")} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)}");
         }
     }
 
@@ -409,6 +409,17 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                 .IsEpisodeLike);
         var bareNumberCount = groupFiles.Count(x => TvEpisodeFileNameParser.IsBareNumberEpisodeFileName(x.FileName));
         var titleNumberCount = groupFiles.Count(x => TvEpisodeFileNameParser.IsTitleNumberEpisodeFileName(x.FileName));
+        var hasTitleNumberSequence = TvEpisodeFileNameParser.TryAnalyzeTitleNumberSequence(
+            groupFiles.Select(x => x.FileName),
+            out var titleNumberSequence);
+        var hasEpisodeSequence = TvEpisodeFileNameParser.TryAnalyzeEpisodeSequence(
+            groupFiles.Select(x => x.FileName),
+            out var episodeSequence);
+        var hasBracketEpisodeSequence = hasEpisodeSequence
+                                        && string.Equals(
+                                            episodeSequence.Pattern,
+                                            "bracket-episode-segment",
+                                            StringComparison.OrdinalIgnoreCase);
         var sequentialEpisodeDirectory = LooksLikeSequentialEpisodeDirectory(groupFiles);
         var hasChineseSeasonHint = TvEpisodeFileNameParser.HasChineseSeasonHint(folderName);
         var hasChineseCountHint = TvEpisodeFileNameParser.HasChineseCountHint(folderName);
@@ -450,9 +461,18 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         {
             strongEvidence.Add("title-number-files");
         }
+        else if (hasTitleNumberSequence)
+        {
+            weakReasons.Add("title-number-sequence");
+        }
         else if (titleNumberCount > 0)
         {
             weakReasons.Add("weak-title-number");
+        }
+
+        if (hasBracketEpisodeSequence)
+        {
+            weakReasons.Add("bracket-episode-segment");
         }
 
         if (hasChineseSeasonHint)
@@ -481,7 +501,14 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                                   || ((isSeasonFolder || hasSiblingSeasonDirectory)
                                       && (explicitEpisodeCount + contextEpisodeCount + bareNumberCount + titleNumberCount > 0 || groupFiles.Count >= 2))
                                   || explicitEpisodeCount >= 2
-                                  || contextEpisodeCount >= 2;
+                                  || contextEpisodeCount >= 2
+                                  || hasTitleNumberSequence
+                                  || hasBracketEpisodeSequence;
+        var verifiedSequence = hasTitleNumberSequence
+            ? titleNumberSequence
+            : hasBracketEpisodeSequence
+                ? episodeSequence
+                : TvEpisodeSequenceAnalysis.Empty;
 
         return new LocalTvDirectoryContext(
             isStrong,
@@ -490,7 +517,8 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             weakReasons.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             explicitEpisodeCount,
             contextEpisodeCount,
-            strongFallbackEpisodeCount);
+            strongFallbackEpisodeCount,
+            verifiedSequence);
     }
 
     private static bool ShouldEmitAiCandidateRange(LocalTvDirectoryContext directoryContext)
@@ -1472,7 +1500,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                 x.FileName,
                 allowSeasonContextOnly: true,
                 allowStrongContextFallbacks: true))
-            .Where(x => x.IsEpisodeLike && !x.IsMultiEpisode && x.EpisodeNumber is > 0 and <= 200)
+            .Where(x => x.IsEpisodeLike && !x.IsMultiEpisode && x.EpisodeNumber is > 0 and <= 9999)
             .Select(x => x.EpisodeNumber)
             .Distinct()
             .OrderBy(x => x)
@@ -1657,7 +1685,8 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         IReadOnlyList<string> WeakReasons,
         int ExplicitEpisodeCount,
         int ContextEpisodeCount,
-        int StrongFallbackEpisodeCount)
+        int StrongFallbackEpisodeCount,
+        TvEpisodeSequenceAnalysis TitleNumberSequence)
     {
         public string EvidenceText => string.Join('|', StrongEvidence);
 

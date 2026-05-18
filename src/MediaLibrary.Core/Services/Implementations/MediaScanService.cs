@@ -241,6 +241,9 @@ public sealed class MediaScanService : IMediaScanService
             postStage.Absorb(identificationResult);
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-movie-stage-complete source=webdav requested={movieMediaFileIds.Length} attempted={identificationResult.AttemptedCount} bound={identificationResult.BoundCount} placeholders={identificationResult.PlaceholderCount} warnings={identificationResult.WarningCount} errors={identificationResult.ErrorCount}");
+            await _movieIdentificationService.AggregateUnidentifiedMediaFilesAsync(
+                enabledScanPaths.Select(x => x.Id).ToArray(),
+                cancellationToken);
             ScanIdentificationDiagnostics.Write(
                 $"event=tmdb-search-cache-summary source=webdav tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbTvSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries} tmdbMovieSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
         }
@@ -386,13 +389,13 @@ public sealed class MediaScanService : IMediaScanService
                 var mediaType = MediaFileRules.GetMediaType(remoteEntry.Name);
                 if (mediaType == MediaType.Other)
                 {
-                    result.IgnoredFileCount++;
+                    result.RecordIgnored("unsupported-extension", remoteEntry.Name);
                     continue;
                 }
 
                 if (!seenFilePaths.Add(remoteEntry.Path))
                 {
-                    result.IgnoredFileCount++;
+                    result.RecordIgnored("duplicate-path", remoteEntry.Name);
                     continue;
                 }
 
@@ -469,12 +472,14 @@ public sealed class MediaScanService : IMediaScanService
             }
 
             result.IsSuccessful = true;
+            result.IgnoredFiles.WriteDiagnostics("webdav", result.IgnoredFileCount);
             await CompletePathLogAsync(log, result, ScanTaskStatus.Success, string.Empty, dbContext, cancellationToken);
             return result;
         }
         catch (Exception exception)
         {
             result.ErrorCount++;
+            result.IgnoredFiles.WriteDiagnostics("webdav", result.IgnoredFileCount);
             await CompletePathLogAsync(log, result, ScanTaskStatus.Failed, $"[MediaFile.Upsert] {TrimMessage(exception.Message)}", dbContext, cancellationToken);
             return result;
         }
@@ -780,6 +785,14 @@ public sealed class MediaScanService : IMediaScanService
         public int IgnoredFileCount { get; set; }
 
         public int ErrorCount { get; set; }
+
+        public ScanIgnoredFileStats IgnoredFiles { get; } = new();
+
+        public void RecordIgnored(string reason, string fileNameOrPath)
+        {
+            IgnoredFileCount++;
+            IgnoredFiles.Add(reason, fileNameOrPath);
+        }
     }
 
     private sealed class PostScanStageResult

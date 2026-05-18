@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
@@ -88,9 +88,60 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
             if (candidate.UnsupportedFiles.Count > 0)
             {
+                var hasMultiEpisodeUnsupported = candidate.UnsupportedFiles.Any(x => x.ParseResult.IsMultiEpisode);
+                var hasVerifiedTitleNumberContext = candidate.UnsupportedFiles.Any(x => x.ParseResult.VerifiedTitleNumberSequenceContext);
+                var unsupportedReason = hasMultiEpisodeUnsupported
+                    ? "multi-episode-not-supported"
+                    : hasVerifiedTitleNumberContext
+                        ? "title-number-sequence-parse-failed"
+                        : candidate.WeakTvReasons.Any(x => string.Equals(x, "title-number-sequence", StringComparison.OrdinalIgnoreCase))
+                            ? "title-number-sequence-not-applied"
+                            : "episode-parse-failed";
+                var unsupportedSamples = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Take(5)
+                        .Select(x => ScanIdentificationDiagnostics.FormatFileName(x.FileName)));
+                var unsupportedKinds = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Select(x => x.ParseResult.MatchKind)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(5));
+                var unsupportedPatterns = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Select(x => x.ParseResult.MultiEpisodePattern)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(5));
+                var detectedStarts = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Where(x => x.ParseResult.IsMultiEpisode)
+                        .Select(x => x.ParseResult.EpisodeNumber)
+                        .Where(x => x > 0)
+                        .Distinct()
+                        .OrderBy(x => x)
+                        .Take(5));
+                var detectedEnds = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Where(x => x.ParseResult.IsMultiEpisode)
+                        .Select(x => x.ParseResult.MultiEpisodeEndNumber)
+                        .Where(x => x.HasValue)
+                        .Select(x => x!.Value)
+                        .Distinct()
+                        .OrderBy(x => x)
+                        .Take(5));
                 ScanIdentificationDiagnostics.Write(
-                    $"event=tv-candidate-unsupported directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} unsupported={candidate.UnsupportedFiles.Count} reason=multi-episode-not-supported");
-                result.Summary.AddWarning("TV.Parse", "发现多集文件，本阶段不支持多集拆分，已跳过对应播放源。");
+                    $"event=tv-candidate-unsupported directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} unsupported={candidate.UnsupportedFiles.Count} reason={unsupportedReason} unsupportedReason={unsupportedReason} unsupportedSampleNames={ScanIdentificationDiagnostics.FormatValue(unsupportedSamples)} unsupportedMatchKind={ScanIdentificationDiagnostics.FormatValue(unsupportedKinds)} detectedMultiEpisodeStart={ScanIdentificationDiagnostics.FormatValue(detectedStarts)} detectedMultiEpisodeEnd={ScanIdentificationDiagnostics.FormatValue(detectedEnds)} detectedMultiEpisodePattern={ScanIdentificationDiagnostics.FormatValue(unsupportedPatterns)} verifiedTitleNumberSequenceContext={hasVerifiedTitleNumberContext.ToString().ToLowerInvariant()}");
+                result.Summary.AddWarning(
+                    "TV.Parse",
+                    hasMultiEpisodeUnsupported
+                        ? "multi-episode-not-supported"
+                        : "\u90e8\u5206\u5267\u96c6\u6587\u4ef6\u6682\u65e0\u6cd5\u89e3\u6790\uff0c\u5df2\u4fdd\u7559\u4e3a\u672a\u8bc6\u522b/\u5f85\u4fee\u6b63\u3002");
             }
 
             if (candidate.Files.Count == 0)
@@ -141,6 +192,8 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             TvSearchCandidate? bestCandidate = null;
             var candidateConflictCount = 0;
             var candidateConflictReasons = new List<string>();
+            var aiRefinedYearGateBlockedCandidate = false;
+            var aiRefinedYearGateBlockedReason = string.Empty;
             foreach (var queryAttempt in candidate.SearchQueries)
             {
                 var query = queryAttempt.Value;
@@ -179,9 +232,16 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 var localizedTitleExactMatch = HasLocalizedTitleExactMatch(query, queryBestCandidate?.Item);
                 var originalTitleConflict = HasOriginalTitleConflict(query, queryBestCandidate?.Item);
                 var isAiRefinedLookup = IsAiRefinedTitleQuery(queryAttempt.Source);
-                var aiRefinedTop1Accepted = isAiRefinedLookup && queryBestCandidate is not null;
+                var aiRefinedYearGate = isAiRefinedLookup
+                    ? GetAiRefinedYearGateResult(queryAttempt, queryBestCandidate)
+                    : AiRefinedYearGateResult.NotChecked("not-ai-refined-lookup");
+                var aiRefinedTop1Accepted = isAiRefinedLookup
+                                               && queryBestCandidate is not null
+                                               && !aiRefinedYearGate.Blocked;
                 var aiRefinedTop1RejectedReason = isAiRefinedLookup && queryBestCandidate is null
                     ? "no-tmdb-result"
+                    : aiRefinedYearGate.Blocked
+                        ? aiRefinedYearGate.Reason
                     : string.Empty;
                 var aiRefinedSafetyGateReason = isAiRefinedLookup
                     ? GetAiRefinedSafetyGateReason(queryAttempt, queryBestCandidate, nextBestCandidate)
@@ -189,18 +249,31 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 var aiRefinedSafetyGatePassed = aiRefinedTop1Accepted;
                 var autoApply = queryBestCandidate is not null
                                 && string.IsNullOrWhiteSpace(conflictReason)
-                                && (aiRefinedTop1Accepted || queryBestCandidate.Confidence >= MatchedConfidence);
+                                && (isAiRefinedLookup
+                                    ? aiRefinedTop1Accepted
+                                    : queryBestCandidate.Confidence >= MatchedConfidence);
                 var autoApplyBlockedReason = autoApply
                     ? string.Empty
                     : isAiRefinedLookup
                         ? FirstNonEmpty(aiRefinedTop1RejectedReason, aiRefinedSafetyGateReason, "no-tmdb-result")
                         : GetTvAutoApplyBlockedReason(queryBestCandidate, conflictReason);
                 var searchDecision = isAiRefinedLookup
-                    ? aiRefinedTop1Accepted ? "match-ai-refined-top1" : "placeholder-no-result"
+                    ? aiRefinedTop1Accepted
+                        ? "match-ai-refined-top1"
+                        : aiRefinedYearGate.Blocked
+                            ? "placeholder-year-conflict"
+                            : "placeholder-no-result"
                     : GetTvSearchDecision(queryBestCandidate, conflictReason);
 
                 ScanIdentificationDiagnostics.Write(
-                    $"event=tv-search-complete query={ScanIdentificationDiagnostics.FormatValue(query)} querySource={ScanIdentificationDiagnostics.FormatValue(queryAttempt.Source)} resultCount={searchPage.Results.Count} topTitle={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.Name)} topOriginal={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.OriginalName)} topTmdbId={ScanIdentificationDiagnostics.FormatNullable(queryBestCandidate?.Item.TmdbId)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(queryBestCandidate?.Confidence)} secondConfidence={ScanIdentificationDiagnostics.FormatConfidence(nextBestCandidate?.Confidence)} tvLocalizedTitleExactMatch={localizedTitleExactMatch.ToString().ToLowerInvariant()} tvOriginalTitleConflict={originalTitleConflict.ToString().ToLowerInvariant()} tvCandidateConflictReason={ScanIdentificationDiagnostics.FormatValue(conflictReason)} conflictReason={ScanIdentificationDiagnostics.FormatValue(conflictReason)} tvAutoApply={autoApply.ToString().ToLowerInvariant()} tvAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(autoApplyBlockedReason)} decision={ScanIdentificationDiagnostics.FormatValue(searchDecision)} aiRefinedLookup={isAiRefinedLookup.ToString().ToLowerInvariant()} aiRefinedTitleParsed={isAiRefinedLookup.ToString().ToLowerInvariant()} aiRefinedTitle={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? query : string.Empty)} aiOriginalLanguageTitle={ScanIdentificationDiagnostics.FormatValue(queryAttempt.OriginalLanguageTitle)} aiEnglishTitleHint={ScanIdentificationDiagnostics.FormatValue(queryAttempt.EnglishTitleHint)} aiLocalizedTitleHint={ScanIdentificationDiagnostics.FormatValue(queryAttempt.LocalizedTitleHint)} aiOriginalTitleHint={ScanIdentificationDiagnostics.FormatValue(queryAttempt.OriginalTitleHint)} aiSearchTitle={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? queryAttempt.SearchTitle : string.Empty)} aiSearchTitleSource={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? queryAttempt.SearchTitleSource : string.Empty)} originalLanguageTitleMissing={(isAiRefinedLookup && string.IsNullOrWhiteSpace(queryAttempt.OriginalLanguageTitle)).ToString().ToLowerInvariant()} fallbackToEnglishTitle={(isAiRefinedLookup && string.Equals(queryAttempt.SearchTitleSource, "english-title", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} fallbackToLocalizedTitle={(isAiRefinedLookup && string.Equals(queryAttempt.SearchTitleSource, "localized-title", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} aiSeriesYearHint={ScanIdentificationDiagnostics.FormatNullable(queryAttempt.SeriesYearHint ?? queryAttempt.YearHint)} aiSeasonYearHint={ScanIdentificationDiagnostics.FormatNullable(queryAttempt.SeasonYearHint)} aiSeasonNumberHint={ScanIdentificationDiagnostics.FormatNullable(queryAttempt.SeasonNumberHint)} aiRefinedTmdbSearchQuery={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? query : string.Empty)} aiRefinedTmdbSearchQuerySource={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? queryAttempt.SearchTitleSource : string.Empty)} aiRefinedTmdbTop1Title={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.Name)} aiRefinedTmdbTop1OriginalTitle={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.OriginalName)} aiRefinedTmdbTop1Year={ScanIdentificationDiagnostics.FormatNullable(queryBestCandidate?.Item.FirstAirYear)} aiRefinedTmdbTop1Id={ScanIdentificationDiagnostics.FormatNullable(queryBestCandidate?.Item.TmdbId)} aiRefinedTmdbResultCount={searchPage.Results.Count} aiRefinedTmdbLookupSucceeded={(isAiRefinedLookup && queryBestCandidate is not null).ToString().ToLowerInvariant()} aiRefinedSafetyGatePassed={aiRefinedSafetyGatePassed.ToString().ToLowerInvariant()} aiRefinedSafetyGateReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedSafetyGateReason)} aiRefinedTop1Accepted={aiRefinedTop1Accepted.ToString().ToLowerInvariant()} aiRefinedTop1RejectedReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedTop1RejectedReason)} aiRefinedAutoApply={(isAiRefinedLookup && autoApply).ToString().ToLowerInvariant()} finalDecisionAfterAiRefinedLookup={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? searchDecision : string.Empty)}");
+                    $"event=tv-search-complete query={ScanIdentificationDiagnostics.FormatValue(query)} querySource={ScanIdentificationDiagnostics.FormatValue(queryAttempt.Source)} resultCount={searchPage.Results.Count} topTitle={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.Name)} topOriginal={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.OriginalName)} topTmdbId={ScanIdentificationDiagnostics.FormatNullable(queryBestCandidate?.Item.TmdbId)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(queryBestCandidate?.Confidence)} secondConfidence={ScanIdentificationDiagnostics.FormatConfidence(nextBestCandidate?.Confidence)} tvLocalizedTitleExactMatch={localizedTitleExactMatch.ToString().ToLowerInvariant()} tvOriginalTitleConflict={originalTitleConflict.ToString().ToLowerInvariant()} tvCandidateConflictReason={ScanIdentificationDiagnostics.FormatValue(conflictReason)} conflictReason={ScanIdentificationDiagnostics.FormatValue(conflictReason)} tvAutoApply={autoApply.ToString().ToLowerInvariant()} tvAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(autoApplyBlockedReason)} decision={ScanIdentificationDiagnostics.FormatValue(searchDecision)} aiRefinedLookup={isAiRefinedLookup.ToString().ToLowerInvariant()} aiRefinedTitleParsed={isAiRefinedLookup.ToString().ToLowerInvariant()} aiRefinedTitle={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? query : string.Empty)} aiOriginalLanguageTitle={ScanIdentificationDiagnostics.FormatValue(queryAttempt.OriginalLanguageTitle)} aiEnglishTitleHint={ScanIdentificationDiagnostics.FormatValue(queryAttempt.EnglishTitleHint)} aiLocalizedTitleHint={ScanIdentificationDiagnostics.FormatValue(queryAttempt.LocalizedTitleHint)} aiOriginalTitleHint={ScanIdentificationDiagnostics.FormatValue(queryAttempt.OriginalTitleHint)} aiSearchTitle={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? queryAttempt.SearchTitle : string.Empty)} aiSearchTitleSource={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? queryAttempt.SearchTitleSource : string.Empty)} originalLanguageTitleMissing={(isAiRefinedLookup && string.IsNullOrWhiteSpace(queryAttempt.OriginalLanguageTitle)).ToString().ToLowerInvariant()} fallbackToEnglishTitle={(isAiRefinedLookup && string.Equals(queryAttempt.SearchTitleSource, "english-title", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} fallbackToLocalizedTitle={(isAiRefinedLookup && string.Equals(queryAttempt.SearchTitleSource, "localized-title", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} aiSeriesYearHint={ScanIdentificationDiagnostics.FormatNullable(queryAttempt.SeriesYearHint)} aiSeasonYearHint={ScanIdentificationDiagnostics.FormatNullable(queryAttempt.SeasonYearHint)} aiSeasonNumberHint={ScanIdentificationDiagnostics.FormatNullable(queryAttempt.SeasonNumberHint)} aiRefinedTmdbSearchQuery={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? query : string.Empty)} aiRefinedTmdbSearchQuerySource={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? queryAttempt.SearchTitleSource : string.Empty)} aiRefinedTmdbTop1Title={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.Name)} aiRefinedTmdbTop1OriginalTitle={ScanIdentificationDiagnostics.FormatValue(queryBestCandidate?.Item.OriginalName)} aiRefinedTmdbTop1Year={ScanIdentificationDiagnostics.FormatNullable(queryBestCandidate?.Item.FirstAirYear)} aiRefinedTmdbTop1Id={ScanIdentificationDiagnostics.FormatNullable(queryBestCandidate?.Item.TmdbId)} aiRefinedTmdbResultCount={searchPage.Results.Count} aiRefinedTmdbLookupSucceeded={(isAiRefinedLookup && queryBestCandidate is not null).ToString().ToLowerInvariant()} aiRefinedYearGateChecked={aiRefinedYearGate.Checked.ToString().ToLowerInvariant()} aiRefinedYearDiff={ScanIdentificationDiagnostics.FormatNullable(aiRefinedYearGate.YearDiff)} aiRefinedYearGateBlocked={aiRefinedYearGate.Blocked.ToString().ToLowerInvariant()} aiRefinedYearGateReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedYearGate.Reason)} aiRefinedSafetyGatePassed={aiRefinedSafetyGatePassed.ToString().ToLowerInvariant()} aiRefinedSafetyGateReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedSafetyGateReason)} aiRefinedTop1Accepted={aiRefinedTop1Accepted.ToString().ToLowerInvariant()} aiRefinedTop1RejectedReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedTop1RejectedReason)} aiRefinedAutoApply={(isAiRefinedLookup && autoApply).ToString().ToLowerInvariant()} finalDecisionAfterAiRefinedLookup={ScanIdentificationDiagnostics.FormatValue(isAiRefinedLookup ? searchDecision : string.Empty)}");
+                if (aiRefinedYearGate.Blocked)
+                {
+                    aiRefinedYearGateBlockedCandidate = true;
+                    aiRefinedYearGateBlockedReason = aiRefinedYearGate.Reason;
+                    break;
+                }
+
                 if (!string.IsNullOrWhiteSpace(conflictReason))
                 {
                     ScanIdentificationDiagnostics.Write(
@@ -210,7 +283,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     continue;
                 }
 
-                if (isAiRefinedLookup && queryBestCandidate is not null)
+                if (isAiRefinedLookup && aiRefinedTop1Accepted && queryBestCandidate is not null)
                 {
                     bestCandidate = queryBestCandidate;
                     break;
@@ -229,6 +302,21 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             }
 
             var bestCandidateIsAiRefinedTop1 = IsAiRefinedTitleQuery(bestCandidate?.QuerySource);
+            if (aiRefinedYearGateBlockedCandidate)
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tv-candidate-placeholder directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} reason=ai-refined-year-conflict rejectReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedYearGateBlockedReason)} aiRefinedYearGateBlocked=true tvAutoApply=false tvAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedYearGateBlockedReason)} finalDecision=tv-placeholder");
+                LogAiCandidateRange(
+                    directoryAnalysis,
+                    candidate,
+                    "ai-refined-year-conflict",
+                    ["ai-refined-year-conflict", aiRefinedYearGateBlockedReason],
+                    candidateConflictsCount: candidateConflictCount);
+                await UpsertUnidentifiedSeasonAsync(candidate, cancellationToken);
+                result.Summary.PlaceholderCount++;
+                continue;
+            }
+
             if (bestCandidate is null || (!bestCandidateIsAiRefinedTop1 && bestCandidate.Confidence < MinimumAutoMatchConfidence))
             {
                 ScanIdentificationDiagnostics.Write(
@@ -676,6 +764,17 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                         allowSeasonContextOnly: true,
                         seasonNumberHint: hint?.SeasonNumberHint ?? folderSeasonNumber,
                         allowStrongContextFallbacks: strongDirectoryContext);
+                    if (!parseResult.IsEpisodeLike
+                        && TvEpisodeFileNameParser.IsVerifiedTitleNumberSequenceMember(
+                            file.FileName,
+                            directoryContext.TitleNumberSequence))
+                    {
+                        parseResult = TvEpisodeFileNameParser.ParseVerifiedTitleNumberSequence(
+                            file.FileName,
+                            directoryContext.TitleNumberSequence,
+                            hint?.SeasonNumberHint ?? folderSeasonNumber);
+                    }
+
                     if (hint?.EpisodeNumberHint is > 0 && !parseResult.IsEpisodeLike)
                     {
                         parseResult = new TvEpisodeFileNameParseResult
@@ -713,7 +812,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         foreach (var parsedFile in parsedFiles)
         {
             ScanIdentificationDiagnostics.Write(
-                $"event=tv-parse directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} folder={ScanIdentificationDiagnostics.FormatValue(folderName)} fileId={parsedFile.MediaFileId} file={ScanIdentificationDiagnostics.FormatFileName(parsedFile.FileName)} directoryRange={(directoryAnalysis?.IsStrongTvFile(parsedFile.MediaFileId) == true).ToString().ToLowerInvariant()} directoryHintSource={ScanIdentificationDiagnostics.FormatValue(directoryAnalysis?.GetHint(parsedFile.MediaFileId)?.Source)} strongContext={strongDirectoryContext.ToString().ToLowerInvariant()} movieFallbackRisk={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)} match={(parsedFile.ParseResult.IsEpisodeLike ? "yes" : "no")} kind={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.MatchKind)} season={parsedFile.SeasonNumber} episode={parsedFile.ParseResult.EpisodeNumber} seasonContextOnly={parsedFile.ParseResult.IsSeasonContextOnly.ToString().ToLowerInvariant()} multi={parsedFile.ParseResult.IsMultiEpisode.ToString().ToLowerInvariant()} seriesCandidate={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.SeriesNameCandidate)} episodeTitle={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.EpisodeTitleCandidate)}");
+                $"event=tv-parse directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} folder={ScanIdentificationDiagnostics.FormatValue(folderName)} fileId={parsedFile.MediaFileId} file={ScanIdentificationDiagnostics.FormatFileName(parsedFile.FileName)} directoryRange={(directoryAnalysis?.IsStrongTvFile(parsedFile.MediaFileId) == true).ToString().ToLowerInvariant()} directoryHintSource={ScanIdentificationDiagnostics.FormatValue(directoryAnalysis?.GetHint(parsedFile.MediaFileId)?.Source)} strongContext={strongDirectoryContext.ToString().ToLowerInvariant()} movieFallbackRisk={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)} match={(parsedFile.ParseResult.IsEpisodeLike ? "yes" : "no")} kind={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.MatchKind)} season={parsedFile.SeasonNumber} episode={parsedFile.ParseResult.EpisodeNumber} seasonContextOnly={parsedFile.ParseResult.IsSeasonContextOnly.ToString().ToLowerInvariant()} multi={parsedFile.ParseResult.IsMultiEpisode.ToString().ToLowerInvariant()} multiEpisodeFalsePositiveAvoided={parsedFile.ParseResult.MultiEpisodeFalsePositiveAvoided.ToString().ToLowerInvariant()} verifiedTitleNumberSequenceContext={parsedFile.ParseResult.VerifiedTitleNumberSequenceContext.ToString().ToLowerInvariant()} seriesCandidate={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.SeriesNameCandidate)} episodeTitle={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.EpisodeTitleCandidate)}");
         }
 
         var unsupportedFiles = parsedFiles
@@ -1346,6 +1445,9 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 .IsEpisodeLike);
         var bareNumberCount = files.Count(x => TvEpisodeFileNameParser.IsBareNumberEpisodeFileName(x.FileName));
         var titleNumberCount = files.Count(x => TvEpisodeFileNameParser.IsTitleNumberEpisodeFileName(x.FileName));
+        var hasTitleNumberSequence = TvEpisodeFileNameParser.TryAnalyzeTitleNumberSequence(
+            files.Select(x => x.FileName),
+            out var titleNumberSequence);
         var sequentialEpisodeDirectory = LooksLikeSequentialEpisodeDirectory(files);
         var hasChineseSeasonHint = TvEpisodeFileNameParser.HasChineseSeasonHint(folderName);
         var hasChineseCountHint = TvEpisodeFileNameParser.HasChineseCountHint(folderName);
@@ -1387,6 +1489,10 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         {
             strongEvidence.Add("title-number-files");
         }
+        else if (hasTitleNumberSequence)
+        {
+            weakReasons.Add("title-number-sequence");
+        }
         else if (titleNumberCount > 0)
         {
             weakReasons.Add("weak-title-number");
@@ -1424,7 +1530,8 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                                   || hasCountSequentialRisk
                                   || (isSeasonFolder && (explicitEpisodeCount + contextEpisodeCount + bareNumberCount + titleNumberCount > 0 || files.Count >= 2))
                                   || explicitEpisodeCount >= 2
-                                  || contextEpisodeCount >= 2;
+                                  || contextEpisodeCount >= 2
+                                  || hasTitleNumberSequence;
 
         return new TvDirectoryContext(
             isStrong,
@@ -1433,7 +1540,8 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             weakReasons.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             explicitEpisodeCount,
             contextEpisodeCount,
-            strongFallbackEpisodeCount);
+            strongFallbackEpisodeCount,
+            titleNumberSequence);
     }
 
     private static void AddCountEvidence(
@@ -1477,7 +1585,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 x.FileName,
                 allowSeasonContextOnly: true,
                 allowStrongContextFallbacks: true))
-            .Where(x => x.IsEpisodeLike && !x.IsMultiEpisode && x.EpisodeNumber is > 0 and <= 200)
+            .Where(x => x.IsEpisodeLike && !x.IsMultiEpisode && x.EpisodeNumber is > 0 and <= 9999)
             .Select(x => x.EpisodeNumber)
             .Distinct()
             .OrderBy(x => x)
@@ -1544,6 +1652,26 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         TvSearchCandidate? nextBestCandidate)
     {
         return bestCandidate is null ? "no-tmdb-result" : string.Empty;
+    }
+
+    private static AiRefinedYearGateResult GetAiRefinedYearGateResult(
+        TvSearchQuery queryAttempt,
+        TvSearchCandidate? bestCandidate)
+    {
+        if (!queryAttempt.SeriesYearHint.HasValue)
+        {
+            return AiRefinedYearGateResult.NotChecked("missing-series-year-hint");
+        }
+
+        if (bestCandidate?.Item.FirstAirYear is not { } firstAirYear)
+        {
+            return AiRefinedYearGateResult.NotChecked("missing-tmdb-first-air-year");
+        }
+
+        var diff = Math.Abs(queryAttempt.SeriesYearHint.Value - firstAirYear);
+        return diff > 2
+            ? new AiRefinedYearGateResult(true, diff, true, "series-year-conflict")
+            : new AiRefinedYearGateResult(true, diff, false, string.Empty);
     }
 
     private static string GetTvSearchDecision(TvSearchCandidate? candidate, string conflictReason)
@@ -1891,7 +2019,8 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         IReadOnlyList<string> WeakReasons,
         int ExplicitEpisodeCount,
         int ContextEpisodeCount,
-        int StrongFallbackEpisodeCount)
+        int StrongFallbackEpisodeCount,
+        TvEpisodeSequenceAnalysis TitleNumberSequence)
     {
         public string EvidenceText => string.Join('|', StrongEvidence);
 
@@ -1931,4 +2060,9 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         int? SeriesYearHint = null,
         int? SeasonYearHint = null,
         int? SeasonNumberHint = null);
+
+    private sealed record AiRefinedYearGateResult(bool Checked, int? YearDiff, bool Blocked, string Reason)
+    {
+        public static AiRefinedYearGateResult NotChecked(string reason) => new(false, null, false, reason);
+    }
 }

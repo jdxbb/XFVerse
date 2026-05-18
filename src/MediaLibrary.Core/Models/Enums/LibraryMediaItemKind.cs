@@ -4,5 +4,6 @@ public enum LibraryMediaItemKind
 {
     Movie = 0,
     Series = 1,
-    Season = 2
+    Season = 2,
+    Other = 3
 }

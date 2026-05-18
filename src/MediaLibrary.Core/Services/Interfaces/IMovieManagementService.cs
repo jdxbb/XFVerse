@@ -33,8 +33,26 @@ public interface IMovieManagementService
         int movieId,
         CancellationToken cancellationToken = default);
 
+    Task RemoveGroupedPlaceholderRangeFromLibraryAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken = default);
+
+    Task RestoreGroupedPlaceholderRangeToLibraryAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken = default);
+
+    Task SetGroupedPlaceholderRangeWatchedAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        bool isWatched,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual");
+
     Task DeleteMovieRecordAsync(
         int movieId,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteGroupedPlaceholderRangeRecordAsync(
+        IReadOnlyCollection<int> mediaFileIds,
         CancellationToken cancellationToken = default);
 
     Task<ResetSourceResult> ResetMediaFileToUnidentifiedAsync(

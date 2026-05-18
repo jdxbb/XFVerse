@@ -16,6 +16,22 @@ public sealed class LibraryMovieListItem
 
     public int SeasonCount { get; set; }
 
+    public int OrphanMediaFileId { get; set; }
+
+    public string GroupedRangeKey { get; set; } = string.Empty;
+
+    public IReadOnlyList<int> GroupedRangeMediaFileIds { get; set; } = [];
+
+    public int GroupedRangeStartNumber { get; set; }
+
+    public int GroupedRangeEndNumber { get; set; }
+
+    public string GroupedRangeParentDisplay { get; set; } = string.Empty;
+
+    public string GroupedRangeSampleFilesText { get; set; } = string.Empty;
+
+    public string GroupedRangeReasonTagsText { get; set; } = string.Empty;
+
     public int InLibraryEpisodeCount { get; set; }
 
     public int WatchedEpisodeCount { get; set; }
@@ -133,10 +149,13 @@ public sealed class LibraryMovieListItem
 
     public bool IsSeason => ItemKind == LibraryMediaItemKind.Season;
 
+    public bool IsOther => ItemKind == LibraryMediaItemKind.Other;
+
     public string MediaKindText => ItemKind switch
     {
         LibraryMediaItemKind.Series => "电视剧",
         LibraryMediaItemKind.Season => "电视剧季",
+        LibraryMediaItemKind.Other => "其他",
         _ => "电影"
     };
 
@@ -148,6 +167,9 @@ public sealed class LibraryMovieListItem
         LibraryMediaItemKind.Season => InLibraryEpisodeCount > 0
             ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 有播放源 {InLibraryEpisodeCount} 集"
             : $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 暂无播放源",
+        LibraryMediaItemKind.Other => GroupedRangeStartNumber > 0 && GroupedRangeEndNumber >= GroupedRangeStartNumber
+            ? $"未识别剧集候选 · {SourceCount} 个文件 · {GroupedRangeStartNumber}-{GroupedRangeEndNumber}"
+            : $"未识别 / 待修正 · {SourceCount} 个文件",
         _ => SourceSummary
     };
 }

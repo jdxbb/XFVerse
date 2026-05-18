@@ -9,14 +9,16 @@ public static class MediaFileRules
         ".mp4",
         ".mkv",
         ".avi",
-        ".mov"
+        ".mov",
+        ".rmvb"
     };
 
     public static readonly IReadOnlySet<string> SubtitleExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         ".srt",
         ".ass",
-        ".ssa"
+        ".ssa",
+        ".sup"
     };
 
     public static MediaType GetMediaType(string fileNameOrPath)

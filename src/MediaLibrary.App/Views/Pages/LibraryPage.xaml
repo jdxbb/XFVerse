@@ -253,13 +253,6 @@
                     </StackPanel>
 
                     <StackPanel Width="132" Margin="0,0,12,12">
-                        <TextBlock Text="识别状态" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedStatusFilter}"
-                                  ItemsSource="{Binding StatusOptions}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
-                    </StackPanel>
-
-                    <StackPanel Width="132" Margin="0,0,12,12">
                         <TextBlock Text="观看状态" Style="{StaticResource BodyMutedTextStyle}" />
                         <ComboBox SelectedItem="{Binding SelectedWatchedFilter}"
                                   ItemsSource="{Binding WatchedFilterOptions}"

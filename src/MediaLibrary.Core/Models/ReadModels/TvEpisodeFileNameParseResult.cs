@@ -8,6 +8,14 @@ public sealed class TvEpisodeFileNameParseResult
 
     public bool IsMultiEpisode { get; set; }
 
+    public bool MultiEpisodeFalsePositiveAvoided { get; set; }
+
+    public bool VerifiedTitleNumberSequenceContext { get; set; }
+
+    public int? MultiEpisodeEndNumber { get; set; }
+
+    public string MultiEpisodePattern { get; set; } = string.Empty;
+
     public int SeasonNumber { get; set; } = 1;
 
     public int EpisodeNumber { get; set; }
