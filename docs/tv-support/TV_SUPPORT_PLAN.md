@@ -1087,3 +1087,10 @@ Phase 4.12d adds Episode source reset-to-unidentified, aligned with Movie detail
 - Watch history, subtitle bindings, Episode watched/progress fields, Season metadata, Episode metadata, probe fields, and real files are not cleared by this action.
 - Reset diagnostics are sanitized and log identifiers / protocol / remaining count only, without full local paths or full WebDAV URLs.
 - This change does not add Episode-level remove-from-library semantics, persistent defaults, watched / unwatched writes, real correction, AI / TMDB correction, scan-rule changes, Watch Insights TV input, TV recommendation input, migration, or database update.
+
+## Phase 4.12d Probe Diagnostics Follow-up
+
+- Probe status text now distinguishes `Success` with no readable technical fields from a normal successful metadata update. Source rows show `已探测（未读取到媒体信息）` when ffprobe completes but duration / resolution / codec / bitrate remain empty.
+- Probe lifecycle diagnostics now include cancellation / abandoned-queue records for graceful shutdown and worker exception records for background failures.
+- Probe and ignored-file sample diagnostics use extension plus a stable hash fingerprint instead of raw sample file names. Full local paths and full WebDAV URLs remain excluded.
+- This follow-up does not change probe queue eligibility, manual probe behavior, lazy detail probe triggering, Episode reset semantics, schema, migrations, or database update.

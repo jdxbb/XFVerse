@@ -101,7 +101,18 @@ public sealed class PlaybackSourceItem
         VideoBitrateKbps,
         AudioBitrateKbps);
 
-    public string ProbeStatusText => MediaSourceDisplayText.FormatProbeStatus(MediaProbeStatus);
+    public string ProbeStatusText => MediaSourceDisplayText.FormatProbeStatus(
+        MediaProbeStatus,
+        MediaSourceDisplayText.HasProbeTechnicalInfo(
+            DurationSeconds,
+            ResolutionWidth,
+            ResolutionHeight,
+            VideoCodec,
+            AudioCodec,
+            AudioChannels,
+            OverallBitrateKbps,
+            VideoBitrateKbps,
+            AudioBitrateKbps));
 
     public string ProbeErrorText => MediaSourceDisplayText.FormatProbeError(MediaProbeError);
 

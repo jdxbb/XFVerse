@@ -517,3 +517,10 @@
 - Scan-time media-probe enqueue is disabled so large scan runs do not occupy the probe queue ahead of the current Movie detail page. Movie probing now enters through detail lazy probe or manual source-row probe.
 - Failed Movie placeholders and orphan carriers reuse the same Movie detail behavior.
 - Movie Discovery ranking, search, recommendation inputs, Watch Insights, Movie fallback thresholds, delete-record semantics, visibility semantics, and correction flows are unchanged.
+
+# Phase 4.12d Probe Diagnostics Boundary
+
+- Movie detail source rows now distinguish successful probes with no readable technical fields from normal successful metadata updates.
+- Probe lifecycle diagnostics now include graceful cancellation / abandoned-queue and worker exception records.
+- Probe and ignored-file sample diagnostics now use extension plus stable hash fingerprints instead of raw sample file names.
+- Movie detail lazy probe eligibility, manual probe actions, scan-time probe disablement, Movie Discovery ranking/search/recommendation inputs, Watch Insights, correction flows, visibility semantics, schema, and migrations are unchanged.

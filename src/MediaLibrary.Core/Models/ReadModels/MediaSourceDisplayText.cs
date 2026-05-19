@@ -251,6 +251,25 @@ internal static class MediaSourceDisplayText
         return string.Join(" · ", parts);
     }
 
+    public static bool HasProbeTechnicalInfo(
+        int? durationSeconds,
+        int? width,
+        int? height,
+        string? videoCodec,
+        string? audioCodec,
+        int? audioChannels,
+        int? overallBitrateKbps,
+        int? videoBitrateKbps,
+        int? audioBitrateKbps)
+    {
+        return durationSeconds.GetValueOrDefault() > 0
+               || (width.GetValueOrDefault() > 0 && height.GetValueOrDefault() > 0)
+               || !string.IsNullOrWhiteSpace(videoCodec)
+               || !string.IsNullOrWhiteSpace(audioCodec)
+               || audioChannels.GetValueOrDefault() > 0
+               || SelectDisplayBitrateKbps(overallBitrateKbps, videoBitrateKbps, audioBitrateKbps).GetValueOrDefault() > 0;
+    }
+
     private static string FormatRawResolution(int width, int height)
     {
         return string.Create(CultureInfo.InvariantCulture, $"{width}×{height}");
@@ -258,11 +277,18 @@ internal static class MediaSourceDisplayText
 
     public static string FormatProbeStatus(MediaProbeStatus status)
     {
+        return FormatProbeStatus(status, hasTechnicalInfo: true);
+    }
+
+    public static string FormatProbeStatus(MediaProbeStatus status, bool hasTechnicalInfo)
+    {
         return status switch
         {
             MediaProbeStatus.NotProbed => "待探测（等待后台任务）",
             MediaProbeStatus.Pending => "探测中（后台读取媒体信息）",
-            MediaProbeStatus.Success => "已完成（媒体信息已更新）",
+            MediaProbeStatus.Success => hasTechnicalInfo
+                ? "已完成（媒体信息已更新）"
+                : "已探测（未读取到媒体信息）",
             MediaProbeStatus.Failed => "失败（暂未取得媒体信息）",
             MediaProbeStatus.Unavailable => "不可用（缺少 ffprobe）",
             MediaProbeStatus.Skipped => "已跳过（非可探测视频）",

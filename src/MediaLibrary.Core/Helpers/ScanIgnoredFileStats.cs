@@ -79,6 +79,6 @@ public sealed class ScanIgnoredFileStats
             '|',
             _samplesByExtension
                 .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(x => $"{x.Key}:{string.Join(',', x.Value.Select(ScanIdentificationDiagnostics.FormatFileName))}"));
+                .Select(x => $"{x.Key}:{string.Join(',', x.Value.Select(ScanIdentificationDiagnostics.FormatFileNameFingerprint))}"));
     }
 }

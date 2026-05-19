@@ -363,6 +363,7 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         }
 
         _disposed = true;
+        WriteProbeQueueAbandoned("service-disposed");
         _disposeTokenSource.Cancel();
         _disposeTokenSource.Dispose();
     }
@@ -394,10 +395,12 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
                 }
                 catch (OperationCanceledException) when (_disposeTokenSource.IsCancellationRequested)
                 {
+                    WriteProbeCanceled(item.MediaFileId, "service-disposed");
                     return;
                 }
-                catch
+                catch (Exception exception)
                 {
+                    WriteProbeWorkerException(item.MediaFileId, exception);
                     // Background probing must never escape into scan, playback, or app shutdown flows.
                 }
             }
@@ -507,9 +510,23 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
             TryKill(process);
             return ProbeProcessResult.Failed("ffprobe timed out");
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            TryKill(process);
+            throw;
+        }
 
-        var output = await outputTask;
-        _ = await errorTask;
+        string output;
+        try
+        {
+            output = await outputTask;
+            _ = await errorTask;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            TryKill(process);
+            throw;
+        }
 
         return process.ExitCode == 0
             ? ProbeProcessResult.Success(output)
@@ -660,13 +677,13 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
     private static void WriteProbeStarted(MediaFile mediaFile)
     {
         ScanIdentificationDiagnostics.Write(
-            $"event=media-probe-started mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} attempt={mediaFile.MediaProbeAttemptCount} probeStarted=true");
+            $"event=media-probe-started mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileNameFingerprint(mediaFile.FileName)} attempt={mediaFile.MediaProbeAttemptCount} probeStarted=true");
     }
 
     private static void WriteProbeSkipped(MediaFile mediaFile, string reason)
     {
         ScanIdentificationDiagnostics.Write(
-            $"event=media-probe-skipped mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} probeSkippedReason={ScanIdentificationDiagnostics.FormatValue(reason)} status={mediaFile.MediaProbeStatus} attempts={mediaFile.MediaProbeAttemptCount}");
+            $"event=media-probe-skipped mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileNameFingerprint(mediaFile.FileName)} probeSkippedReason={ScanIdentificationDiagnostics.FormatValue(reason)} status={mediaFile.MediaProbeStatus} attempts={mediaFile.MediaProbeAttemptCount}");
     }
 
     private static void WriteProbeSucceeded(ProbeStartState startState, ProbeResult result)
@@ -677,19 +694,48 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
             .ToLowerInvariant();
         var hasBitrate = result.OverallBitrateKbps.HasValue.ToString().ToLowerInvariant();
         ScanIdentificationDiagnostics.Write(
-            $"event=media-probe-succeeded mediaFileId={startState.MediaFileId} mediaFileKind={startState.MediaFileKind} protocolType={FormatProtocol(startState.ProtocolType)} file={ScanIdentificationDiagnostics.FormatFileName(startState.FileName)} probeSucceeded=true hasDuration={hasDuration} hasResolution={hasResolution} hasBitrate={hasBitrate}");
+            $"event=media-probe-succeeded mediaFileId={startState.MediaFileId} mediaFileKind={startState.MediaFileKind} protocolType={FormatProtocol(startState.ProtocolType)} file={ScanIdentificationDiagnostics.FormatFileNameFingerprint(startState.FileName)} probeSucceeded=true hasDuration={hasDuration} hasResolution={hasResolution} hasBitrate={hasBitrate}");
     }
 
     private static void WriteProbeIssue(MediaFile mediaFile, MediaProbeStatus status, string reason)
     {
         ScanIdentificationDiagnostics.Write(
-            $"event=media-probe-failed mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} probeStatus={status} probeFailedReason={ScanIdentificationDiagnostics.FormatValue(reason, 220)}");
+            $"event=media-probe-failed mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileNameFingerprint(mediaFile.FileName)} probeStatus={status} probeFailedReason={ScanIdentificationDiagnostics.FormatValue(reason, 220)}");
     }
 
     private static void WriteProbeIssue(ProbeStartState startState, MediaProbeStatus status, string reason)
     {
         ScanIdentificationDiagnostics.Write(
-            $"event=media-probe-failed mediaFileId={startState.MediaFileId} mediaFileKind={startState.MediaFileKind} protocolType={FormatProtocol(startState.ProtocolType)} file={ScanIdentificationDiagnostics.FormatFileName(startState.FileName)} probeStatus={status} probeFailedReason={ScanIdentificationDiagnostics.FormatValue(reason, 220)}");
+            $"event=media-probe-failed mediaFileId={startState.MediaFileId} mediaFileKind={startState.MediaFileKind} protocolType={FormatProtocol(startState.ProtocolType)} file={ScanIdentificationDiagnostics.FormatFileNameFingerprint(startState.FileName)} probeStatus={status} probeFailedReason={ScanIdentificationDiagnostics.FormatValue(reason, 220)}");
+    }
+
+    private void WriteProbeQueueAbandoned(string reason)
+    {
+        int abandonedCount;
+        lock (_queueLock)
+        {
+            abandonedCount = _queue.Count;
+        }
+
+        if (abandonedCount <= 0)
+        {
+            return;
+        }
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-abandoned queuedCount={abandonedCount} reason={ScanIdentificationDiagnostics.FormatValue(reason)}");
+    }
+
+    private static void WriteProbeCanceled(int mediaFileId, string reason)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-canceled mediaFileId={mediaFileId} reason={ScanIdentificationDiagnostics.FormatValue(reason)}");
+    }
+
+    private static void WriteProbeWorkerException(int mediaFileId, Exception exception)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-failed mediaFileId={mediaFileId} mediaFileKind=unknown protocolType=unknown probeStatus=Failed probeFailedReason={ScanIdentificationDiagnostics.FormatValue($"worker-exception:{exception.GetType().Name}", 120)}");
     }
 
     private static string ResolveMediaFileKind(MediaFile mediaFile)

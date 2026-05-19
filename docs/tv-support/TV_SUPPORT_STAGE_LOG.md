@@ -1914,3 +1914,36 @@ Known Issues:
 - Blocker: none.
 - Deferred: Episode-level remove-from-library, persistent default source, and watched / unwatched buttons remain future work.
 - Noise: reset source rows remain active `MediaFile` records and are expected to reappear through Other / unidentified item handling rather than Episode source lists.
+
+## Phase 4.12d Follow-up - Probe status wording and diagnostics hardening
+
+Completed:
+
+- Updated shared source-row probe status text so a completed ffprobe run with no readable duration / resolution / codec / bitrate is shown as `已探测（未读取到媒体信息）` instead of a normal metadata update.
+- Applied the status wording to Movie detail sources, Episode detail sources, and shared playback source read models.
+- Added graceful-shutdown diagnostics for abandoned queued probe work and canceled active probe work.
+- Added background worker exception diagnostics so a swallowed probe worker exception still leaves a terminal log record.
+- Killed the ffprobe process when the linked cancellation token is canceled, reducing the chance of a probe process continuing after shutdown.
+- Hardened probe lifecycle and ignored-file sample diagnostics by logging file extension plus a stable hash fingerprint instead of raw sample file names.
+
+Not done:
+
+- No probe retry policy, probe queue scheduling change, manual probe behavior change, lazy detail trigger change, scan-time probe re-enable, source reset semantic change, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new migration is created.
+3. `Success` probe rows with no technical fields show `已探测（未读取到媒体信息）`.
+4. Normal successful probe rows still show completed media-info wording.
+5. Probe pending / failed / unavailable / skipped wording remains explicit.
+6. Detail lazy probe and manual probe entry points remain unchanged.
+7. Graceful cancellation / abandoned queue paths emit diagnostics without full paths or URLs.
+8. Probe and ignored-file sample logs no longer contain raw sample file names.
+9. Episode source reset to unidentified remains independent from active probing.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: deeper ffprobe output analysis for files that complete successfully but expose no readable stream metadata.
+- Noise: historical log lines still contain older raw sample names from before this hardening.

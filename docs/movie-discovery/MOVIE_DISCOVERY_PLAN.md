@@ -390,6 +390,12 @@
 - Scan-time media-probe enqueue is disabled; Movie probing now enters through Movie detail lazy probe or the source-row manual probe action.
 - Failed Movie placeholders / orphan carriers benefit through the existing unidentified Movie detail carrier.
 - This does not change Movie Discovery search, ranking, recommendation inputs, Watch Insights inputs, correction flows, delete-record semantics, visibility semantics, schema, or migrations.
+
+## Phase 4.12d Probe Diagnostics Boundary
+
+- Movie source rows share the updated probe wording: a successful ffprobe run with no readable media fields is shown as `已探测（未读取到媒体信息）`.
+- Probe lifecycle logs now include graceful cancellation / abandoned-queue diagnostics and use extension plus stable hash fingerprints for sample file identifiers.
+- This does not change Movie detail lazy probe eligibility, manual probe behavior, scan-time probe disablement, Movie Discovery search/ranking/recommendation inputs, Watch Insights inputs, correction flows, schema, or migrations.
 # Phase 4.11f-fix-9 Scan Boundary Note
 
 Movie discovery semantics are unchanged. Scan closeout now routes additional verified TV-like sequence patterns away from Movie placeholder scatter when there is same-parent sequence evidence, while short bare-number collection-like folders without TV evidence stay in Other / unknown collection handling instead of unidentified TV season projection. TV.Parse scan warnings are warning telemetry and no longer count as scan errors.

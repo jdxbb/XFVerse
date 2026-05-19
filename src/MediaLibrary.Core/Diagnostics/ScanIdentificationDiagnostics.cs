@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using MediaLibrary.Core.Models.ReadModels;
@@ -60,6 +61,23 @@ public static partial class ScanIdentificationDiagnostics
         var normalized = fileName.Replace('\\', '/').Trim();
         var lastSeparatorIndex = normalized.LastIndexOf('/');
         return FormatValue(lastSeparatorIndex >= 0 ? normalized[(lastSeparatorIndex + 1)..] : normalized, 180);
+    }
+
+    public static string FormatFileNameFingerprint(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return "(none)";
+        }
+
+        var normalized = fileName.Replace('\\', '/').Trim();
+        var lastSeparatorIndex = normalized.LastIndexOf('/');
+        var name = lastSeparatorIndex >= 0 ? normalized[(lastSeparatorIndex + 1)..] : normalized;
+        var extension = Path.GetExtension(name);
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(name.ToLowerInvariant())))
+            .ToLowerInvariant()[..10];
+        var extensionText = string.IsNullOrWhiteSpace(extension) ? "(none)" : extension.ToLowerInvariant();
+        return FormatValue($"ext={extensionText} hash={hash}", 80);
     }
 
     public static string FormatNullable(int? value)
