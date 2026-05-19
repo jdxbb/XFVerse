@@ -274,6 +274,11 @@
                                             CommandParameter="{Binding}"
                                             Content="立即探测"
                                             Style="{StaticResource SecondaryButtonStyle}" />
+                                    <Button Margin="0,10,0,0"
+                                            Command="{Binding DataContext.ResetSourceRecognitionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Content="重置为未识别"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
                                 </StackPanel>
                             </Grid>
                         </DataTemplate>

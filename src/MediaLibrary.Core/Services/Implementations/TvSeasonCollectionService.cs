@@ -1,4 +1,5 @@
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -267,6 +268,77 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             RecordStateChange(dbContext, season, item, StateWantToWatch, oldWantToWatch, item.IsWantToWatch, changeSource, now);
             CleanupCollectionEntityIfEmpty(dbContext, item);
         }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ResetEpisodeSourceToUnidentifiedAsync(
+        int tvEpisodeId,
+        int mediaFileId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var mediaFile = await dbContext.MediaFiles
+            .Include(x => x.Episode)
+            .ThenInclude(x => x!.Season)
+            .Include(x => x.SourceConnection)
+            .FirstOrDefaultAsync(x => x.Id == mediaFileId, cancellationToken);
+
+        if (mediaFile is null)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=missing-media-file");
+            throw new InvalidOperationException("播放源记录不存在。");
+        }
+
+        if (mediaFile.EpisodeId != tvEpisodeId || mediaFile.Episode is null)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=not-current-episode-source actualEpisodeId={mediaFile.EpisodeId?.ToString() ?? "(none)"}");
+            throw new InvalidOperationException("该播放源不属于当前剧集。");
+        }
+
+        if (mediaFile.MediaType != MediaType.Video)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=not-video");
+            throw new InvalidOperationException("只能重置视频播放源。");
+        }
+
+        if (mediaFile.IsDeleted)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=deleted-source");
+            throw new InvalidOperationException("该播放源记录已不可用。");
+        }
+
+        if (mediaFile.Episode.Season?.IdentificationStatus == IdentificationStatus.Failed)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=already-unidentified");
+            throw new InvalidOperationException("该剧集已是未识别状态。");
+        }
+
+        var now = DateTime.UtcNow;
+        var oldEpisodeId = mediaFile.EpisodeId;
+        mediaFile.EpisodeId = null;
+        mediaFile.MovieId = null;
+        mediaFile.UpdatedAt = now;
+        mediaFile.Episode.UpdatedAt = now;
+        if (mediaFile.Episode.Season is not null)
+        {
+            mediaFile.Episode.Season.UpdatedAt = now;
+        }
+
+        var remainingActiveSourceCount = await dbContext.MediaFiles
+            .CountAsync(
+                x => x.EpisodeId == tvEpisodeId
+                     && x.Id != mediaFileId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted,
+                cancellationToken);
+        ScanIdentificationDiagnostics.Write(
+            $"event=tv-episode-source-reset-unidentified episodeId={tvEpisodeId} mediaFileId={mediaFileId} oldEpisodeId={oldEpisodeId} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType)} remainingActiveSourceCount={remainingActiveSourceCount}");
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -883,6 +955,11 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             (false, true) => "网盘",
             _ => "暂无播放源"
         };
+    }
+
+    private static string FormatProtocol(ProtocolType? protocolType)
+    {
+        return protocolType == ProtocolType.Local ? "local" : "webdav";
     }
 
     private static string NormalizeSource(string? source)

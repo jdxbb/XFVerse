@@ -17,7 +17,6 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly ISubtitleBindingService _subtitleBindingService;
     private readonly IAiClassificationService _aiClassificationService;
-    private readonly IMediaProbeService _mediaProbeService;
 
     public LocalMediaScanService(
         ISettingsService settingsService,
@@ -25,8 +24,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         ITvSeasonIdentificationService tvSeasonIdentificationService,
         IMovieIdentificationService movieIdentificationService,
         ISubtitleBindingService subtitleBindingService,
-        IAiClassificationService aiClassificationService,
-        IMediaProbeService mediaProbeService)
+        IAiClassificationService aiClassificationService)
     {
         _settingsService = settingsService;
         _tvScanDirectoryAnalysisService = tvScanDirectoryAnalysisService;
@@ -34,7 +32,6 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         _movieIdentificationService = movieIdentificationService;
         _subtitleBindingService = subtitleBindingService;
         _aiClassificationService = aiClassificationService;
-        _mediaProbeService = mediaProbeService;
     }
 
     public async Task<ScanOverviewModel> GetOverviewAsync(CancellationToken cancellationToken = default)
@@ -345,14 +342,9 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             await UpdateConnectionLastScanAtAsync(sourceConnectionId, completedAt, cancellationToken);
         }
 
-        var mediaProbeCandidateIds = await CollectMediaProbeCandidateIdsAsync(
-            sourceConnectionId,
-            scanPaths.Select(x => x.Id).ToArray(),
-            postProcessVideoMediaFileIds,
-            "local",
-            cancellationToken);
         QueueMovieClassification(postProcessVideoMediaFileIds);
-        QueueMediaProbe(mediaProbeCandidateIds);
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-scan-skipped source=local changedVideoFiles={postProcessVideoMediaFileIds.Count} reason=detail-lazy-and-manual-only");
 
         totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
         ScanIdentificationDiagnostics.Write(
@@ -798,64 +790,6 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 await _aiClassificationService.ClassifyMovieAsync(movieId, cancellationToken);
             }
         }
-    }
-
-    private void QueueMediaProbe(IReadOnlyCollection<int> mediaFileIds)
-    {
-        if (mediaFileIds.Count == 0)
-        {
-            return;
-        }
-
-        var ids = mediaFileIds.ToArray();
-        _ = Task.Run(
-            async () =>
-            {
-                try
-                {
-                    await _mediaProbeService.EnqueueMediaFilesAsync(ids);
-                }
-                catch
-                {
-                    // Media probing is best-effort and must not affect scan results.
-                }
-            });
-    }
-
-    private static async Task<IReadOnlyCollection<int>> CollectMediaProbeCandidateIdsAsync(
-        int sourceConnectionId,
-        IReadOnlyCollection<int> scanPathIds,
-        IReadOnlyCollection<int> changedVideoMediaFileIds,
-        string source,
-        CancellationToken cancellationToken)
-    {
-        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
-        var ids = new HashSet<int>(changedVideoMediaFileIds.Where(id => id > 0));
-        var changedCount = ids.Count;
-        var catchUpIds = await dbContext.MediaFiles
-            .AsNoTracking()
-            .Where(x => x.SourceConnectionId == sourceConnectionId
-                        && x.ScanPathId.HasValue
-                        && scanPathIds.Contains(x.ScanPathId.Value)
-                        && !x.IsDeleted
-                        && x.MediaType == MediaType.Video)
-            .Where(x => x.MediaProbeStatus != MediaProbeStatus.Success
-                        || x.MediaProbeFileSize != x.FileSize
-                        || x.MediaProbeLastModifiedAt != x.LastModifiedAt)
-            .Select(x => x.Id)
-            .ToListAsync(cancellationToken);
-        var catchUpAddedCount = 0;
-        foreach (var mediaFileId in catchUpIds.Where(id => id > 0))
-        {
-            if (ids.Add(mediaFileId))
-            {
-                catchUpAddedCount++;
-            }
-        }
-
-        ScanIdentificationDiagnostics.Write(
-            $"event=media-probe-scan-candidates source={source} changedVideoFiles={changedCount} mediaProbeCandidateCount={ids.Count} mediaProbeCatchUpCount={catchUpAddedCount}");
-        return ids.ToArray();
     }
 
     private void QueueMovieClassification(IReadOnlyCollection<int> mediaFileIds)

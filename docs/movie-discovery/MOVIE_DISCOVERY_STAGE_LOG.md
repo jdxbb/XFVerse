@@ -514,5 +514,6 @@
 - Movie source-row probe status copy now uses explicit stage language for waiting, running, completed, failed, unavailable, and skipped states.
 - Movie detail source rows now include an `立即探测` action. It validates the source belongs to the current Movie and force-probes only that selected source.
 - Movie detail disables the source-row `立即探测` action while the selected source is probing. Detail-page auto probe temporarily disables checked sources during candidate evaluation, then keeps only queued / pending sources disabled and restores skipped sources.
+- Scan-time media-probe enqueue is disabled so large scan runs do not occupy the probe queue ahead of the current Movie detail page. Movie probing now enters through detail lazy probe or manual source-row probe.
 - Failed Movie placeholders and orphan carriers reuse the same Movie detail behavior.
 - Movie Discovery ranking, search, recommendation inputs, Watch Insights, Movie fallback thresholds, delete-record semantics, visibility semantics, and correction flows are unchanged.

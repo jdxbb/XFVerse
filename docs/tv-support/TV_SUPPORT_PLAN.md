@@ -1069,4 +1069,21 @@ Phase 4.12c-fix-4 adds current-detail lazy probing instead of app startup or ful
 - Episode source rows include an `立即探测` button. It runs a force probe for the selected source after verifying the source still belongs to the current Episode, then refreshes the detail view.
 - The `立即探测` button is disabled while that source is probing. Detail-page auto probe temporarily disables checked sources during candidate evaluation, then keeps only queued / pending sources disabled and restores skipped sources.
 - Detail lazy diagnostics are sanitized and report content kind, source count, candidate count, queued count, skip reasons, protocol counts, limit, and refresh behavior without logging full local paths or full WebDAV URLs.
-- This change keeps scan-time probe, does not add startup probing, does not queue the full library, and does not change scan identification, Episode default source selection, playback, source deletion, watched / unwatched writes, migration, or database update.
+- Scan-time probe enqueue is now disabled so large scan runs cannot block current detail-page probe work. Probe entry points are detail-page lazy probe and source-row manual probe only.
+- This change does not add startup probing, does not queue the full library, and does not change scan identification, Episode default source selection, playback, source deletion, watched / unwatched writes, migration, or database update.
+
+## Phase 4.12d Update
+
+Phase 4.12d adds Episode source reset-to-unidentified, aligned with Movie detail's source reset semantics.
+
+- Episode detail source rows now include `重置为未识别`.
+- Episodes already in an unidentified Season keep the same source row visible, but `重置为未识别` is disabled because the source is already in the unidentified review flow.
+- Active media probing no longer disables `重置为未识别`; probing only disables probe actions.
+- The action confirms before writing and states that real local / WebDAV files are not deleted and Episode metadata / watched / progress are not cleared.
+- The TV collection service resets by clearing the current Episode's active video `MediaFile.EpisodeId`, after verifying that `mediaFileId` belongs to the loaded Episode.
+- Reset sources stop appearing in Episode detail and Season detail, then return to Other / unidentified item handling because the `MediaFile` row remains active and unbound.
+- Resetting the current derived default source causes Episode detail to reload and derive a new default from remaining active sources. If no sources remain, the default source becomes empty.
+- Resetting the last source keeps the Episode and Season visible. Episode detail shows `暂无播放源`, the play button is disabled, and the correction placeholder remains available.
+- Watch history, subtitle bindings, Episode watched/progress fields, Season metadata, Episode metadata, probe fields, and real files are not cleared by this action.
+- Reset diagnostics are sanitized and log identifiers / protocol / remaining count only, without full local paths or full WebDAV URLs.
+- This change does not add Episode-level remove-from-library semantics, persistent defaults, watched / unwatched writes, real correction, AI / TMDB correction, scan-rule changes, Watch Insights TV input, TV recommendation input, migration, or database update.

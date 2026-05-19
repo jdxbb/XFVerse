@@ -12,8 +12,11 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 {
     private readonly INavigationStateService _navigationStateService;
     private readonly ITvDetailQueryService _tvDetailQueryService;
+    private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IPlayerWindowService _playerWindowService;
     private readonly IMediaProbeService _mediaProbeService;
+    private readonly IConfirmationDialogService _confirmationDialogService;
+    private readonly IDataRefreshService _dataRefreshService;
     private readonly HashSet<int> _lazyProbeCheckedMediaFileIds = [];
     private readonly HashSet<int> _probingMediaFileIds = [];
     private bool _isProbeCompletionRefreshQueued;
@@ -43,18 +46,25 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     public EpisodeDetailViewModel(
         INavigationStateService navigationStateService,
         ITvDetailQueryService tvDetailQueryService,
+        ITvSeasonCollectionService tvSeasonCollectionService,
         IPlayerWindowService playerWindowService,
-        IMediaProbeService mediaProbeService)
+        IMediaProbeService mediaProbeService,
+        IConfirmationDialogService confirmationDialogService,
+        IDataRefreshService dataRefreshService)
         : base("剧集详情", "查看单集基础信息、识别状态、进度和播放源。")
     {
         _navigationStateService = navigationStateService;
         _tvDetailQueryService = tvDetailQueryService;
+        _tvSeasonCollectionService = tvSeasonCollectionService;
         _playerWindowService = playerWindowService;
         _mediaProbeService = mediaProbeService;
+        _confirmationDialogService = confirmationDialogService;
+        _dataRefreshService = dataRefreshService;
         NavigateBackToSeasonCommand = new RelayCommand(NavigateBackToSeason, () => _seasonId.HasValue);
         OpenPlayerCommand = new AsyncRelayCommand(OpenPlayerAsync, _ => CanOpenPlayer);
         PlaySourceCommand = new AsyncRelayCommand(PlaySourceAsync, _ => CanOpenPlayer);
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
+        ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
         CorrectionPlaceholderCommand = new RelayCommand(ShowCorrectionPlaceholder, () => HasEpisode);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
@@ -70,6 +80,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     public AsyncRelayCommand PlaySourceCommand { get; }
 
     public RelayCommand ManualProbeSourceCommand { get; }
+
+    public AsyncRelayCommand ResetSourceRecognitionCommand { get; }
 
     public RelayCommand CorrectionPlaceholderCommand { get; }
 
@@ -118,6 +130,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(HasNoEpisode));
                 CorrectionPlaceholderCommand.RaiseCanExecuteChanged();
+                ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
                 RefreshPlayerCommandState();
             }
         }
@@ -128,7 +141,13 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     public bool IsUnidentified
     {
         get => _isUnidentified;
-        private set => SetProperty(ref _isUnidentified, value);
+        private set
+        {
+            if (SetProperty(ref _isUnidentified, value))
+            {
+                ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     public bool HasSources
@@ -139,6 +158,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             if (SetProperty(ref _hasSources, value))
             {
                 OnPropertyChanged(nameof(HasNoSources));
+                ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
                 RefreshPlayerCommandState();
             }
         }
@@ -154,6 +174,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isOpeningPlayer, value))
             {
                 RefreshPlayerCommandState();
+                ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -217,6 +238,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             }
 
             NavigateBackToSeasonCommand.RaiseCanExecuteChanged();
+            ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
             RefreshPlayerCommandState();
             StatusMessage = model.HasSources
                 ? $"已加载 {model.EpisodeNumberText}，可从默认源或指定播放源打开播放器。"
@@ -284,6 +306,74 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
                && Sources.Any(item => item.MediaFileId == source.MediaFileId)
                && source.MediaProbeStatus != MediaProbeStatus.Pending
                && !_probingMediaFileIds.Contains(source.MediaFileId);
+    }
+
+    private bool CanResetSourceRecognition(object? parameter)
+    {
+        return parameter is TvEpisodeSourceItem source
+               && _episodeId.HasValue
+               && HasEpisode
+               && !IsUnidentified
+               && !IsOpeningPlayer
+               && !_playerWindowService.IsPlayerOpen
+               && Sources.Any(item => item.MediaFileId == source.MediaFileId);
+    }
+
+    private async Task ResetSourceRecognitionAsync(object? parameter)
+    {
+        if (parameter is not TvEpisodeSourceItem source)
+        {
+            StatusMessage = "请先选择要重置的播放源。";
+            return;
+        }
+
+        if (!_episodeId.HasValue || !Sources.Any(item => item.MediaFileId == source.MediaFileId))
+        {
+            StatusMessage = "该播放源不属于当前剧集。";
+            return;
+        }
+
+        if (IsUnidentified)
+        {
+            StatusMessage = "该剧集已是未识别状态，无需重复重置。";
+            return;
+        }
+
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "确认重置为未识别？",
+            $"会将该播放源从当前剧集中拆出，并回到 Other / 未识别项承接；不会删除本地或网盘中的真实文件，也不会清空剧集 metadata、已看状态或进度。\n\n播放源：{source.DisplayFileName}",
+            "重置为未识别",
+            "取消");
+        if (!confirmed)
+        {
+            StatusMessage = "已取消重置播放源。";
+            return;
+        }
+
+        try
+        {
+            await _tvSeasonCollectionService.ResetEpisodeSourceToUnidentifiedAsync(
+                _episodeId.Value,
+                source.MediaFileId,
+                CancellationToken.None);
+            _probingMediaFileIds.Remove(source.MediaFileId);
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyPlaybackChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+            StatusMessage = HasSources
+                ? "播放源已重置为未识别，真实文件未被删除。"
+                : "最后一个播放源已重置为未识别，真实文件未被删除；该剧集仍保留。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"重置播放源失败：{DescribeException(exception)}";
+        }
+        finally
+        {
+            ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
+            ManualProbeSourceCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private async Task ManualProbeSourceAsync(object? parameter)
@@ -515,6 +605,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(SourcePlayButtonText));
         OpenPlayerCommand?.RaiseCanExecuteChanged();
         PlaySourceCommand?.RaiseCanExecuteChanged();
+        ResetSourceRecognitionCommand?.RaiseCanExecuteChanged();
     }
 
     private void OnPlayerWindowClosed(object? sender, EventArgs e)
@@ -570,6 +661,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         Sources.Clear();
         StatusMessage = statusMessage;
         NavigateBackToSeasonCommand.RaiseCanExecuteChanged();
+        ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
         RefreshPlayerCommandState();
     }
 

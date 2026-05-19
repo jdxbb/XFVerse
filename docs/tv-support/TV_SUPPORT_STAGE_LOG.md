@@ -1837,7 +1837,7 @@ Completed:
 - Episode detail now schedules the same check for the current Episode's active video sources, including failed unidentified Episodes.
 - The lazy path only receives current detail source ids, then `MediaProbeService` rechecks ownership, active video state, deleted state, source kind, probe status, stale probe snapshots, recent pending probes, and input availability before queueing.
 - Each detail page queues at most 10 lazy probe candidates per call and tracks checked `MediaFileId` values for the ViewModel lifetime to avoid repeat enqueue from repeated refreshes.
-- Detail lazy probe uses the same `MediaProbeService` background queue as scan-time probe. It does not block the first detail render or playback buttons.
+- Detail lazy probe uses the same `MediaProbeService` background queue as manual queue work. It does not block the first detail render or playback buttons.
 - `MediaProbeService` now emits probe status-change notifications when a source enters pending and when it reaches success / failed / unavailable / skipped.
 - Current Movie / Episode detail pages listen for those notifications and refresh automatically when one of their displayed sources changes probe state.
 - Added sanitized detail-lazy probe diagnostics for check start, candidates, queued work, skipped work, and status-change refresh.
@@ -1847,7 +1847,7 @@ Completed:
 
 Not done:
 
-- No app startup probe, full-library probe backlog, task center UI, probe architecture rewrite, scan-rule change, Episode default-source change, source deletion, set-default action, watched / unwatched write action, TV Watch Insights input, TV recommendation input, migration, database update, commit, or push was added.
+- No app startup probe, scan-time probe enqueue, full-library probe backlog, task center UI, probe architecture rewrite, scan-rule change, Episode default-source change, source deletion, set-default action, watched / unwatched write action, TV Watch Insights input, TV recommendation input, migration, database update, commit, or push was added.
 
 Manual acceptance matrix:
 
@@ -1871,3 +1871,46 @@ Known Issues:
 - Blocker: none.
 - Deferred: background task-center UI remains deferred.
 - Noise: probe status-change refresh is debounced; several near-simultaneous source completions may appear after one combined refresh.
+
+## Phase 4.12d - Episode source reset to unidentified
+
+Completed:
+
+- Audited the initial 4.12d source-delete implementation: it did not call physical file delete, WebDAV delete, hard-delete `MediaFile`, or clear watch history / subtitle bindings / probe fields / metadata, but it did mark `MediaFile.IsDeleted=true`, which prevented the source from returning to Other / unidentified handling.
+- Replaced the Episode detail source-row action with `重置为未识别` to align with Movie detail source reset semantics.
+- Disabled `重置为未识别` when the Episode already belongs to an unidentified Season, with a matching service-side guard for non-UI calls.
+- Active media probing no longer disables `重置为未识别`; probing only disables probe actions.
+- Disabled scan-time media-probe enqueue for WebDAV and local scans so large scan runs do not occupy the probe queue ahead of current detail pages.
+- Added a confirmation step that states the source is split out from the current Episode, real local / WebDAV files are not deleted, and Episode metadata / watched / progress are not cleared.
+- Added a scoped TV reset method that verifies `mediaFileId` belongs to the current Episode, rejects mismatches, and clears `MediaFile.EpisodeId` while keeping the row active.
+- Kept Episode, Season, metadata, watched state, Episode progress, watch history records, subtitle bindings, probe fields, and real files intact when a source is reset.
+- Episode detail reloads after reset, so remaining sources, derived default source, source count, and play-button enabled state are recalculated.
+- Resetting the last source keeps the Episode detail page and Season detail Episode row available; the detail page shows `暂无播放源`.
+- The reset `MediaFile` can be picked up by Other / unidentified item handling because it is no longer bound to an Episode or Movie and is not marked deleted.
+- Data refresh notifications cover library, playback-history views, and collection surfaces without touching TV Watch Insights or recommendations.
+- Reset diagnostics are sanitized and avoid full local paths and full WebDAV URLs.
+
+Not done:
+
+- No physical local-file delete, WebDAV remote delete, `MediaFile` delete, Episode delete, Season delete, Episode-level remove-from-library command, persistent Episode default source, set-default action, watched / unwatched write action, real correction flow, AI correction, TMDB candidate search, scan-rule change, scan-time probe enqueue, TV Watch Insights input, TV recommendation input, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Recognized Episode multi-source detail can reset one source and remove it from the list.
+2. Failed unidentified Episode uses the same reset path.
+3. The confirmation copy states real local / WebDAV files are not deleted.
+4. A source whose `mediaFileId` does not belong to the current Episode is rejected.
+5. Remaining sources can still play after one source is reset.
+6. Resetting the current derived default source recalculates the default from remaining active sources.
+7. Resetting the last source leaves the Episode visible and shows `暂无播放源`.
+8. Season detail still lists the Episode after the last source is reset.
+9. Watch history / progress references to the reset source do not crash the detail page.
+10. Manual probe, source display, playback, and correction placeholder behavior remain in place.
+11. Logs remain sanitized and do not contain full local paths or full WebDAV URLs.
+12. No new Phase 4.12d migration is created.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: Episode-level remove-from-library, persistent default source, and watched / unwatched buttons remain future work.
+- Noise: reset source rows remain active `MediaFile` records and are expected to reappear through Other / unidentified item handling rather than Episode source lists.
