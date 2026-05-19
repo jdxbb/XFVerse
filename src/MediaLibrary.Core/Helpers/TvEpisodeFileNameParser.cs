@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using MediaLibrary.Core.Models.ReadModels;
 
@@ -118,6 +119,11 @@ public static partial class TvEpisodeFileNameParser
             return "generic-season-or-count-query";
         }
 
+        if (IsStructuralPartOnlyQuery(normalized))
+        {
+            return "structural-part-query";
+        }
+
         if (QualityOnlyQueryRegex().IsMatch(normalized))
         {
             return "quality-only-query";
@@ -157,6 +163,27 @@ public static partial class TvEpisodeFileNameParser
                && ReleaseMetadataQueryTokenRegex().IsMatch(normalized);
     }
 
+    private static bool IsStructuralPartOnlyQuery(string value)
+    {
+        var tokens = value
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return tokens.Length > 0
+               && tokens.Any(IsStructuralPartToken)
+               && tokens.All(IsStructuralPartQueryToken);
+    }
+
+    private static bool IsStructuralPartQueryToken(string token)
+    {
+        return IsStructuralPartToken(token)
+               || StructuralSeasonTokenRegex().IsMatch(token)
+               || int.TryParse(token, NumberStyles.None, CultureInfo.InvariantCulture, out _);
+    }
+
+    private static bool IsStructuralPartToken(string token)
+    {
+        return StructuralPartTokenRegex().IsMatch(token);
+    }
+
     public static bool IsBareNumberEpisodeFileName(string value)
     {
         var normalized = Path.GetFileNameWithoutExtension(value).Trim();
@@ -166,13 +193,12 @@ public static partial class TvEpisodeFileNameParser
     public static bool IsTitleNumberEpisodeFileName(string value)
     {
         return TryParseEpisodeSequencePattern(value, out var pattern)
-               && string.Equals(pattern.Pattern, "title-number", StringComparison.OrdinalIgnoreCase);
+               && IsTitleLikeSequencePattern(pattern.Pattern);
     }
 
     public static bool IsVerifiedTitleNumberSequenceMember(string fileName, TvEpisodeSequenceAnalysis sequence)
     {
         return sequence.IsSequence
-               && string.Equals(sequence.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)
                && TryParseEpisodeSequencePattern(fileName, out var pattern)
                && string.Equals(pattern.PatternKey, sequence.PatternKey, StringComparison.OrdinalIgnoreCase)
                && pattern.Number >= sequence.StartNumber
@@ -184,7 +210,7 @@ public static partial class TvEpisodeFileNameParser
         TvEpisodeSequenceAnalysis sequence,
         int? seasonNumberHint = null)
     {
-        var nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName).Trim();
+        var nameWithoutExtension = GetBaseNameFromRawFileName(fileName);
         var multiEpisodeFalsePositiveAvoided = HasRejectedMultiEpisodeCandidate(nameWithoutExtension);
         if (string.IsNullOrWhiteSpace(nameWithoutExtension)
             || !IsVerifiedTitleNumberSequenceMember(fileName, sequence))
@@ -195,9 +221,10 @@ public static partial class TvEpisodeFileNameParser
             };
         }
 
-        var normalized = NormalizeTitleNumberSequenceName(nameWithoutExtension);
-        var match = TitleNumberEpisodeRegex().Match(normalized);
-        if (!match.Success || !TryReadInt(match.Groups["episode"].Value, out var episodeNumber))
+        if (!TryParseEpisodeSequencePatternFromBaseName(nameWithoutExtension, out var pattern)
+            || !string.Equals(pattern.PatternKey, sequence.PatternKey, StringComparison.OrdinalIgnoreCase)
+            || pattern.Number < sequence.StartNumber
+            || pattern.Number > sequence.EndNumber)
         {
             return new TvEpisodeFileNameParseResult
             {
@@ -207,16 +234,44 @@ public static partial class TvEpisodeFileNameParser
             };
         }
 
-        var explicitSeasonNumber = TryParseSeasonNumber(normalized);
-        var result = BuildResult(
-            normalized,
-            new EpisodeMatch(match, explicitSeasonNumber ?? seasonNumberHint ?? 1, episodeNumber, "VerifiedTitleNumberSequence", null),
-            "VerifiedTitleNumberSequence",
-            isMultiEpisode: false,
-            isSeasonContextOnly: !explicitSeasonNumber.HasValue,
-            multiEpisodeFalsePositiveAvoided: multiEpisodeFalsePositiveAvoided);
-        result.VerifiedTitleNumberSequenceContext = true;
-        return result;
+        var explicitSeasonNumber = pattern.SeasonNumber ?? TryParseSeasonNumber(nameWithoutExtension);
+        if (pattern.PartHintDetected)
+        {
+            return new TvEpisodeFileNameParseResult
+            {
+                IsEpisodeLike = false,
+                IsSeasonContextOnly = false,
+                IsMultiEpisode = false,
+                MultiEpisodeFalsePositiveAvoided = multiEpisodeFalsePositiveAvoided,
+                SeasonNumber = Math.Max(1, explicitSeasonNumber ?? seasonNumberHint ?? 1),
+                EpisodeNumber = 0,
+                SeriesNameCandidate = CleanSeriesNameCandidate(pattern.PrefixKey),
+                EpisodeTitleCandidate = string.Empty,
+                MatchKind = $"VerifiedEpisodeSequence:{pattern.Pattern}",
+                VerifiedTitleNumberSequenceContext = true,
+                PartHintDetected = true,
+                PartHint = pattern.PartNumber,
+                EpisodeInPart = pattern.EpisodeInPart ?? pattern.Number,
+                EpisodeOffset = null,
+                EpisodeOffsetApplied = false,
+                EpisodeOffsetSkippedReason = "not-evaluated",
+                EpisodeOffsetSource = string.Empty
+            };
+        }
+
+        return new TvEpisodeFileNameParseResult
+        {
+            IsEpisodeLike = true,
+            IsSeasonContextOnly = !explicitSeasonNumber.HasValue,
+            IsMultiEpisode = false,
+            MultiEpisodeFalsePositiveAvoided = multiEpisodeFalsePositiveAvoided,
+            SeasonNumber = Math.Max(1, explicitSeasonNumber ?? seasonNumberHint ?? 1),
+            EpisodeNumber = pattern.Number,
+            SeriesNameCandidate = CleanSeriesNameCandidate(pattern.PrefixKey),
+            EpisodeTitleCandidate = string.Empty,
+            MatchKind = $"VerifiedEpisodeSequence:{pattern.Pattern}",
+            VerifiedTitleNumberSequenceContext = true
+        };
     }
 
     public static bool TryAnalyzeTitleNumberSequence(
@@ -226,7 +281,7 @@ public static partial class TvEpisodeFileNameParser
         var patterns = fileNames
             .Select(
                 x => TryParseEpisodeSequencePattern(x, out var pattern)
-                    && string.Equals(pattern.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)
+                    && IsTitleLikeSequencePattern(pattern.Pattern)
                         ? pattern
                         : null)
             .Where(x => x is not null)
@@ -249,8 +304,23 @@ public static partial class TvEpisodeFileNameParser
 
     public static bool TryParseEpisodeSequencePattern(string fileName, out TvEpisodeSequencePattern pattern)
     {
+        return TryParseEpisodeSequencePatternFromBaseName(GetBaseNameFromRawFileName(fileName), out pattern);
+    }
+
+    private static bool TryParseEpisodeSequencePatternFromBaseName(string baseName, out TvEpisodeSequencePattern pattern)
+    {
         pattern = new TvEpisodeSequencePattern(string.Empty, string.Empty, string.Empty, 0);
-        var name = Path.GetFileNameWithoutExtension(fileName).Trim();
+        var name = baseName.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        if (TryParseTitleSeasonPartEpisodeSequencePattern(name, out pattern))
+        {
+            return true;
+        }
+
         if (string.IsNullOrWhiteSpace(name) || ExcludedEpisodeSequenceTokenRegex().IsMatch(name))
         {
             return false;
@@ -278,6 +348,11 @@ public static partial class TvEpisodeFileNameParser
             return true;
         }
 
+        if (TryParseLeadingNumberTitleSequencePattern(name, out pattern))
+        {
+            return true;
+        }
+
         var normalized = NormalizeTitleNumberSequenceName(name);
         var titleNumberMatch = TitleNumberEpisodeRegex().Match(normalized);
         if (titleNumberMatch.Success
@@ -291,32 +366,105 @@ public static partial class TvEpisodeFileNameParser
         return false;
     }
 
+    private static string GetBaseNameFromRawFileName(string fileName)
+    {
+        return Path.GetFileNameWithoutExtension(fileName).Trim();
+    }
+
+    private static bool TryParseTitleSeasonPartEpisodeSequencePattern(
+        string name,
+        out TvEpisodeSequencePattern pattern)
+    {
+        pattern = new TvEpisodeSequencePattern(string.Empty, string.Empty, string.Empty, 0);
+        var normalized = NormalizeTitleNumberSequenceName(name);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        foreach (var match in new[]
+                 {
+                     TitleSeasonPartEpisodeSequenceRegex().Match(normalized),
+                     TitlePartEpisodeSequenceRegex().Match(normalized)
+                 })
+        {
+            if (!match.Success
+                || !TryReadInt(match.Groups["part"].Value, out var partNumber)
+                || !TryReadInt(match.Groups["episode"].Value, out var episodeInPart)
+                || !TryNormalizeSequenceTitlePrefix(match.Groups["title"].Value, out var prefixKey)
+                || IsGenericPartSequencePrefix(prefixKey))
+            {
+                continue;
+            }
+
+            int? seasonNumber = null;
+            if (match.Groups["season"].Success
+                && TryReadSeasonToken(match.Groups["season"].Value, out var parsedSeasonNumber))
+            {
+                seasonNumber = Math.Max(1, parsedSeasonNumber);
+            }
+
+            var keySeason = seasonNumber.HasValue
+                ? $"s{seasonNumber.Value}:"
+                : string.Empty;
+            pattern = new TvEpisodeSequencePattern(
+                $"title-part-number:{prefixKey}:{keySeason}p{partNumber}",
+                "title-part-number",
+                prefixKey,
+                episodeInPart,
+                seasonNumber,
+                partNumber,
+                episodeInPart,
+                true);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsGenericPartSequencePrefix(string prefixKey)
+    {
+        return string.Equals(prefixKey, "part", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(prefixKey, "pt", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(prefixKey, "season", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool TryParseBracketEpisodeSequencePattern(
         string name,
         out TvEpisodeSequencePattern pattern)
     {
         pattern = new TvEpisodeSequencePattern(string.Empty, string.Empty, string.Empty, 0);
-        var bracketValues = BracketedContentRegex()
+        var bracketParts = BracketedContentRegex()
             .Matches(name)
-            .Select(match => TrimBracketContent(match.Value))
-            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(match => new BracketPart(TrimBracketContent(match.Value), match.Index, match.Length))
+            .Where(value => !string.IsNullOrWhiteSpace(value.Value))
             .ToArray();
-        if (bracketValues.Length < 2)
+        if (bracketParts.Length == 0)
         {
             return false;
         }
 
-        for (var index = 1; index < bracketValues.Length; index++)
+        for (var index = 0; index < bracketParts.Length; index++)
         {
-            var segmentMatch = BracketEpisodeSegmentRegex().Match(bracketValues[index]);
-            if (!segmentMatch.Success || !TryReadInt(segmentMatch.Groups["episode"].Value, out var episodeNumber))
+            if (!TryParseBracketEpisodeNumber(bracketParts[index].Value, out var episodeNumber))
             {
                 continue;
             }
 
+            var titleFromText = ExtractTextBeforeBracket(name, bracketParts[index]);
+            if (TryNormalizeSequenceTitlePrefix(titleFromText, out var textPrefixKey))
+            {
+                pattern = new TvEpisodeSequencePattern(
+                    $"fansub-bracket-number:{textPrefixKey}",
+                    "fansub-bracket-episode",
+                    textPrefixKey,
+                    episodeNumber);
+                return true;
+            }
+
             for (var titleIndex = index - 1; titleIndex >= 0; titleIndex--)
             {
-                if (TryNormalizeSequenceTitlePrefix(bracketValues[titleIndex], out var prefixKey))
+                if (TryNormalizeSequenceTitlePrefix(bracketParts[titleIndex].Value, out var prefixKey))
                 {
                     pattern = new TvEpisodeSequencePattern(
                         $"bracket-title-number:{prefixKey}",
@@ -329,6 +477,56 @@ public static partial class TvEpisodeFileNameParser
         }
 
         return false;
+    }
+
+    private static bool TryParseLeadingNumberTitleSequencePattern(
+        string name,
+        out TvEpisodeSequencePattern pattern)
+    {
+        pattern = new TvEpisodeSequencePattern(string.Empty, string.Empty, string.Empty, 0);
+        var match = LeadingNumberTitleSequenceRegex().Match(name);
+        if (!match.Success
+            || !TryReadInt(match.Groups["episode"].Value, out var episodeNumber)
+            || !TryReadSeasonToken(match.Groups["season"].Value, out var seasonNumber)
+            || !TryNormalizeSequenceTitlePrefix(match.Groups["title"].Value, out var prefixKey))
+        {
+            return false;
+        }
+
+        pattern = new TvEpisodeSequencePattern(
+            $"leading-number-title:{prefixKey}:s{seasonNumber}",
+            "leading-number-title",
+            prefixKey,
+            episodeNumber,
+            Math.Max(1, seasonNumber));
+        return true;
+    }
+
+    private static string ExtractTextBeforeBracket(string name, BracketPart episodeBracket)
+    {
+        if (episodeBracket.Index <= 0)
+        {
+            return string.Empty;
+        }
+
+        var prefix = name[..episodeBracket.Index];
+        prefix = BracketedContentRegex().Replace(prefix, " ");
+        prefix = TitleNumberReleaseTailRegex().Replace(prefix, " ");
+        prefix = SeparatorsRegex().Replace(prefix, " ");
+        return WhitespaceRegex().Replace(prefix, " ").Trim();
+    }
+
+    private static bool TryParseBracketEpisodeNumber(string value, out int episodeNumber)
+    {
+        episodeNumber = 0;
+        var segmentMatch = BracketEpisodeSegmentRegex().Match(value);
+        if (!segmentMatch.Success || !TryReadInt(segmentMatch.Groups["episode"].Value, out episodeNumber))
+        {
+            return false;
+        }
+
+        var hasExplicitEpisodeMarker = BracketEpisodeExplicitMarkerRegex().IsMatch(value);
+        return hasExplicitEpisodeMarker || !IsReleaseNumber(episodeNumber);
     }
 
     private static string TrimBracketContent(string value)
@@ -649,6 +847,15 @@ public static partial class TvEpisodeFileNameParser
         return true;
     }
 
+    private static bool IsTitleLikeSequencePattern(string pattern)
+    {
+        return string.Equals(pattern, "title-number", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(pattern, "title-part-number", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(pattern, "fansub-bracket-episode", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(pattern, "leading-number-title", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool TryBuildStrictSequence(
         IReadOnlyList<TvEpisodeSequencePattern> patterns,
         out TvEpisodeSequenceAnalysis sequence)
@@ -710,6 +917,8 @@ public static partial class TvEpisodeFileNameParser
 
     private readonly record struct EpisodeMatch(Match Match, int SeasonNumber, int EpisodeNumber, string Kind, int? MultiEpisodeEndNumber);
 
+    private readonly record struct BracketPart(string Value, int Index, int Length);
+
     [GeneratedRegex(@"\b[Ss](?<season>\d{1,2})[\s._-]*[Ee](?<episode>\d{1,4})\s*(?:-|~|to)\s*(?:[Ee])?(?<endEpisode>\d{1,3})(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex MultiEpisodeTokenRegex();
 
@@ -746,6 +955,15 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"^(?=.*[\p{L}\u4e00-\u9fff])(?<title>.+?)(?:[\s._-]+)?(?<episode>\d{1,4})\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex TitleNumberEpisodeRegex();
 
+    [GeneratedRegex(@"^(?=.*[\p{L}\u4e00-\u9fff])(?<title>.+?)\s+(?:[Ss](?<season>\d{1,2})|Season\s*(?<season>\d{1,2}))\s+(?:Pt|Part)\s*(?<part>\d{1,2})\s+(?<episode>\d{1,4})\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TitleSeasonPartEpisodeSequenceRegex();
+
+    [GeneratedRegex(@"^(?=.*[\p{L}\u4e00-\u9fff])(?<title>.+?)\s+(?:Pt|Part)\s*(?<part>\d{1,2})\s+(?<episode>\d{1,4})\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TitlePartEpisodeSequenceRegex();
+
+    [GeneratedRegex(@"^\s*(?<episode>\d{1,4})[\s._-]+(?<title>.+?)[\s._-]+(?:[Ss](?<season>\d{1,2})|Season[\s._-]*(?<season>\d{1,2}))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LeadingNumberTitleSequenceRegex();
+
     [GeneratedRegex(@"\b(?:4K|8K|1080P|2160P|720P|480P|UHD|FHD|HDR|HDR10|DV|WEB[-\s]?DL|WEBRIP|BDRIP|BLURAY|HEVC|H\.?265|H\.?264|X264|X265|AAC|AC3|EAC3|DDP\d?|DTS|TRUEHD|ATMOS|FLAC|REMUX|10BIT|8BIT)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TitleNumberReleaseTailRegex();
 
@@ -772,6 +990,9 @@ public static partial class TvEpisodeFileNameParser
 
     [GeneratedRegex(@"^\s*(?:E|EP|Episode\s*)?(?<episode>\d{1,4})\s*(?:[-:：].*)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex BracketEpisodeSegmentRegex();
+
+    [GeneratedRegex(@"^\s*(?:E|EP|Episode)\s*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex BracketEpisodeExplicitMarkerRegex();
 
     [GeneratedRegex(@"[._\-]+", RegexOptions.CultureInvariant)]
     private static partial Regex SeparatorsRegex();
@@ -802,13 +1023,23 @@ public static partial class TvEpisodeFileNameParser
 
     [GeneratedRegex(@"^(?:\d{1,4}|19\d{2}|20\d{2}|4K|8K|1080P|2160P|720P|480P|UHD|FHD|HD|SD|HDR|HDR10|DV|DOLBY|VISION|WEB|DL|WEBDL|WEBRIP|BDRIP|BRRIP|BLURAY|HDTV|REMUX|PROPER|REPACK|EXTENDED|LIMITED|IMAX|HEVC|H\.?265|H\.?264|X264|X265|AV1|AAC|AC3|EAC3|DDP\d?|DTS|TRUEHD|ATMOS|FLAC|LPCM|PCM|MA|JAPANESE|ENGLISH|CHINESE|MANDARIN|CANTONESE|KOREAN|MULTI|SUBS?|SUBBED|DUBBED|DUAL|AUDIO|AMZN|NF|DSNP|HMAX|ITUNES)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ReleaseMetadataQueryTokenRegex();
+
+    [GeneratedRegex(@"^(?:part|pt)(?:\d{1,2})?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex StructuralPartTokenRegex();
+
+    [GeneratedRegex(@"^(?:s(?:\d{1,2})?|season(?:\d{1,2})?)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex StructuralSeasonTokenRegex();
 }
 
 public sealed record TvEpisodeSequencePattern(
     string PatternKey,
     string Pattern,
     string PrefixKey,
-    int Number);
+    int Number,
+    int? SeasonNumber = null,
+    int? PartNumber = null,
+    int? EpisodeInPart = null,
+    bool PartHintDetected = false);
 
 public sealed record TvEpisodeSequenceAnalysis(
     bool IsSequence,

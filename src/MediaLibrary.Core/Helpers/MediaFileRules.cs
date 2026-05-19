@@ -23,6 +23,11 @@ public static class MediaFileRules
 
     public static MediaType GetMediaType(string fileNameOrPath)
     {
+        if (IsIgnoredSystemFile(fileNameOrPath))
+        {
+            return MediaType.Other;
+        }
+
         var extension = Path.GetExtension(fileNameOrPath);
         if (VideoExtensions.Contains(extension))
         {
@@ -35,5 +40,11 @@ public static class MediaFileRules
         }
 
         return MediaType.Other;
+    }
+
+    public static bool IsIgnoredSystemFile(string fileNameOrPath)
+    {
+        var fileName = Path.GetFileName(fileNameOrPath.Replace('\\', '/'));
+        return fileName.StartsWith("._", StringComparison.Ordinal);
     }
 }

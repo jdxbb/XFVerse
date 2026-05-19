@@ -200,6 +200,14 @@ public sealed class MediaScanService : IMediaScanService
                 postProcessVideoMediaFileIds.ToArray(),
                 tvDirectoryAnalysis,
                 cancellationToken);
+            if (aiOnUncertainApplyResult.HasBatchFailure)
+            {
+                postStage.AddWarning("AI.OnUncertain", "AI 辅助部分失败，部分项目已保留为未识别/待修正。");
+                tvWarningCount++;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=scan-ai-on-uncertain-warning source=webdav failedBatches={aiOnUncertainApplyResult.FailedBatchCount} failedRangeCount={aiOnUncertainApplyResult.FailedRangeCount} warning=partial-ai-failure warningsIncludedInErrorCount=false");
+            }
+
             var aiAffectedMediaFileIds = aiOnUncertainApplyResult.AffectedMediaFileIds
                 .Where(postProcessVideoMediaFileIds.Contains)
                 .Distinct()
@@ -264,7 +272,7 @@ public sealed class MediaScanService : IMediaScanService
         if (successfulLogIds.Count > 0 && postStage.HasIssues)
         {
             await MarkLogsAsPartialSuccessAsync(successfulLogIds, postStage, cancellationToken);
-            totalResult.ErrorCount += postStage.IssueCount;
+            totalResult.ErrorCount += postStage.ErrorCount;
         }
 
         if (successfulLogIds.Count > 0)
@@ -279,7 +287,7 @@ public sealed class MediaScanService : IMediaScanService
 
         totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
         ScanIdentificationDiagnostics.Write(
-            $"event=scan-run-complete source=webdav scanned={totalResult.TotalScannedCount} new={totalResult.NewFileCount} updated={totalResult.UpdatedFileCount} ignored={totalResult.IgnoredFileCount} errors={totalResult.ErrorCount} backgroundAiClassification=queued");
+            $"event=scan-run-complete source=webdav scanned={totalResult.TotalScannedCount} new={totalResult.NewFileCount} updated={totalResult.UpdatedFileCount} ignored={totalResult.IgnoredFileCount} errors={totalResult.ErrorCount} warnings={postStage.WarningCount} scanErrorCount={totalResult.ErrorCount} scanWarningCount={postStage.WarningCount} rawWarningCount={postStage.RawWarningCount} tvParseRawWarningCount={postStage.RawWarningCount} warningDedupedCount={Math.Max(0, postStage.RawWarningCount - postStage.WarningCount)} tvParseDeduplicatedWarningCount={postStage.WarningCount} warningsIncludedInErrorCount=false finalScanStatus={(totalResult.ErrorCount > 0 ? "partial-success" : "success-with-warnings-or-success")} backgroundAiClassification=queued");
         return totalResult;
     }
 
@@ -386,6 +394,12 @@ public sealed class MediaScanService : IMediaScanService
 
             foreach (var remoteEntry in remoteEntries.OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase))
             {
+                if (MediaFileRules.IsIgnoredSystemFile(remoteEntry.Name))
+                {
+                    result.RecordIgnored("macos-resource-fork", remoteEntry.Name);
+                    continue;
+                }
+
                 var mediaType = MediaFileRules.GetMediaType(remoteEntry.Name);
                 if (mediaType == MediaType.Other)
                 {
@@ -715,7 +729,7 @@ public sealed class MediaScanService : IMediaScanService
         foreach (var log in logs)
         {
             log.Status = ScanTaskStatus.PartialSuccess;
-            log.ErrorCount += postStage.IssueCount;
+            log.ErrorCount += postStage.ErrorCount;
             log.ErrorMessage = string.IsNullOrWhiteSpace(log.ErrorMessage)
                 ? summary
                 : $"{log.ErrorMessage}；{summary}";
@@ -751,7 +765,12 @@ public sealed class MediaScanService : IMediaScanService
             return $"扫描完成，共扫描 {totalResult.TotalScannedCount} 个文件。";
         }
 
-        if (postStage.HasIssues && totalResult.ErrorCount == postStage.IssueCount)
+        if (totalResult.ErrorCount == 0 && postStage.WarningCount > 0)
+        {
+            return $"扫描入库完成，共扫描 {totalResult.TotalScannedCount} 个文件；存在 {postStage.WarningCount} 个警告。{postStage.BuildSummary()}";
+        }
+
+        if (postStage.HasIssues && totalResult.ErrorCount == postStage.ErrorCount)
         {
             return $"扫描入库完成，共扫描 {totalResult.TotalScannedCount} 个文件；识别/元数据阶段存在问题。{postStage.BuildSummary()}";
         }
@@ -798,10 +817,13 @@ public sealed class MediaScanService : IMediaScanService
     private sealed class PostScanStageResult
     {
         private readonly List<string> _messages = [];
+        private readonly HashSet<string> _warningKeys = new(StringComparer.OrdinalIgnoreCase);
 
         public int ErrorCount { get; private set; }
 
         public int WarningCount { get; private set; }
+
+        public int RawWarningCount { get; private set; }
 
         public bool HasIssues => IssueCount > 0;
 
@@ -810,7 +832,19 @@ public sealed class MediaScanService : IMediaScanService
         public void Absorb(IdentificationRunResult result)
         {
             ErrorCount += result.ErrorCount;
-            WarningCount += result.WarningCount;
+            RawWarningCount += result.WarningCount;
+            var keyedWarningCount = 0;
+            foreach (var warningKey in result.WarningKeys.Where(x => !string.IsNullOrWhiteSpace(x)))
+            {
+                keyedWarningCount++;
+                if (_warningKeys.Add(warningKey))
+                {
+                    WarningCount++;
+                }
+            }
+
+            var unkeyedWarningCount = Math.Max(0, result.WarningCount - keyedWarningCount);
+            WarningCount += unkeyedWarningCount;
             foreach (var message in result.Messages)
             {
                 AddMessage(message);
@@ -825,6 +859,7 @@ public sealed class MediaScanService : IMediaScanService
 
         public void AddWarning(string stage, string message)
         {
+            RawWarningCount++;
             WarningCount++;
             AddMessage($"[{stage}] {message}");
         }

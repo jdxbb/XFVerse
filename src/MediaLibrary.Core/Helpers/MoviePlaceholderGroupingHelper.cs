@@ -34,6 +34,27 @@ public static partial class MoviePlaceholderGroupingHelper
         foreach (var parentGroup in parsedCandidates.GroupBy(x => x.Placeholder.ParentPath))
         {
             var parentItems = parentGroup.ToList();
+            if (TryBuildLongRunningRange(parentItems, out var longRunningRange, out var longRunningSkipReason))
+            {
+                if (ShouldApplyMovieCollectionGuard(longRunningRange))
+                {
+                    AddCount(skippedRunReasons, "movie-collection-guard");
+                }
+                else
+                {
+                    foreach (var item in longRunningRange.NumberedItems)
+                    {
+                        consumedMediaFileIds.Add(item.Input.MediaFileId);
+                    }
+
+                    ranges.Add(longRunningRange);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(longRunningSkipReason))
+            {
+                AddCount(skippedRunReasons, longRunningSkipReason);
+            }
+
             if (parentItems.Select(x => x.Pattern.PatternKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() <= 1)
             {
                 continue;
@@ -65,14 +86,20 @@ public static partial class MoviePlaceholderGroupingHelper
                     consumedMediaFileIds.Add(item.Placeholder.MediaFileId);
                 }
 
-                ranges.Add(
-                    new MoviePlaceholderGroupingRange(
-                        first.Placeholder.ParentPath,
-                        "mixed-episode-sequence",
-                        "mixed-pattern",
-                        first.Pattern.Number,
-                        last.Pattern.Number,
-                        run.Select(x => x.Placeholder).ToArray()));
+                var range = new MoviePlaceholderGroupingRange(
+                    first.Placeholder.ParentPath,
+                    "mixed-episode-sequence",
+                    "mixed-pattern",
+                    first.Pattern.Number,
+                    last.Pattern.Number,
+                    ToRangeItems(run));
+                if (ShouldApplyMovieCollectionGuard(range))
+                {
+                    AddCount(skippedRunReasons, "movie-collection-guard");
+                    continue;
+                }
+
+                ranges.Add(range);
             }
         }
 
@@ -97,14 +124,20 @@ public static partial class MoviePlaceholderGroupingHelper
 
                 var first = run[0];
                 var last = run[^1];
-                ranges.Add(
-                    new MoviePlaceholderGroupingRange(
-                        first.Placeholder.ParentPath,
-                        first.Pattern.PatternKey,
-                        first.Pattern.Pattern,
-                        first.Pattern.Number,
-                        last.Pattern.Number,
-                        run.Select(x => x.Placeholder).ToArray()));
+                var range = new MoviePlaceholderGroupingRange(
+                    first.Placeholder.ParentPath,
+                    first.Pattern.PatternKey,
+                    first.Pattern.Pattern,
+                    first.Pattern.Number,
+                    last.Pattern.Number,
+                    ToRangeItems(run));
+                if (ShouldApplyMovieCollectionGuard(range))
+                {
+                    AddCount(skippedRunReasons, "movie-collection-guard");
+                    continue;
+                }
+
+                ranges.Add(range);
             }
         }
 
@@ -171,6 +204,88 @@ public static partial class MoviePlaceholderGroupingHelper
         return runs;
     }
 
+    private static IReadOnlyList<MoviePlaceholderGroupingRangeItem> ToRangeItems(
+        IEnumerable<MoviePlaceholderGroupingParsedCandidate> run)
+    {
+        return run
+            .OrderBy(x => x.Pattern.Number)
+            .Select(x => new MoviePlaceholderGroupingRangeItem(x.Placeholder, x.Pattern.Number))
+            .ToArray();
+    }
+
+    private static bool TryBuildLongRunningRange(
+        IReadOnlyList<MoviePlaceholderGroupingParsedCandidate> parentItems,
+        out MoviePlaceholderGroupingRange range,
+        out string skippedReason)
+    {
+        range = new MoviePlaceholderGroupingRange(string.Empty, string.Empty, string.Empty, 0, 0, []);
+        skippedReason = string.Empty;
+        if (parentItems.Count < 10)
+        {
+            return false;
+        }
+
+        if (parentItems.GroupBy(x => x.Pattern.Number).Any(x => x.Count() > 1))
+        {
+            skippedReason = "long-running-duplicate-episode-number";
+            return false;
+        }
+
+        var ordered = parentItems.OrderBy(x => x.Pattern.Number).ToList();
+        var start = ordered[0].Pattern.Number;
+        var end = ordered[^1].Pattern.Number;
+        var span = end - start + 1;
+        if (end < 100 && span < 20)
+        {
+            return false;
+        }
+
+        var numbers = ordered.Select(x => x.Pattern.Number).ToHashSet();
+        var missing = Enumerable.Range(start, span).Where(x => !numbers.Contains(x)).ToArray();
+        var missingRatio = span == 0 ? 1 : (double)missing.Length / span;
+        if (missing.Length == 0 || missingRatio > 0.2)
+        {
+            skippedReason = missing.Length == 0 ? string.Empty : "long-running-too-many-gaps";
+            return false;
+        }
+
+        var parentPath = ordered[0].Placeholder.ParentPath;
+        range = new MoviePlaceholderGroupingRange(
+            parentPath,
+            "long-running-episode-range",
+            "long-running-range",
+            start,
+            end,
+            ToRangeItems(ordered),
+            missing);
+        return true;
+    }
+
+    private static bool ShouldApplyMovieCollectionGuard(MoviePlaceholderGroupingRange range)
+    {
+        if (!IsBareNumberLikePattern(range.Pattern)
+            || range.FileCount > 8
+            || HasTvHint(range.ParentPath))
+        {
+            return false;
+        }
+
+        var parentDisplay = GetParentFolderDisplay(range.ParentPath);
+        return MovieCollectionFolderRegex().IsMatch(parentDisplay)
+               || (range.StartNumber <= 1 && range.EndNumber <= 8);
+    }
+
+    private static bool IsBareNumberLikePattern(string pattern)
+    {
+        return string.Equals(pattern, "bare-number", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(pattern, "bare-number-quality", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasTvHint(string value)
+    {
+        return TvHintRegex().IsMatch(value ?? string.Empty);
+    }
+
     private static bool TryParseEpisodePattern(
         string fileName,
         out MoviePlaceholderEpisodePattern pattern,
@@ -226,6 +341,11 @@ public static partial class MoviePlaceholderGroupingHelper
             return true;
         }
 
+        if (TryParseLeadingNumberTitlePattern(name, out pattern))
+        {
+            return true;
+        }
+
         var titleNumberName = WhitespaceRegex()
             .Replace(
                 SeparatorRegex().Replace(
@@ -249,24 +369,31 @@ public static partial class MoviePlaceholderGroupingHelper
     private static bool TryParseBracketedEpisodePattern(string name, out MoviePlaceholderEpisodePattern pattern)
     {
         pattern = new MoviePlaceholderEpisodePattern(string.Empty, string.Empty, 0);
-        var bracketValues = BracketedContentRegex()
+        var bracketParts = BracketedContentRegex()
             .Matches(name)
-            .Select(match => TrimBracketContent(match.Value))
-            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(match => new BracketPart(TrimBracketContent(match.Value), match.Index, match.Length))
+            .Where(value => !string.IsNullOrWhiteSpace(value.Value))
             .ToArray();
-        if (bracketValues.Length == 0)
+        if (bracketParts.Length == 0)
         {
             return false;
         }
 
-        for (var index = 0; index < bracketValues.Length; index++)
+        for (var index = 0; index < bracketParts.Length; index++)
         {
-            if (!TryParseBracketedEpisodeSegment(bracketValues[index], out var number))
+            if (!TryParseBracketedEpisodeSegment(bracketParts[index].Value, out var number))
             {
                 continue;
             }
 
-            var titleKey = FindNearestBracketTitleKey(bracketValues, index);
+            var titleFromText = ExtractTextBeforeBracket(name, bracketParts[index]);
+            if (TryNormalizeTitlePrefix(titleFromText, out var textTitleKey))
+            {
+                pattern = new MoviePlaceholderEpisodePattern($"fansub-bracket-number:{textTitleKey}", "fansub-bracket-episode", number);
+                return true;
+            }
+
+            var titleKey = FindNearestBracketTitleKey(bracketParts.Select(x => x.Value).ToArray(), index);
             var patternKey = string.IsNullOrWhiteSpace(titleKey)
                 ? "bracket-episode-segment"
                 : $"bracket-title-number:{titleKey}";
@@ -275,6 +402,34 @@ public static partial class MoviePlaceholderGroupingHelper
         }
 
         return false;
+    }
+
+    private static bool TryParseLeadingNumberTitlePattern(string name, out MoviePlaceholderEpisodePattern pattern)
+    {
+        pattern = new MoviePlaceholderEpisodePattern(string.Empty, string.Empty, 0);
+        var match = LeadingNumberTitleRegex().Match(name);
+        if (!match.Success
+            || !TryReadPositiveEpisodeNumber(match.Groups["episode"].Value, out var number)
+            || !TryNormalizeTitlePrefix(match.Groups["title"].Value, out var prefixKey))
+        {
+            return false;
+        }
+
+        pattern = new MoviePlaceholderEpisodePattern($"leading-number-title:{prefixKey}", "leading-number-title", number);
+        return true;
+    }
+
+    private static string ExtractTextBeforeBracket(string name, BracketPart episodeBracket)
+    {
+        if (episodeBracket.Index <= 0)
+        {
+            return string.Empty;
+        }
+
+        var prefix = name[..episodeBracket.Index];
+        prefix = BracketedContentRegex().Replace(prefix, " ");
+        prefix = SeparatorRegex().Replace(prefix, " ");
+        return WhitespaceRegex().Replace(prefix, " ").Trim();
     }
 
     private static string TrimBracketContent(string value)
@@ -288,12 +443,14 @@ public static partial class MoviePlaceholderGroupingHelper
         var markerMatch = BracketedEpisodeMarkerOnlyRegex().Match(value);
         if (markerMatch.Success)
         {
-            return TryReadPositiveEpisodeNumber(markerMatch.Groups["episode"].Value, out number);
+            return TryReadPositiveEpisodeNumber(markerMatch.Groups["episode"].Value, out number)
+                   && !IsReleaseNumber(number);
         }
 
         var segmentMatch = BracketedEpisodeSegmentRegex().Match(value);
         return segmentMatch.Success
-               && TryReadPositiveEpisodeNumber(segmentMatch.Groups["episode"].Value, out number);
+               && TryReadPositiveEpisodeNumber(segmentMatch.Groups["episode"].Value, out number)
+               && !IsReleaseNumber(number);
     }
 
     private static string FindNearestBracketTitleKey(IReadOnlyList<string> bracketValues, int episodeSegmentIndex)
@@ -361,6 +518,12 @@ public static partial class MoviePlaceholderGroupingHelper
                && number > 0;
     }
 
+    private static bool IsReleaseNumber(int value)
+    {
+        return value is 480 or 720 or 1080 or 2160 or 4320
+               || value is >= 1900 and <= 2099;
+    }
+
     private static bool IsCjk(char ch)
     {
         return ch >= 0x4E00 && ch <= 0x9FFF;
@@ -406,6 +569,9 @@ public static partial class MoviePlaceholderGroupingHelper
     [GeneratedRegex(@"^(?<prefix>.*?[\p{L}\u4e00-\u9fff].*?)[\s._-]*(?<episode>\d{1,4})\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex TitleNumberRegex();
 
+    [GeneratedRegex(@"^\s*(?<episode>\d{1,4})[\s._-]+(?<title>.+?)[\s._-]+(?:[Ss]\d{1,2}|Season[\s._-]*\d{1,2})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LeadingNumberTitleRegex();
+
     [GeneratedRegex(@"(?:^|[\s._\-\[\(])(?:cd|disc|disk|part|sample|trailer|teaser|preview|extras?|bonus|featurette)\s*\d*(?:$|[\s._\-\]\)])|\u82b1\u7d6e|\u9884\u544a|\u7279\u5178|\u5e55\u540e|\u8bbf\u8c08|\u6837\u7247|\u7247\u6bb5|(?:^|[\s._\-\[\(])[\u4e0a\u4e0b](?:$|[\s._\-\]\)])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ExcludedTokenRegex();
 
@@ -414,6 +580,12 @@ public static partial class MoviePlaceholderGroupingHelper
 
     [GeneratedRegex(@"\b(?:1080p|2160p|720p|480p|4k|8k|uhd|fhd|hdr|hdr10|dv|x264|x265|h264|h265|hevc|av1|bluray|bdrip|webrip|webdl|web|dl|hdtv|remux|aac|ac3|eac3|dts|truehd|atmos|flac|lpcm|10bit|8bit|sub|subs|subbed|dubbed|group|team)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex BracketTitleNoiseRegex();
+
+    [GeneratedRegex(@"(?:合集|系列|全集|套装|collection|movies?|trilogy|quadrilogy)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex MovieCollectionFolderRegex();
+
+    [GeneratedRegex(@"(?:\b[Ss]\d{1,2}\b|\bSeason\s*\d{1,2}\b|\bEpisode\b|\bEP\d{1,4}\b|\bE\d{1,4}\b|第\s*\d{1,4}\s*[季集话]|剧集|电视剧|TV)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TvHintRegex();
 }
 
 public sealed record MoviePlaceholderGroupingInput(
@@ -430,8 +602,11 @@ public sealed record MoviePlaceholderGroupingRange(
     string Pattern,
     int StartNumber,
     int EndNumber,
-    IReadOnlyList<MoviePlaceholderGroupingInput> Items)
+    IReadOnlyList<MoviePlaceholderGroupingRangeItem> NumberedItems,
+    IReadOnlyList<int>? MissingNumbers = null)
 {
+    public IReadOnlyList<MoviePlaceholderGroupingInput> Items => NumberedItems.Select(x => x.Input).ToArray();
+
     public int FileCount => Items.Count;
 
     public IReadOnlyList<int> MediaFileIds => Items.Select(x => x.MediaFileId).Distinct().ToArray();
@@ -440,6 +615,8 @@ public sealed record MoviePlaceholderGroupingRange(
         Items.Select(x => x.PlaceholderReason).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
     public IReadOnlyList<string> SampleFileNames => Items.Select(x => x.FileName).Take(5).ToArray();
+
+    public int MissingCount => MissingNumbers?.Count ?? 0;
 }
 
 public sealed record MoviePlaceholderGroupingResult(
@@ -450,6 +627,12 @@ public sealed record MoviePlaceholderGroupingResult(
     IReadOnlyDictionary<string, int> SkippedReasons);
 
 internal sealed record MoviePlaceholderEpisodePattern(string PatternKey, string Pattern, int Number);
+
+public sealed record MoviePlaceholderGroupingRangeItem(
+    MoviePlaceholderGroupingInput Input,
+    int EpisodeNumber);
+
+internal readonly record struct BracketPart(string Value, int Index, int Length);
 
 internal sealed record MoviePlaceholderGroupingParsedCandidate(
     MoviePlaceholderGroupingInput Placeholder,

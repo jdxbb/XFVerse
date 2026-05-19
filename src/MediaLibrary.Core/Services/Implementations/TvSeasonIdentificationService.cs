@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using MediaLibrary.Core.Data;
+using System.Text.RegularExpressions;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.Entities;
@@ -15,6 +16,9 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
     private const double MinimumAutoMatchConfidence = 0.55d;
     private const double MatchedConfidence = 0.80d;
     private const string UnidentifiedSeasonTitle = "未识别电视剧季";
+    private static readonly Regex DirectoryPartTokenRegex = new(
+        @"\b(?:pt|part)\.?\s*(?<part>[1-9]\d*)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private readonly ISettingsService _settingsService;
     private readonly ITmdbService _tmdbService;
@@ -64,7 +68,8 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             return result;
         }
 
-        var candidates = await BuildCandidatesAsync(distinctIds, directoryAnalysis, cancellationToken);
+        var candidates = SortCandidatesForPartOffset(
+            await BuildCandidatesAsync(distinctIds, directoryAnalysis, cancellationToken));
         ScanIdentificationDiagnostics.Write(
             $"event=tv-identify-candidates requested={distinctIds.Length} candidateCount={candidates.Count}");
         if (candidates.Count == 0)
@@ -90,8 +95,15 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             {
                 var hasMultiEpisodeUnsupported = candidate.UnsupportedFiles.Any(x => x.ParseResult.IsMultiEpisode);
                 var hasVerifiedTitleNumberContext = candidate.UnsupportedFiles.Any(x => x.ParseResult.VerifiedTitleNumberSequenceContext);
+                var hasPartOffsetUnsupported = candidate.UnsupportedFiles.Any(
+                    x => x.ParseResult.PartHintDetected
+                         && !x.ParseResult.EpisodeOffsetApplied
+                         && x.ParseResult.PartHint is > 1
+                         && x.ParseResult.EpisodeInPart is > 0);
                 var unsupportedReason = hasMultiEpisodeUnsupported
                     ? "multi-episode-not-supported"
+                    : hasPartOffsetUnsupported
+                        ? "part-offset-not-applied"
                     : hasVerifiedTitleNumberContext
                         ? "title-number-sequence-parse-failed"
                         : candidate.WeakTvReasons.Any(x => string.Equals(x, "title-number-sequence", StringComparison.OrdinalIgnoreCase))
@@ -135,16 +147,49 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                         .Distinct()
                         .OrderBy(x => x)
                         .Take(5));
+                var partHints = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Select(x => x.ParseResult.PartHint)
+                        .Where(x => x.HasValue)
+                        .Select(x => x!.Value)
+                        .Distinct()
+                        .OrderBy(x => x)
+                        .Take(5));
+                var episodeInParts = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Select(x => x.ParseResult.EpisodeInPart)
+                        .Where(x => x.HasValue)
+                        .Select(x => x!.Value)
+                        .Distinct()
+                        .OrderBy(x => x)
+                        .Take(5));
+                var offsetSkippedReasons = string.Join(
+                    '|',
+                    candidate.UnsupportedFiles
+                        .Select(x => x.ParseResult.EpisodeOffsetSkippedReason)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(5));
                 ScanIdentificationDiagnostics.Write(
-                    $"event=tv-candidate-unsupported directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} unsupported={candidate.UnsupportedFiles.Count} reason={unsupportedReason} unsupportedReason={unsupportedReason} unsupportedSampleNames={ScanIdentificationDiagnostics.FormatValue(unsupportedSamples)} unsupportedMatchKind={ScanIdentificationDiagnostics.FormatValue(unsupportedKinds)} detectedMultiEpisodeStart={ScanIdentificationDiagnostics.FormatValue(detectedStarts)} detectedMultiEpisodeEnd={ScanIdentificationDiagnostics.FormatValue(detectedEnds)} detectedMultiEpisodePattern={ScanIdentificationDiagnostics.FormatValue(unsupportedPatterns)} verifiedTitleNumberSequenceContext={hasVerifiedTitleNumberContext.ToString().ToLowerInvariant()}");
+                    $"event=tv-candidate-unsupported directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} unsupported={candidate.UnsupportedFiles.Count} reason={unsupportedReason} unsupportedReason={unsupportedReason} unsupportedSampleNames={ScanIdentificationDiagnostics.FormatValue(unsupportedSamples)} unsupportedMatchKind={ScanIdentificationDiagnostics.FormatValue(unsupportedKinds)} detectedMultiEpisodeStart={ScanIdentificationDiagnostics.FormatValue(detectedStarts)} detectedMultiEpisodeEnd={ScanIdentificationDiagnostics.FormatValue(detectedEnds)} detectedMultiEpisodePattern={ScanIdentificationDiagnostics.FormatValue(unsupportedPatterns)} verifiedTitleNumberSequenceContext={hasVerifiedTitleNumberContext.ToString().ToLowerInvariant()} partHintDetected={hasPartOffsetUnsupported.ToString().ToLowerInvariant()} partHint={ScanIdentificationDiagnostics.FormatValue(partHints)} episodeInPart={ScanIdentificationDiagnostics.FormatValue(episodeInParts)} partOffsetEvaluationStarted=false episodeOffsetApplied=false episodeOffset=(none) episodeOffsetSource=(none) episodeOffsetSkippedReason={ScanIdentificationDiagnostics.FormatValue(offsetSkippedReasons)}");
+                var warningDedupKey = $"tv-parse:{candidate.DirectoryPath}:{candidate.SeasonNumber}:{unsupportedReason}:{unsupportedKinds}";
                 result.Summary.AddWarning(
                     "TV.Parse",
                     hasMultiEpisodeUnsupported
                         ? "multi-episode-not-supported"
-                        : "\u90e8\u5206\u5267\u96c6\u6587\u4ef6\u6682\u65e0\u6cd5\u89e3\u6790\uff0c\u5df2\u4fdd\u7559\u4e3a\u672a\u8bc6\u522b/\u5f85\u4fee\u6b63\u3002");
+                        : "\u90e8\u5206\u5267\u96c6\u6587\u4ef6\u6682\u65e0\u6cd5\u89e3\u6790\uff0c\u5df2\u4fdd\u7559\u4e3a\u672a\u8bc6\u522b/\u5f85\u4fee\u6b63\u3002",
+                    warningDedupKey);
             }
 
-            if (candidate.Files.Count == 0)
+            var hasPartOffsetCandidates = HasPartOffsetCandidates(candidate);
+            if (hasPartOffsetCandidates)
+            {
+                LogPartOffsetCandidateReadiness(candidate);
+            }
+
+            if (candidate.Files.Count == 0 && !hasPartOffsetCandidates)
             {
                 ScanIdentificationDiagnostics.Write(
                     $"event=tv-candidate-skip directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} reason=no-supported-files");
@@ -171,6 +216,15 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
             if (!hasTmdbCredential || candidate.SearchQueries.Count == 0)
             {
+                if (hasPartOffsetCandidates)
+                {
+                    var partOffsetSkippedReason = hasTmdbCredential
+                        ? "no-ai-refined-title-on-part-candidate"
+                        : "missing-tmdb-credential";
+                    MarkPartOffsetSkipped(candidate.UnsupportedFiles.Where(IsPartOffsetCandidate), partOffsetSkippedReason);
+                    LogPartOffsetNotEvaluated(candidate, partOffsetSkippedReason, bestCandidate: null);
+                }
+
                 ScanIdentificationDiagnostics.Write(
                     $"event=tv-candidate-placeholder directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} reason={(hasTmdbCredential ? "no-usable-query" : "missing-tmdb-credential")} rejectReason={(hasTmdbCredential ? "generic-or-quality-only-query" : "missing-tmdb-credential")}");
                 LogAiCandidateRange(
@@ -304,6 +358,13 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             var bestCandidateIsAiRefinedTop1 = IsAiRefinedTitleQuery(bestCandidate?.QuerySource);
             if (aiRefinedYearGateBlockedCandidate)
             {
+                if (hasPartOffsetCandidates)
+                {
+                    var partOffsetSkippedReason = FirstNonEmpty(aiRefinedYearGateBlockedReason, "ai-refined-series-not-safe");
+                    MarkPartOffsetSkipped(candidate.UnsupportedFiles.Where(IsPartOffsetCandidate), partOffsetSkippedReason);
+                    LogPartOffsetNotEvaluated(candidate, partOffsetSkippedReason, bestCandidate);
+                }
+
                 ScanIdentificationDiagnostics.Write(
                     $"event=tv-candidate-placeholder directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} reason=ai-refined-year-conflict rejectReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedYearGateBlockedReason)} aiRefinedYearGateBlocked=true tvAutoApply=false tvAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(aiRefinedYearGateBlockedReason)} finalDecision=tv-placeholder");
                 LogAiCandidateRange(
@@ -319,6 +380,13 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
             if (bestCandidate is null || (!bestCandidateIsAiRefinedTop1 && bestCandidate.Confidence < MinimumAutoMatchConfidence))
             {
+                if (hasPartOffsetCandidates)
+                {
+                    var partOffsetSkippedReason = GetPartOffsetNotEvaluatedReason(candidate, bestCandidate);
+                    MarkPartOffsetSkipped(candidate.UnsupportedFiles.Where(IsPartOffsetCandidate), partOffsetSkippedReason);
+                    LogPartOffsetNotEvaluated(candidate, partOffsetSkippedReason, bestCandidate);
+                }
+
                 ScanIdentificationDiagnostics.Write(
                     $"event=tv-candidate-placeholder directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} reason={(bestCandidate is null ? "no-result" : "below-threshold")} rejectReason={(bestCandidate is null ? "query-no-result" : "below-threshold")} tvAutoApply=false tvAutoApplyBlockedReason={ScanIdentificationDiagnostics.FormatValue(GetTvAutoApplyBlockedReason(bestCandidate, string.Empty))} finalDecision=tv-placeholder");
                 var rangeType = candidateConflictCount > 0 ? "candidate-conflict" : "placeholder-needed";
@@ -338,6 +406,12 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
             if (!bestCandidateIsAiRefinedTop1 && bestCandidate.Confidence < MatchedConfidence)
             {
+                if (hasPartOffsetCandidates)
+                {
+                    MarkPartOffsetSkipped(candidate.UnsupportedFiles.Where(IsPartOffsetCandidate), "ai-refined-series-not-safe");
+                    LogPartOffsetNotEvaluated(candidate, "ai-refined-series-not-safe", bestCandidate);
+                }
+
                 ScanIdentificationDiagnostics.Write(
                     $"event=tv-candidate-placeholder directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} topTmdbId={bestCandidate.Item.TmdbId} topTitle={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Item.Name)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(bestCandidate.Confidence)} reason=needs-review-not-auto-applied rejectReason=needs-review-not-auto-applied tvAutoApply=false tvAutoApplyBlockedReason=needs-review-not-auto-applied finalDecision=tv-placeholder");
                 LogAiCandidateRange(
@@ -347,6 +421,24 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     candidateConflictCount > 0
                         ? new[] { "candidate-conflict", "needs-review-not-auto-applied" }.Concat(candidateConflictReasons).ToArray()
                         : ["needs-review-not-auto-applied"],
+                    candidateConflictsCount: candidateConflictCount);
+                await UpsertUnidentifiedSeasonAsync(candidate, cancellationToken);
+                result.Summary.PlaceholderCount++;
+                continue;
+            }
+
+            if (hasPartOffsetCandidates && candidate.Files.Count == 0 && !bestCandidateIsAiRefinedTop1)
+            {
+                const string partOffsetSkippedReason = "ai-refined-series-not-safe";
+                MarkPartOffsetSkipped(candidate.UnsupportedFiles.Where(IsPartOffsetCandidate), partOffsetSkippedReason);
+                LogPartOffsetNotEvaluated(candidate, partOffsetSkippedReason, bestCandidate);
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tv-candidate-placeholder directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} topTmdbId={bestCandidate.Item.TmdbId} topTitle={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Item.Name)} topConfidence={ScanIdentificationDiagnostics.FormatConfidence(bestCandidate.Confidence)} reason=part-offset-requires-ai-refined-series rejectReason={partOffsetSkippedReason} tvAutoApply=false tvAutoApplyBlockedReason={partOffsetSkippedReason} finalDecision=tv-placeholder");
+                LogAiCandidateRange(
+                    directoryAnalysis,
+                    candidate,
+                    "part-offset-not-applied",
+                    ["part-offset-not-applied", partOffsetSkippedReason],
                     candidateConflictsCount: candidateConflictCount);
                 await UpsertUnidentifiedSeasonAsync(candidate, cancellationToken);
                 result.Summary.PlaceholderCount++;
@@ -370,6 +462,28 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 ScanIdentificationDiagnostics.Write(
                     $"event=tv-detail-error tmdbId={bestCandidate.Item.TmdbId} season={candidate.SeasonNumber} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
                 result.Summary.AddWarning("TV.Detail", TrimMessage(exception.Message));
+            }
+
+            var partOffsetResult = HasPartOffsetCandidates(candidate)
+                ? await ApplySafeSiblingPartOffsetsAsync(
+                    candidate,
+                    bestCandidate.Item.TmdbId,
+                    seasonDetails,
+                    cancellationToken)
+                : PartOffsetApplicationResult.NotEvaluated("no-part-offset-candidates");
+            if (candidate.Files.Count == 0)
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tv-candidate-placeholder directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} reason=part-offset-not-applied rejectReason={ScanIdentificationDiagnostics.FormatValue(partOffsetResult.SkippedReason)} partOffsetEvaluationStarted={partOffsetResult.Evaluated.ToString().ToLowerInvariant()} episodeOffsetApplied=false episodeOffsetSkippedReason={ScanIdentificationDiagnostics.FormatValue(partOffsetResult.SkippedReason)} tvAutoApply=false finalDecision=tv-placeholder");
+                LogAiCandidateRange(
+                    directoryAnalysis,
+                    candidate,
+                    "part-offset-not-applied",
+                    ["part-offset-not-applied", partOffsetResult.SkippedReason],
+                    candidateConflictsCount: candidateConflictCount);
+                await UpsertUnidentifiedSeasonAsync(candidate, cancellationToken);
+                result.Summary.PlaceholderCount++;
+                continue;
             }
 
             try
@@ -745,6 +859,38 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         return candidates;
     }
 
+    private static List<TvSeasonCandidate> SortCandidatesForPartOffset(IReadOnlyList<TvSeasonCandidate> candidates)
+    {
+        return candidates
+            .OrderBy(x => x.SourceConnectionId)
+            .ThenBy(x => NormalizeDirectoryForCompare(GetDirectoryPath(x.DirectoryPath)), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.SeasonNumber)
+            .ThenBy(GetCandidatePartSortKey)
+            .ThenBy(x => x.DirectoryPath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static int GetCandidatePartSortKey(TvSeasonCandidate candidate)
+    {
+        var parsedPart = candidate.Files
+            .Concat(candidate.UnsupportedFiles)
+            .Select(x => x.ParseResult.PartHint)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .DefaultIfEmpty()
+            .Min();
+        if (parsedPart > 0)
+        {
+            return parsedPart;
+        }
+
+        var directoryPart = DirectoryPartTokenRegex.Match(candidate.DirectoryPath);
+        return directoryPart.Success
+               && int.TryParse(directoryPart.Groups["part"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var partNumber)
+            ? partNumber
+            : 1;
+    }
+
     private static IReadOnlyList<TvSeasonCandidate> BuildCandidatesForDirectory(
         string directoryPath,
         IReadOnlyList<CandidateMediaFile> files,
@@ -812,7 +958,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         foreach (var parsedFile in parsedFiles)
         {
             ScanIdentificationDiagnostics.Write(
-                $"event=tv-parse directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} folder={ScanIdentificationDiagnostics.FormatValue(folderName)} fileId={parsedFile.MediaFileId} file={ScanIdentificationDiagnostics.FormatFileName(parsedFile.FileName)} directoryRange={(directoryAnalysis?.IsStrongTvFile(parsedFile.MediaFileId) == true).ToString().ToLowerInvariant()} directoryHintSource={ScanIdentificationDiagnostics.FormatValue(directoryAnalysis?.GetHint(parsedFile.MediaFileId)?.Source)} strongContext={strongDirectoryContext.ToString().ToLowerInvariant()} movieFallbackRisk={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)} match={(parsedFile.ParseResult.IsEpisodeLike ? "yes" : "no")} kind={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.MatchKind)} season={parsedFile.SeasonNumber} episode={parsedFile.ParseResult.EpisodeNumber} seasonContextOnly={parsedFile.ParseResult.IsSeasonContextOnly.ToString().ToLowerInvariant()} multi={parsedFile.ParseResult.IsMultiEpisode.ToString().ToLowerInvariant()} multiEpisodeFalsePositiveAvoided={parsedFile.ParseResult.MultiEpisodeFalsePositiveAvoided.ToString().ToLowerInvariant()} verifiedTitleNumberSequenceContext={parsedFile.ParseResult.VerifiedTitleNumberSequenceContext.ToString().ToLowerInvariant()} seriesCandidate={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.SeriesNameCandidate)} episodeTitle={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.EpisodeTitleCandidate)}");
+                $"event=tv-parse directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} folder={ScanIdentificationDiagnostics.FormatValue(folderName)} fileId={parsedFile.MediaFileId} file={ScanIdentificationDiagnostics.FormatFileName(parsedFile.FileName)} directoryRange={(directoryAnalysis?.IsStrongTvFile(parsedFile.MediaFileId) == true).ToString().ToLowerInvariant()} directoryHintSource={ScanIdentificationDiagnostics.FormatValue(directoryAnalysis?.GetHint(parsedFile.MediaFileId)?.Source)} strongContext={strongDirectoryContext.ToString().ToLowerInvariant()} movieFallbackRisk={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)} match={(parsedFile.ParseResult.IsEpisodeLike ? "yes" : "no")} kind={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.MatchKind)} season={parsedFile.SeasonNumber} episode={parsedFile.ParseResult.EpisodeNumber} seasonContextOnly={parsedFile.ParseResult.IsSeasonContextOnly.ToString().ToLowerInvariant()} multi={parsedFile.ParseResult.IsMultiEpisode.ToString().ToLowerInvariant()} multiEpisodeFalsePositiveAvoided={parsedFile.ParseResult.MultiEpisodeFalsePositiveAvoided.ToString().ToLowerInvariant()} verifiedTitleNumberSequenceContext={parsedFile.ParseResult.VerifiedTitleNumberSequenceContext.ToString().ToLowerInvariant()} partHintDetected={parsedFile.ParseResult.PartHintDetected.ToString().ToLowerInvariant()} seasonHint={ScanIdentificationDiagnostics.FormatNullable(parsedFile.ParseResult.SeasonNumber)} partHint={ScanIdentificationDiagnostics.FormatNullable(parsedFile.ParseResult.PartHint)} episodeInPart={ScanIdentificationDiagnostics.FormatNullable(parsedFile.ParseResult.EpisodeInPart)} episodeOffsetApplied={parsedFile.ParseResult.EpisodeOffsetApplied.ToString().ToLowerInvariant()} episodeOffset={ScanIdentificationDiagnostics.FormatNullable(parsedFile.ParseResult.EpisodeOffset)} episodeOffsetSource={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.EpisodeOffsetSource)} episodeOffsetSkippedReason={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.EpisodeOffsetSkippedReason)} seriesCandidate={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.SeriesNameCandidate)} episodeTitle={ScanIdentificationDiagnostics.FormatValue(parsedFile.ParseResult.EpisodeTitleCandidate)}");
         }
 
         var unsupportedFiles = parsedFiles
@@ -851,18 +997,23 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
         if (validEpisodeFiles.Count == 0 && directoryContext.BlocksMovieFallback)
         {
+            var rejectedSeasonNumber = ResolveRejectedSeasonNumber(folderSeasonNumber, parsedFiles);
+            var partOffsetSearchFiles = parsedFiles.Where(IsPartOffsetCandidate).ToList();
+            var failedQuerySourceFiles = partOffsetSearchFiles.Count > 0
+                ? partOffsetSearchFiles
+                : validEpisodeFiles;
             ScanIdentificationDiagnostics.Write(
-                $"event=tv-directory-rejected directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} folder={ScanIdentificationDiagnostics.FormatValue(folderName)} folderSeason={ScanIdentificationDiagnostics.FormatNullable(folderSeasonNumber)} files={files.Count} validEpisodeFiles=0 unsupported={unsupportedFiles.Count} reason=tv-risk-parser-failed rejectReason=tv-context-no-movie-fallback strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)} movieFallbackRisk=true finalDecision=ai-candidate");
-            var failedSearchQueries = BuildSearchQueries(directoryPath, folderName, validEpisodeFiles, directoryAnalysis);
+                $"event=tv-directory-rejected directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} folder={ScanIdentificationDiagnostics.FormatValue(folderName)} folderSeason={ScanIdentificationDiagnostics.FormatNullable(folderSeasonNumber)} files={files.Count} validEpisodeFiles=0 unsupported={unsupportedFiles.Count} reason=tv-risk-parser-failed rejectReason=tv-context-no-movie-fallback strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)} movieFallbackRisk=true partOffsetCandidateFiles={partOffsetSearchFiles.Count} finalDecision=ai-candidate");
+            var failedSearchQueries = BuildSearchQueries(directoryPath, folderName, failedQuerySourceFiles, directoryAnalysis);
             return [
                 new TvSeasonCandidate
                 {
                     SourceConnectionId = files[0].SourceConnectionId,
                     DirectoryPath = directoryPath,
                     FolderName = folderName,
-                    CandidateName = BuildCandidateName(directoryPath, folderName, validEpisodeFiles, directoryAnalysis),
-                    CommonPrefix = BuildCommonPrefix(validEpisodeFiles),
-                    SeasonNumber = folderSeasonNumber ?? 1,
+                    CandidateName = BuildCandidateName(directoryPath, folderName, failedQuerySourceFiles, directoryAnalysis),
+                    CommonPrefix = BuildCommonPrefix(failedQuerySourceFiles),
+                    SeasonNumber = rejectedSeasonNumber,
                     SearchQueries = failedSearchQueries.Usable,
                     RejectedSearchQueries = failedSearchQueries.Rejected,
                     NoisySearchQueries = failedSearchQueries.Noisy,
@@ -1056,6 +1207,538 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static bool HasPartOffsetCandidates(TvSeasonCandidate candidate)
+    {
+        return candidate.UnsupportedFiles.Any(IsPartOffsetCandidate);
+    }
+
+    private static IReadOnlyList<TvSeasonCandidateFile> GetPartOffsetCandidateFiles(TvSeasonCandidate candidate)
+    {
+        return candidate.UnsupportedFiles
+            .Where(IsPartOffsetCandidate)
+            .OrderBy(x => x.ParseResult.PartHint)
+            .ThenBy(x => x.ParseResult.EpisodeInPart)
+            .ToArray();
+    }
+
+    private static TvSearchQuery? GetAiRefinedPartQuery(TvSeasonCandidate candidate)
+    {
+        return candidate.SearchQueries
+            .Where(x => IsAiRefinedTitleQuery(x.Source))
+            .OrderBy(x => x.Priority)
+            .FirstOrDefault();
+    }
+
+    private static string GetPartOffsetNotEvaluatedReason(
+        TvSeasonCandidate candidate,
+        TvSearchCandidate? bestCandidate)
+    {
+        var aiRefinedQuery = GetAiRefinedPartQuery(candidate);
+        if (aiRefinedQuery is null)
+        {
+            return "no-ai-refined-title-on-part-candidate";
+        }
+
+        if (bestCandidate is null)
+        {
+            return "ai-refined-series-search-no-result";
+        }
+
+        return IsAiRefinedTitleQuery(bestCandidate.QuerySource)
+            ? "unsafe-context"
+            : "ai-refined-series-not-safe";
+    }
+
+    private static void LogPartOffsetCandidateReadiness(TvSeasonCandidate candidate)
+    {
+        var partFiles = GetPartOffsetCandidateFiles(candidate);
+        var aiRefinedQuery = GetAiRefinedPartQuery(candidate);
+        var partHints = string.Join(
+            '|',
+            partFiles
+                .Select(x => x.ParseResult.PartHint)
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .OrderBy(x => x));
+        var episodeInPartStart = partFiles
+            .Select(x => x.ParseResult.EpisodeInPart)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .DefaultIfEmpty(0)
+            .Min();
+        var episodeInPartEnd = partFiles
+            .Select(x => x.ParseResult.EpisodeInPart)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .DefaultIfEmpty(0)
+            .Max();
+        var episodeRange = episodeInPartStart > 0 && episodeInPartEnd > 0
+            ? FormatNumberRange(episodeInPartStart, episodeInPartEnd)
+            : string.Empty;
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=tv-part-offset-candidate directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} partHintDetected=true seasonHint={candidate.SeasonNumber} partHint={ScanIdentificationDiagnostics.FormatValue(partHints)} episodeInPart={ScanIdentificationDiagnostics.FormatValue(episodeRange)} aiRefinedTitleAvailable={(aiRefinedQuery is not null).ToString().ToLowerInvariant()} aiRefinedSeriesLookupAttempted={(aiRefinedQuery is not null).ToString().ToLowerInvariant()} aiRefinedSeriesLookupQuery={ScanIdentificationDiagnostics.FormatValue(aiRefinedQuery?.Value)} aiRefinedSeriesLookupSucceeded=false partOffsetEvaluationStarted=false episodeOffsetApplied=false episodeOffsetSkippedReason=pending");
+    }
+
+    private static void LogPartOffsetNotEvaluated(
+        TvSeasonCandidate candidate,
+        string skippedReason,
+        TvSearchCandidate? bestCandidate)
+    {
+        var partFiles = GetPartOffsetCandidateFiles(candidate);
+        var aiRefinedQuery = GetAiRefinedPartQuery(candidate);
+        var partHints = string.Join(
+            '|',
+            partFiles
+                .Select(x => x.ParseResult.PartHint)
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .OrderBy(x => x));
+        var episodeInPartStart = partFiles
+            .Select(x => x.ParseResult.EpisodeInPart)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .DefaultIfEmpty(0)
+            .Min();
+        var episodeInPartEnd = partFiles
+            .Select(x => x.ParseResult.EpisodeInPart)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .DefaultIfEmpty(0)
+            .Max();
+        var episodeRange = episodeInPartStart > 0 && episodeInPartEnd > 0
+            ? FormatNumberRange(episodeInPartStart, episodeInPartEnd)
+            : string.Empty;
+        var aiRefinedLookupSucceeded = bestCandidate is not null && IsAiRefinedTitleQuery(bestCandidate.QuerySource);
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=tv-part-offset-not-evaluated directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} candidate={ScanIdentificationDiagnostics.FormatValue(candidate.CandidateName)} season={candidate.SeasonNumber} partHintDetected=true seasonHint={candidate.SeasonNumber} partHint={ScanIdentificationDiagnostics.FormatValue(partHints)} episodeInPart={ScanIdentificationDiagnostics.FormatValue(episodeRange)} aiRefinedTitleAvailable={(aiRefinedQuery is not null).ToString().ToLowerInvariant()} aiRefinedSeriesLookupAttempted={(aiRefinedQuery is not null).ToString().ToLowerInvariant()} aiRefinedSeriesLookupQuery={ScanIdentificationDiagnostics.FormatValue(aiRefinedQuery?.Value)} aiRefinedSeriesLookupSucceeded={aiRefinedLookupSucceeded.ToString().ToLowerInvariant()} partOffsetEvaluationStarted=false episodeOffsetApplied=false episodeOffsetSkippedReason={ScanIdentificationDiagnostics.FormatValue(skippedReason)}");
+    }
+
+    private static bool IsPartOffsetCandidate(TvSeasonCandidateFile candidateFile)
+    {
+        return candidateFile.ParseResult.PartHintDetected
+               && candidateFile.ParseResult.PartHint is > 1
+               && candidateFile.ParseResult.EpisodeInPart is > 0
+               && candidateFile.ParseResult.SeasonNumber > 0
+               && !candidateFile.ParseResult.IsMultiEpisode
+               && !candidateFile.ParseResult.IsEpisodeLike;
+    }
+
+    private static bool IsSafelyBoundSeasonStatus(IdentificationStatus status)
+    {
+        return status is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed;
+    }
+
+    private static async Task<PartOffsetApplicationResult> ApplySafeSiblingPartOffsetsAsync(
+        TvSeasonCandidate candidate,
+        int tmdbSeriesId,
+        TmdbTvSeasonDetailResult? seasonDetails,
+        CancellationToken cancellationToken)
+    {
+        var partGroups = candidate.UnsupportedFiles
+            .Where(IsPartOffsetCandidate)
+            .GroupBy(x => x.ParseResult.PartHint!.Value)
+            .OrderBy(x => x.Key)
+            .ToList();
+        if (partGroups.Count == 0)
+        {
+            return PartOffsetApplicationResult.NotEvaluated("no-part-offset-candidates");
+        }
+
+        var tmdbSeasonEpisodeCount = GetTmdbSeasonEpisodeCount(seasonDetails);
+        var tmdbEpisodeNumbers = GetTmdbSeasonEpisodeNumbers(seasonDetails);
+        if (!tmdbSeasonEpisodeCount.HasValue)
+        {
+            LogPartOffsetSkipped(candidate, partGroups, tmdbSeriesId, "tmdb-episode-count-unavailable", null, null, null, null, false, false, "none");
+            MarkPartOffsetSkipped(partGroups.SelectMany(x => x), "tmdb-episode-count-unavailable");
+            return PartOffsetApplicationResult.EvaluatedWithSkip("tmdb-episode-count-unavailable");
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var currentMediaFileIds = candidate.Files
+            .Concat(candidate.UnsupportedFiles)
+            .Select(x => x.MediaFileId)
+            .ToHashSet();
+        var tvSeason = await dbContext.TvSeasons
+            .Include(x => x.Series)
+            .Include(x => x.Episodes)
+            .ThenInclude(x => x.MediaFiles)
+            .FirstOrDefaultAsync(
+                x => x.Series != null
+                     && x.Series.TmdbSeriesId == tmdbSeriesId
+                     && x.SeasonNumber == candidate.SeasonNumber,
+                cancellationToken);
+
+        var tvSeasonIsSafe = tvSeason is not null && IsSafelyBoundSeasonStatus(tvSeason.IdentificationStatus);
+        var databaseEpisodeNumbers = tvSeasonIsSafe
+            ? tvSeason!.Episodes
+                .Where(
+                    episode => episode.EpisodeNumber > 0
+                               && episode.MediaFiles.Any(
+                                   mediaFile => IsUsableSiblingBoundMediaFile(
+                                       mediaFile,
+                                       currentMediaFileIds,
+                                       candidate.SourceConnectionId,
+                                       candidate.DirectoryPath)))
+                .Select(x => x.EpisodeNumber)
+                .Distinct()
+                .ToList()
+            : [];
+        var currentScanEpisodeNumbers = candidate.Files
+            .Where(
+                file => file.ParseResult.IsEpisodeLike
+                        && !file.ParseResult.IsMultiEpisode
+                        && file.ParseResult.EpisodeNumber > 0
+                        && Math.Max(1, file.SeasonNumber) == candidate.SeasonNumber)
+            .Select(x => x.ParseResult.EpisodeNumber)
+            .Distinct()
+            .ToList();
+        var contextSource = GetPartOffsetContextSource(databaseEpisodeNumbers.Count > 0, currentScanEpisodeNumbers.Count > 0);
+        var siblingBoundEpisodeNumbers = databaseEpisodeNumbers
+            .Concat(currentScanEpisodeNumbers)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+        if (tvSeason is not null && !tvSeasonIsSafe && currentScanEpisodeNumbers.Count == 0)
+        {
+            LogPartOffsetSkipped(candidate, partGroups, tmdbSeriesId, "previous-part-not-bound", tmdbSeasonEpisodeCount, null, null, null, false, false, contextSource);
+            MarkPartOffsetSkipped(partGroups.SelectMany(x => x), "previous-part-not-bound");
+            return PartOffsetApplicationResult.EvaluatedWithSkip("previous-part-not-bound");
+        }
+
+        var occupiedEpisodes = tvSeason?.Episodes
+            .Where(
+                episode => episode.EpisodeNumber > 0
+                           && episode.MediaFiles.Any(
+                               mediaFile => !currentMediaFileIds.Contains(mediaFile.Id)
+                                            && !mediaFile.IsDeleted))
+            .Select(x => x.EpisodeNumber)
+            .ToHashSet() ?? [];
+        var appliedCount = 0;
+        var lastSkippedReason = string.Empty;
+
+        foreach (var partGroup in partGroups)
+        {
+            var partNumber = partGroup.Key;
+            var files = partGroup.OrderBy(x => x.ParseResult.EpisodeInPart!.Value).ToList();
+            var episodeInPartNumbers = files.Select(x => x.ParseResult.EpisodeInPart!.Value).ToArray();
+            var contiguousEnd = GetContiguousEndFromOne(siblingBoundEpisodeNumbers);
+            var evaluationReason = GetPartOffsetSkipReason(
+                candidate,
+                partNumber,
+                episodeInPartNumbers,
+                contiguousEnd,
+                tmdbSeasonEpisodeCount.Value,
+                tmdbEpisodeNumbers,
+                occupiedEpisodes,
+                out var mappedStart,
+                out var mappedEnd,
+                out var targetConflict);
+            if (!string.IsNullOrWhiteSpace(evaluationReason))
+            {
+                lastSkippedReason = evaluationReason;
+                MarkPartOffsetSkipped(files, evaluationReason);
+                LogPartOffsetEvaluation(
+                    candidate,
+                    partNumber,
+                    episodeInPartNumbers,
+                    tmdbSeriesId,
+                    tmdbSeasonEpisodeCount.Value,
+                    contiguousEnd,
+                    applied: false,
+                    offset: null,
+                    mappedStart: mappedStart,
+                    mappedEnd: mappedEnd,
+                    skippedReason: evaluationReason,
+                    targetConflict: targetConflict,
+                    seriesMismatch: false,
+                    contextSource: contextSource);
+                continue;
+            }
+
+            foreach (var candidateFile in files)
+            {
+                var mappedEpisodeNumber = candidateFile.ParseResult.EpisodeInPart!.Value + contiguousEnd;
+                candidateFile.ParseResult.IsEpisodeLike = true;
+                candidateFile.ParseResult.IsSeasonContextOnly = false;
+                candidateFile.ParseResult.SeasonNumber = candidate.SeasonNumber;
+                candidateFile.ParseResult.EpisodeNumber = mappedEpisodeNumber;
+                candidateFile.ParseResult.EpisodeOffsetApplied = true;
+                candidateFile.ParseResult.EpisodeOffset = contiguousEnd;
+                candidateFile.ParseResult.EpisodeOffsetSource = "sibling-part-continuation";
+                candidateFile.ParseResult.EpisodeOffsetSkippedReason = string.Empty;
+                candidateFile.ParseResult.MatchKind = $"{candidateFile.ParseResult.MatchKind}:offset";
+                candidateFile.SeasonNumber = candidate.SeasonNumber;
+                candidate.Files.Add(candidateFile);
+                siblingBoundEpisodeNumbers.Add(mappedEpisodeNumber);
+                occupiedEpisodes.Add(mappedEpisodeNumber);
+                appliedCount++;
+            }
+
+            candidate.UnsupportedFiles.RemoveAll(x => files.Any(y => y.MediaFileId == x.MediaFileId));
+            LogPartOffsetEvaluation(
+                candidate,
+                partNumber,
+                episodeInPartNumbers,
+                tmdbSeriesId,
+                tmdbSeasonEpisodeCount.Value,
+                contiguousEnd,
+                applied: true,
+                offset: contiguousEnd,
+                mappedStart: mappedStart,
+                mappedEnd: mappedEnd,
+                skippedReason: string.Empty,
+                targetConflict: false,
+                seriesMismatch: false,
+                contextSource: contextSource);
+        }
+
+        return appliedCount > 0
+            ? new PartOffsetApplicationResult(true, true, appliedCount, string.Empty)
+            : PartOffsetApplicationResult.EvaluatedWithSkip(FirstNonEmpty(lastSkippedReason, "unsafe-context"));
+    }
+
+    private static int? GetTmdbSeasonEpisodeCount(TmdbTvSeasonDetailResult? seasonDetails)
+    {
+        if (seasonDetails?.EpisodeCount is > 0)
+        {
+            return seasonDetails.EpisodeCount;
+        }
+
+        var maxEpisodeNumber = seasonDetails?.Episodes
+            .Where(x => x.EpisodeNumber > 0)
+            .Select(x => x.EpisodeNumber)
+            .DefaultIfEmpty(0)
+            .Max();
+        return maxEpisodeNumber is > 0 ? maxEpisodeNumber : null;
+    }
+
+    private static HashSet<int> GetTmdbSeasonEpisodeNumbers(TmdbTvSeasonDetailResult? seasonDetails)
+    {
+        return seasonDetails?.Episodes
+            .Where(x => x.EpisodeNumber > 0)
+            .Select(x => x.EpisodeNumber)
+            .ToHashSet() ?? [];
+    }
+
+    private static string GetPartOffsetContextSource(bool hasDatabaseEvidence, bool hasCurrentScanEvidence)
+    {
+        return hasDatabaseEvidence && hasCurrentScanEvidence
+            ? "mixed"
+            : hasDatabaseEvidence
+                ? "database-bound-episodes"
+                : hasCurrentScanEvidence
+                    ? "current-scan"
+                    : "none";
+    }
+
+    private static string GetPartOffsetSkipReason(
+        TvSeasonCandidate candidate,
+        int partNumber,
+        IReadOnlyList<int> episodeInPartNumbers,
+        int previousPartEndEpisode,
+        int tmdbSeasonEpisodeCount,
+        IReadOnlySet<int> tmdbEpisodeNumbers,
+        IReadOnlySet<int> occupiedEpisodes,
+        out int? mappedStart,
+        out int? mappedEnd,
+        out bool targetConflict)
+    {
+        mappedStart = null;
+        mappedEnd = null;
+        targetConflict = false;
+        if (candidate.SeasonNumber <= 0)
+        {
+            return "missing-season-hint";
+        }
+
+        if (partNumber < 2)
+        {
+            return "missing-part-hint";
+        }
+
+        if (episodeInPartNumbers.Count == 0 || episodeInPartNumbers[0] != 1)
+        {
+            return "unsafe-context";
+        }
+
+        if (episodeInPartNumbers.Distinct().Count() != episodeInPartNumbers.Count
+            || !IsStrictContiguous(episodeInPartNumbers))
+        {
+            return "previous-part-not-contiguous";
+        }
+
+        if (previousPartEndEpisode <= 0)
+        {
+            return "missing-previous-range";
+        }
+
+        if (partNumber > 2 && previousPartEndEpisode < (partNumber - 1) * episodeInPartNumbers.Count)
+        {
+            return "missing-previous-range";
+        }
+
+        mappedStart = episodeInPartNumbers[0] + previousPartEndEpisode;
+        mappedEnd = episodeInPartNumbers[^1] + previousPartEndEpisode;
+        if (mappedEnd.Value > tmdbSeasonEpisodeCount)
+        {
+            return "tmdb-episode-count-insufficient";
+        }
+
+        var mappedNumbers = Enumerable.Range(mappedStart.Value, mappedEnd.Value - mappedStart.Value + 1).ToArray();
+        if (tmdbEpisodeNumbers.Count == 0 || mappedNumbers.Any(x => !tmdbEpisodeNumbers.Contains(x)))
+        {
+            return "target-episode-missing";
+        }
+
+        targetConflict = mappedNumbers.Any(occupiedEpisodes.Contains);
+        return targetConflict ? "target-episode-conflict" : string.Empty;
+    }
+
+    private static bool IsStrictContiguous(IReadOnlyList<int> numbers)
+    {
+        for (var index = 1; index < numbers.Count; index++)
+        {
+            if (numbers[index] != numbers[index - 1] + 1)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int GetContiguousEndFromOne(IEnumerable<int> numbers)
+    {
+        var set = numbers.Where(x => x > 0).ToHashSet();
+        var current = 0;
+        while (set.Contains(current + 1))
+        {
+            current++;
+        }
+
+        return current;
+    }
+
+    private static bool IsUsableSiblingBoundMediaFile(
+        MediaFile mediaFile,
+        IReadOnlySet<int> currentMediaFileIds,
+        int sourceConnectionId,
+        string candidateDirectoryPath)
+    {
+        return mediaFile.SourceConnectionId == sourceConnectionId
+               && mediaFile.MediaType == MediaType.Video
+               && !mediaFile.IsDeleted
+               && !currentMediaFileIds.Contains(mediaFile.Id)
+               && IsSameOrSiblingDirectory(candidateDirectoryPath, mediaFile.FilePath);
+    }
+
+    private static bool IsSameOrSiblingDirectory(string candidateDirectoryPath, string filePath)
+    {
+        var candidateDirectory = NormalizeDirectoryForCompare(candidateDirectoryPath);
+        var fileDirectory = NormalizeDirectoryForCompare(GetDirectoryPath(filePath));
+        if (string.Equals(candidateDirectory, fileDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var candidateParent = NormalizeDirectoryForCompare(GetDirectoryPath(candidateDirectoryPath));
+        var fileParent = NormalizeDirectoryForCompare(GetDirectoryPath(fileDirectory));
+        return !string.IsNullOrWhiteSpace(candidateParent)
+               && !string.Equals(candidateParent, "/", StringComparison.Ordinal)
+               && string.Equals(candidateParent, fileParent, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeDirectoryForCompare(string value)
+    {
+        return value.Replace('\\', '/').TrimEnd('/').ToUpperInvariant();
+    }
+
+    private static void MarkPartOffsetSkipped(IEnumerable<TvSeasonCandidateFile> files, string reason)
+    {
+        foreach (var file in files)
+        {
+            file.ParseResult.EpisodeOffsetApplied = false;
+            file.ParseResult.EpisodeOffset = null;
+            file.ParseResult.EpisodeOffsetSource = string.Empty;
+            file.ParseResult.EpisodeOffsetSkippedReason = reason;
+        }
+    }
+
+    private static void LogPartOffsetSkipped(
+        TvSeasonCandidate candidate,
+        IReadOnlyList<IGrouping<int, TvSeasonCandidateFile>> partGroups,
+        int tmdbSeriesId,
+        string skippedReason,
+        int? tmdbSeasonEpisodeCount,
+        int? previousPartEndEpisode,
+        int? mappedStart,
+        int? mappedEnd,
+        bool targetConflict,
+        bool seriesMismatch,
+        string contextSource)
+    {
+        foreach (var partGroup in partGroups)
+        {
+            LogPartOffsetEvaluation(
+                candidate,
+                partGroup.Key,
+                partGroup.Select(x => x.ParseResult.EpisodeInPart!.Value).OrderBy(x => x).ToArray(),
+                tmdbSeriesId,
+                tmdbSeasonEpisodeCount,
+                previousPartEndEpisode,
+                applied: false,
+                offset: null,
+                mappedStart: mappedStart,
+                mappedEnd: mappedEnd,
+                skippedReason: skippedReason,
+                targetConflict: targetConflict,
+                seriesMismatch: seriesMismatch,
+                contextSource: contextSource);
+        }
+    }
+
+    private static void LogPartOffsetEvaluation(
+        TvSeasonCandidate candidate,
+        int partNumber,
+        IReadOnlyList<int> episodeInPartNumbers,
+        int tmdbSeriesId,
+        int? tmdbSeasonEpisodeCount,
+        int? previousPartEndEpisode,
+        bool applied,
+        int? offset,
+        int? mappedStart,
+        int? mappedEnd,
+        string skippedReason,
+        bool targetConflict,
+        bool seriesMismatch,
+        string contextSource)
+    {
+        var episodeInPartStart = episodeInPartNumbers.Count > 0 ? episodeInPartNumbers[0] : (int?)null;
+        var episodeInPartEnd = episodeInPartNumbers.Count > 0 ? episodeInPartNumbers[^1] : (int?)null;
+        var mappedEpisodeNumber = mappedStart.HasValue && mappedEnd.HasValue
+            ? mappedStart == mappedEnd ? mappedStart.Value.ToString(CultureInfo.InvariantCulture) : $"{mappedStart}-{mappedEnd}"
+            : string.Empty;
+        ScanIdentificationDiagnostics.Write(
+            $"event=tv-part-offset-evaluation directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} partOffsetEvaluationStarted=true partOffsetContextSource={ScanIdentificationDiagnostics.FormatValue(contextSource)} partOffsetSeriesConfirmed={(tmdbSeriesId > 0).ToString().ToLowerInvariant()} partOffsetSeasonConfirmed={(candidate.SeasonNumber > 0 && tmdbSeasonEpisodeCount.HasValue).ToString().ToLowerInvariant()} previousRangeFound={(previousPartEndEpisode is > 0).ToString().ToLowerInvariant()} previousPartFound={(previousPartEndEpisode is > 0).ToString().ToLowerInvariant()} previousRangeStartEpisode={ScanIdentificationDiagnostics.FormatNullable(previousPartEndEpisode is > 0 ? 1 : null)} previousRangeEndEpisode={ScanIdentificationDiagnostics.FormatNullable(previousPartEndEpisode)} previousRangeEpisodeCount={ScanIdentificationDiagnostics.FormatNullable(previousPartEndEpisode)} previousRangeContiguous={(previousPartEndEpisode is > 0).ToString().ToLowerInvariant()} previousPartEndEpisode={ScanIdentificationDiagnostics.FormatNullable(previousPartEndEpisode)} previousPartBoundSeriesId={tmdbSeriesId} previousPartBoundSeasonNumber={candidate.SeasonNumber} partHint={partNumber} episodeInPart={ScanIdentificationDiagnostics.FormatValue(FormatNumberRange(episodeInPartStart, episodeInPartEnd))} episodeOffsetApplied={applied.ToString().ToLowerInvariant()} episodeOffset={ScanIdentificationDiagnostics.FormatNullable(offset)} episodeOffsetSource={ScanIdentificationDiagnostics.FormatValue(applied ? "sibling-part-continuation" : string.Empty)} mappedEpisodeNumber={ScanIdentificationDiagnostics.FormatValue(mappedEpisodeNumber)} tmdbSeasonEpisodeCount={ScanIdentificationDiagnostics.FormatNullable(tmdbSeasonEpisodeCount)} episodeOffsetSkippedReason={ScanIdentificationDiagnostics.FormatValue(skippedReason)} targetEpisodeConflict={targetConflict.ToString().ToLowerInvariant()} partOffsetTargetConflict={targetConflict.ToString().ToLowerInvariant()} seriesMismatch={seriesMismatch.ToString().ToLowerInvariant()} seasonMismatch=false partOffsetSeriesMismatch={seriesMismatch.ToString().ToLowerInvariant()}");
+    }
+
+    private static string FormatNumberRange(int? start, int? end)
+    {
+        if (!start.HasValue || !end.HasValue)
+        {
+            return string.Empty;
+        }
+
+        return start == end
+            ? start.Value.ToString(CultureInfo.InvariantCulture)
+            : $"{start.Value}-{end.Value}";
     }
 
     private static async Task<TvSeries> UpsertSeriesAsync(
@@ -1266,6 +1949,23 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 folderName);
     }
 
+    private static int ResolveRejectedSeasonNumber(
+        int? folderSeasonNumber,
+        IReadOnlyList<TvSeasonCandidateFile> parsedFiles)
+    {
+        if (folderSeasonNumber is > 0)
+        {
+            return folderSeasonNumber.Value;
+        }
+
+        var partSeasonNumbers = parsedFiles
+            .Where(x => x.ParseResult.PartHintDetected && x.ParseResult.SeasonNumber > 0)
+            .Select(x => x.ParseResult.SeasonNumber)
+            .Distinct()
+            .ToArray();
+        return partSeasonNumbers.Length == 1 ? partSeasonNumbers[0] : 1;
+    }
+
     private static TvSearchQuerySet BuildSearchQueries(
         string directoryPath,
         string folderName,
@@ -1283,7 +1983,8 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     var rejectReason = TvEpisodeFileNameParser.GetSeriesSearchQueryRejectReason(query.Value);
                     if (!string.IsNullOrWhiteSpace(rejectReason))
                     {
-                        if (IsAiRefinedTitleQuery(query.Source))
+                        if (IsAiRefinedTitleQuery(query.Source)
+                            && !string.Equals(rejectReason, "structural-part-query", StringComparison.OrdinalIgnoreCase))
                         {
                             ScanIdentificationDiagnostics.Write(
                                 $"event=tv-query-ai-refined-reject-bypassed directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} query={ScanIdentificationDiagnostics.FormatValue(query.Value)} querySource={ScanIdentificationDiagnostics.FormatValue(query.Source)} badQueryRejectReason={ScanIdentificationDiagnostics.FormatValue(rejectReason)} aiRefinedLookupAttempted=true");
@@ -1322,6 +2023,19 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 $"event=tv-query-rejected directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} query={ScanIdentificationDiagnostics.FormatValue(rejectedQuery.Value)} querySource={ScanIdentificationDiagnostics.FormatValue(rejectedQuery.Source)} queryQuality={ScanIdentificationDiagnostics.FormatValue(rejectedQuery.Quality)} badQueryRejectReason={ScanIdentificationDiagnostics.FormatValue(rejectedQuery.RejectReason)}");
         }
 
+        var structuralPartRejected = rejected
+            .Concat(noisy)
+            .Where(x => string.Equals(x.RejectReason, "structural-part-query", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(x => $"{x.Source}:{x.Value}", StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.First())
+            .ToList();
+        if (structuralPartRejected.Count > 0)
+        {
+            var samples = string.Join('|', structuralPartRejected.Take(5).Select(x => x.Value));
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-structural-part-query-rejected directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} rejectedStructuralPartQueryCount={structuralPartRejected.Count} sampleQueries={ScanIdentificationDiagnostics.FormatValue(samples)}");
+        }
+
         return new TvSearchQuerySet(
             queries,
             noisy
@@ -1355,23 +2069,40 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         var values = new List<TvSearchQuery>();
         foreach (var hint in files
                      .Select(x => directoryAnalysis?.GetHint(x.MediaFileId))
-                     .Where(x => !string.IsNullOrWhiteSpace(x?.SeriesTitleHint)))
+                     .Where(x => !string.IsNullOrWhiteSpace(FirstNonEmpty(
+                         x?.SeriesTitleHint,
+                         x?.OriginalLanguageTitle,
+                         x?.SearchTitle,
+                         x?.EnglishTitleHint,
+                         x?.LocalizedTitleHint))))
         {
             var source = IsAiRefinedTitleHintSource(hint!.Source)
                 ? "ai-refined-title"
                 : IsAiDirectoryHintSource(hint.Source)
                     ? "ai-title-hint"
                     : "directory-title-hint";
+            var queryTitle = IsAiRefinedTitleHintSource(hint.Source)
+                ? FirstNonEmpty(
+                    hint.OriginalLanguageTitle,
+                    hint.SearchTitle,
+                    hint.SeriesTitleHint,
+                    hint.EnglishTitleHint,
+                    hint.LocalizedTitleHint)
+                : hint.SeriesTitleHint;
             values.Add(new TvSearchQuery(
-                hint.SeriesTitleHint,
+                queryTitle,
                 source,
                 10,
                 LocalizedTitleHint: hint.LocalizedTitleHint,
                 OriginalTitleHint: hint.OriginalTitleHint,
                 OriginalLanguageTitle: hint.OriginalLanguageTitle,
                 EnglishTitleHint: hint.EnglishTitleHint,
-                SearchTitle: FirstNonEmpty(hint.SearchTitle, hint.SeriesTitleHint),
-                SearchTitleSource: FirstNonEmpty(hint.SearchTitleSource, "legacy-refined-title"),
+                SearchTitle: FirstNonEmpty(hint.SearchTitle, queryTitle, hint.SeriesTitleHint),
+                SearchTitleSource: FirstNonEmpty(
+                    hint.SearchTitleSource,
+                    IsAiRefinedTitleHintSource(hint.Source) && !string.IsNullOrWhiteSpace(hint.OriginalLanguageTitle)
+                        ? "original-language"
+                        : "legacy-refined-title"),
                 YearHint: hint.SeriesYearHint ?? hint.YearHint,
                 SeriesYearHint: hint.SeriesYearHint ?? hint.YearHint,
                 SeasonYearHint: hint.SeasonYearHint,
@@ -2064,5 +2795,22 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
     private sealed record AiRefinedYearGateResult(bool Checked, int? YearDiff, bool Blocked, string Reason)
     {
         public static AiRefinedYearGateResult NotChecked(string reason) => new(false, null, false, reason);
+    }
+
+    private sealed record PartOffsetApplicationResult(
+        bool Evaluated,
+        bool Applied,
+        int AppliedCount,
+        string SkippedReason)
+    {
+        public static PartOffsetApplicationResult NotEvaluated(string reason)
+        {
+            return new PartOffsetApplicationResult(false, false, 0, reason);
+        }
+
+        public static PartOffsetApplicationResult EvaluatedWithSkip(string reason)
+        {
+            return new PartOffsetApplicationResult(true, false, 0, reason);
+        }
     }
 }

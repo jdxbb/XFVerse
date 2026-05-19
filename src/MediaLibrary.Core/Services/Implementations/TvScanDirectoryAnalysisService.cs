@@ -21,9 +21,11 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
     private const int MaxAiChildFolderNamesPerDirectory = 8;
     private static readonly TimeSpan AiRangeTimeout = TimeSpan.FromSeconds(18);
     private const int MaxAiOnUncertainRanges = 80;
+    private const int MaxAiOnUncertainBatchCount = 3;
+    private const int MaxAiOnUncertainBatchAttempts = 2;
     private const int MaxAiOnUncertainSamplesPerRange = 5;
     private const int MaxAiOnUncertainQueriesPerRange = 5;
-    private static readonly TimeSpan AiOnUncertainTimeout = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan AiOnUncertainTimeout = TimeSpan.FromSeconds(300);
 
     private readonly IAiService _aiService;
 
@@ -132,12 +134,6 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             .ToList();
         var rangesWithFiles = inputRanges.Count(x => x.MediaFileIds.Count > 0);
         var rangesWithoutFiles = Math.Max(0, inputRanges.Count - rangesWithFiles);
-        var prompt = BuildAiOnUncertainPrompt(inputRanges);
-        var requestId = Guid.NewGuid().ToString("N")[..8];
-        var stopwatch = Stopwatch.StartNew();
-        var responseChars = 0;
-        var jsonParseSucceeded = false;
-        var promptTokenEstimate = EstimateTokenCount(prompt);
         var pathItems = files
             .OrderBy(x => x.FilePath, StringComparer.OrdinalIgnoreCase)
             .Select(x => new SanitizedPathItem(x.Id, x.FilePath, SanitizePathForPrompt(x.FilePath)))
@@ -145,14 +141,123 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         var pathItemsById = pathItems
             .GroupBy(x => x.Id)
             .ToDictionary(x => x.Key, x => x.First());
+        var batches = BuildAiOnUncertainBatches(inputRanges);
+        var totalInputChars = batches.Sum(x => x.Prompt.Length);
+        var totalTokenEstimate = batches.Sum(x => EstimateTokenCount(x.Prompt));
+        var totalStopwatch = Stopwatch.StartNew();
 
         ScanIdentificationDiagnostics.Write(
-            $"event=ai-on-uncertain-request-start requestId={requestId} aiOnUncertainAttempted=true aiOnUncertainCandidateRanges={inputRanges.Count} aiOnUncertainRangesWithFiles={rangesWithFiles} aiOnUncertainRangesWithoutFiles={rangesWithoutFiles} omittedCandidateRanges={Math.Max(0, analysis.AiCandidateRanges.Count - inputRanges.Count)} aiOnUncertainInputChars={prompt.Length} aiOnUncertainInputTokenEstimate={promptTokenEstimate} timeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} fullAiRangeAnalysis=disabled aiAutoApply=false schema=ai-original-language-title-v1");
+            $"event=ai-on-uncertain-batching-start aiOnUncertainBatchingEnabled=true aiOnUncertainAttempted=true aiOnUncertainCandidateRanges={inputRanges.Count} aiOnUncertainRangesWithFiles={rangesWithFiles} aiOnUncertainRangesWithoutFiles={rangesWithoutFiles} omittedCandidateRanges={Math.Max(0, analysis.AiCandidateRanges.Count - inputRanges.Count)} aiOnUncertainBatchCount={batches.Count} aiOnUncertainMaxBatchCount={MaxAiOnUncertainBatchCount} aiOnUncertainBatchTimeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} aiOnUncertainTotalInputChars={totalInputChars} aiOnUncertainInputChars={totalInputChars} aiOnUncertainInputTokenEstimate={totalTokenEstimate} fullAiRangeAnalysis=disabled aiAutoApply=false schema=ai-original-language-title-v1");
+
+        var batchTasks = batches
+            .Select(batch => ExecuteAiOnUncertainBatchWithRetryAsync(batch, cancellationToken))
+            .ToArray();
+        var batchResults = await Task.WhenAll(batchTasks);
+        totalStopwatch.Stop();
+
+        var runResult = new TvScanAiOnUncertainApplyResult();
+        var successfulBatchCount = 0;
+        var failedBatchCount = 0;
+        var failedRangeCount = 0;
+        var parsedHintsTotal = 0;
+        var appliedHintsTotal = 0;
+        var ignoredHintsTotal = 0;
+        var responseRangesTotal = 0;
+        var appliedByMediaFileIds = 0;
+        var appliedByPathFallback = 0;
+        var ignoredNoMediaFileIds = 0;
+        var ignoredNoFilesInRange = 0;
+        var skippedNoOriginalOrSearchTitle = 0;
+
+        foreach (var batchResult in batchResults.OrderBy(x => x.Batch.Index))
+        {
+            if (!batchResult.Succeeded || batchResult.Response is null)
+            {
+                failedBatchCount++;
+                failedRangeCount += batchResult.Batch.InputRanges.Count;
+                continue;
+            }
+
+            successfulBatchCount++;
+            responseRangesTotal += batchResult.Response.Ranges.Count;
+            var applyStats = ApplyAiOnUncertainBatchHints(
+                batchResult,
+                pathItems,
+                pathItemsById,
+                analysis,
+                runResult);
+            parsedHintsTotal += applyStats.ParsedHints;
+            appliedHintsTotal += applyStats.AppliedHints;
+            ignoredHintsTotal += applyStats.IgnoredHints;
+            appliedByMediaFileIds += applyStats.AppliedByMediaFileIds;
+            appliedByPathFallback += applyStats.AppliedByPathFallback;
+            ignoredNoMediaFileIds += applyStats.IgnoredNoMediaFileIds;
+            ignoredNoFilesInRange += applyStats.IgnoredNoFilesInRange;
+            skippedNoOriginalOrSearchTitle += applyStats.SkippedNoOriginalOrSearchTitle;
+        }
+
+        runResult.SuccessfulBatchCount = successfulBatchCount;
+        runResult.FailedBatchCount = failedBatchCount;
+        runResult.FailedRangeCount = failedRangeCount;
+        runResult.ParsedHints = parsedHintsTotal;
+        runResult.AppliedHints = appliedHintsTotal;
+        runResult.IgnoredHints = ignoredHintsTotal;
+
+        var partialSucceeded = successfulBatchCount > 0 && failedBatchCount > 0;
+        var succeeded = successfulBatchCount > 0;
+        ScanIdentificationDiagnostics.Write(
+            $"event=ai-on-uncertain-complete aiOnUncertainBatchingEnabled=true aiOnUncertainSucceeded={succeeded.ToString().ToLowerInvariant()} aiOnUncertainPartialSucceeded={partialSucceeded.ToString().ToLowerInvariant()} aiOnUncertainTotalDurationMs={totalStopwatch.ElapsedMilliseconds} aiOnUncertainDurationMs={totalStopwatch.ElapsedMilliseconds} aiOnUncertainCandidateRanges={inputRanges.Count} aiOnUncertainBatchCount={batches.Count} aiOnUncertainSuccessfulBatches={successfulBatchCount} aiOnUncertainFailedBatches={failedBatchCount} aiOnUncertainFailedRangeCount={failedRangeCount} aiOnUncertainResponseRanges={responseRangesTotal} aiOnUncertainParsedHintsTotal={parsedHintsTotal} aiOnUncertainParsedHints={parsedHintsTotal} aiOnUncertainAppliedHintsTotal={appliedHintsTotal} aiOnUncertainAppliedHints={appliedHintsTotal} aiOnUncertainIgnoredHintsTotal={ignoredHintsTotal} aiOnUncertainIgnoredHints={ignoredHintsTotal} aiOnUncertainRangesWithFiles={rangesWithFiles} aiOnUncertainRangesWithoutFiles={rangesWithoutFiles} aiOnUncertainAppliedByMediaFileIds={appliedByMediaFileIds} aiOnUncertainAppliedByPathFallback={appliedByPathFallback} aiOnUncertainIgnoredNoMediaFileIds={ignoredNoMediaFileIds} aiOnUncertainIgnoredNoFilesInRange={ignoredNoFilesInRange} skippedNoOriginalOrSearchTitle={skippedNoOriginalOrSearchTitle} aiOnUncertainAffectedMediaFiles={runResult.AffectedMediaFileIds.Count} aiAffectedMediaFiles={runResult.AffectedMediaFileIds.Count} aiHintApplied={(appliedHintsTotal > 0).ToString().ToLowerInvariant()} aiAutoApply=false fallback={(appliedHintsTotal > 0 ? "tmdb-validation-required" : "local-placeholders-preserved")}");
+        return runResult;
+    }
+
+    private async Task<AiOnUncertainBatchExecutionResult> ExecuteAiOnUncertainBatchWithRetryAsync(
+        AiOnUncertainBatch batch,
+        CancellationToken cancellationToken)
+    {
+        AiOnUncertainBatchExecutionResult? lastResult = null;
+        for (var attempt = 1; attempt <= MaxAiOnUncertainBatchAttempts; attempt++)
+        {
+            var result = await ExecuteAiOnUncertainBatchAttemptAsync(batch, attempt, cancellationToken);
+            result.RetryAttempted = attempt > 1;
+            if (result.Succeeded)
+            {
+                result.RetrySucceeded = attempt > 1;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=ai-on-uncertain-batch-complete requestId={result.RequestId} aiOnUncertainBatchIndex={batch.Index} aiOnUncertainBatchRangeCount={batch.InputRanges.Count} aiOnUncertainBatchSucceeded=true aiOnUncertainBatchParsedHints={result.ParsedHintCount} aiOnUncertainBatchRetryAttempted={result.RetryAttempted.ToString().ToLowerInvariant()} aiOnUncertainBatchRetrySucceeded={result.RetrySucceeded.ToString().ToLowerInvariant()} aiOnUncertainBatchFailedReason=(none)");
+                return result;
+            }
+
+            lastResult = result;
+            if (attempt < MaxAiOnUncertainBatchAttempts)
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=ai-on-uncertain-batch-retry requestId={result.RequestId} aiOnUncertainBatchIndex={batch.Index} aiOnUncertainBatchAttempt={attempt} aiOnUncertainBatchRetryAttempted=true aiOnUncertainBatchFailedReason={ScanIdentificationDiagnostics.FormatValue(result.FailureReason)}");
+            }
+        }
+
+        lastResult ??= AiOnUncertainBatchExecutionResult.Failure(batch, string.Empty, "unknown");
+        ScanIdentificationDiagnostics.Write(
+            $"event=ai-on-uncertain-batch-complete requestId={lastResult.RequestId} aiOnUncertainBatchIndex={batch.Index} aiOnUncertainBatchRangeCount={batch.InputRanges.Count} aiOnUncertainBatchSucceeded=false aiOnUncertainBatchParsedHints=0 aiOnUncertainBatchRetryAttempted={(MaxAiOnUncertainBatchAttempts > 1).ToString().ToLowerInvariant()} aiOnUncertainBatchRetrySucceeded=false aiOnUncertainBatchFailedReason={ScanIdentificationDiagnostics.FormatValue(lastResult.FailureReason)} fallback=local-placeholders-preserved");
+        return lastResult;
+    }
+
+    private async Task<AiOnUncertainBatchExecutionResult> ExecuteAiOnUncertainBatchAttemptAsync(
+        AiOnUncertainBatch batch,
+        int attempt,
+        CancellationToken cancellationToken)
+    {
+        var requestId = Guid.NewGuid().ToString("N")[..8];
+        var stopwatch = Stopwatch.StartNew();
+        var responseChars = 0;
+        var jsonParseSucceeded = false;
+        var groupKeys = string.Join('|', batch.GroupKeys.Take(8));
+        ScanIdentificationDiagnostics.Write(
+            $"event=ai-on-uncertain-request-start requestId={requestId} aiOnUncertainBatchingEnabled=true aiOnUncertainAttempted=true aiOnUncertainBatchIndex={batch.Index} aiOnUncertainBatchRangeCount={batch.InputRanges.Count} aiOnUncertainBatchInputChars={batch.Prompt.Length} aiOnUncertainBatchGroupKeys={ScanIdentificationDiagnostics.FormatValue(groupKeys)} aiOnUncertainBatchAttempt={attempt} timeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} aiOnUncertainBatchTimeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} fullAiRangeAnalysis=disabled aiAutoApply=false schema=ai-original-language-title-v1");
         try
         {
             var response = await _aiService.GenerateTextAsync(
                 "You review uncertain TV scan directory ranges. Return JSON hints only. Never return episodeFiles.",
-                prompt,
+                batch.Prompt,
                 new AiRequestOptions
                 {
                     Temperature = 0.1,
@@ -162,81 +267,15 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             stopwatch.Stop();
             responseChars = response?.Length ?? 0;
             ScanIdentificationDiagnostics.Write(
-                $"event=ai-on-uncertain-response requestId={requestId} aiOnUncertainDurationMs={stopwatch.ElapsedMilliseconds} responseChars={responseChars} assistantContentChars={responseChars} empty={string.IsNullOrWhiteSpace(response).ToString().ToLowerInvariant()} aiAutoApply=false schema=ai-original-language-title-v1");
+                $"event=ai-on-uncertain-response requestId={requestId} aiOnUncertainBatchIndex={batch.Index} aiOnUncertainBatchAttempt={attempt} aiOnUncertainBatchDurationMs={stopwatch.ElapsedMilliseconds} responseChars={responseChars} assistantContentChars={responseChars} empty={string.IsNullOrWhiteSpace(response).ToString().ToLowerInvariant()} aiAutoApply=false schema=ai-original-language-title-v1");
             if (string.IsNullOrWhiteSpace(response))
             {
-                ScanIdentificationDiagnostics.Write(
-                    $"event=ai-on-uncertain-complete requestId={requestId} aiOnUncertainSucceeded=false aiOnUncertainFailureReason=empty-or-not-configured fallback=local-placeholders-preserved aiAutoApply=false");
-                return new TvScanAiOnUncertainApplyResult();
+                return AiOnUncertainBatchExecutionResult.Failure(batch, requestId, "empty-or-not-configured", stopwatch.ElapsedMilliseconds, responseChars, jsonParseSucceeded);
             }
 
             var parsed = ParseAiOnUncertainResponse(response);
             jsonParseSucceeded = true;
-            var runResult = new TvScanAiOnUncertainApplyResult();
-            var inputById = inputRanges.ToDictionary(x => x.InputRangeId, StringComparer.OrdinalIgnoreCase);
-            var appliedHints = 0;
-            var appliedFiles = 0;
-            var ignoredHints = 0;
-            var parsedHints = 0;
-            var appliedByMediaFileIds = 0;
-            var appliedByPathFallback = 0;
-            var ignoredNoMediaFileIds = 0;
-            var ignoredNoFilesInRange = 0;
-            var skippedNoOriginalOrSearchTitle = 0;
-            foreach (var hint in parsed.Ranges)
-            {
-                parsedHints++;
-                var titleSelection = SelectAiOnUncertainSearchTitle(hint);
-                if (!TryResolveAiOnUncertainInputRange(hint, inputById, inputRanges, out var inputRange, out var appliedBy))
-                {
-                    ignoredHints++;
-                    ScanIdentificationDiagnostics.Write(
-                        $"event=ai-on-uncertain-hint-ignored requestId={requestId} inputRangeId={ScanIdentificationDiagnostics.FormatValue(hint.InputRangeId)} reason=no-range-match ignoredReason=no-range-match aiHintApplied=false aiAutoApply=false");
-                    continue;
-                }
-
-                var applyResult = ApplyAiOnUncertainHint(hint, inputRange, pathItems, pathItemsById, analysis);
-                if (applyResult.AppliedFiles == 0)
-                {
-                    ignoredHints++;
-                    if (string.Equals(applyResult.IgnoredReason, "no-media-file-ids", StringComparison.OrdinalIgnoreCase))
-                    {
-                        ignoredNoMediaFileIds++;
-                    }
-                    else if (string.Equals(applyResult.IgnoredReason, "no-files-in-input-range", StringComparison.OrdinalIgnoreCase))
-                    {
-                        ignoredNoFilesInRange++;
-                    }
-                    else if (string.Equals(applyResult.IgnoredReason, "no-original-or-search-title", StringComparison.OrdinalIgnoreCase))
-                    {
-                        skippedNoOriginalOrSearchTitle++;
-                    }
-
-                    ScanIdentificationDiagnostics.Write(
-                        $"event=ai-on-uncertain-hint-ignored requestId={requestId} inputRangeId={ScanIdentificationDiagnostics.FormatValue(hint.InputRangeId)} aiRefinedTitleParsed={!string.IsNullOrWhiteSpace(titleSelection.Title)} aiRefinedTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiOriginalLanguageTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.OriginalLanguageTitle)} aiEnglishTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.EnglishTitleHint)} aiLocalizedTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.LocalizedTitleHint)} aiOriginalTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.OriginalTitleHint)} aiSearchTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiSearchTitleSource={ScanIdentificationDiagnostics.FormatValue(titleSelection.Source)} originalLanguageTitleMissing={titleSelection.OriginalLanguageTitleMissing.ToString().ToLowerInvariant()} fallbackToEnglishTitle={titleSelection.FallbackToEnglishTitle.ToString().ToLowerInvariant()} fallbackToLocalizedTitle={titleSelection.FallbackToLocalizedTitle.ToString().ToLowerInvariant()} aiSeriesYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeriesYearHint ?? hint.YearHint)} aiSeasonYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonYearHint)} aiSeasonNumberHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonNumberHint)} confidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiConfidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiNeedsReview={hint.NeedsReview.ToString().ToLowerInvariant()} evidence={ScanIdentificationDiagnostics.FormatValue(FormatEvidence(hint.Evidence))} reason={ScanIdentificationDiagnostics.FormatValue(applyResult.IgnoredReason)} ignoredReason={ScanIdentificationDiagnostics.FormatValue(applyResult.IgnoredReason)} aiRefinedLookupAttempted=false aiRefinedLookupSkippedReason={ScanIdentificationDiagnostics.FormatValue(applyResult.IgnoredReason)} rangeMediaFileCount={applyResult.RangeMediaFileCount} filesResolvedCount={applyResult.FilesResolvedCount} filesResolvedBy={ScanIdentificationDiagnostics.FormatValue(applyResult.FilesResolvedBy)} aiHintApplied=false aiHintAppliedBy={appliedBy} directoryHintMismatch={applyResult.DirectoryHintMismatch.ToString().ToLowerInvariant()} aiAutoApply=false finalDecisionAfterAiHint=placeholder-preserved finalDecisionAfterAiRefinedLookup=placeholder-preserved");
-                    continue;
-                }
-
-                appliedHints++;
-                appliedFiles += applyResult.AppliedFiles;
-                runResult.AppliedFiles += applyResult.AppliedFiles;
-                runResult.AddAffectedMediaFiles(applyResult.AppliedMediaFileIds);
-                if (string.Equals(applyResult.FilesResolvedBy, "mediaFileIds", StringComparison.OrdinalIgnoreCase))
-                {
-                    appliedByMediaFileIds++;
-                }
-                else if (string.Equals(applyResult.FilesResolvedBy, "sanitizedPathFallback", StringComparison.OrdinalIgnoreCase))
-                {
-                    appliedByPathFallback++;
-                }
-
-                ScanIdentificationDiagnostics.Write(
-                    $"event=ai-on-uncertain-hint-applied requestId={requestId} inputRangeId={ScanIdentificationDiagnostics.FormatValue(hint.InputRangeId)} aiRefinedTitleParsed={!string.IsNullOrWhiteSpace(titleSelection.Title)} aiRefinedTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiOriginalLanguageTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.OriginalLanguageTitle)} aiEnglishTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.EnglishTitleHint)} aiLocalizedTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.LocalizedTitleHint)} aiOriginalTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.OriginalTitleHint)} aiSearchTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiSearchTitleSource={ScanIdentificationDiagnostics.FormatValue(titleSelection.Source)} originalLanguageTitleMissing={titleSelection.OriginalLanguageTitleMissing.ToString().ToLowerInvariant()} fallbackToEnglishTitle={titleSelection.FallbackToEnglishTitle.ToString().ToLowerInvariant()} fallbackToLocalizedTitle={titleSelection.FallbackToLocalizedTitle.ToString().ToLowerInvariant()} aiSeriesYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeriesYearHint ?? hint.YearHint)} aiSeasonYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonYearHint)} aiSeasonNumberHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonNumberHint)} confidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiConfidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiNeedsReview={hint.NeedsReview.ToString().ToLowerInvariant()} evidence={ScanIdentificationDiagnostics.FormatValue(FormatEvidence(hint.Evidence))} aiEvidence={ScanIdentificationDiagnostics.FormatValue(FormatEvidence(hint.Evidence))} seriesTitleHint={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} rangeMediaFileCount={applyResult.RangeMediaFileCount} filesResolvedCount={applyResult.FilesResolvedCount} filesResolvedBy={ScanIdentificationDiagnostics.FormatValue(applyResult.FilesResolvedBy)} appliedFiles={applyResult.AppliedFiles} aiHintApplied=true aiHintAppliedBy={appliedBy} aiHintQuerySource=ai-refined-title directoryHintMismatch={applyResult.DirectoryHintMismatch.ToString().ToLowerInvariant()} directoryHintMatchCount={applyResult.DirectoryHintMatchCount} tmdbValidationAfterAiHint=pending aiRefinedLookupAttempted=true aiRefinedLookupPending=true aiAutoApply=false finalDecisionAfterAiHint=tmdb-validation-pending finalDecisionAfterAiRefinedLookup=tmdb-validation-pending");
-            }
-
-            ScanIdentificationDiagnostics.Write(
-                $"event=ai-on-uncertain-complete requestId={requestId} aiOnUncertainSucceeded=true aiOnUncertainDurationMs={stopwatch.ElapsedMilliseconds} aiOnUncertainResponseRanges={parsed.Ranges.Count} aiOnUncertainParsedHints={parsedHints} aiOnUncertainAppliedHints={appliedHints} aiOnUncertainIgnoredHints={ignoredHints} aiOnUncertainRangesWithFiles={rangesWithFiles} aiOnUncertainRangesWithoutFiles={rangesWithoutFiles} aiOnUncertainAppliedByMediaFileIds={appliedByMediaFileIds} aiOnUncertainAppliedByPathFallback={appliedByPathFallback} aiOnUncertainIgnoredNoMediaFileIds={ignoredNoMediaFileIds} aiOnUncertainIgnoredNoFilesInRange={ignoredNoFilesInRange} skippedNoOriginalOrSearchTitle={skippedNoOriginalOrSearchTitle} aiOnUncertainJsonParseSucceeded={jsonParseSucceeded.ToString().ToLowerInvariant()} aiHintApplied={(appliedHints > 0).ToString().ToLowerInvariant()} appliedHints={appliedHints} appliedFiles={appliedFiles} aiAffectedMediaFiles={runResult.AffectedMediaFileIds.Count} aiAutoApply=false fallback={(appliedHints > 0 ? "tmdb-validation-required" : "local-placeholders-preserved")}");
-            return runResult;
+            return AiOnUncertainBatchExecutionResult.Success(batch, requestId, parsed, stopwatch.ElapsedMilliseconds, responseChars, jsonParseSucceeded);
         }
         catch (Exception exception)
         {
@@ -250,9 +289,74 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                         : "unknown-cancellation"
                 : "not-cancellation";
             ScanIdentificationDiagnostics.Write(
-                $"event=ai-on-uncertain-error requestId={requestId} aiOnUncertainSucceeded=false aiOnUncertainDurationMs={stopwatch.ElapsedMilliseconds} timeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} exceptionType={ScanIdentificationDiagnostics.FormatValue(exception.GetType().Name)} innerExceptionType={ScanIdentificationDiagnostics.FormatValue(exception.InnerException?.GetType().Name)} cancellationOrigin={ScanIdentificationDiagnostics.FormatValue(cancellationOrigin)} responseChars={responseChars} assistantContentChars={responseChars} aiOnUncertainJsonParseSucceeded={jsonParseSucceeded.ToString().ToLowerInvariant()} aiOnUncertainFailureReason=ai-failed fallback=local-placeholders-preserved aiAutoApply=false error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 180)}");
-            return new TvScanAiOnUncertainApplyResult();
+                $"event=ai-on-uncertain-error requestId={requestId} aiOnUncertainBatchIndex={batch.Index} aiOnUncertainBatchAttempt={attempt} aiOnUncertainBatchSucceeded=false aiOnUncertainBatchDurationMs={stopwatch.ElapsedMilliseconds} timeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} aiOnUncertainBatchTimeoutMs={(int)AiOnUncertainTimeout.TotalMilliseconds} exceptionType={ScanIdentificationDiagnostics.FormatValue(exception.GetType().Name)} innerExceptionType={ScanIdentificationDiagnostics.FormatValue(exception.InnerException?.GetType().Name)} cancellationOrigin={ScanIdentificationDiagnostics.FormatValue(cancellationOrigin)} responseChars={responseChars} assistantContentChars={responseChars} aiOnUncertainJsonParseSucceeded={jsonParseSucceeded.ToString().ToLowerInvariant()} aiOnUncertainBatchFailedReason=ai-failed aiOnUncertainFailureReason=ai-failed fallback=local-placeholders-preserved aiAutoApply=false error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 180)}");
+            return AiOnUncertainBatchExecutionResult.Failure(batch, requestId, "ai-failed", stopwatch.ElapsedMilliseconds, responseChars, jsonParseSucceeded);
         }
+    }
+
+    private static AiOnUncertainBatchApplyStats ApplyAiOnUncertainBatchHints(
+        AiOnUncertainBatchExecutionResult batchResult,
+        IReadOnlyList<SanitizedPathItem> pathItems,
+        IReadOnlyDictionary<int, SanitizedPathItem> pathItemsById,
+        TvScanDirectoryAnalysisResult analysis,
+        TvScanAiOnUncertainApplyResult runResult)
+    {
+        var stats = new AiOnUncertainBatchApplyStats();
+        var inputById = batchResult.Batch.InputRanges.ToDictionary(x => x.InputRangeId, StringComparer.OrdinalIgnoreCase);
+        foreach (var hint in batchResult.Response?.Ranges ?? [])
+        {
+            stats.ParsedHints++;
+            var titleSelection = SelectAiOnUncertainSearchTitle(hint);
+            if (!TryResolveAiOnUncertainInputRange(hint, inputById, batchResult.Batch.InputRanges, out var inputRange, out var appliedBy))
+            {
+                stats.IgnoredHints++;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=ai-on-uncertain-hint-ignored requestId={batchResult.RequestId} aiOnUncertainBatchIndex={batchResult.Batch.Index} inputRangeId={ScanIdentificationDiagnostics.FormatValue(hint.InputRangeId)} reason=no-range-match ignoredReason=no-range-match aiHintApplied=false aiAutoApply=false");
+                continue;
+            }
+
+            var applyResult = ApplyAiOnUncertainHint(hint, inputRange, pathItems, pathItemsById, analysis);
+            if (applyResult.AppliedFiles == 0)
+            {
+                stats.IgnoredHints++;
+                if (string.Equals(applyResult.IgnoredReason, "no-media-file-ids", StringComparison.OrdinalIgnoreCase))
+                {
+                    stats.IgnoredNoMediaFileIds++;
+                }
+                else if (string.Equals(applyResult.IgnoredReason, "no-files-in-input-range", StringComparison.OrdinalIgnoreCase))
+                {
+                    stats.IgnoredNoFilesInRange++;
+                }
+                else if (string.Equals(applyResult.IgnoredReason, "no-original-or-search-title", StringComparison.OrdinalIgnoreCase))
+                {
+                    stats.SkippedNoOriginalOrSearchTitle++;
+                }
+
+                ScanIdentificationDiagnostics.Write(
+                    $"event=ai-on-uncertain-hint-ignored requestId={batchResult.RequestId} aiOnUncertainBatchIndex={batchResult.Batch.Index} inputRangeId={ScanIdentificationDiagnostics.FormatValue(hint.InputRangeId)} aiRefinedTitleParsed={!string.IsNullOrWhiteSpace(titleSelection.Title)} aiRefinedTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiOriginalLanguageTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.OriginalLanguageTitle)} aiEnglishTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.EnglishTitleHint)} aiLocalizedTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.LocalizedTitleHint)} aiOriginalTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.OriginalTitleHint)} aiSearchTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiSearchTitleSource={ScanIdentificationDiagnostics.FormatValue(titleSelection.Source)} originalLanguageTitleMissing={titleSelection.OriginalLanguageTitleMissing.ToString().ToLowerInvariant()} fallbackToEnglishTitle={titleSelection.FallbackToEnglishTitle.ToString().ToLowerInvariant()} fallbackToLocalizedTitle={titleSelection.FallbackToLocalizedTitle.ToString().ToLowerInvariant()} aiSeriesYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeriesYearHint ?? hint.YearHint)} aiSeasonYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonYearHint)} aiSeasonNumberHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonNumberHint)} confidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiConfidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiNeedsReview={hint.NeedsReview.ToString().ToLowerInvariant()} evidence={ScanIdentificationDiagnostics.FormatValue(FormatEvidence(hint.Evidence))} reason={ScanIdentificationDiagnostics.FormatValue(applyResult.IgnoredReason)} ignoredReason={ScanIdentificationDiagnostics.FormatValue(applyResult.IgnoredReason)} aiRefinedLookupAttempted=false aiRefinedLookupSkippedReason={ScanIdentificationDiagnostics.FormatValue(applyResult.IgnoredReason)} rangeMediaFileCount={applyResult.RangeMediaFileCount} filesResolvedCount={applyResult.FilesResolvedCount} filesResolvedBy={ScanIdentificationDiagnostics.FormatValue(applyResult.FilesResolvedBy)} aiHintApplied=false aiHintAppliedBy={appliedBy} directoryHintMismatch={applyResult.DirectoryHintMismatch.ToString().ToLowerInvariant()} aiAutoApply=false finalDecisionAfterAiHint=placeholder-preserved finalDecisionAfterAiRefinedLookup=placeholder-preserved");
+                continue;
+            }
+
+            stats.AppliedHints++;
+            stats.AppliedFiles += applyResult.AppliedFiles;
+            runResult.AppliedFiles += applyResult.AppliedFiles;
+            runResult.AddAffectedMediaFiles(applyResult.AppliedMediaFileIds);
+            if (string.Equals(applyResult.FilesResolvedBy, "mediaFileIds", StringComparison.OrdinalIgnoreCase))
+            {
+                stats.AppliedByMediaFileIds++;
+            }
+            else if (string.Equals(applyResult.FilesResolvedBy, "sanitizedPathFallback", StringComparison.OrdinalIgnoreCase))
+            {
+                stats.AppliedByPathFallback++;
+            }
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=ai-on-uncertain-hint-applied requestId={batchResult.RequestId} aiOnUncertainBatchIndex={batchResult.Batch.Index} inputRangeId={ScanIdentificationDiagnostics.FormatValue(hint.InputRangeId)} aiRefinedTitleParsed={!string.IsNullOrWhiteSpace(titleSelection.Title)} aiRefinedTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiOriginalLanguageTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.OriginalLanguageTitle)} aiEnglishTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.EnglishTitleHint)} aiLocalizedTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.LocalizedTitleHint)} aiOriginalTitleHint={ScanIdentificationDiagnostics.FormatValue(hint.OriginalTitleHint)} aiSearchTitle={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} aiSearchTitleSource={ScanIdentificationDiagnostics.FormatValue(titleSelection.Source)} originalLanguageTitleMissing={titleSelection.OriginalLanguageTitleMissing.ToString().ToLowerInvariant()} fallbackToEnglishTitle={titleSelection.FallbackToEnglishTitle.ToString().ToLowerInvariant()} fallbackToLocalizedTitle={titleSelection.FallbackToLocalizedTitle.ToString().ToLowerInvariant()} aiSeriesYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeriesYearHint ?? hint.YearHint)} aiSeasonYearHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonYearHint)} aiSeasonNumberHint={ScanIdentificationDiagnostics.FormatNullable(hint.SeasonNumberHint)} confidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiConfidence={ScanIdentificationDiagnostics.FormatValue(hint.Confidence)} aiNeedsReview={hint.NeedsReview.ToString().ToLowerInvariant()} evidence={ScanIdentificationDiagnostics.FormatValue(FormatEvidence(hint.Evidence))} aiEvidence={ScanIdentificationDiagnostics.FormatValue(FormatEvidence(hint.Evidence))} seriesTitleHint={ScanIdentificationDiagnostics.FormatValue(titleSelection.Title)} rangeMediaFileCount={applyResult.RangeMediaFileCount} filesResolvedCount={applyResult.FilesResolvedCount} filesResolvedBy={ScanIdentificationDiagnostics.FormatValue(applyResult.FilesResolvedBy)} appliedFiles={applyResult.AppliedFiles} aiHintApplied=true aiHintAppliedBy={appliedBy} aiHintQuerySource=ai-refined-title directoryHintMismatch={applyResult.DirectoryHintMismatch.ToString().ToLowerInvariant()} directoryHintMatchCount={applyResult.DirectoryHintMatchCount} tmdbValidationAfterAiHint=pending aiRefinedLookupAttempted=true aiRefinedLookupPending=true aiAutoApply=false finalDecisionAfterAiHint=tmdb-validation-pending finalDecisionAfterAiRefinedLookup=tmdb-validation-pending");
+        }
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=ai-on-uncertain-batch-apply-complete requestId={batchResult.RequestId} aiOnUncertainBatchIndex={batchResult.Batch.Index} aiOnUncertainBatchParsedHints={stats.ParsedHints} aiOnUncertainBatchAppliedHints={stats.AppliedHints} aiOnUncertainBatchIgnoredHints={stats.IgnoredHints} aiOnUncertainBatchAppliedFiles={stats.AppliedFiles}");
+        return stats;
     }
 
     private static void ApplyLocalHints(IReadOnlyList<ScanFile> files, TvScanDirectoryAnalysisResult result)
@@ -358,7 +462,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                     allDirectoryPaths);
                 result.AddAiCandidateRange(aiCandidateRange);
                 ScanIdentificationDiagnostics.Write(
-                    $"event=ai-candidate-range directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} rangeType={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.RangeType)} riskTags={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RiskTags))} sourceFiles={aiCandidateRange.SourceFileCount} directVideoCount={aiCandidateRange.DirectVideoCount} childFolderCount={aiCandidateRange.ChildFolderCount} rangeMediaFileCount={aiCandidateRange.MediaFileIds.Count} rangeHasMediaFiles={(aiCandidateRange.MediaFileIds.Count > 0).ToString().ToLowerInvariant()} sampleDirectVideoFiles={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.SampleDirectVideoFiles))} suspectedSeriesFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeriesFolder)} suspectedSeasonFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeasonFolder)} usableCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.UsableCandidateQueries))} rejectedCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RejectedCandidateQueries))} noisyCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.NoisyCandidateQueries))} candidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.CandidateQueries))} blockedMovieFallbackCount={aiCandidateRange.BlockedMovieFallbackCount} candidateConflictsCount={aiCandidateRange.CandidateConflictsCount} chineseStructureHints={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.ChineseStructureHints))} titleNumberSequenceCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentAddedToAiCandidateRanges={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} titleNumberSequenceCandidateRange={(directoryContext.TitleNumberSequence.IsSequence ? $"{directoryContext.TitleNumberSequence.StartNumber}-{directoryContext.TitleNumberSequence.EndNumber}" : "(none)")} titleNumberSequencePrefix={ScanIdentificationDiagnostics.FormatValue(directoryContext.TitleNumberSequence.PrefixKey)} titleNumberSequenceStart={directoryContext.TitleNumberSequence.StartNumber} titleNumberSequenceEnd={directoryContext.TitleNumberSequence.EndNumber} titleNumberSequenceFiles={directoryContext.TitleNumberSequence.FileCount} addedToAiCandidateRanges=true aiCandidateRangeReason={(directoryContext.TitleNumberSequence.IsSequence ? directoryContext.TitleNumberSequence.Pattern : "local-tv-risk")}");
+                    $"event=ai-candidate-range directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} rangeType={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.RangeType)} riskTags={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RiskTags))} sourceFiles={aiCandidateRange.SourceFileCount} directVideoCount={aiCandidateRange.DirectVideoCount} childFolderCount={aiCandidateRange.ChildFolderCount} rangeMediaFileCount={aiCandidateRange.MediaFileIds.Count} rangeHasMediaFiles={(aiCandidateRange.MediaFileIds.Count > 0).ToString().ToLowerInvariant()} sampleDirectVideoFiles={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.SampleDirectVideoFiles))} suspectedSeriesFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeriesFolder)} suspectedSeasonFolder={ScanIdentificationDiagnostics.FormatValue(aiCandidateRange.SuspectedSeasonFolder)} usableCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.UsableCandidateQueries))} rejectedCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.RejectedCandidateQueries))} noisyCandidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.NoisyCandidateQueries))} candidateQueries={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.CandidateQueries))} blockedMovieFallbackCount={aiCandidateRange.BlockedMovieFallbackCount} candidateConflictsCount={aiCandidateRange.CandidateConflictsCount} chineseStructureHints={ScanIdentificationDiagnostics.FormatValue(string.Join('|', aiCandidateRange.ChineseStructureHints))} titleNumberSequenceCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} fansubBracketEpisodeCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "fansub-bracket-episode", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} leadingNumberTitleCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "leading-number-title", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentAddedToAiCandidateRanges={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} titleNumberSequenceCandidateRange={(directoryContext.TitleNumberSequence.IsSequence ? $"{directoryContext.TitleNumberSequence.StartNumber}-{directoryContext.TitleNumberSequence.EndNumber}" : "(none)")} titleNumberSequencePrefix={ScanIdentificationDiagnostics.FormatValue(directoryContext.TitleNumberSequence.PrefixKey)} titleNumberSequenceStart={directoryContext.TitleNumberSequence.StartNumber} titleNumberSequenceEnd={directoryContext.TitleNumberSequence.EndNumber} titleNumberSequenceFiles={directoryContext.TitleNumberSequence.FileCount} addedToAiCandidateRanges=true aiCandidateRangeReason={(directoryContext.TitleNumberSequence.IsSequence ? directoryContext.TitleNumberSequence.Pattern : "local-tv-risk")}");
             }
             else if (directoryContext.BlocksMovieFallback)
             {
@@ -381,7 +485,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             }
 
             ScanIdentificationDiagnostics.Write(
-                $"event=tv-range-local directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} titleHint={ScanIdentificationDiagnostics.FormatValue(titleHint)} strong={directoryContext.IsStrong.ToString().ToLowerInvariant()} blocksMovieFallback={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} seasonFolder={isSeasonFolder.ToString().ToLowerInvariant()} siblingSeason={hasSiblingSeasonDirectory.ToString().ToLowerInvariant()} explicitEpisodes={directoryContext.ExplicitEpisodeCount} contextEpisodes={directoryContext.ContextEpisodeCount} strongFallbackEpisodes={directoryContext.StrongFallbackEpisodeCount} validEpisodes={validEpisodeCount} titleNumberSequenceCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} titleNumberSequencePrefix={ScanIdentificationDiagnostics.FormatValue(directoryContext.TitleNumberSequence.PrefixKey)} titleNumberSequenceStart={directoryContext.TitleNumberSequence.StartNumber} titleNumberSequenceEnd={directoryContext.TitleNumberSequence.EndNumber} titleNumberSequenceFiles={directoryContext.TitleNumberSequence.FileCount} addedToAiCandidateRanges={(ShouldEmitAiCandidateRange(directoryContext)).ToString().ToLowerInvariant()} aiCandidateRangeReason={(directoryContext.TitleNumberSequence.IsSequence ? directoryContext.TitleNumberSequence.Pattern : "(none)")} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)}");
+                $"event=tv-range-local directory={ScanIdentificationDiagnostics.FormatPath(directoryPath)} titleHint={ScanIdentificationDiagnostics.FormatValue(titleHint)} strong={directoryContext.IsStrong.ToString().ToLowerInvariant()} blocksMovieFallback={directoryContext.BlocksMovieFallback.ToString().ToLowerInvariant()} seasonFolder={isSeasonFolder.ToString().ToLowerInvariant()} siblingSeason={hasSiblingSeasonDirectory.ToString().ToLowerInvariant()} explicitEpisodes={directoryContext.ExplicitEpisodeCount} contextEpisodes={directoryContext.ContextEpisodeCount} strongFallbackEpisodes={directoryContext.StrongFallbackEpisodeCount} validEpisodes={validEpisodeCount} titleNumberSequenceCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "title-number", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} fansubBracketEpisodeCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "fansub-bracket-episode", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} bracketEpisodeSegmentCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "bracket-episode-segment", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} leadingNumberTitleCandidate={(directoryContext.TitleNumberSequence.IsSequence && string.Equals(directoryContext.TitleNumberSequence.Pattern, "leading-number-title", StringComparison.OrdinalIgnoreCase)).ToString().ToLowerInvariant()} titleNumberSequencePrefix={ScanIdentificationDiagnostics.FormatValue(directoryContext.TitleNumberSequence.PrefixKey)} titleNumberSequenceStart={directoryContext.TitleNumberSequence.StartNumber} titleNumberSequenceEnd={directoryContext.TitleNumberSequence.EndNumber} titleNumberSequenceFiles={directoryContext.TitleNumberSequence.FileCount} addedToAiCandidateRanges={(ShouldEmitAiCandidateRange(directoryContext)).ToString().ToLowerInvariant()} aiCandidateRangeReason={(directoryContext.TitleNumberSequence.IsSequence ? directoryContext.TitleNumberSequence.Pattern : "(none)")} strongTvEvidenceCount={directoryContext.StrongEvidence.Count} strongTvEvidence={ScanIdentificationDiagnostics.FormatValue(directoryContext.EvidenceText)} weakTvContextReason={ScanIdentificationDiagnostics.FormatValue(directoryContext.WeakReasonText)}");
         }
     }
 
@@ -843,6 +947,94 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
             range.CandidateConflictsCount,
             range.ChineseStructureHints.Take(8).ToArray(),
             range.MediaFileIds.Where(x => x > 0).Distinct().OrderBy(x => x).ToArray());
+    }
+
+    private static IReadOnlyList<AiOnUncertainBatch> BuildAiOnUncertainBatches(
+        IReadOnlyList<AiOnUncertainInputRange> inputRanges)
+    {
+        var batchCount = Math.Min(MaxAiOnUncertainBatchCount, Math.Max(1, inputRanges.Count));
+        var targetGroupSize = (int)Math.Ceiling(inputRanges.Count / (double)batchCount);
+        var groupedRanges = inputRanges
+            .GroupBy(GetAiOnUncertainBatchGroupKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(
+                group =>
+                {
+                    var orderedRanges = group
+                        .OrderBy(x => x.SanitizedPath, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(x => x.InputRangeId, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    var chunkSize = orderedRanges.Length > Math.Max(targetGroupSize * 2, targetGroupSize + 1)
+                        ? Math.Max(1, targetGroupSize)
+                        : orderedRanges.Length;
+                    return orderedRanges
+                        .Chunk(chunkSize)
+                        .Select(
+                            (chunk, index) => new
+                            {
+                                Key = index == 0 ? group.Key : $"{group.Key}#{index + 1}",
+                                Ranges = chunk.ToArray(),
+                                Weight = BuildAiOnUncertainPrompt(chunk).Length
+                            });
+                })
+            .OrderByDescending(x => x.Weight)
+            .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var buckets = Enumerable.Range(0, batchCount)
+            .Select(_ => new AiOnUncertainBatchBuilder())
+            .ToArray();
+        foreach (var group in groupedRanges)
+        {
+            var target = buckets
+                .OrderBy(x => x.InputChars)
+                .ThenBy(x => x.Ranges.Count)
+                .First();
+            target.Ranges.AddRange(group.Ranges);
+            target.GroupKeys.Add(group.Key);
+            target.InputChars += group.Weight;
+        }
+
+        var batches = buckets
+            .Where(x => x.Ranges.Count > 0)
+            .Select(
+                (bucket, index) =>
+                {
+                    var orderedRanges = bucket.Ranges
+                        .OrderBy(x => x.SanitizedPath, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(x => x.InputRangeId, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    return new AiOnUncertainBatch(
+                        index + 1,
+                        orderedRanges,
+                        bucket.GroupKeys
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                            .Take(10)
+                            .ToArray(),
+                        BuildAiOnUncertainPrompt(orderedRanges));
+                })
+            .ToArray();
+        ScanIdentificationDiagnostics.Write(
+            $"event=ai-on-uncertain-batch-grouping aiOnUncertainBatchingEnabled=true aiOnUncertainCandidateRanges={inputRanges.Count} aiOnUncertainBatchCount={batches.Length} aiOnUncertainMaxBatchCount={MaxAiOnUncertainBatchCount} aiOnUncertainBatchGroupCount={groupedRanges.Count} aiOnUncertainBatchGroupingReason=local-deterministic-series-folder-parent-title");
+        return batches;
+    }
+
+    private static string GetAiOnUncertainBatchGroupKey(AiOnUncertainInputRange range)
+    {
+        return NormalizeAiOnUncertainBatchGroupKey(
+            FirstNonEmpty(
+                range.SuspectedSeriesFolder,
+                range.UsableCandidateQueries.FirstOrDefault(),
+                GetDirectoryPath(range.SanitizedPath),
+                range.SanitizedPath));
+    }
+
+    private static string NormalizeAiOnUncertainBatchGroupKey(string value)
+    {
+        var normalized = TvEpisodeFileNameParser.CleanSeriesNameCandidate(
+            string.IsNullOrWhiteSpace(value) ? "unknown" : value);
+        return string.IsNullOrWhiteSpace(normalized)
+            ? "unknown"
+            : normalized.ToUpperInvariant();
     }
 
     private static string BuildAiOnUncertainPrompt(IReadOnlyList<AiOnUncertainInputRange> ranges)
@@ -1658,6 +1850,109 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         IReadOnlyList<string> ChildFolderNames,
         IReadOnlyList<string> SampleFileNames,
         int EpisodeLikeFileCount);
+
+    private sealed record AiOnUncertainBatch(
+        int Index,
+        IReadOnlyList<AiOnUncertainInputRange> InputRanges,
+        IReadOnlyList<string> GroupKeys,
+        string Prompt);
+
+    private sealed class AiOnUncertainBatchBuilder
+    {
+        public List<AiOnUncertainInputRange> Ranges { get; } = [];
+
+        public List<string> GroupKeys { get; } = [];
+
+        public int InputChars { get; set; }
+    }
+
+    private sealed class AiOnUncertainBatchExecutionResult
+    {
+        private AiOnUncertainBatchExecutionResult(
+            AiOnUncertainBatch batch,
+            string requestId,
+            bool succeeded,
+            AiOnUncertainResponse? response,
+            string failureReason,
+            long durationMs,
+            int responseChars,
+            bool jsonParseSucceeded)
+        {
+            Batch = batch;
+            RequestId = requestId;
+            Succeeded = succeeded;
+            Response = response;
+            FailureReason = failureReason;
+            DurationMs = durationMs;
+            ResponseChars = responseChars;
+            JsonParseSucceeded = jsonParseSucceeded;
+        }
+
+        public AiOnUncertainBatch Batch { get; }
+
+        public string RequestId { get; }
+
+        public bool Succeeded { get; }
+
+        public AiOnUncertainResponse? Response { get; }
+
+        public string FailureReason { get; }
+
+        public long DurationMs { get; }
+
+        public int ResponseChars { get; }
+
+        public bool JsonParseSucceeded { get; }
+
+        public bool RetryAttempted { get; set; }
+
+        public bool RetrySucceeded { get; set; }
+
+        public int ParsedHintCount => Response?.Ranges.Count ?? 0;
+
+        public static AiOnUncertainBatchExecutionResult Success(
+            AiOnUncertainBatch batch,
+            string requestId,
+            AiOnUncertainResponse response,
+            long durationMs,
+            int responseChars,
+            bool jsonParseSucceeded)
+        {
+            return new AiOnUncertainBatchExecutionResult(batch, requestId, true, response, string.Empty, durationMs, responseChars, jsonParseSucceeded);
+        }
+
+        public static AiOnUncertainBatchExecutionResult Failure(
+            AiOnUncertainBatch batch,
+            string requestId,
+            string reason,
+            long durationMs = 0,
+            int responseChars = 0,
+            bool jsonParseSucceeded = false)
+        {
+            return new AiOnUncertainBatchExecutionResult(batch, requestId, false, null, reason, durationMs, responseChars, jsonParseSucceeded);
+        }
+    }
+
+    private sealed class AiOnUncertainBatchApplyStats
+    {
+        public int ParsedHints { get; set; }
+
+        public int AppliedHints { get; set; }
+
+        public int IgnoredHints { get; set; }
+
+        public int AppliedFiles { get; set; }
+
+        public int AppliedByMediaFileIds { get; set; }
+
+        public int AppliedByPathFallback { get; set; }
+
+        public int IgnoredNoMediaFileIds { get; set; }
+
+        public int IgnoredNoFilesInRange { get; set; }
+
+        public int SkippedNoOriginalOrSearchTitle { get; set; }
+    }
 
     private sealed record AiOnUncertainInputRange(
         string InputRangeId,

@@ -25,6 +25,9 @@
 
 ## Deferred
 
+- Phase 4.11f-fix-9 keeps `01: title` / `01：title`, SP/OAD/OVA/special mapping, theater collections, course/extras classification, and active correction outside default scan. These still belong to manual correction, Episode detail, or later specialty phases.
+- Long-running numeric unknown range grouping allows small gaps but does not create missing Episode rows. Large gaps, duplicate episode numbers, and ambiguous short movie collections remain unresolved / Other items.
+- Existing `._*` rows created before the AppleDouble filter may require rescan missing-file cleanup or manual delete-record cleanup; new scans should ignore those files before media type detection.
 - `TvSeasonRatingSources` is deferred until a later rating persistence decision.
 - Season-level IMDb rating display is deferred unless OMDb responses can be verified as stable and unambiguous.
 - Additional TV detail refinements are deferred until the library and discovery phases expose their entry points.
@@ -162,3 +165,124 @@ Noise:
 
 - Orphan grouping remains conservative: same direct parent, strict contiguous episode-like numbers, and no cross-directory merge.
 - `.rmvb` scan admission does not guarantee every file is playable; playback capability depends on the player stack.
+
+## Phase 4.11f-fix-10 Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- Automatic part offset mapping remains deferred. `S3 Part 2 01` is not assumed to mean any specific TMDB episode number without stronger evidence or user confirmation.
+- Final-season wording, SP/OAD/OVA, theatrical collection mapping, and manual part-offset correction remain active-correction / Episode-management work.
+
+Noise:
+
+- Part hints are diagnostics and grouping context, not successful recognition by themselves.
+- Unresolved part ranges can still appear under unidentified / pending-correction surfaces until a correction workflow maps them to exact TMDB episodes.
+
+## Phase 4.11f-fix-11 Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- Part offsets are applied only when previous sibling part evidence is already safely bound to the same TMDB Series and Season. Missing or unbound previous parts still require active correction / manual confirmation.
+- Final Season wording, SP/OAD/OVA, theatrical collection mapping, and explicit user-controlled part-offset correction remain deferred.
+- Multi-source conflict resolution remains conservative; an occupied target Episode blocks offset unless a later multi-source workflow can safely merge it.
+
+Noise:
+
+- Part offset diagnostics can report `missing-previous-part`, `previous-part-not-bound`, or `target-episode-conflict` for files that are probably correct but lack enough safe evidence.
+- The offset rule intentionally favors unresolved / pending correction over guessing a folk-season or part-to-TMDB mapping.
+
+## Phase 4.11f-fix-11-hotfix Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- Automatic sibling part offset apply is disabled pending a safer redesign. The redesign should run before low-confidence placeholder decisions, carry parsed part context into candidate search, and only then apply offsets with same-Series / same-Season evidence.
+- Part ranges with valid `partHint` / `episodeInPart` but no safe offset remain unidentified / pending correction.
+- Final Season wording, SP/OAD/OVA, theatrical collection mapping, and explicit user-controlled part-offset correction remain deferred.
+
+Noise:
+
+- Structural part-only queries are rejected aggressively. Real-title queries that include part wording remain eligible when they contain a title token beyond season / part / number structure.
+
+## Phase 4.11f-fix-13 Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- If one AI batch is still too large, retry-time sub-batching can be considered later. This phase keeps the batching model simple and bounded.
+- AI provider-side concurrency or rate limits may still cause one batch to fail; successful sibling batches should still apply.
+- AI timeout tuning remains operational and provider-dependent.
+
+Noise:
+
+- Batch grouping is deterministic and local. It keeps related ranges together where possible, but it is not a semantic clustering model.
+- Partial AI failures can still leave some folders unresolved even when nearby batches succeed.
+
+## Phase 4.11f-fix-14 Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- Part offsets still require a confirmed TMDB Series / Season and a previous contiguous episode range. Missing Part1 evidence, missing TMDB episode metadata, or occupied target episodes leave later parts unresolved.
+- Final Season wording, SP/OAD/OVA, theatrical collection mapping, and explicit user-controlled part-offset correction remain deferred.
+- More advanced cross-directory part reconciliation can be revisited in the active correction flow if safe automatic evidence is not available during scan.
+
+Noise:
+
+- Later parts can remain in `Other` / unidentified season surfaces even when the title is correct, because the offset is intentionally blocked without E01..N evidence.
+- Current-scan ordering helps same-parent part folders, but it is still a conservative local ordering rule rather than a semantic season planner.
+
+## Phase 4.11f-fix-14-hotfix Known Issues
+
+Blocker:
+
+- None.
+
+Deferred:
+
+- Later-part offset still depends on confirmed TMDB Series / Season plus previous contiguous episode evidence. If that evidence is missing, the range remains unidentified / pending correction.
+- Final Season wording, SP/OAD/OVA, theatrical collection mapping, and explicit user-controlled part-offset correction remain deferred.
+- Scan duration summary accuracy remains a separate deferred issue.
+
+Noise:
+
+- Part candidates can now attempt AI refined Series lookup before offset evaluation, but a successful title lookup alone does not guarantee offset; target episode availability and conflict checks still decide apply.
+- Folder-name part queries may still appear as rejected/noisy diagnostics, but structural-only part queries remain blocked from TMDB lookup.
+
+## Phase 4.11g Known Issues
+
+Blocker:
+
+- None for the default TV scan closeout baseline.
+
+Deferred:
+
+- Episode detail page and per-episode multi-source management remain Phase 4.12 work.
+- Active correction, cross-type correction, manual regrouping into Seasons, and user-confirmed part offsets remain Phase 4.12 / 4.13 work.
+- SP/OAD/OVA, specials, theatrical collections, course / extras classification, and Final Season folk-to-TMDB mapping remain outside default scan.
+- TV discovery expansion, TV recommendation inputs, TV Watch Insights, Watch Profile TV fingerprints, and TV persona inputs remain deferred.
+- `.sup` scan admission is complete, but actual renderer / playback support still needs validation.
+- Media-library performance and large `Other` / unidentified-season list ergonomics remain later optimization work.
+
+Noise:
+
+- Movie placeholders can remain high in mixed anime / movie / course folders; this is expected unresolved data, not a scan failure.
+- AI refined title top1 can still require human correction when TMDB naming, folk season splits, or source folders disagree.
+- AppleDouble `._*` files from older scans may require delete-record cleanup if they were inserted before the ignore rule existed.

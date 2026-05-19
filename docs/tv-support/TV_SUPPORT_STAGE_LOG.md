@@ -1,5 +1,52 @@
 # TV Support Stage Log
 
+## Phase 4.11g - TV Scan Final Acceptance And Closeout
+
+Completed:
+
+- Audited the latest real scan log as the Phase 4.11g acceptance baseline.
+- Confirmed AI-on-uncertain runs in at most 3 concurrent batches, all latest batches succeeded, and successful hints were merged through the existing `inputRangeId -> MediaFileIds` apply path.
+- Confirmed the post-AI TV retry scope is limited to AI-affected media files.
+- Confirmed later-part offset runs after TMDB Series / Season confirmation and maps later part episodes only when previous contiguous sibling evidence is available.
+- Confirmed structural `Part` / `S Part` style queries are rejected before TMDB lookup and do not auto-bind.
+- Confirmed TV.Parse warnings are deduplicated and excluded from scan error count.
+- Confirmed Movie placeholder volume is expected boundary data, not a scan blocker.
+- Confirmed library projection keeps recognized Movie, recognized TV, and `Other` separated; orphan video rows and unidentified Seasons are represented in `Other`.
+- Confirmed batch select / hide / delete-record paths include grouped placeholders and unidentified Seasons through existing Movie / Season collection services.
+- Confirmed Watch Insights and AI recommendation services still load movie-backed data only.
+
+Not done:
+
+- No code changes were made for Phase 4.11g.
+- No new scan rules, AI prompt changes, TMDB threshold changes, Movie fallback changes, Episode detail page, multi-source management, active correction UI, or anime-special mapping were added.
+- No migration, database update, commit, or push was performed.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No migration diff is present.
+3. AI-on-uncertain batch count is at most 3.
+4. Successful AI batch hints are applied and failed batches would remain warning / unresolved data.
+5. TV retry only processes AI-affected files.
+6. Part offset requires confirmed Series / Season and previous contiguous episode evidence.
+7. Structural part-only queries are rejected.
+8. Orphan files and unidentified Seasons appear in `Other`.
+9. Movie category is recognized Movie only and TV category is recognized TV only.
+10. Batch delete / hide semantics do not delete local or WebDAV files.
+11. TV remains excluded from Watch Insights and AI recommendations.
+12. Remaining complex cases are deferred to Phase 4.12 / 4.13.
+
+## Phase 4.11f-fix-9 - Episode Sequence Parsing And Warning Semantics
+
+- Expanded verified episode sequence parsing for fansub bracket forms such as `[Group] Title [01][Quality]` and `Title [01][Quality]`.
+- Reused bracket episode segment evidence in TV apply so `[Title][01 - subtitle]` style ranges can parse episodes after AI/TMDB validation instead of falling back to unsupported.
+- Added verified leading-number-title support only when the same folder sequence provides strong TV context, such as `01.Title.S01.2022...`; `01: title` / `01：title` remains out of scope.
+- Added long-running placeholder grouping support for large numeric ranges with a small gap ratio; missing episode numbers are recorded but no missing Episode rows are created.
+- Added a bare-number movie collection guard so short `1..5` style collections without TV evidence stay in Other / unknown handling instead of becoming unidentified TV seasons.
+- TV.Parse warnings are now deduplicated by directory/reason and no longer inflate scan `ErrorCount`; run diagnostics log raw and deduplicated warning counts.
+- Follow-up scan discovery filtering excludes macOS AppleDouble `._*` resource fork files before media type detection, so `._*.mkv` no longer enters TV/Movie identification or AI candidate ranges.
+- Did not change AI prompt, TMDB top1/year-gate strategy, Movie fallback semantics, deletion semantics, migrations, Watch Insights, or TV AI recommendation exclusion.
+
 ## Phase 4.2 - TV Metadata Services And Rating Audit
 
 Implemented service-layer metadata support for TV:
@@ -1457,3 +1504,170 @@ Manual acceptance matrix:
 8. `.rmvb` is scanned as video and `.sup` is scanned as subtitle candidate.
 9. `01: title`, SP/OAD/OVA, course, and theatrical collection handling remain out of default scan scope.
 10. Delete / hide semantics, Movie AI background classification, and TV exclusion from Watch Insights / recommendations are unchanged.
+
+## Phase 4.11f-fix-10 - Dotted part title parsing
+
+Completed:
+
+- Verified title-number parsing now distinguishes raw file names from already-trimmed base names, preventing dotted part markers such as `Pt.2` from being treated as file extensions during TV apply.
+- Verified sequence parsing now detects generic `Pt.2` / `Pt 2` / `Part.2` / `Part 2` hints after explicit season markers.
+- Part-aware parse results preserve `seasonHint`, `partHint`, and `episodeInPart` diagnostics.
+- Part hints do not automatically offset episode numbers. A part file such as `Title S3 Pt.2 01` is preserved as unresolved / pending correction unless a later correction workflow can safely map the part offset.
+- `tv-parse` and unsupported-candidate diagnostics now report `partHintDetected`, `partHint`, `episodeInPart`, `episodeOffsetApplied=false`, and `episodeOffsetSkippedReason=no-safe-part-offset`.
+
+Not done:
+
+- No automatic `Part 2 -> E13` or similar offset mapping was added.
+- Final-season, SP/OAD/OVA, theatrical collection, and manual part-offset correction remain deferred.
+- No AI prompt, TMDB top1, year-gate, migration, database update, Watch Insights, or recommendation behavior was changed.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.11f-fix-10 migration is created.
+3. `Pt.2` / `Part.2` no longer causes a second extension trim that removes the episode number.
+4. Part-aware verified sequences log season / part / episode-in-part hints.
+5. Part hint is not treated as an episode number.
+6. Episode-in-part is not automatically offset to a TMDB episode number.
+7. Unresolved part ranges remain unidentified / pending correction instead of wrong-binding.
+8. Existing `Title S3 01` style parsing is not rolled back.
+9. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.11f-fix-11 - Safe sibling part episode offset
+
+Completed:
+
+- The fix-10 dotted part parser path is preserved: verified title-number parsing trims the raw file extension once and keeps `Pt.2` / `Part.2` as part hints instead of treating `.2` as an extension.
+- Part-aware parse results continue to expose `seasonHint`, `partHint`, and `episodeInPart` diagnostics before any offset is considered.
+- A safe sibling part offset pass now runs after TMDB Series / Season validation and before matched Season apply.
+- Offset is generic for `Part 2+`: the current part must have an explicit season number, a `partHint >= 2`, a contiguous episode-in-part sequence starting at 1, a previously bound same-source sibling range for the same TMDB Series and Season, available TMDB season episode count, and no target episode conflict.
+- When safe, `episodeInPart + previousPartEndEpisode` becomes the TMDB episode number and logs `episodeOffsetApplied=true`, `episodeOffsetSource=sibling-part-continuation`, `previousPartEndEpisode`, and `mappedEpisodeNumber`.
+- When unsafe, the files remain unresolved / pending correction with `episodeOffsetSkippedReason` such as `missing-previous-part`, `previous-part-not-bound`, `tmdb-episode-count-unavailable`, `tmdb-episode-count-insufficient`, or `target-episode-conflict`.
+
+Not done:
+
+- No hard-coded `Part 2 -> E13` rule was added.
+- No SP/OAD/OVA, theatrical collection, Final Season mapping, third AI pass, migration, database update, Watch Insights input, or TV recommendation input was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.11f-fix-11 migration is created.
+3. `Pt.2` / `Part.2` still parse as part hints, not extensions.
+4. Part offset requires explicit season and part hints.
+5. Part offset requires same TMDB Series and Season sibling evidence.
+6. Part offset requires a contiguous previous episode range and TMDB season episode count.
+7. Target episode conflicts block offset instead of overwriting sources.
+8. Unsafe part ranges remain unidentified / pending correction.
+9. The logic is generic for later parts and does not special-case a title, folder, or TMDB id.
+10. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.11f-fix-11-hotfix - Disable unsafe part offset apply
+
+Completed:
+
+- Kept the fix-10 dotted part parser path: `Pt.2` / `Part.2` remains a part hint and is not treated as an extension, an episode number, or a TMDB title.
+- Added a hard TV query reject for structural part-only queries such as `Part`, `Pt`, `Part 2`, `S3 Part`, and `Season 3 Part 2`.
+- Structural part queries now go to rejected candidate-query diagnostics with reason `structural-part-query`, including AI refined title sources; they no longer enter usable queries, TMDB search, or auto-apply.
+- Disabled the current automatic sibling part offset apply path for this phase. Existing helper code remains for future redesign, but the active scan path reports `part-offset-apply-disabled` and keeps unresolved part files as unidentified / pending correction.
+- Offset diagnostics now distinguish parse-time `not-evaluated` from an actual safety evaluation failure.
+
+Not done:
+
+- No new Part2 / Part3 offset mapping was implemented.
+- No AI prompt, TMDB top1, year-gate, SP/OAD/OVA, theatrical collection, migration, database update, Watch Insights, or recommendation behavior was changed.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.11f-fix-11-hotfix migration is created.
+3. Structural `Part` / `S Part` queries are rejected before TMDB search.
+4. AI refined structural part queries are not bypassed into usable TV queries.
+5. Part hints remain logged as diagnostics.
+6. Automatic part offset apply is disabled until a safer ordering / evidence model is redesigned.
+7. Unresolved part files remain unidentified / pending correction instead of wrong-binding.
+8. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.11f-fix-13 - Batch AI-on-uncertain requests
+
+Completed:
+
+- AI-on-uncertain no longer sends all final candidate ranges in one large request.
+- Candidate ranges are deterministically grouped by local folder / suspected title context and split into at most 3 batch prompts without splitting any individual range.
+- Up to 3 AI batches run concurrently. Each batch has its own 300 second timeout and can retry once with the same payload.
+- Successful batch hints are retained and merged back into the same `inputRangeId -> MediaFileIds` apply path. Failed batches only affect their own ranges and leave those ranges as local placeholders / ai-candidates.
+- Final AI summary now reports batch count, successful / failed batches, failed range count, parsed / applied / ignored hint totals, and affected media files.
+- Partial AI batch failure is recorded as a warning, not a scan error.
+
+Not done:
+
+- No AI prompt, response schema, TMDB top1, year gate, parser, part-offset, Movie fallback, migration, database update, Watch Insights, or recommendation behavior was changed.
+- Failed batches are not recursively split in this phase; that remains a deferred optimization if a single batch is still too large.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.11f-fix-13 migration is created.
+3. AI-on-uncertain batch count is at most 3.
+4. Each range remains intact inside one batch.
+5. Batches can run concurrently and have independent timeout / retry state.
+6. Successful batch hints are applied even if another batch fails.
+7. Failed batch ranges remain unresolved / pending correction.
+8. Partial AI failure increments warning telemetry, not scan error count.
+9. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.11f-fix-14 - Safe part sequence offset after AI batching
+
+Completed:
+
+- Preserved the fix-10 dotted part parser: `Pt.2` / `Part.2` remains a part hint with `episodeInPart`, not a filename extension or search title.
+- Re-enabled part offset only after the scan has a confirmed TMDB Series and Season from the normal AI refined title / TMDB validation path.
+- Structural part-only queries remain rejected as `structural-part-query`; `Part`, `Pt`, `S Part`, `Season Part`, and season / part / number-only strings cannot search TMDB or auto-apply.
+- Candidate processing now orders sibling part directories so earlier same-parent parts are handled before later parts where possible.
+- Safe offset can use either current-scan evidence already parsed as contiguous E01..N or safely bound database episodes for the same source, TMDB Series, and Season.
+- Offset is generic for later parts: it maps `episodeInPart + previousRangeEndEpisode` only when the previous range starts at E01, is contiguous, TMDB season episodes exist, and target episodes are not occupied.
+- If the evidence is insufficient, the part files stay unidentified / pending correction with explicit skipped reasons such as `missing-previous-range`, `previous-part-not-bound`, `target-episode-missing`, or `target-episode-conflict`.
+
+Not done:
+
+- No fixed `Part 2 -> E13` rule was added.
+- No AI prompt, TMDB top1, year gate, Final Season mapping, SP/OAD/OVA mapping, theatrical collection handling, migration, database update, Watch Insights input, or TV recommendation input was changed.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.11f-fix-14 migration is created.
+3. Structural part-only queries are rejected before TMDB search.
+4. Part offset runs only after TMDB Series / Season confirmation.
+5. Current-scan E01..N evidence can support same-candidate later part offset.
+6. Safely bound database E01..N evidence can support sibling later part offset.
+7. Offset does not create missing TMDB episodes.
+8. Target episode conflicts block offset instead of overwriting sources.
+9. Ordinary non-part TV parsing and AI refined matching are not gated by offset.
+10. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.11f-fix-14-hotfix - AI refined title for unsupported part offset candidates
+
+Completed:
+
+- Unsupported-only part candidates now keep parsed `partHint` / `episodeInPart` files in the search-query source set so an applied AI refined title can confirm the TMDB Series / Season.
+- AI original-language / refined title hints are preferred over folder-name queries for those part candidates. Folder-name noise such as subtitles, quality tags, and structural part wording no longer has to be the only TMDB lookup path.
+- Part offset still starts only after TMDB Series / Season confirmation and the existing safe sibling offset checks.
+- If no AI refined title is available, the refined lookup finds no Series, or the candidate is not safe, part files remain unidentified / pending correction with explicit `episodeOffsetSkippedReason`.
+- Diagnostics now log `aiRefinedTitleAvailable`, `aiRefinedSeriesLookupAttempted`, `aiRefinedSeriesLookupQuery`, `aiRefinedSeriesLookupSucceeded`, and concrete not-evaluated reasons.
+
+Not done:
+
+- No AI prompt, batching, parser, TMDB top1, year gate, Final Season mapping, SP/OAD/OVA mapping, migration, database update, Watch Insights input, or TV recommendation input was changed.
+- No unsafe `Part 2 -> fixed offset` rule was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.11f-fix-14-hotfix migration is created.
+3. Unsupported-only part candidates can use AI refined / original-language title for TMDB Series lookup.
+4. Structural part-only queries remain rejected before TMDB search.
+5. Part offset evaluation starts only after confirmed TMDB Series / Season.
+6. Offset failure leaves files unidentified / pending correction with explicit skipped reasons.
+7. Ordinary non-part TV remains on the existing AI refined / parser path.
+8. TV remains excluded from Watch Insights and AI recommendation inputs.

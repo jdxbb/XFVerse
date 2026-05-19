@@ -12,9 +12,23 @@ public sealed class TvEpisodeFileNameParseResult
 
     public bool VerifiedTitleNumberSequenceContext { get; set; }
 
+    public bool PartHintDetected { get; set; }
+
+    public bool EpisodeOffsetApplied { get; set; }
+
     public int? MultiEpisodeEndNumber { get; set; }
 
+    public int? PartHint { get; set; }
+
+    public int? EpisodeInPart { get; set; }
+
+    public int? EpisodeOffset { get; set; }
+
     public string MultiEpisodePattern { get; set; } = string.Empty;
+
+    public string EpisodeOffsetSkippedReason { get; set; } = string.Empty;
+
+    public string EpisodeOffsetSource { get; set; } = string.Empty;
 
     public int SeasonNumber { get; set; } = 1;
 

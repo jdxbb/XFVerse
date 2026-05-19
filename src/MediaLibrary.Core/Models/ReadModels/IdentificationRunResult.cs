@@ -3,6 +3,7 @@ namespace MediaLibrary.Core.Models.ReadModels;
 public sealed class IdentificationRunResult
 {
     private readonly List<string> _messages = [];
+    private readonly HashSet<string> _warningKeys = new(StringComparer.OrdinalIgnoreCase);
 
     public int AttemptedCount { get; set; }
 
@@ -16,6 +17,8 @@ public sealed class IdentificationRunResult
 
     public IReadOnlyList<string> Messages => _messages;
 
+    public IReadOnlyCollection<string> WarningKeys => _warningKeys;
+
     public bool HasIssues => ErrorCount > 0 || WarningCount > 0;
 
     public void AddError(string stage, string message)
@@ -24,8 +27,13 @@ public sealed class IdentificationRunResult
         AddMessage(stage, message);
     }
 
-    public void AddWarning(string stage, string message)
+    public void AddWarning(string stage, string message, string? key = null)
     {
+        if (!string.IsNullOrWhiteSpace(key) && !_warningKeys.Add(key.Trim()))
+        {
+            return;
+        }
+
         WarningCount++;
         AddMessage(stage, message);
     }

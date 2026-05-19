@@ -155,3 +155,60 @@ Noise:
 - AI 推荐 Tab 未在本轮修改。
 - 推荐算法、画像 AI、媒体库、观影洞察、首页、设置页和播放器未在本轮修改。
 - 未新增 DB 字段，未新增 migration。
+## Phase 4.11f-fix-9 Notes
+
+- Short bare-number folders that look like movie collections and have no TV evidence are intentionally kept out of unidentified TV season grouping.
+- Long-running unknown numeric ranges may still stay split when gaps are too large, duplicate episode numbers exist, or folder evidence is too ambiguous.
+- TV.Parse warnings are no longer scan errors; real scan errors should still come from enumeration, save, access, or provider failures.
+- Existing `._*` MediaFile rows from older scans may remain until covered by missing-file cleanup or manual delete-record cleanup. New scans ignore macOS AppleDouble files before Movie identification.
+
+## Phase 4.11f-fix-10 Notes
+
+- TV part hints such as `Pt.2` / `Part.2` are preserved for correction, but they are not Movie collection evidence and do not change Movie discovery behavior.
+- Automatic part offset mapping remains deferred; unresolved part ranges should stay pending correction rather than becoming wrong Movie or TV bindings.
+
+## Phase 4.11f-fix-11 Notes
+
+- Safe part offset is TV-only and requires same-Series / same-Season sibling evidence before any episode remapping.
+- Movie discovery does not use part hints as Movie title evidence, collection evidence, ranking input, recommendation input, or Watch Insights input.
+- Part files without enough sibling evidence remain unresolved / pending correction in `Other`.
+
+## Phase 4.11f-fix-11-hotfix Notes
+
+- Automatic part offset apply is disabled until the TV-side evidence model is redesigned.
+- Structural part-only queries are rejected before TMDB search and cannot become Movie or TV matches.
+- Part hints remain correction context only; Movie Discovery, Movie recommendation AI, Watch Insights, and delete / visibility semantics are unchanged.
+
+## Phase 4.11f-fix-13 Notes
+
+- AI-on-uncertain batching is TV scan plumbing. Partial batch failure can leave TV ranges unresolved, but it should not change Movie discovery or Movie recommendation behavior.
+- Provider rate limits or a single oversized batch can still leave some ranges unresolved; retry-time sub-batching is deferred.
+
+## Phase 4.11f-fix-14 Notes
+
+- Safe TV part offset can reduce unresolved later-part episodes only when previous same-Series / same-Season episode evidence is available.
+- If part evidence is unsafe, the range remains in TV / Other correction surfaces; Movie discovery should not reinterpret it as a Movie title or collection.
+- Movie Discovery thresholds, recommendation AI inputs, Watch Insights, and delete / visibility semantics remain unchanged.
+
+## Phase 4.11f-fix-14-hotfix Notes
+
+- AI refined title lookup for unsupported TV part candidates is TV-side confirmation only.
+- Structural part-only strings remain rejected and should not be treated as Movie titles, Movie collection hints, recommendation input, or Watch Insights input.
+- Later-part files without safe offset evidence remain unresolved / pending correction in TV / Other surfaces.
+
+## Phase 4.11g Notes
+
+Blocker:
+
+- None for Movie Discovery from the TV scan closeout.
+
+Deferred:
+
+- Cross-type active correction, manual regrouping, Episode detail, multi-source management, TV recommendation inputs, TV Watch Insights, and anime-special mapping remain outside Movie Discovery.
+- Large mixed folders can still create many unresolved `Other` rows; UI ergonomics and performance tuning remain later work.
+- `.sup` is accepted as a subtitle candidate, but playback / renderer behavior still needs validation.
+
+Noise:
+
+- Unrecognized Movie placeholders being visible in `Other` is expected and does not mean Movie Discovery ranking/search changed.
+- TV scan logs may mention Movie fallback blocking or placeholder grouping; those are scan diagnostics and are not Movie Discovery recommendation inputs.

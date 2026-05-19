@@ -449,3 +449,59 @@
 - `dotnet build MediaLibrary.sln`
 - 0 warning
 - 0 error
+# Phase 4.11f-fix-9 Scan Closeout Notes
+
+- Placeholder / orphan grouping now understands additional verified TV-like sequence shapes before they reach Movie fallback: fansub bracket numbers, bracket episode segments reused at apply time, and leading-number-title files with explicit season context.
+- Long-running numeric unknown ranges can be grouped with a small gap ratio, but missing numbers are diagnostics only and do not fabricate Episode rows.
+- A bare-number movie collection guard keeps short `1..5` collection-like folders without TV evidence out of unidentified TV season projection.
+- Scan warnings from TV.Parse no longer inflate scan `ErrorCount`; final scan diagnostics log raw warning count, deduplicated warning count, and `warningsIncludedInErrorCount=false`.
+- Scan discovery now ignores macOS AppleDouble `._*` resource fork files before media type detection, preventing `._*.mkv` from becoming Movie placeholders or AI candidates.
+- Movie discovery, Movie AI recommendation inputs, Watch Insights, and normal Movie fallback thresholds are unchanged.
+
+# Phase 4.11f-fix-10 TV Part Parsing Note
+
+- TV verified title-number parsing now preserves dotted part markers such as `Pt.2` instead of truncating them as file extensions.
+- Part hints are recorded for unresolved TV correction but are not converted into Movie fallback rules or Movie discovery behavior.
+- Movie discovery ranking/search pages, Movie recommendation AI inputs, Watch Insights, delete-record semantics, and visibility semantics remain unchanged.
+
+# Phase 4.11f-fix-11 Safe Part Offset Note
+
+- TV part offset is now allowed only after the same TMDB Series and Season are established and a previous sibling part has already produced a safe contiguous episode range.
+- The rule is generic and does not add Movie-side title, folder, or TMDB exceptions.
+- Unsafe part ranges remain unresolved / pending correction instead of falling back into Movie matching.
+- Movie discovery ranking/search pages, Movie recommendation AI inputs, Watch Insights, delete-record semantics, and visibility semantics remain unchanged.
+
+# Phase 4.11f-fix-11-hotfix Part Query Boundary
+
+- TV structural part-only queries are now rejected before TMDB search, including AI refined title sources.
+- `Part`, `Pt`, `S Part`, `Part 2`, and season / part / number-only variants are not Movie or TV title evidence.
+- The automatic sibling part offset apply path is disabled until a safer TV-side redesign is implemented.
+- Dotted part parsing remains TV correction context only and does not change Movie fallback thresholds, Movie Discovery ranking/search pages, Movie recommendation AI inputs, Watch Insights, delete-record semantics, or visibility semantics.
+
+# Phase 4.11f-fix-13 AI-on-uncertain Batching
+
+- Scan AI-on-uncertain requests are split into at most 3 concurrent batches with one retry per failed batch.
+- Successful TV AI batches still feed the existing TMDB validation path; failed batches keep their ranges unresolved.
+- Partial AI batch failure is a scan warning instead of a scan error.
+- Movie Discovery ranking/search pages, Movie recommendation AI inputs, Watch Insights, Movie fallback thresholds, delete-record semantics, and visibility semantics remain unchanged.
+
+# Phase 4.11f-fix-14 Safe TV Part Offset Boundary
+
+- Safe part sequence offset remains a TV identification concern and does not change Movie discovery or Movie fallback thresholds.
+- Structural part-only strings are rejected before TV TMDB lookup and are not Movie title evidence.
+- Later TV parts can bind only after TMDB Series / Season confirmation plus previous contiguous episode evidence; otherwise they stay unresolved / pending correction.
+- No Movie ranking/search, Movie recommendation AI, Watch Insights, delete-record, or visibility semantics changed.
+
+# Phase 4.11f-fix-14-hotfix Part Candidate Lookup Boundary
+
+- Unsupported-only TV part candidates can now use applied AI refined / original-language titles for TMDB Series confirmation before safe offset evaluation.
+- This remains TV-only plumbing. It does not change Movie discovery thresholds, Movie fallback behavior, Movie recommendation inputs, Watch Insights, delete-record semantics, or visibility semantics.
+- Structural part-only strings remain rejected and are not Movie title evidence.
+
+# Phase 4.11g TV Scan Closeout Boundary
+
+- TV scan final acceptance completed as a scan and media-library closeout, not a Movie Discovery feature change.
+- AI-on-uncertain batching, TV retry scoping, safe part offset, orphan `Other` projection, unidentified Seasons, warning/error semantics, `.rmvb` / `.sup` scan admission, and macOS `._*` ignores are accepted for the TV scan baseline.
+- Movie Discovery search, ranking, Movie AI recommendation inputs, Watch Insights, Movie fallback thresholds, delete-record semantics, and visibility semantics are unchanged.
+- Unrecognized Movie placeholders remain unresolved data under `Other`; recognized Movie rows remain the only rows in the Movie category.
+- Phase 4.12 / 4.13 will own correction UI, Episode detail, multi-source handling, manual regrouping, and complex anime / special content workflows.
