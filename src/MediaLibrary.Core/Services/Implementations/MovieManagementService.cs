@@ -37,6 +37,55 @@ public sealed class MovieManagementService : IMovieManagementService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<int> EnsureUnidentifiedMoviePlaceholderForMediaFileAsync(
+        int mediaFileId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var mediaFile = await dbContext.MediaFiles
+            .FirstOrDefaultAsync(
+                x => x.Id == mediaFileId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted,
+                cancellationToken)
+            ?? throw new InvalidOperationException("未识别文件不存在，或已不在媒体库中。");
+
+        if (mediaFile.MovieId.HasValue)
+        {
+            return mediaFile.MovieId.Value;
+        }
+
+        if (mediaFile.EpisodeId.HasValue)
+        {
+            throw new InvalidOperationException("该文件已属于电视剧集，不能作为未识别电影详情打开。");
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var parsedName = MovieFileNameParser.Parse(mediaFile.FileName);
+        var now = DateTime.UtcNow;
+        var placeholderMovie = new Movie
+        {
+            Title = BuildUnidentifiedMovieTitle(mediaFile.FileName),
+            ReleaseYear = parsedName.ReleaseYear,
+            IdentificationStatus = IdentificationStatus.Failed,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        dbContext.Movies.Add(placeholderMovie);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        mediaFile.MovieId = placeholderMovie.Id;
+        mediaFile.UpdatedAt = now;
+        placeholderMovie.DefaultMediaFileId = mediaFile.Id;
+        placeholderMovie.UpdatedAt = now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return placeholderMovie.Id;
+    }
+
     public async Task SetFavoriteAsync(
         int movieId,
         bool isFavorite,

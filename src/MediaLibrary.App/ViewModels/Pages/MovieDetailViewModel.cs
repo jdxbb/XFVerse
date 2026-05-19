@@ -4,6 +4,7 @@ using System.Net.Http;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
@@ -25,6 +26,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private readonly IAiClassificationService _aiClassificationService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IUserCollectionService _userCollectionService;
+    private readonly IMediaProbeService _mediaProbeService;
+    private readonly HashSet<int> _lazyProbeCheckedMediaFileIds = [];
+    private readonly HashSet<int> _probingMediaFileIds = [];
+    private bool _isProbeCompletionRefreshQueued;
     private AiRecommendationItem? _externalRecommendation;
     private int? _movieId;
     private int? _tmdbId;
@@ -78,7 +83,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         IMovieManagementService movieManagementService,
         IAiClassificationService aiClassificationService,
         IDataRefreshService dataRefreshService,
-        IUserCollectionService userCollectionService)
+        IUserCollectionService userCollectionService,
+        IMediaProbeService mediaProbeService)
         : base("详情", "查看影片信息、播放源、字幕、评分、识别修正和观看记录。")
     {
         _navigationStateService = navigationStateService;
@@ -89,11 +95,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _aiClassificationService = aiClassificationService;
         _dataRefreshService = dataRefreshService;
         _userCollectionService = userCollectionService;
+        _mediaProbeService = mediaProbeService;
 
         SearchCandidatesCommand = new AsyncRelayCommand(SearchCandidatesAsync);
         ApplyManualMatchCommand = new AsyncRelayCommand(ApplyManualMatchAsync);
         SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync);
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync);
+        ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
         OpenPlayerCommand = new AsyncRelayCommand(OpenPlayerAsync, _ => CanOpenPlayer);
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync);
         ToggleWatchedCommand = new AsyncRelayCommand(ToggleWatchedAsync, () => CanToggleWatched);
@@ -104,6 +112,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
 
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
+        _mediaProbeService.ProbeStatusChanged += OnProbeStatusChanged;
     }
 
     public ObservableCollection<MovieRatingItem> Ratings { get; } = [];
@@ -119,6 +128,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public AsyncRelayCommand SetDefaultSourceCommand { get; }
 
     public AsyncRelayCommand ResetSourceRecognitionCommand { get; }
+
+    public RelayCommand ManualProbeSourceCommand { get; }
 
     public AsyncRelayCommand OpenPlayerCommand { get; }
 
@@ -462,6 +473,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 IdentificationStatus.Failed => "该影片尚未识别成功，可使用人工修正或 AI 辅助识别。",
                 _ => "详情已加载。"
             };
+            ScheduleDetailLazyProbe(detail.MovieId, detail.Sources);
 
             if (NeedsAutoClassification(detail))
             {
@@ -479,6 +491,197 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         catch (Exception exception)
         {
             ClearMovieState($"加载影片详情失败：{DescribeException(exception)}");
+        }
+    }
+
+    private void ScheduleDetailLazyProbe(int movieId, IReadOnlyCollection<MovieSourceItem> sources)
+    {
+        var mediaFileIds = sources
+            .Select(source => source.MediaFileId)
+            .Where(mediaFileId => _lazyProbeCheckedMediaFileIds.Add(mediaFileId))
+            .ToArray();
+        if (mediaFileIds.Length == 0)
+        {
+            return;
+        }
+
+        _ = RunDetailLazyProbeAsync(movieId, mediaFileIds);
+    }
+
+    private async Task RunDetailLazyProbeAsync(int movieId, IReadOnlyCollection<int> mediaFileIds)
+    {
+        var requestedMediaFileIds = mediaFileIds
+            .Where(mediaFileId => mediaFileId > 0)
+            .Distinct()
+            .ToArray();
+        SetProbeBusyState(requestedMediaFileIds, isBusy: true);
+        try
+        {
+            var result = await _mediaProbeService.EnqueueDetailSourcesAsync(
+                requestedMediaFileIds,
+                "movie",
+                movieId,
+                cancellationToken: CancellationToken.None);
+            var activeProbeMediaFileIds = result.ProbeMediaFileIds.ToHashSet();
+            SetProbeBusyState(
+                requestedMediaFileIds.Where(mediaFileId => !activeProbeMediaFileIds.Contains(mediaFileId)),
+                isBusy: false);
+            if (result.QueuedCount <= 0)
+            {
+                return;
+            }
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-detail-lazy-refresh contentKind=movie queuedCount={result.QueuedCount} refreshStrategy=probe-status-changed-event");
+        }
+        catch (Exception exception)
+        {
+            SetProbeBusyState(requestedMediaFileIds, isBusy: false);
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-detail-lazy-refresh contentKind=movie skippedReason=refresh-error error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+    }
+
+    private bool CanManualProbeSource(object? parameter)
+    {
+        return parameter is MovieSourceItem source
+               && IsLibraryMovie
+               && _movieId.HasValue
+               && Sources.Any(item => item.MediaFileId == source.MediaFileId)
+               && source.MediaProbeStatus != MediaProbeStatus.Pending
+               && !_probingMediaFileIds.Contains(source.MediaFileId);
+    }
+
+    private async Task ManualProbeSourceAsync(object? parameter)
+    {
+        if (parameter is not MovieSourceItem source)
+        {
+            StatusMessage = "请先选择要探测的播放源。";
+            return;
+        }
+
+        if (!Sources.Any(item => item.MediaFileId == source.MediaFileId))
+        {
+            StatusMessage = "该播放源不属于当前影片。";
+            return;
+        }
+
+        if (!_probingMediaFileIds.Add(source.MediaFileId))
+        {
+            return;
+        }
+
+        ManualProbeSourceCommand.RaiseCanExecuteChanged();
+        StatusMessage = "正在手动探测该播放源。";
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-manual-started contentKind=movie mediaFileId={source.MediaFileId}");
+        try
+        {
+            await _mediaProbeService.ProbeMediaFileAsync(source.MediaFileId, force: true);
+            if (IsLibraryMovie && _movieId is { } movieId && _navigationStateService.SelectedMovieId == movieId)
+            {
+                await LoadMovieAsync(movieId, CancellationToken.None);
+            }
+
+            StatusMessage = "手动探测已完成，播放源信息已刷新。";
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-manual-completed contentKind=movie mediaFileId={source.MediaFileId}");
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"手动探测失败：{DescribeException(exception)}";
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-manual-failed contentKind=movie mediaFileId={source.MediaFileId} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+        finally
+        {
+            _probingMediaFileIds.Remove(source.MediaFileId);
+            ManualProbeSourceCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void OnProbeStatusChanged(object? sender, MediaProbeStatusChangedEventArgs e)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(new Action(() => OnProbeStatusChanged(sender, e)));
+            return;
+        }
+
+        if (!IsLibraryMovie
+            || _movieId is null
+            || _navigationStateService.SelectedMovieId != _movieId
+            || Sources.All(source => source.MediaFileId != e.MediaFileId))
+        {
+            return;
+        }
+
+        UpdateProbeBusyState(e);
+        QueueProbeCompletionRefresh();
+    }
+
+    private void UpdateProbeBusyState(MediaProbeStatusChangedEventArgs e)
+    {
+        SetProbeBusyState([e.MediaFileId], e.Status == MediaProbeStatus.Pending);
+    }
+
+    private void SetProbeBusyState(IEnumerable<int> mediaFileIds, bool isBusy)
+    {
+        var changed = false;
+        foreach (var mediaFileId in mediaFileIds)
+        {
+            if (mediaFileId <= 0)
+            {
+                continue;
+            }
+
+            changed |= isBusy
+                ? _probingMediaFileIds.Add(mediaFileId)
+                : _probingMediaFileIds.Remove(mediaFileId);
+        }
+
+        if (changed)
+        {
+            ManualProbeSourceCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void QueueProbeCompletionRefresh()
+    {
+        if (_isProbeCompletionRefreshQueued)
+        {
+            return;
+        }
+
+        _isProbeCompletionRefreshQueued = true;
+        _ = RefreshAfterProbeStatusChangedAsync();
+    }
+
+    private async Task RefreshAfterProbeStatusChangedAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(600));
+            if (!IsLibraryMovie || _movieId is not { } movieId || _navigationStateService.SelectedMovieId != movieId)
+            {
+                ScanIdentificationDiagnostics.Write(
+                    "event=media-probe-detail-lazy-refresh contentKind=movie skippedReason=page-changed");
+                return;
+            }
+
+            await LoadMovieAsync(movieId, CancellationToken.None);
+            ScanIdentificationDiagnostics.Write(
+                "event=media-probe-detail-lazy-refresh contentKind=movie status=completed refreshStrategy=probe-status-changed-event");
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-detail-lazy-refresh contentKind=movie skippedReason=refresh-error error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+        finally
+        {
+            _isProbeCompletionRefreshQueued = false;
         }
     }
 

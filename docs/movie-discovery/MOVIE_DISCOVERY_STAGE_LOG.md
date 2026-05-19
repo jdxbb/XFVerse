@@ -505,3 +505,14 @@
 - Movie Discovery search, ranking, Movie AI recommendation inputs, Watch Insights, Movie fallback thresholds, delete-record semantics, and visibility semantics are unchanged.
 - Unrecognized Movie placeholders remain unresolved data under `Other`; recognized Movie rows remain the only rows in the Movie category.
 - Phase 4.12 / 4.13 will own correction UI, Episode detail, multi-source handling, manual regrouping, and complex anime / special content workflows.
+
+# Phase 4.12c-fix-4 Movie Detail Lazy Probe Boundary
+
+- Movie detail now queues a background best-effort media probe check for the current Movie's active sources after the detail page loads.
+- The lazy probe path is scoped to the current Movie detail source ids and capped at 10 candidates; it does not scan or enqueue the full library.
+- Movie detail now refreshes automatically from probe status-change notifications when one of the currently displayed sources changes probe state.
+- Movie source-row probe status copy now uses explicit stage language for waiting, running, completed, failed, unavailable, and skipped states.
+- Movie detail source rows now include an `立即探测` action. It validates the source belongs to the current Movie and force-probes only that selected source.
+- Movie detail disables the source-row `立即探测` action while the selected source is probing. Detail-page auto probe temporarily disables checked sources during candidate evaluation, then keeps only queued / pending sources disabled and restores skipped sources.
+- Failed Movie placeholders and orphan carriers reuse the same Movie detail behavior.
+- Movie Discovery ranking, search, recommendation inputs, Watch Insights, Movie fallback thresholds, delete-record semantics, visibility semantics, and correction flows are unchanged.

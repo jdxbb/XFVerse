@@ -58,6 +58,19 @@ public sealed class NavigationStateService : INavigationStateService
                 tvEpisodeId: tvEpisodeId));
     }
 
+    public void RequestEpisodeDetail(int tvEpisodeId)
+    {
+        SelectedMovieId = null;
+        SelectedTvSeriesId = null;
+        SelectedTvSeasonId = null;
+        SelectedTvEpisodeId = tvEpisodeId;
+        SelectedExternalRecommendation = null;
+        SelectedWatchHistoryDate = null;
+        NavigationRequested?.Invoke(
+            this,
+            new NavigationRequest(NavigationPageKey.EpisodeDetail, tvEpisodeId: tvEpisodeId));
+    }
+
     public void RequestExternalMovieDetail(AiRecommendationItem recommendation)
     {
         SelectedMovieId = null;

@@ -348,6 +348,169 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         };
     }
 
+    public async Task<TvEpisodeDetailModel?> GetEpisodeDetailAsync(
+        int episodeId,
+        int? preferredMediaFileId = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var episode = await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => x.Id == episodeId)
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.TvSeasonId,
+                    x.EpisodeNumber,
+                    x.Title,
+                    x.Overview,
+                    x.AirDate,
+                    x.RuntimeMinutes,
+                    x.IsWatched,
+                    x.LastPlayedAt,
+                    x.LastPlayPositionSeconds,
+                    x.DurationWatchedSeconds,
+                    x.StillRemoteUrl,
+                    SeasonNumber = x.Season!.SeasonNumber,
+                    SeasonName = x.Season.Name,
+                    SeasonPosterRemoteUrl = x.Season.PosterRemoteUrl,
+                    SeasonIdentificationStatus = x.Season.IdentificationStatus,
+                    SeriesId = x.Season.TvSeriesId,
+                    SeriesName = x.Season.Series!.Name,
+                    SeriesOriginalName = x.Season.Series.OriginalName,
+                    SeriesPosterRemoteUrl = x.Season.Series.PosterRemoteUrl
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (episode is null)
+        {
+            return null;
+        }
+
+        var sourceRows = await LoadSourceRowsAsync(dbContext, [episode.Id], cancellationToken);
+        var sources = sourceRows
+            .Select(
+                x => new TvEpisodeSourceItem
+                {
+                    MediaFileId = x.MediaFileId,
+                    FileName = x.FileName,
+                    FilePath = x.FilePath,
+                    RemoteUri = x.RemoteUri,
+                    Extension = x.Extension,
+                    FileSize = x.FileSize,
+                    LastModifiedAt = x.LastModifiedAt,
+                    DurationSeconds = x.DurationSeconds,
+                    ResolutionWidth = x.ResolutionWidth,
+                    ResolutionHeight = x.ResolutionHeight,
+                    VideoCodec = x.VideoCodec,
+                    AudioCodec = x.AudioCodec,
+                    AudioChannels = x.AudioChannels,
+                    AudioSampleRate = x.AudioSampleRate,
+                    OverallBitrateKbps = x.OverallBitrateKbps,
+                    VideoBitrateKbps = x.VideoBitrateKbps,
+                    AudioBitrateKbps = x.AudioBitrateKbps,
+                    MediaProbeStatus = x.MediaProbeStatus,
+                    MediaProbeError = x.MediaProbeError,
+                    MediaProbedAt = x.MediaProbedAt,
+                    ProtocolType = x.ProtocolType
+                })
+            .ToList();
+        var sourceIds = sources.Select(x => x.MediaFileId).ToArray();
+        var latestHistoryRows = sourceIds.Length == 0
+            ? []
+            : await dbContext.WatchHistories
+                .AsNoTracking()
+                .Where(history => history.EpisodeId == episodeId && sourceIds.Contains(history.MediaFileId))
+                .OrderByDescending(history => history.EndedAt ?? history.StartedAt)
+                .Select(
+                    history => new
+                    {
+                        history.MediaFileId,
+                        LastPlayedAt = history.EndedAt ?? history.StartedAt,
+                        history.LastPlayPositionSeconds
+                    })
+                .ToListAsync(cancellationToken);
+        var latestHistoryBySource = latestHistoryRows
+            .GroupBy(history => history.MediaFileId)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        foreach (var source in sources)
+        {
+            if (latestHistoryBySource.TryGetValue(source.MediaFileId, out var history))
+            {
+                source.LastPlayedAt = history.LastPlayedAt;
+                source.LastPlayPositionSeconds = history.LastPlayPositionSeconds;
+            }
+        }
+
+        var effectiveDefaultMediaFileId = EpisodeSourceSelectionHelper.ResolveDefaultMediaFileId(
+            sources,
+            preferredMediaFileId,
+            source => source.MediaFileId,
+            source => source.ProtocolType,
+            source => source.FilePath,
+            source => source.DisplayFileName,
+            source => source.LastPlayedAt,
+            source => source.LastPlayPositionSeconds);
+        foreach (var source in sources)
+        {
+            source.IsDefault = source.MediaFileId == effectiveDefaultMediaFileId;
+        }
+
+        sources = sources
+            .OrderBy(source => source.MediaFileId == effectiveDefaultMediaFileId ? 0 : 1)
+            .ThenBy(source => source.ProtocolType == ProtocolType.Local ? 0 : 1)
+            .ThenByDescending(source => source.LastPlayedAt.HasValue)
+            .ThenByDescending(source => source.LastPlayedAt)
+            .ThenByDescending(source => source.LastPlayPositionSeconds > 0)
+            .ThenBy(source => source.DisplayFileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var firstSourceTitle = sourceRows
+            .OrderBy(x => x.FileName, StringComparer.OrdinalIgnoreCase)
+            .Select(x => BuildSafeSourceTitle(x.FileName))
+            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+            ?? string.Empty;
+        var sourceSummary = TvDetailDisplayText.FormatSourceSummary(
+            sourceRows.Select(x => x.ProtocolType).Distinct().ToArray());
+
+        return new TvEpisodeDetailModel
+        {
+            EpisodeId = episode.Id,
+            SeasonId = episode.TvSeasonId,
+            SeriesId = episode.SeriesId,
+            SeasonNumber = episode.SeasonNumber,
+            EpisodeNumber = episode.EpisodeNumber,
+            SeriesName = episode.SeriesName,
+            SeriesOriginalName = episode.SeriesOriginalName ?? string.Empty,
+            SeasonName = episode.SeasonName,
+            Title = episode.SeasonIdentificationStatus == IdentificationStatus.Failed
+                    && IsGenericEpisodeTitle(episode.Title, episode.EpisodeNumber)
+                ? string.Empty
+                : episode.Title,
+            FallbackTitle = string.IsNullOrWhiteSpace(firstSourceTitle)
+                ? $"E{episode.EpisodeNumber:D2}"
+                : firstSourceTitle,
+            Overview = episode.Overview ?? string.Empty,
+            AirDate = episode.AirDate,
+            RuntimeMinutes = episode.RuntimeMinutes,
+            IsWatched = episode.IsWatched,
+            LastPlayedAt = episode.LastPlayedAt,
+            LastPlayPositionSeconds = episode.LastPlayPositionSeconds,
+            DurationWatchedSeconds = episode.DurationWatchedSeconds,
+            StillDisplayUrl = FirstNonEmpty(
+                episode.StillRemoteUrl,
+                episode.SeasonPosterRemoteUrl,
+                episode.SeriesPosterRemoteUrl),
+            ActiveSourceCount = sourceRows.Count,
+            SourceSummary = sourceSummary,
+            DefaultMediaFileId = effectiveDefaultMediaFileId,
+            Sources = sources,
+            SeasonIdentificationStatus = episode.SeasonIdentificationStatus
+        };
+    }
+
     public async Task<string> GetSeasonTmdbRatingDisplayAsync(
         int seasonId,
         CancellationToken cancellationToken = default)
@@ -432,6 +595,26 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                 x => new SourceRow
                 {
                     EpisodeId = x.EpisodeId!.Value,
+                    MediaFileId = x.Id,
+                    FileName = x.FileName,
+                    FilePath = x.FilePath,
+                    RemoteUri = x.RemoteUri ?? string.Empty,
+                    Extension = x.Extension,
+                    FileSize = x.FileSize,
+                    LastModifiedAt = x.LastModifiedAt,
+                    DurationSeconds = x.DurationSeconds,
+                    ResolutionWidth = x.ResolutionWidth,
+                    ResolutionHeight = x.ResolutionHeight,
+                    VideoCodec = x.VideoCodec,
+                    AudioCodec = x.AudioCodec,
+                    AudioChannels = x.AudioChannels,
+                    AudioSampleRate = x.AudioSampleRate,
+                    OverallBitrateKbps = x.OverallBitrateKbps,
+                    VideoBitrateKbps = x.VideoBitrateKbps,
+                    AudioBitrateKbps = x.AudioBitrateKbps,
+                    MediaProbeStatus = x.MediaProbeStatus,
+                    MediaProbeError = x.MediaProbeError,
+                    MediaProbedAt = x.MediaProbedAt,
                     ProtocolType = x.SourceConnection!.ProtocolType
                 })
             .ToListAsync(cancellationToken);
@@ -440,6 +623,31 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
     private static string FirstNonEmpty(params string?[] values)
     {
         return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
+    private static string BuildSafeSourceTitle(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return string.Empty;
+        }
+
+        var name = Path.GetFileNameWithoutExtension(fileName.Trim());
+        return string.IsNullOrWhiteSpace(name) ? fileName.Trim() : name.Trim();
+    }
+
+    private static bool IsGenericEpisodeTitle(string? title, int episodeNumber)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return true;
+        }
+
+        var trimmed = title.Trim();
+        return string.Equals(trimmed, $"第 {episodeNumber} 集", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, $"第{episodeNumber}集", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, $"E{episodeNumber}", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, $"E{episodeNumber:D2}", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<SeasonRatingKey?> LoadSeasonRatingKeyAsync(
@@ -511,6 +719,46 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
     private sealed class SourceRow
     {
         public int EpisodeId { get; set; }
+
+        public int MediaFileId { get; set; }
+
+        public string FileName { get; set; } = string.Empty;
+
+        public string FilePath { get; set; } = string.Empty;
+
+        public string RemoteUri { get; set; } = string.Empty;
+
+        public string Extension { get; set; } = string.Empty;
+
+        public long FileSize { get; set; }
+
+        public DateTime? LastModifiedAt { get; set; }
+
+        public int? DurationSeconds { get; set; }
+
+        public int? ResolutionWidth { get; set; }
+
+        public int? ResolutionHeight { get; set; }
+
+        public string? VideoCodec { get; set; }
+
+        public string? AudioCodec { get; set; }
+
+        public int? AudioChannels { get; set; }
+
+        public int? AudioSampleRate { get; set; }
+
+        public int? OverallBitrateKbps { get; set; }
+
+        public int? VideoBitrateKbps { get; set; }
+
+        public int? AudioBitrateKbps { get; set; }
+
+        public MediaProbeStatus MediaProbeStatus { get; set; } = MediaProbeStatus.NotProbed;
+
+        public string? MediaProbeError { get; set; }
+
+        public DateTime? MediaProbedAt { get; set; }
 
         public ProtocolType ProtocolType { get; set; }
     }

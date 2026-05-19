@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using MediaLibrary.Core.Models.Enums;
 
 namespace MediaLibrary.Core.Models.ReadModels;
@@ -19,6 +20,17 @@ internal static class MediaSourceDisplayText
             ProtocolType.WebDav => "网盘",
             _ => protocolType.ToString()
         };
+    }
+
+    public static string FormatSafeLocation(ProtocolType protocolType, string filePath, string? remoteUri = null)
+    {
+        var location = protocolType == ProtocolType.Local
+            ? BuildSafePathLocation(filePath)
+            : BuildSafeWebDavLocation(filePath, remoteUri);
+
+        return protocolType == ProtocolType.Local
+            ? $"本地位置：{location}"
+            : $"网盘位置：{location}";
     }
 
     public static string FormatFileSize(long fileSize)
@@ -248,12 +260,12 @@ internal static class MediaSourceDisplayText
     {
         return status switch
         {
-            MediaProbeStatus.NotProbed => "未探测",
-            MediaProbeStatus.Pending => "探测中",
-            MediaProbeStatus.Success => "已探测",
-            MediaProbeStatus.Failed => "探测失败",
-            MediaProbeStatus.Unavailable => "ffprobe 不可用",
-            MediaProbeStatus.Skipped => "已跳过",
+            MediaProbeStatus.NotProbed => "待探测（等待后台任务）",
+            MediaProbeStatus.Pending => "探测中（后台读取媒体信息）",
+            MediaProbeStatus.Success => "已完成（媒体信息已更新）",
+            MediaProbeStatus.Failed => "失败（暂未取得媒体信息）",
+            MediaProbeStatus.Unavailable => "不可用（缺少 ffprobe）",
+            MediaProbeStatus.Skipped => "已跳过（非可探测视频）",
             _ => Unknown
         };
     }
@@ -272,10 +284,11 @@ internal static class MediaSourceDisplayText
             || normalized.Contains("basic ", StringComparison.OrdinalIgnoreCase)
             || normalized.Contains("token", StringComparison.OrdinalIgnoreCase))
         {
-            return "错误信息已脱敏";
+            return "失败原因：错误信息已脱敏";
         }
 
-        return normalized.Length <= 160 ? normalized : normalized[..160];
+        var text = normalized.Length <= 160 ? normalized : normalized[..160];
+        return $"失败原因：{text}";
     }
 
     public static string FormatDateTime(DateTime? value)
@@ -300,5 +313,81 @@ internal static class MediaSourceDisplayText
             VideoCacheStatus.InUse => "正在使用，停止后可删除",
             _ => Unknown
         };
+    }
+
+    private static string BuildSafeWebDavLocation(string filePath, string? remoteUri)
+    {
+        var primaryPath = !string.IsNullOrWhiteSpace(filePath)
+            ? DecodeForDisplay(filePath)
+            : string.Empty;
+        if (!string.IsNullOrWhiteSpace(primaryPath) && primaryPath.Trim() != "/")
+        {
+            return BuildSafePathLocation(primaryPath);
+        }
+
+        return BuildSafePathLocation(remoteUri ?? string.Empty);
+    }
+
+    private static string BuildSafePathLocation(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "-";
+        }
+
+        var displayPath = ExtractDisplayPath(value);
+        var parts = displayPath
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(DecodeForDisplay)
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .Where(part => !part.Contains(':', StringComparison.Ordinal))
+            .TakeLast(2)
+            .ToArray();
+
+        return parts.Length == 0 ? DisplayFallback(value) : string.Join(" / ", parts);
+    }
+
+    private static string ExtractDisplayPath(string value)
+    {
+        var trimmed = value.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        {
+            return uri.IsFile
+                ? uri.LocalPath
+                : DecodeForDisplay(uri.AbsolutePath);
+        }
+
+        return DecodeForDisplay(trimmed);
+    }
+
+    private static string DecodeForDisplay(string value)
+    {
+        var decoded = WebUtility.HtmlDecode(value.Trim());
+        for (var attempt = 0; attempt < 2 && decoded.Contains('%', StringComparison.Ordinal); attempt++)
+        {
+            try
+            {
+                var next = Uri.UnescapeDataString(decoded);
+                if (string.Equals(next, decoded, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                decoded = next;
+            }
+            catch
+            {
+                break;
+            }
+        }
+
+        return decoded;
+    }
+
+    private static string DisplayFallback(string value)
+    {
+        var fileName = Path.GetFileName(DecodeForDisplay(value));
+        return string.IsNullOrWhiteSpace(fileName) ? "-" : fileName;
     }
 }

@@ -246,11 +246,29 @@
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <Button Margin="0,0,0,8"
+                                                Command="{Binding DataContext.OpenEpisodeDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Content="详情"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
                                         <Button Command="{Binding DataContext.PlayEpisodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
-                                                Content="{Binding PlayButtonText}"
-                                                IsEnabled="{Binding HasPlayableSource}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                                Content="{Binding PlayButtonText}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasPlayableSource}" Value="True">
+                                                            <Setter Property="IsEnabled" Value="True" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding DataContext.CanOpenEpisodePlayer, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                            <Setter Property="IsEnabled" Value="False" />
+                                                            <Setter Property="Content" Value="播放器打开中" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
                                         <WrapPanel Margin="0,8,0,0" HorizontalAlignment="Center">
                                             <Button Margin="0,0,8,0"
                                                     Command="{Binding DataContext.MarkEpisodeWatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"

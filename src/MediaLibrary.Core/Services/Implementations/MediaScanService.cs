@@ -282,8 +282,14 @@ public sealed class MediaScanService : IMediaScanService
             await UpdateConnectionLastScanAtAsync(connection.Id.Value, completedAt, cancellationToken);
         }
 
+        var mediaProbeCandidateIds = await CollectMediaProbeCandidateIdsAsync(
+            connection.Id.Value,
+            enabledScanPaths.Select(x => x.Id).ToArray(),
+            postProcessVideoMediaFileIds,
+            "webdav",
+            cancellationToken);
         QueueMovieClassification(postProcessVideoMediaFileIds);
-        QueueMediaProbe(postProcessVideoMediaFileIds);
+        QueueMediaProbe(mediaProbeCandidateIds);
 
         totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
         ScanIdentificationDiagnostics.Write(
@@ -311,6 +317,42 @@ public sealed class MediaScanService : IMediaScanService
                     // Media probing is best-effort and must not affect scan results.
                 }
             });
+    }
+
+    private static async Task<IReadOnlyCollection<int>> CollectMediaProbeCandidateIdsAsync(
+        int sourceConnectionId,
+        IReadOnlyCollection<int> scanPathIds,
+        IReadOnlyCollection<int> changedVideoMediaFileIds,
+        string source,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var ids = new HashSet<int>(changedVideoMediaFileIds.Where(id => id > 0));
+        var changedCount = ids.Count;
+        var catchUpIds = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(x => x.SourceConnectionId == sourceConnectionId
+                        && x.ScanPathId.HasValue
+                        && scanPathIds.Contains(x.ScanPathId.Value)
+                        && !x.IsDeleted
+                        && x.MediaType == MediaType.Video)
+            .Where(x => x.MediaProbeStatus != MediaProbeStatus.Success
+                        || x.MediaProbeFileSize != x.FileSize
+                        || x.MediaProbeLastModifiedAt != x.LastModifiedAt)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        var catchUpAddedCount = 0;
+        foreach (var mediaFileId in catchUpIds.Where(id => id > 0))
+        {
+            if (ids.Add(mediaFileId))
+            {
+                catchUpAddedCount++;
+            }
+        }
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-scan-candidates source={source} changedVideoFiles={changedCount} mediaProbeCandidateCount={ids.Count} mediaProbeCatchUpCount={catchUpAddedCount}");
+        return ids.ToArray();
     }
 
     private void QueueMovieClassification(IReadOnlyCollection<int> mediaFileIds)

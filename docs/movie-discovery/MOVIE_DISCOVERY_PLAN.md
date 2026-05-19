@@ -378,6 +378,17 @@
 - 未入库详情继续复用 `DiscoveryExternalMovieAdapter` 到 `AiRecommendationItem`。
 - 不新增 DB 字段，不新增 migration。
 - 不改推荐算法，不改 AI 推荐 Tab，不改媒体库、观影洞察、设置页或播放器。
+
+## Phase 4.12c-fix-4 Movie Detail Lazy Probe Note
+
+- Movie detail now performs a non-blocking lazy probe check for only the current Movie's active playback sources.
+- The check reuses `MediaProbeService`, caps candidates at 10, skips current successful probe snapshots, and does not queue the full library.
+- Movie detail refreshes automatically when a currently displayed source changes probe state, using the shared probe status-change notification.
+- Movie source-row probe status text now uses explicit stage labels for waiting, running, completed, failed, unavailable, and skipped states.
+- Movie detail source rows include an `立即探测` button that force-probes the selected current source and refreshes the detail page.
+- The `立即探测` button is disabled while that source is probing. Detail-page auto probe temporarily disables checked sources during candidate evaluation, then keeps only queued / pending sources disabled and restores skipped sources.
+- Failed Movie placeholders / orphan carriers benefit through the existing unidentified Movie detail carrier.
+- This does not change Movie Discovery search, ranking, recommendation inputs, Watch Insights inputs, correction flows, delete-record semantics, visibility semantics, schema, or migrations.
 # Phase 4.11f-fix-9 Scan Boundary Note
 
 Movie discovery semantics are unchanged. Scan closeout now routes additional verified TV-like sequence patterns away from Movie placeholder scatter when there is same-parent sequence evidence, while short bare-number collection-like folders without TV evidence stay in Other / unknown collection handling instead of unidentified TV season projection. TV.Parse scan warnings are warning telemetry and no longer count as scan errors.

@@ -13,5 +13,6 @@ public enum NavigationPageKey
     MovieDiscovery = 10,
     WatchHistory = 11,
     SeriesOverview = 12,
-    TvSeasonDetail = 13
+    TvSeasonDetail = 13,
+    EpisodeDetail = 14
 }

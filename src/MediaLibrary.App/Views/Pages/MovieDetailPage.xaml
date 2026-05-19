@@ -281,6 +281,11 @@
                                                         Content="播放此源"
                                                         Style="{StaticResource PrimaryButtonStyle}" />
                                                 <Button Margin="0,10,0,0"
+                                                        Command="{Binding DataContext.ManualProbeSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="立即探测"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                <Button Margin="0,10,0,0"
                                                         Command="{Binding DataContext.SetDefaultSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}">
                                                     <Button.Style>

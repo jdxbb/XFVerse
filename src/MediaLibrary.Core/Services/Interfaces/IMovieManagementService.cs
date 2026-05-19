@@ -9,6 +9,10 @@ public interface IMovieManagementService
         int mediaFileId,
         CancellationToken cancellationToken = default);
 
+    Task<int> EnsureUnidentifiedMoviePlaceholderForMediaFileAsync(
+        int mediaFileId,
+        CancellationToken cancellationToken = default);
+
     Task SetFavoriteAsync(
         int movieId,
         bool isFavorite,

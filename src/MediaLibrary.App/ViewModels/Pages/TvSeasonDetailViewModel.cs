@@ -44,6 +44,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private bool _isSeasonUnwatched;
     private bool _isVisibleInLibrary;
     private bool _isEpisodeMetadataLoading;
+    private bool _isOpeningEpisodePlayer;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
     private string _tmdbRatingDisplay = SeasonRatingUnavailableText;
     private string _imdbRatingDisplay = string.Empty;
@@ -64,7 +65,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _dataRefreshService = dataRefreshService;
         NavigateBackToSeriesCommand = new RelayCommand(NavigateBackToSeries, () => _seriesId.HasValue);
-        PlayEpisodeCommand = new AsyncRelayCommand(PlayEpisodeAsync);
+        OpenEpisodeDetailCommand = new RelayCommand(OpenEpisodeDetail);
+        PlayEpisodeCommand = new AsyncRelayCommand(PlayEpisodeAsync, CanPlayEpisode);
         ToggleFavoriteCommand = new AsyncRelayCommand(() => ToggleFavoriteAsync(), () => HasSeason && (IsFavorite || IsSeasonWatched));
         ToggleWantToWatchCommand = new AsyncRelayCommand(() => ToggleWantToWatchAsync(), () => HasSeason && (IsWantToWatch || IsSeasonUnwatched));
         ToggleNotInterestedCommand = new AsyncRelayCommand(() => ToggleNotInterestedAsync(), () => HasSeason);
@@ -74,11 +76,14 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         MarkEpisodeWatchedCommand = new AsyncRelayCommand(parameter => SetEpisodeWatchedAsync(parameter, true));
         MarkEpisodeUnwatchedCommand = new AsyncRelayCommand(parameter => SetEpisodeWatchedAsync(parameter, false));
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
+        _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
     }
 
     public ObservableCollection<TvSeasonEpisodeListItem> Episodes { get; } = [];
 
     public RelayCommand NavigateBackToSeriesCommand { get; }
+
+    public RelayCommand OpenEpisodeDetailCommand { get; }
 
     public AsyncRelayCommand PlayEpisodeCommand { get; }
 
@@ -162,6 +167,24 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     }
 
     public string EpisodeEmptyText => IsEpisodeMetadataLoading ? "正在加载本季集信息..." : "暂无已解析集。";
+
+    public bool IsOpeningEpisodePlayer
+    {
+        get => _isOpeningEpisodePlayer;
+        private set
+        {
+            if (SetProperty(ref _isOpeningEpisodePlayer, value))
+            {
+                RefreshEpisodePlayCommandState();
+            }
+        }
+    }
+
+    public bool CanOpenEpisodePlayer => !IsOpeningEpisodePlayer && !_playerWindowService.IsPlayerOpen;
+
+    public string EpisodePlayButtonBusyText => IsOpeningEpisodePlayer || _playerWindowService.IsPlayerOpen
+        ? "播放器打开中"
+        : string.Empty;
 
     public bool IsUnidentified
     {
@@ -320,6 +343,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             IsEpisodeMetadataLoading = shouldEnsureEpisodeMetadata;
             NavigateBackToSeriesCommand.RaiseCanExecuteChanged();
             RaiseSeasonStateCommandCanExecuteChanged();
+            RefreshEpisodePlayCommandState();
             OnPropertyChanged(nameof(HasEpisodes));
             OnPropertyChanged(nameof(HasNoEpisodes));
             var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
@@ -384,6 +408,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             OnPropertyChanged(nameof(HasEpisodes));
             OnPropertyChanged(nameof(HasNoEpisodes));
             RaiseSeasonStateCommandCanExecuteChanged();
+            RefreshEpisodePlayCommandState();
             StatusMessage = result.HasErrors
                 ? result.BuildStatusMessage()
                 : result.Skipped
@@ -463,6 +488,17 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             _navigationStateService.RequestTvSeriesOverview(_seriesId.Value);
         }
+    }
+
+    private void OpenEpisodeDetail(object? parameter)
+    {
+        if (parameter is not TvSeasonEpisodeListItem episode)
+        {
+            StatusMessage = "请先选择要查看的集。";
+            return;
+        }
+
+        _navigationStateService.RequestEpisodeDetail(episode.EpisodeId);
     }
 
     private async Task ToggleFavoriteAsync()
@@ -609,12 +645,57 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
         try
         {
+            if (!CanOpenEpisodePlayer)
+            {
+                StatusMessage = "播放器已打开或正在打开，请关闭播放器后再播放其他集。";
+                return;
+            }
+
+            IsOpeningEpisodePlayer = true;
             StatusMessage = $"{episode.EpisodeNumberText} 正在打开播放器。";
             await _playerWindowService.OpenEpisodeAsync(episode.EpisodeId);
+            StatusMessage = $"{episode.EpisodeNumberText} 已打开播放器。";
         }
         catch (Exception exception)
         {
             StatusMessage = $"打开剧集播放失败：{DescribeException(exception)}";
+        }
+        finally
+        {
+            if (!_playerWindowService.IsPlayerOpen)
+            {
+                IsOpeningEpisodePlayer = false;
+            }
+        }
+    }
+
+    private bool CanPlayEpisode(object? parameter)
+    {
+        return parameter is TvSeasonEpisodeListItem episode
+               && episode.HasPlayableSource
+               && CanOpenEpisodePlayer;
+    }
+
+    private void OnPlayerWindowClosed(object? sender, EventArgs e)
+    {
+        IsOpeningEpisodePlayer = false;
+        _ = RefreshSeasonAfterPlayerClosedAsync();
+    }
+
+    private async Task RefreshSeasonAfterPlayerClosedAsync()
+    {
+        if (!_seasonId.HasValue || _navigationStateService.SelectedTvSeasonId != _seasonId.Value)
+        {
+            return;
+        }
+
+        try
+        {
+            await ActivateAsync();
+        }
+        catch
+        {
+            // Playback-close refresh is best-effort; the page can still be refreshed manually.
         }
     }
 
@@ -646,11 +727,13 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         IsSeasonUnwatched = true;
         IsVisibleInLibrary = false;
         IsEpisodeMetadataLoading = false;
+        IsOpeningEpisodePlayer = false;
         CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
         StatusMessage = statusMessage;
         Episodes.Clear();
         NavigateBackToSeriesCommand.RaiseCanExecuteChanged();
         RaiseSeasonStateCommandCanExecuteChanged();
+        RefreshEpisodePlayCommandState();
         OnPropertyChanged(nameof(HasEpisodes));
         OnPropertyChanged(nameof(HasNoEpisodes));
     }
@@ -663,6 +746,13 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         MarkSeasonWatchedCommand.RaiseCanExecuteChanged();
         MarkSeasonUnwatchedCommand.RaiseCanExecuteChanged();
         AddSeasonToLibraryCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshEpisodePlayCommandState()
+    {
+        OnPropertyChanged(nameof(CanOpenEpisodePlayer));
+        OnPropertyChanged(nameof(EpisodePlayButtonBusyText));
+        PlayEpisodeCommand.RaiseCanExecuteChanged();
     }
 
     private static string DescribeException(Exception exception)

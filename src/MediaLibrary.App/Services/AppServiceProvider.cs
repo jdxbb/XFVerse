@@ -76,6 +76,7 @@ public static class AppServiceProvider
         services.AddSingleton<MovieDetailViewModel>();
         services.AddSingleton<SeriesOverviewViewModel>();
         services.AddSingleton<TvSeasonDetailViewModel>();
+        services.AddSingleton<EpisodeDetailViewModel>();
         services.AddSingleton<ScanTasksViewModel>();
         services.AddSingleton<RecommendationsViewModel>();
         services.AddSingleton<WatchInsightsViewModel>();

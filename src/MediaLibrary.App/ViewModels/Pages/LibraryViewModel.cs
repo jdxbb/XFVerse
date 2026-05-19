@@ -1650,6 +1650,11 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private void OpenMovie(object? parameter)
     {
+        _ = OpenMovieAsync(parameter);
+    }
+
+    private async Task OpenMovieAsync(object? parameter)
+    {
         var movie = parameter switch
         {
             LibraryMovieItemViewModel item => item.Movie,
@@ -1659,6 +1664,12 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         if (movie is null)
         {
+            return;
+        }
+
+        if (movie.IsOther && movie.OrphanMediaFileId > 0)
+        {
+            await OpenOrphanUnknownMovieDetailAsync(movie.OrphanMediaFileId);
             return;
         }
 
@@ -1693,6 +1704,21 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         _navigationStateService.RequestExternalMovieDetail(BuildRecommendationItem(movie));
+    }
+
+    private async Task OpenOrphanUnknownMovieDetailAsync(int mediaFileId)
+    {
+        try
+        {
+            StatusMessage = "正在打开未识别文件详情。";
+            var movieId = await _movieManagementService.EnsureUnidentifiedMoviePlaceholderForMediaFileAsync(mediaFileId);
+            _dataRefreshService.NotifyLibraryChanged();
+            _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movieId);
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"打开未识别文件详情失败：{DescribeException(exception)}";
+        }
     }
 
     private static AiRecommendationItem BuildRecommendationItem(LibraryMovieListItem movie)

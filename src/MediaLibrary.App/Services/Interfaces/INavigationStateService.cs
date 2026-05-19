@@ -26,6 +26,8 @@ public interface INavigationStateService
 
     void RequestTvSeasonDetail(int tvSeasonId, int? tvEpisodeId = null);
 
+    void RequestEpisodeDetail(int tvEpisodeId);
+
     void RequestExternalMovieDetail(AiRecommendationItem recommendation);
 
     DateTime? ConsumeWatchHistoryTargetDate();

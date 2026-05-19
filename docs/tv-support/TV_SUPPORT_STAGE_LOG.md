@@ -1671,3 +1671,203 @@ Manual acceptance matrix:
 6. Offset failure leaves files unidentified / pending correction with explicit skipped reasons.
 7. Ordinary non-part TV remains on the existing AI refined / parser path.
 8. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.12b - Episode detail and unknown detail shells
+
+Completed:
+
+- Added an Episode detail navigation route, ViewModel, and page shell.
+- Added a TV detail query for Episode basics: Series / Season / Episode labels, identification status, overview / air date / runtime, watched / progress summary, source count, and source summary.
+- Episode detail supports both recognized Episodes and failed unidentified Episodes. Missing titles fall back to safe source file names or `E{n}`.
+- Season detail now has a non-playback `详情` entry per Episode. The existing Episode play command and playback button behavior were left unchanged.
+- Other orphan unknown video items now ensure a failed Movie placeholder before opening and then reuse the existing unidentified Movie detail page as their detail carrier.
+- Added a `修正信息` placeholder on Episode detail. It only reports that correction will be supported later and does not call AI, TMDB, or mutate correction state.
+- Kept TV outside Watch Insights, AI recommendation inputs, Watch Profile inputs, and recommendation fingerprints.
+
+Not done:
+
+- No full Episode playback-source list, specified-source playback, source deletion, watched/unwatched write action, real correction workflow, AI correction, TMDB candidate search, scan-rule change, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.12b migration is created.
+3. Recognized Episodes can open the Episode detail shell from Season detail.
+4. Failed unidentified Episodes can open the same shell with `未识别 / 待修正` status.
+5. Season detail Episode play buttons keep their existing behavior.
+6. Episode detail tolerates missing overview / air date / runtime / title metadata.
+7. Episodes with active sources show a source count; Episodes without active sources show `暂无播放源`.
+8. Other orphan unknown video files open through the unidentified Movie detail carrier instead of doing nothing.
+9. The `修正信息` action is a placeholder only and does not trigger AI, TMDB, or correction writes.
+10. Movie detail and unidentified Movie detail remain the carrier for Movie / orphan unknown items.
+
+## Phase 4.12c - Episode source list and playback
+
+Completed:
+
+- Episode detail now shows a full active source list instead of only a source summary.
+- Source rows display safe file names, local / WebDAV source type, masked location text, format, file size, duration, resolution, codecs, bitrate, probe state, recent playback, and progress where available.
+- Added a top Episode play button that uses a derived default source. The default derivation prefers an explicit preferred source, then recent / in-progress playable source, then accessible local source, then WebDAV or the first stable source.
+- Added per-source `播放此源` actions. The Episode detail ViewModel validates that the source belongs to the current Episode before passing `EpisodeId + MediaFileId` to the existing Episode player service.
+- Recognized Episodes and failed unidentified Episodes use the same source list and playback path.
+- Episodes without active sources keep the detail shell, display `暂无播放源`, and keep playback disabled.
+- Other orphan unknown files still reuse the failed Movie placeholder / unidentified Movie detail carrier; no raw orphan playback path was added.
+- Kept the `修正信息` action as a placeholder only.
+
+Not done:
+
+- No source deletion, persistent Episode default source, watched / unwatched write action, real correction workflow, AI correction, TMDB candidate search, batch correction, manual Season aggregation, scan-rule change, online subtitle search, TV Watch Insights input, TV recommendation input, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.12c migration is created.
+3. Recognized Episodes display active source rows.
+4. A single-source Episode can use the top play button.
+5. A multi-source Episode top play uses the derived default source.
+6. A multi-source Episode can play an explicitly selected source.
+7. Failed unidentified Episodes display sources and use the same playback path.
+8. Source rows do not display full local paths or full WebDAV URLs.
+9. Episodes without sources display `暂无播放源` and disable playback.
+10. Season detail Episode play buttons keep their existing behavior.
+11. Movie detail source list and playback behavior remain unchanged.
+12. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.12c-fix - Episode source display and default playback alignment
+
+Completed:
+
+- Moved Episode source location text onto a shared source display helper. Episode detail now decodes WebDAV / path text for display only, masks locations to safe trailing segments, and does not expose full local paths or full WebDAV URLs.
+- Replaced the Episode detail-only safe-location implementation so recognized Episodes and failed unidentified Episodes use the same local / WebDAV display behavior.
+- Added a shared Episode default-source selection helper and wired both Episode detail and Episode playback session resolution to it.
+- The non-persistent Episode default rule is: preferred active source, accessible local source, recent / in-progress source, WebDAV source, then stable first source.
+- `OpenEpisodeAsync(episodeId)` now resolves the same Episode default source as the Episode detail top play button. Passing an explicit `MediaFileId` still plays that selected source.
+- Season detail Episode play buttons continue to call the existing Episode player path, but now inherit the aligned playback-session default rule.
+- Episode detail source-row playback remains guarded so the selected `MediaFileId` must belong to the current Episode.
+- Episode detail top play, Episode source-row play, and Season detail Episode play commands now enter a short opening state so repeated clicks cannot start duplicate playback work.
+
+Not done:
+
+- No WebDAV lazy probe, manual reprobe entry, Movie detail raw-path display change, source deletion, set-default button, persistent Episode default source, watched / unwatched write action, real correction flow, AI correction, TMDB candidate search, scan-rule change, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.12c-fix migration is created.
+3. Episode detail WebDAV locations are decoded for display and do not show full URLs.
+4. Episode detail local locations do not show full absolute paths.
+5. WebDAV-only, local-only, and mixed WebDAV + local Episode source lists keep all active sources visible.
+6. Episode detail top play and `OpenEpisodeAsync(episodeId)` use the same derived default source.
+7. Season detail Episode play uses the same playback-session default rule.
+8. Explicit source-row playback still plays the selected source.
+9. Failed unidentified Episode source list and playback stay on the same path as recognized Episode.
+10. Episodes without sources still show `暂无播放源` and keep playback disabled.
+11. Movie detail playback behavior remains unchanged.
+12. TV remains excluded from Watch Insights and AI recommendation inputs.
+
+## Phase 4.12c-fix-2 - Episode play busy state while player is open
+
+Completed:
+
+- Aligned Episode detail playback buttons with the existing player-window lifecycle semantics: play buttons now remain disabled while `IPlayerWindowService.IsPlayerOpen` is true, not only during the short open call.
+- Episode detail subscribes to `PlayerWindowClosed` and refreshes command state / detail data when the player closes.
+- Episode detail top play button and per-source play buttons now bind explicit busy text and `CanOpenPlayer`, so the disabled state is visible even when command requery is not enough.
+- Season detail Episode play commands now use the same page-level player-open gate and stay disabled while any player window is open.
+- Season detail Episode play buttons have explicit XAML `IsEnabled` trigger logic combining `HasPlayableSource` with the page-level `CanOpenEpisodePlayer`.
+- The existing selected-source guard and Episode default-source rule were not changed.
+
+Not done:
+
+- No source deletion, set-default action, watched / unwatched write action, default-source rule change, scan-rule change, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Episode detail top play disables while the player window is open.
+2. Episode detail source-row play disables while the player window is open.
+3. Season detail Episode play disables while the player window is open.
+4. Buttons recover after `PlayerWindowClosed`.
+5. Playback failure recovers the buttons because no player window remains open.
+6. Episodes without sources remain disabled.
+7. Explicit source-row playback still plays the selected source.
+8. Episode default-source selection remains unchanged from 4.12c-fix.
+9. Movie detail playback behavior remains unchanged.
+10. No new Phase 4.12c-fix-2 migration is created.
+
+## Phase 4.12c-fix-3 - Episode media probing restore
+
+Completed:
+
+- Audited the Movie / Episode media-probe path. Detail pages do not start ffprobe; both read technical fields already stored on `MediaFile`.
+- Confirmed `MediaProbeService` writes probe results to `MediaFile`, so Movie, Episode, failed Episode placeholders, and orphan / failed Movie placeholders can share the same probe fields.
+- WebDAV and local scans now expand the post-scan probe candidate set beyond newly changed videos to include active videos in the scanned paths whose probe status is not successful or whose probe snapshot is stale.
+- This catch-up candidate collection covers Episode sources and existing unprobed sources without changing TV identification or Movie fallback rules.
+- Added probe queue diagnostics with counts for Movie, Episode, orphan, WebDAV, and local sources.
+- Added sanitized probe lifecycle diagnostics for skipped, started, succeeded, failed, and unavailable probe outcomes. Logs include source kind and protocol but not full local paths or full WebDAV URLs.
+- Episode detail source rows already mapped duration, resolution, codec, bitrate, probe status, probe error, and probed-at fields from `MediaFile`, so no detail-page lazy probing was added.
+
+Not done:
+
+- No detail-page lazy probe, manual reprobe action, background task center, ffprobe architecture rewrite, scan recognition rule change, default-source rule change, source deletion, set-default action, watched / unwatched write action, TV Watch Insights input, TV recommendation input, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.12c-fix-3 migration is created.
+3. Local Episode sources are included in post-scan probe candidates when they are new, changed, unprobed, or stale.
+4. WebDAV Episode sources are included in post-scan probe candidates when they are new, changed, unprobed, or stale.
+5. Failed unidentified Episode sources use the same `MediaFile` probe path.
+6. Movie source probing remains on the same `MediaFile` path.
+7. Probe execution is not filtered by `MovieId`; Episode and orphan sources are not skipped solely because they are not Movie sources.
+8. WebDAV probe still uses the existing playback URL / credential construction and remains best-effort.
+9. Probe logs are diagnostic and sanitized, with no full local paths or full WebDAV URLs.
+10. Episode detail continues to display existing probe fields from `MediaFile`.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: manual reprobe and detail-page lazy probe remain out of scope.
+- Noise: WebDAV probe can still fail because of remote server, credential, timeout, or ffprobe limitations; the fix records sanitized failure status instead of fabricating technical metadata.
+
+## Phase 4.12c-fix-4 - Detail lazy media probing
+
+Completed:
+
+- Added a detail-page lazy probe path for Movie detail and Episode detail.
+- Movie detail now schedules a background best-effort probe check for the current Movie's active video sources after the detail model has loaded.
+- Episode detail now schedules the same check for the current Episode's active video sources, including failed unidentified Episodes.
+- The lazy path only receives current detail source ids, then `MediaProbeService` rechecks ownership, active video state, deleted state, source kind, probe status, stale probe snapshots, recent pending probes, and input availability before queueing.
+- Each detail page queues at most 10 lazy probe candidates per call and tracks checked `MediaFileId` values for the ViewModel lifetime to avoid repeat enqueue from repeated refreshes.
+- Detail lazy probe uses the same `MediaProbeService` background queue as scan-time probe. It does not block the first detail render or playback buttons.
+- `MediaProbeService` now emits probe status-change notifications when a source enters pending and when it reaches success / failed / unavailable / skipped.
+- Current Movie / Episode detail pages listen for those notifications and refresh automatically when one of their displayed sources changes probe state.
+- Added sanitized detail-lazy probe diagnostics for check start, candidates, queued work, skipped work, and status-change refresh.
+- Probe status text in source rows now uses explicit stage language for waiting, running, completed, failed, unavailable, and skipped states. Episode source rows also show sanitized failure reason text.
+- Episode detail source rows now include an `立即探测` action. It validates the source belongs to the current Episode and then runs a force probe for that `MediaFileId` immediately, refreshing the detail view after completion.
+- Episode and Movie detail probe actions are disabled while the selected source is probing. Detail-page auto probe temporarily disables checked sources during candidate evaluation, then keeps only queued / pending sources disabled and restores skipped sources.
+
+Not done:
+
+- No app startup probe, full-library probe backlog, task center UI, probe architecture rewrite, scan-rule change, Episode default-source change, source deletion, set-default action, watched / unwatched write action, TV Watch Insights input, TV recommendation input, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. No new Phase 4.12c-fix-4 migration is created.
+3. Opening Episode detail can queue current unprobed / stale Episode sources for probe.
+4. Failed unidentified Episode detail uses the same lazy probe path.
+5. Opening Movie detail can queue current unprobed / stale Movie sources for probe.
+6. Failed Movie placeholders / orphan carriers use Movie detail lazy probe.
+7. Sources outside the current Movie / Episode are rejected by ownership checks.
+8. Successfully probed and current sources are skipped.
+9. Recent pending sources are skipped to avoid duplicate active probe work.
+10. Detail pages do not queue all library files.
+11. Detail pages remain playable while lazy probe runs.
+12. Logs remain sanitized and do not contain full local paths or full WebDAV URLs.
+13. Episode source-row `立即探测` starts a force probe for the selected source only.
+14. Probe buttons are disabled while the selected source is actively probing, including detail-page lazy probe candidate evaluation and pending state.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: background task-center UI remains deferred.
+- Noise: probe status-change refresh is debounced; several near-simultaneous source completions may appear after one combined refresh.

@@ -537,10 +537,20 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                 })
             .ToList();
 
-        var selectedMediaFileId = ResolveSelectedMediaFileId(
-            sources,
-            preferredMediaFileId,
-            movieDefaultMediaFileId: null);
+        var selectedMediaFileId = EpisodeSourceSelectionHelper.ResolveDefaultMediaFileId(
+                                      sources,
+                                      preferredMediaFileId,
+                                      source => source.MediaFileId,
+                                      source => source.ProtocolType,
+                                      source => source.FilePath,
+                                      source => source.FileName,
+                                      source => latestHistory.TryGetValue(source.MediaFileId, out var history)
+                                          ? history.LastPlayedAt
+                                          : (DateTime?)null,
+                                      source => sourceSpecificResumePositions.TryGetValue(source.MediaFileId, out var position)
+                                          ? position
+                                          : 0)
+                                  ?? sources[0].MediaFileId;
         foreach (var source in sources)
         {
             source.IsDefault = source.MediaFileId == selectedMediaFileId;
@@ -549,6 +559,11 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
         sources = sources
             .OrderBy(x => x.MediaFileId == selectedMediaFileId ? 0 : 1)
             .ThenBy(x => x.ProtocolType == ProtocolType.Local ? 0 : 1)
+            .ThenByDescending(x => latestHistory.ContainsKey(x.MediaFileId))
+            .ThenByDescending(x => latestHistory.TryGetValue(x.MediaFileId, out var history)
+                ? history.LastPlayedAt
+                : (DateTime?)null)
+            .ThenByDescending(x => sourceSpecificResumePositions.TryGetValue(x.MediaFileId, out var position) && position > 0)
             .ThenBy(x => x.FileName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 

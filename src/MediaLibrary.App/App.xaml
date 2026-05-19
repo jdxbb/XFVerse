@@ -33,6 +33,9 @@
             <DataTemplate DataType="{x:Type viewModels:TvSeasonDetailViewModel}">
                 <pages:TvSeasonDetailPage />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:EpisodeDetailViewModel}">
+                <pages:EpisodeDetailPage />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type viewModels:ScanTasksViewModel}">
                 <pages:ScanTasksPage />
             </DataTemplate>

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
@@ -16,7 +17,9 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
 {
     private const int MaxAutomaticAttempts = 2;
     private const int MaxErrorLength = 500;
+    private const int DefaultDetailLazyProbeLimit = 10;
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(25);
+    private static readonly TimeSpan RecentPendingThreshold = TimeSpan.FromMinutes(2);
     private readonly ConcurrentQueue<ProbeQueueItem> _queue = new();
     private readonly HashSet<int> _queuedMediaFileIds = [];
     private readonly object _queueLock = new();
@@ -24,31 +27,89 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
     private int _isWorkerRunning;
     private bool _disposed;
 
-    public Task EnqueueMediaFilesAsync(
+    public event EventHandler<MediaProbeStatusChangedEventArgs>? ProbeStatusChanged;
+
+    public async Task<MediaProbeDetailLazyResult> EnqueueDetailSourcesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        string contentKind,
+        int contentId,
+        int limit = DefaultDetailLazyProbeLimit,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedContentKind = NormalizeContentKind(contentKind);
+        var requestedIds = mediaFileIds
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+        var effectiveLimit = Math.Clamp(limit, 0, DefaultDetailLazyProbeLimit);
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-detail-lazy-check-started contentKind={normalizedContentKind} contentId={contentId} sourceCount={requestedIds.Length} limit={effectiveLimit}");
+
+        if (requestedIds.Length == 0 || effectiveLimit == 0 || cancellationToken.IsCancellationRequested || _disposed)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-detail-lazy-skipped contentKind={normalizedContentKind} contentId={contentId} sourceCount={requestedIds.Length} skippedReason={ScanIdentificationDiagnostics.FormatValue(requestedIds.Length == 0 ? "no-sources" : "probe-unavailable")} limit={effectiveLimit}");
+            return new MediaProbeDetailLazyResult(
+                requestedIds.Length,
+                0,
+                0,
+                requestedIds.Length,
+                effectiveLimit,
+                Array.Empty<int>());
+        }
+
+        var candidateResult = await LoadDetailLazyProbeCandidatesAsync(
+            requestedIds,
+            normalizedContentKind,
+            contentId,
+            effectiveLimit,
+            cancellationToken);
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-detail-lazy-candidates contentKind={normalizedContentKind} contentId={contentId} sourceCount={candidateResult.SourceCount} candidateCount={candidateResult.CandidateIds.Count} skippedCount={candidateResult.SkippedCount} protocolLocalCount={candidateResult.LocalCandidateCount} protocolWebDavCount={candidateResult.WebDavCandidateCount} limit={effectiveLimit} skippedReasons={ScanIdentificationDiagnostics.FormatValue(candidateResult.SkippedReasonsText)}");
+
+        if (candidateResult.CandidateIds.Count == 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-detail-lazy-skipped contentKind={normalizedContentKind} contentId={contentId} sourceCount={candidateResult.SourceCount} candidateCount=0 skippedReason={ScanIdentificationDiagnostics.FormatValue("no-candidates")} limit={effectiveLimit}");
+            return new MediaProbeDetailLazyResult(
+                candidateResult.SourceCount,
+                0,
+                0,
+                candidateResult.SkippedCount,
+                effectiveLimit,
+                Array.Empty<int>());
+        }
+
+        var enqueueResult = EnqueueMediaFilesCore(candidateResult.CandidateIds, force: false, cancellationToken);
+        await WriteProbeQueueSummaryAsync(
+            enqueueResult.RequestedCount,
+            enqueueResult.EnqueuedIds,
+            enqueueResult.DuplicateCount,
+            cancellationToken);
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-detail-lazy-queued contentKind={normalizedContentKind} contentId={contentId} sourceCount={candidateResult.SourceCount} candidateCount={candidateResult.CandidateIds.Count} queuedCount={enqueueResult.EnqueuedIds.Count} duplicateQueuedCount={enqueueResult.DuplicateCount} limit={effectiveLimit}");
+        StartWorkerIfNeeded();
+        return new MediaProbeDetailLazyResult(
+            candidateResult.SourceCount,
+            candidateResult.CandidateIds.Count,
+            enqueueResult.EnqueuedIds.Count,
+            candidateResult.SkippedCount,
+            effectiveLimit,
+            candidateResult.CandidateIds);
+    }
+
+    public async Task EnqueueMediaFilesAsync(
         IReadOnlyCollection<int> mediaFileIds,
         bool force = false,
         CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested || mediaFileIds.Count == 0 || _disposed)
-        {
-            return Task.CompletedTask;
-        }
-
-        foreach (var mediaFileId in mediaFileIds.Where(id => id > 0).Distinct())
-        {
-            lock (_queueLock)
-            {
-                if (!_queuedMediaFileIds.Add(mediaFileId))
-                {
-                    continue;
-                }
-
-                _queue.Enqueue(new ProbeQueueItem(mediaFileId, force));
-            }
-        }
-
+        var enqueueResult = EnqueueMediaFilesCore(mediaFileIds, force, cancellationToken);
+        await WriteProbeQueueSummaryAsync(
+            enqueueResult.RequestedCount,
+            enqueueResult.EnqueuedIds,
+            enqueueResult.DuplicateCount,
+            cancellationToken);
         StartWorkerIfNeeded();
-        return Task.CompletedTask;
     }
 
     public async Task EnqueueMovieSourcesAsync(
@@ -64,6 +125,226 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
             .ToListAsync(cancellationToken);
 
         await EnqueueMediaFilesAsync(mediaFileIds, force, cancellationToken);
+    }
+
+    private ProbeEnqueueResult EnqueueMediaFilesCore(
+        IReadOnlyCollection<int> mediaFileIds,
+        bool force,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested || mediaFileIds.Count == 0 || _disposed)
+        {
+            return new ProbeEnqueueResult(0, [], 0);
+        }
+
+        var requestedIds = mediaFileIds
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+        var enqueuedIds = new List<int>(requestedIds.Length);
+        var duplicateCount = 0;
+        foreach (var mediaFileId in requestedIds)
+        {
+            lock (_queueLock)
+            {
+                if (!_queuedMediaFileIds.Add(mediaFileId))
+                {
+                    duplicateCount++;
+                    continue;
+                }
+
+                _queue.Enqueue(new ProbeQueueItem(mediaFileId, force));
+                enqueuedIds.Add(mediaFileId);
+            }
+        }
+
+        return new ProbeEnqueueResult(requestedIds.Length, enqueuedIds, duplicateCount);
+    }
+
+    private static async Task<DetailLazyProbeCandidateResult> LoadDetailLazyProbeCandidatesAsync(
+        IReadOnlyCollection<int> requestedIds,
+        string contentKind,
+        int contentId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var mediaFiles = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Include(x => x.SourceConnection)
+            .Where(x => requestedIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+        var filesById = mediaFiles.ToDictionary(x => x.Id);
+        var candidateRows = new List<MediaFile>(Math.Min(limit, requestedIds.Count));
+        var skippedReasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var limitSkippedCount = 0;
+        var now = DateTime.UtcNow;
+
+        foreach (var mediaFileId in requestedIds)
+        {
+            if (!filesById.TryGetValue(mediaFileId, out var mediaFile))
+            {
+                AddSkippedReason(skippedReasons, "missing-media-file");
+                continue;
+            }
+
+            var skippedReason = GetDetailLazyProbeSkippedReason(mediaFile, contentKind, contentId, now);
+            if (!string.IsNullOrWhiteSpace(skippedReason))
+            {
+                AddSkippedReason(skippedReasons, skippedReason);
+                continue;
+            }
+
+            if (candidateRows.Count >= limit)
+            {
+                limitSkippedCount++;
+                AddSkippedReason(skippedReasons, "limit");
+                continue;
+            }
+
+            candidateRows.Add(mediaFile);
+        }
+
+        return new DetailLazyProbeCandidateResult(
+            requestedIds.Count,
+            candidateRows.Select(x => x.Id).ToArray(),
+            requestedIds.Count - candidateRows.Count,
+            candidateRows.Count(x => x.SourceConnection?.ProtocolType == ProtocolType.Local),
+            candidateRows.Count(x => x.SourceConnection?.ProtocolType != ProtocolType.Local),
+            limitSkippedCount,
+            FormatSkippedReasons(skippedReasons));
+    }
+
+    private static string? GetDetailLazyProbeSkippedReason(
+        MediaFile mediaFile,
+        string contentKind,
+        int contentId,
+        DateTime now)
+    {
+        if (mediaFile.IsDeleted)
+        {
+            return "deleted";
+        }
+
+        if (mediaFile.MediaType != MediaType.Video)
+        {
+            return "not-video";
+        }
+
+        if (MediaFileRules.IsIgnoredSystemFile(mediaFile.FileName))
+        {
+            return "ignored-system-file";
+        }
+
+        if (contentKind == "movie" && mediaFile.MovieId != contentId)
+        {
+            return "not-current-movie-source";
+        }
+
+        if (contentKind == "episode" && mediaFile.EpisodeId != contentId)
+        {
+            return "not-current-episode-source";
+        }
+
+        if (!HasProbeInputInformation(mediaFile))
+        {
+            return "missing-probe-input";
+        }
+
+        if (IsRecentlyPending(mediaFile, now))
+        {
+            return "pending";
+        }
+
+        return ShouldProbe(mediaFile) ? null : "current-or-attempt-limit";
+    }
+
+    private static bool HasProbeInputInformation(MediaFile mediaFile)
+    {
+        if (mediaFile.SourceConnection is null)
+        {
+            return false;
+        }
+
+        if (mediaFile.SourceConnection.ProtocolType == ProtocolType.Local)
+        {
+            return !string.IsNullOrWhiteSpace(mediaFile.FilePath);
+        }
+
+        return !string.IsNullOrWhiteSpace(mediaFile.FilePath)
+               || !string.IsNullOrWhiteSpace(mediaFile.RemoteUri);
+    }
+
+    private static bool IsRecentlyPending(MediaFile mediaFile, DateTime now)
+    {
+        return mediaFile.MediaProbeStatus == MediaProbeStatus.Pending
+               && now - mediaFile.UpdatedAt <= RecentPendingThreshold;
+    }
+
+    private static void AddSkippedReason(IDictionary<string, int> skippedReasons, string reason)
+    {
+        skippedReasons.TryGetValue(reason, out var count);
+        skippedReasons[reason] = count + 1;
+    }
+
+    private static string FormatSkippedReasons(IReadOnlyDictionary<string, int> skippedReasons)
+    {
+        return skippedReasons.Count == 0
+            ? "(none)"
+            : string.Join(
+                "|",
+                skippedReasons
+                    .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => $"{x.Key}:{x.Value}"));
+    }
+
+    private static string NormalizeContentKind(string contentKind)
+    {
+        return string.Equals(contentKind, "episode", StringComparison.OrdinalIgnoreCase)
+            ? "episode"
+            : "movie";
+    }
+
+    private static async Task WriteProbeQueueSummaryAsync(
+        int requestedCount,
+        IReadOnlyCollection<int> enqueuedIds,
+        int duplicateCount,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var rows = enqueuedIds.Count == 0
+                ? []
+                : await LoadProbeQueueRowsAsync(enqueuedIds, cancellationToken);
+            var movieSourceCount = rows.Count(x => x.MovieId.HasValue);
+            var episodeSourceCount = rows.Count(x => x.EpisodeId.HasValue);
+            var orphanSourceCount = rows.Count(x => !x.MovieId.HasValue && !x.EpisodeId.HasValue);
+            var webDavCount = rows.Count(x => x.ProtocolType == ProtocolType.WebDav);
+            var localCount = rows.Count(x => x.ProtocolType == ProtocolType.Local);
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-queued mediaProbeCandidateCount={requestedCount} mediaProbeMovieSourceCount={movieSourceCount} mediaProbeEpisodeSourceCount={episodeSourceCount} mediaProbeOrphanSourceCount={orphanSourceCount} mediaProbeWebDavCount={webDavCount} mediaProbeLocalCount={localCount} mediaProbeEnqueuedCount={rows.Count} mediaProbeDuplicateQueuedCount={duplicateCount}");
+        }
+        catch
+        {
+            // Probe diagnostics are best-effort and must not affect scanning or playback.
+        }
+    }
+
+    private static async Task<IReadOnlyList<ProbeQueueRow>> LoadProbeQueueRowsAsync(
+        IReadOnlyCollection<int> enqueuedIds,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        return await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(x => enqueuedIds.Contains(x.Id))
+            .Select(
+                x => new ProbeQueueRow(
+                    x.MovieId,
+                    x.EpisodeId,
+                    x.SourceConnection == null ? ProtocolType.WebDav : x.SourceConnection.ProtocolType))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task ProbeMediaFileAsync(
@@ -261,6 +542,8 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
 
         if (mediaFile is null)
         {
+            ScanIdentificationDiagnostics.Write(
+                $"event=media-probe-skipped mediaFileId={mediaFileId} mediaFileKind=missing protocolType=unknown probeSkippedReason=missing-media-file");
             return null;
         }
 
@@ -272,11 +555,14 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
             mediaFile.MediaProbedAt = now;
             mediaFile.UpdatedAt = now;
             await dbContext.SaveChangesAsync(cancellationToken);
+            WriteProbeSkipped(mediaFile, "not-video");
+            NotifyProbeStatusChanged(mediaFile, MediaProbeStatus.Skipped);
             return null;
         }
 
         if (!force && !ShouldProbe(mediaFile))
         {
+            WriteProbeSkipped(mediaFile, "snapshot-current-or-attempt-limit");
             return null;
         }
 
@@ -295,6 +581,8 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
             mediaFile.MediaProbeLastModifiedAt = mediaFile.LastModifiedAt;
             mediaFile.UpdatedAt = now;
             await dbContext.SaveChangesAsync(cancellationToken);
+            WriteProbeIssue(mediaFile, MediaProbeStatus.Failed, "probe-input-build-failed");
+            NotifyProbeStatusChanged(mediaFile, MediaProbeStatus.Failed);
             return null;
         }
 
@@ -303,12 +591,15 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         mediaFile.MediaProbeError = null;
         mediaFile.UpdatedAt = now;
         await dbContext.SaveChangesAsync(cancellationToken);
+        WriteProbeStarted(mediaFile);
+        NotifyProbeStatusChanged(mediaFile, MediaProbeStatus.Pending);
 
         return new ProbeStartState(
             mediaFile.Id,
             mediaFile.FileName,
             mediaFile.SourceConnectionId,
             mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav,
+            ResolveMediaFileKind(mediaFile),
             mediaFile.FileSize,
             mediaFile.LastModifiedAt,
             input);
@@ -364,6 +655,98 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         }
 
         return uriBuilder.Uri;
+    }
+
+    private static void WriteProbeStarted(MediaFile mediaFile)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-started mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} attempt={mediaFile.MediaProbeAttemptCount} probeStarted=true");
+    }
+
+    private static void WriteProbeSkipped(MediaFile mediaFile, string reason)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-skipped mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} probeSkippedReason={ScanIdentificationDiagnostics.FormatValue(reason)} status={mediaFile.MediaProbeStatus} attempts={mediaFile.MediaProbeAttemptCount}");
+    }
+
+    private static void WriteProbeSucceeded(ProbeStartState startState, ProbeResult result)
+    {
+        var hasDuration = result.DurationSeconds.HasValue.ToString().ToLowerInvariant();
+        var hasResolution = (result.ResolutionWidth.HasValue && result.ResolutionHeight.HasValue)
+            .ToString()
+            .ToLowerInvariant();
+        var hasBitrate = result.OverallBitrateKbps.HasValue.ToString().ToLowerInvariant();
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-succeeded mediaFileId={startState.MediaFileId} mediaFileKind={startState.MediaFileKind} protocolType={FormatProtocol(startState.ProtocolType)} file={ScanIdentificationDiagnostics.FormatFileName(startState.FileName)} probeSucceeded=true hasDuration={hasDuration} hasResolution={hasResolution} hasBitrate={hasBitrate}");
+    }
+
+    private static void WriteProbeIssue(MediaFile mediaFile, MediaProbeStatus status, string reason)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-failed mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileName(mediaFile.FileName)} probeStatus={status} probeFailedReason={ScanIdentificationDiagnostics.FormatValue(reason, 220)}");
+    }
+
+    private static void WriteProbeIssue(ProbeStartState startState, MediaProbeStatus status, string reason)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=media-probe-failed mediaFileId={startState.MediaFileId} mediaFileKind={startState.MediaFileKind} protocolType={FormatProtocol(startState.ProtocolType)} file={ScanIdentificationDiagnostics.FormatFileName(startState.FileName)} probeStatus={status} probeFailedReason={ScanIdentificationDiagnostics.FormatValue(reason, 220)}");
+    }
+
+    private static string ResolveMediaFileKind(MediaFile mediaFile)
+    {
+        if (mediaFile.EpisodeId.HasValue)
+        {
+            return "episode";
+        }
+
+        return mediaFile.MovieId.HasValue ? "movie" : "orphan";
+    }
+
+    private static string FormatProtocol(ProtocolType protocolType)
+    {
+        return protocolType == ProtocolType.Local ? "local" : "webdav";
+    }
+
+    private void NotifyProbeStatusChanged(MediaFile mediaFile, MediaProbeStatus status)
+    {
+        NotifyProbeStatusChanged(
+            mediaFile.Id,
+            status,
+            ResolveMediaFileKind(mediaFile),
+            mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav);
+    }
+
+    private void NotifyProbeStatusChanged(ProbeStartState startState, MediaProbeStatus status)
+    {
+        NotifyProbeStatusChanged(
+            startState.MediaFileId,
+            status,
+            startState.MediaFileKind,
+            startState.ProtocolType);
+    }
+
+    private void NotifyProbeStatusChanged(
+        int mediaFileId,
+        MediaProbeStatus status,
+        string mediaFileKind,
+        ProtocolType protocolType)
+    {
+        var handler = ProbeStatusChanged;
+        if (handler is null)
+        {
+            return;
+        }
+
+        try
+        {
+            handler(
+                this,
+                new MediaProbeStatusChangedEventArgs(mediaFileId, status, mediaFileKind, protocolType));
+        }
+        catch
+        {
+            // Probe status notifications are UI refresh hints and must not affect background probing.
+        }
     }
 
     private static FfprobeResolution ResolveFfprobePath()
@@ -585,6 +968,8 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         mediaFile.MediaProbeLastModifiedAt = mediaFile.LastModifiedAt;
         mediaFile.UpdatedAt = now;
         await dbContext.SaveChangesAsync(cancellationToken);
+        WriteProbeSucceeded(startState, result);
+        NotifyProbeStatusChanged(startState, MediaProbeStatus.Success);
     }
 
     private static string? BuildCodecInfo(ProbeResult result)
@@ -595,7 +980,7 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
-    private static async Task MarkUnavailableAsync(
+    private async Task MarkUnavailableAsync(
         ProbeStartState startState,
         string error,
         CancellationToken cancellationToken)
@@ -603,7 +988,7 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         await MarkProbeIssueAsync(startState, MediaProbeStatus.Unavailable, error, cancellationToken);
     }
 
-    private static async Task MarkFailedAsync(
+    private async Task MarkFailedAsync(
         ProbeStartState startState,
         string error,
         CancellationToken cancellationToken)
@@ -611,7 +996,7 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         await MarkProbeIssueAsync(startState, MediaProbeStatus.Failed, error, cancellationToken);
     }
 
-    private static async Task MarkProbeIssueAsync(
+    private async Task MarkProbeIssueAsync(
         ProbeStartState startState,
         MediaProbeStatus status,
         string error,
@@ -632,6 +1017,8 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         mediaFile.MediaProbeLastModifiedAt = mediaFile.LastModifiedAt;
         mediaFile.UpdatedAt = now;
         await dbContext.SaveChangesAsync(cancellationToken);
+        WriteProbeIssue(startState, status, error);
+        NotifyProbeStatusChanged(startState, status);
     }
 
     private static string TrimError(string error)
@@ -648,11 +1035,28 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
 
     private sealed record ProbeQueueItem(int MediaFileId, bool Force);
 
+    private sealed record ProbeEnqueueResult(
+        int RequestedCount,
+        IReadOnlyList<int> EnqueuedIds,
+        int DuplicateCount);
+
+    private sealed record ProbeQueueRow(int? MovieId, int? EpisodeId, ProtocolType ProtocolType);
+
+    private sealed record DetailLazyProbeCandidateResult(
+        int SourceCount,
+        IReadOnlyList<int> CandidateIds,
+        int SkippedCount,
+        int LocalCandidateCount,
+        int WebDavCandidateCount,
+        int LimitSkippedCount,
+        string SkippedReasonsText);
+
     private sealed record ProbeStartState(
         int MediaFileId,
         string FileName,
         int SourceConnectionId,
         ProtocolType ProtocolType,
+        string MediaFileKind,
         long FileSize,
         DateTime? LastModifiedAt,
         string Input);
