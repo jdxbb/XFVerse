@@ -1094,3 +1094,39 @@ Phase 4.12d adds Episode source reset-to-unidentified, aligned with Movie detail
 - Probe lifecycle diagnostics now include cancellation / abandoned-queue records for graceful shutdown and worker exception records for background failures.
 - Probe and ignored-file sample diagnostics use extension plus a stable hash fingerprint instead of raw sample file names. Full local paths and full WebDAV URLs remain excluded.
 - This follow-up does not change probe queue eligibility, manual probe behavior, lazy detail probe triggering, Episode reset semantics, schema, migrations, or database update.
+
+## Phase 4.12e Update
+
+Phase 4.12e adds a persistent Episode default-source setting aligned with Movie detail.
+
+- `TvEpisode.DefaultMediaFileId` stores the user-selected default source. The field is nullable and uses a `SetNull` foreign key to `MediaFiles`.
+- Episode detail source rows now include `设为默认`; the current effective default row shows the existing default badge and the button reads `当前默认`.
+- Episode detail top play, Season detail Episode play, and `OpenEpisodeAsync(episodeId)` all resolve the same effective default source through the shared Episode source-selection helper.
+- The default-source priority is: persisted Episode default if it is still an active usable source, explicit preferred source for detail queries, accessible local source, recent / in-progress source, WebDAV source, then stable first source.
+- Explicit source-row playback still passes `EpisodeId + MediaFileId` and plays that selected source; it is not overridden by the persisted default.
+- If the persisted default is reset to unidentified, deleted, unbound, no longer active, or a local file is not accessible, playback falls back to the derived default rule.
+- Resetting an Episode source to unidentified clears `TvEpisode.DefaultMediaFileId` when that source was the persisted default, while preserving Episode / Season metadata, watched state, progress, watch history, probe fields, and real files.
+- This phase adds a migration but does not execute database update. It does not add watched / unwatched writes, real correction, AI / TMDB matching, scan-rule changes, TV Watch Insights input, TV recommendation input, online subtitles, commit, or push.
+
+## Phase 4.12e-fix Update
+
+Phase 4.12e-fix hardens rescan behavior after `reset to unidentified`.
+
+- Reset-to-unidentified is not a blacklist. A reset source may be considered again on a later scan.
+- WebDAV and local scans now run a shared rescan reattach step after TV / Movie identification and before placeholder / orphan grouping.
+- Local and WebDAV unchanged active unbound videos are treated as restricted reattach candidates; they are not pushed wholesale through full identification.
+- Episode reattach is allowed only for active unbound video or failed Movie placeholder video, safe single-Episode parsing, matched / manually confirmed existing Season context, same source, and same or sibling directory context.
+- Reattach appends the file as another Episode playback source and preserves real files, Episode / Season metadata, watched / progress state, watch history, subtitle bindings, and probe fields.
+- New scan diagnostics record new, deleted-reappeared, changed, unchanged-unbound, post-process, reattach, and placeholder-fallback counts without raw paths or full WebDAV URLs.
+- Movie reattach is logged but not automatically applied in this fix; automatic Movie matching remains deferred until a safer product rule exists.
+- Delete-record semantics are unchanged: deleting records clears XFVerse software history, and a later scan treats the file as new or deleted-reappeared.
+
+## Phase 4.12f Update
+
+Phase 4.12f adds Episode detail watched / unwatched controls without changing playback-source or scan semantics.
+
+- Episode detail now exposes a watched toggle beside the primary playback action. The button reads `标记已看`, `取消已看`, or `更新中...` while the operation is running.
+- The toggle uses the existing `SetEpisodeWatchedAsync` TV collection service, so recognized Episodes, failed unidentified Episodes, and no-source metadata Episodes share the same state rules as Season detail.
+- Toggling an Episode watched state refreshes the current Episode detail and notifies playback / collection listeners so Season detail and library projections reload with the existing Season aggregate progress rules.
+- Manual Episode watched / unwatched does not create `WatchHistory`, does not affect Movie watched state, and does not add TV inputs to Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
+- This update does not change source lists, playback, default-source selection, manual probe, split-source behavior, correction placeholders, scan rules, migrations, or database update behavior.

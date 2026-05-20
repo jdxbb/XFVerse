@@ -34,7 +34,11 @@ public sealed class TvEpisode
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    public int? DefaultMediaFileId { get; set; }
+
     public TvSeason? Season { get; set; }
+
+    public MediaFile? DefaultMediaFile { get; set; }
 
     public ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
 

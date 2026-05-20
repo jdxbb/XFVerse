@@ -292,6 +292,7 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                     x.TvSeasonId,
                     x.EpisodeNumber,
                     x.Title,
+                    x.DefaultMediaFileId,
                     SeasonNumber = x.Season!.SeasonNumber,
                     SeasonTitle = x.Season.Name,
                     SeriesId = x.Season.Series!.Id,
@@ -537,27 +538,34 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                 })
             .ToList();
 
-        var selectedMediaFileId = EpisodeSourceSelectionHelper.ResolveDefaultMediaFileId(
-                                      sources,
-                                      preferredMediaFileId,
-                                      source => source.MediaFileId,
-                                      source => source.ProtocolType,
-                                      source => source.FilePath,
-                                      source => source.FileName,
-                                      source => latestHistory.TryGetValue(source.MediaFileId, out var history)
-                                          ? history.LastPlayedAt
-                                          : (DateTime?)null,
-                                      source => sourceSpecificResumePositions.TryGetValue(source.MediaFileId, out var position)
-                                          ? position
-                                          : 0)
+        var effectiveDefaultMediaFileId = EpisodeSourceSelectionHelper.ResolveDefaultMediaFileId(
+            sources,
+            episode.DefaultMediaFileId,
+            null,
+            source => source.MediaFileId,
+            source => source.ProtocolType,
+            source => source.FilePath,
+            source => source.FileName,
+            source => latestHistory.TryGetValue(source.MediaFileId, out var history)
+                ? history.LastPlayedAt
+                : (DateTime?)null,
+            source => sourceSpecificResumePositions.TryGetValue(source.MediaFileId, out var position)
+                ? position
+                : 0);
+        var preferredSource = preferredMediaFileId.HasValue
+            ? sources.FirstOrDefault(source => source.MediaFileId == preferredMediaFileId.Value)
+            : null;
+        var selectedMediaFileId = preferredSource?.MediaFileId
+                                  ?? effectiveDefaultMediaFileId
                                   ?? sources[0].MediaFileId;
         foreach (var source in sources)
         {
-            source.IsDefault = source.MediaFileId == selectedMediaFileId;
+            source.IsDefault = source.MediaFileId == effectiveDefaultMediaFileId;
         }
 
         sources = sources
             .OrderBy(x => x.MediaFileId == selectedMediaFileId ? 0 : 1)
+            .ThenBy(x => x.MediaFileId == effectiveDefaultMediaFileId ? 0 : 1)
             .ThenBy(x => x.ProtocolType == ProtocolType.Local ? 0 : 1)
             .ThenByDescending(x => latestHistory.ContainsKey(x.MediaFileId))
             .ThenByDescending(x => latestHistory.TryGetValue(x.MediaFileId, out var history)
@@ -578,7 +586,7 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
             SeriesTitle = episode.SeriesTitle,
             SeasonTitle = episode.SeasonTitle,
             EpisodeTitle = episode.Title,
-            DefaultMediaFileId = selectedMediaFileId,
+            DefaultMediaFileId = effectiveDefaultMediaFileId,
             SelectedMediaFileId = selectedMediaFileId,
             Sources = sources,
             PreviousEpisode = previousEpisode,

@@ -372,6 +372,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     x.LastPlayedAt,
                     x.LastPlayPositionSeconds,
                     x.DurationWatchedSeconds,
+                    x.DefaultMediaFileId,
                     x.StillRemoteUrl,
                     SeasonNumber = x.Season!.SeasonNumber,
                     SeasonName = x.Season.Name,
@@ -447,6 +448,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
 
         var effectiveDefaultMediaFileId = EpisodeSourceSelectionHelper.ResolveDefaultMediaFileId(
             sources,
+            episode.DefaultMediaFileId,
             preferredMediaFileId,
             source => source.MediaFileId,
             source => source.ProtocolType,

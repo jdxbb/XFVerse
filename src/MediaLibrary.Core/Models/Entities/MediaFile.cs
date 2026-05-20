@@ -82,6 +82,8 @@ public sealed class MediaFile
 
     public Movie? DefaultForMovie { get; set; }
 
+    public TvEpisode? DefaultForEpisode { get; set; }
+
     public ICollection<SubtitleBinding> SubtitleBindings { get; set; } = new List<SubtitleBinding>();
 
     public ICollection<SubtitleBinding> SubtitleBindingsAsSubtitle { get; set; } = new List<SubtitleBinding>();

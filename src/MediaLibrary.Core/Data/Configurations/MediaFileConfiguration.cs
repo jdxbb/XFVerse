@@ -76,6 +76,11 @@ public sealed class MediaFileConfiguration : IEntityTypeConfiguration<MediaFile>
             .HasForeignKey<Movie>(x => x.DefaultMediaFileId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(x => x.DefaultForEpisode)
+            .WithOne(x => x.DefaultMediaFile)
+            .HasForeignKey<TvEpisode>(x => x.DefaultMediaFileId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasMany(x => x.WatchHistories)
             .WithOne(x => x.MediaFile)
             .HasForeignKey(x => x.MediaFileId)

@@ -26,6 +26,7 @@ public sealed class TvEpisodeConfiguration : IEntityTypeConfiguration<TvEpisode>
             .HasMaxLength(1200);
 
         builder.HasIndex(x => x.TmdbEpisodeId);
+        builder.HasIndex(x => x.DefaultMediaFileId);
         builder.HasIndex(x => x.IsWatched);
         builder.HasIndex(x => x.LastPlayedAt);
         builder.HasIndex(x => new { x.TvSeasonId, x.EpisodeNumber })

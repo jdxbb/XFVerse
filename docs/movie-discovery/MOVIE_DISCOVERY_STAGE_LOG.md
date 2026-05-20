@@ -524,3 +524,23 @@
 - Probe lifecycle diagnostics now include graceful cancellation / abandoned-queue and worker exception records.
 - Probe and ignored-file sample diagnostics now use extension plus stable hash fingerprints instead of raw sample file names.
 - Movie detail lazy probe eligibility, manual probe actions, scan-time probe disablement, Movie Discovery ranking/search/recommendation inputs, Watch Insights, correction flows, visibility semantics, schema, and migrations are unchanged.
+
+# Phase 4.12e Unidentified Movie Reset Guard
+
+- Movie detail now disables `重置为未识别` when the loaded Movie is already a failed / unidentified placeholder.
+- This covers Other / orphan single-source carriers that reuse Movie detail.
+- `MovieManagementService.ResetMediaFileToUnidentifiedAsync` also rejects already-unidentified Movies, so non-UI calls cannot create another placeholder for the same already-unidentified source.
+
+# Phase 4.12e-fix Rescan Reattach Boundary
+
+- Rescan reattach now runs before placeholder / orphan grouping so reset-to-unidentified TV sources can safely return to an existing matched Episode when the same-source directory context is unambiguous.
+- Movie reattach candidates are logged but not automatically attached in this fix; automatic Movie source reattach remains deferred because title / year matching without a prior-association tombstone can be ambiguous.
+- Delete-record semantics are unchanged: deleting records clears XFVerse software history, and later scans treat the physical file as new or deleted-reappeared.
+- Movie Discovery ranking, search, recommendation inputs, Watch Insights, Movie fallback thresholds, visibility semantics, schema, and migrations are unchanged.
+
+# Phase 4.12e UI Semantics Follow-up
+
+- Movie detail now labels the source reset action as `从当前电影拆分`; the underlying operation still moves the selected source out of the current Movie into unidentified carrying without deleting real files.
+- Failed / unidentified Movie placeholders, including orphan carriers shown through Movie detail, remain disabled for this action.
+- Episode detail uses the parallel `从当前集拆分` wording; unidentified Episodes enable it only for multi-source Episodes, while single-source unidentified Episodes remain disabled.
+- Movie Discovery ranking, search, recommendation inputs, Watch Insights, Movie fallback thresholds, visibility semantics, schema, and migrations are unchanged.

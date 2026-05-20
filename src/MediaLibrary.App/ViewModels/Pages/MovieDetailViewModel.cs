@@ -100,7 +100,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         SearchCandidatesCommand = new AsyncRelayCommand(SearchCandidatesAsync);
         ApplyManualMatchCommand = new AsyncRelayCommand(ApplyManualMatchAsync);
         SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync);
-        ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync);
+        ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
         OpenPlayerCommand = new AsyncRelayCommand(OpenPlayerAsync, _ => CanOpenPlayer);
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync);
@@ -219,6 +219,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 RefreshNotInterestedCommandState();
                 RefreshWatchedCommandState();
                 RefreshAddToLibraryCommandState();
+                RefreshResetSourceRecognitionCommandState();
             }
         }
     }
@@ -243,6 +244,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 RefreshNotInterestedCommandState();
                 RefreshWatchedCommandState();
                 RefreshAddToLibraryCommandState();
+                RefreshResetSourceRecognitionCommandState();
             }
         }
     }
@@ -260,6 +262,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     }
 
     public bool CanOpenPlayer => CanPlay && !_isOpeningPlayer && !_playerWindowService.IsPlayerOpen;
+
+    public bool CanResetSourcesToUnidentified => HasMovie
+                                                 && IsLibraryMovie
+                                                 && _identificationStatus != IdentificationStatus.Failed;
 
     public bool IsFavorite
     {
@@ -430,6 +436,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             SceneTagsText = string.IsNullOrWhiteSpace(detail.SceneTagsText) ? "尚未分类" : detail.SceneTagsText;
             IdentificationStatusText = GetIdentificationStatusText(detail.IdentificationStatus);
             _identificationStatus = detail.IdentificationStatus;
+            RefreshResetSourceRecognitionCommandState();
             if (_identificationStatus is not (IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed))
             {
                 AiTagsText = string.Empty;
@@ -453,6 +460,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             {
                 Sources.Add(source);
             }
+            RefreshResetSourceRecognitionCommandState();
 
             CanPlay = Sources.Count > 0;
             PlayButtonText = CanPlay ? "播放默认源" : "暂无可播放源";
@@ -876,6 +884,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(CanOpenPlayer));
         OpenPlayerCommand?.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshResetSourceRecognitionCommandState()
+    {
+        OnPropertyChanged(nameof(CanResetSourcesToUnidentified));
+        ResetSourceRecognitionCommand?.RaiseCanExecuteChanged();
     }
 
     private void RefreshWantToWatchCommandState()
@@ -1374,19 +1388,23 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
+        if (!CanResetSourcesToUnidentified)
+        {
+            StatusMessage = "该播放源已在未识别承接中，无需从当前电影拆分。";
+            return;
+        }
+
         try
         {
             var result = await _movieManagementService.ResetMediaFileToUnidentifiedAsync(_movieId.Value, source.MediaFileId);
             _dataRefreshService.NotifyMetadataChanged();
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, result.DetailMovieId);
             await LoadMovieAsync(result.DetailMovieId, CancellationToken.None);
-            StatusMessage = result.ShouldNavigateToPlaceholder
-                ? $"已将播放源“{source.FileName}”重置为未识别。"
-                : $"已将播放源“{source.FileName}”从当前影片中拆出并重置为未识别。";
+            StatusMessage = $"已将播放源“{source.FileName}”从当前电影拆分。";
         }
         catch (Exception exception)
         {
-            StatusMessage = $"重置播放源失败：{DescribeException(exception)}";
+            StatusMessage = $"拆分播放源失败：{DescribeException(exception)}";
         }
     }
 
@@ -1429,6 +1447,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         DefaultSourceDisplay = "尚未设置";
         StatusMessage = statusMessage;
         _identificationStatus = IdentificationStatus.Pending;
+        RefreshResetSourceRecognitionCommandState();
         OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
         ManualSearchQuery = string.Empty;
         ManualSearchYear = string.Empty;
@@ -1436,6 +1455,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         Sources.Clear();
         SearchCandidates.Clear();
         OnPropertyChanged(nameof(HasSearchCandidates));
+    }
+
+    private bool CanResetSourceRecognition(object? parameter)
+    {
+        return parameter is MovieSourceItem source
+               && CanResetSourcesToUnidentified
+               && Sources.Any(item => item.MediaFileId == source.MediaFileId);
     }
 
     private static string GetIdentificationStatusText(IdentificationStatus status)

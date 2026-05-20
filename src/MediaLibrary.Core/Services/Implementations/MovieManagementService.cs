@@ -645,6 +645,11 @@ public sealed class MovieManagementService : IMovieManagementService
             ?? throw new InvalidOperationException("要重置的播放源不存在，或不属于当前影片。");
 
         var parsedName = MovieFileNameParser.Parse(mediaFile.FileName);
+        if (movie.IdentificationStatus == IdentificationStatus.Failed)
+        {
+            throw new InvalidOperationException("该播放源已在未识别承接中，无需重复重置。");
+        }
+
         var placeholderTitle = BuildUnidentifiedMovieTitle(mediaFile.FileName);
         var now = DateTime.UtcNow;
         var remainingSourceCount = movie.MediaFiles

@@ -1947,3 +1947,150 @@ Known Issues:
 - Blocker: none.
 - Deferred: deeper ffprobe output analysis for files that complete successfully but expose no readable stream metadata.
 - Noise: historical log lines still contain older raw sample names from before this hardening.
+
+## Phase 4.12e - Episode persistent default source
+
+Completed:
+
+- Added nullable `TvEpisode.DefaultMediaFileId` with a `SetNull` relationship to `MediaFiles`, mirroring Movie default-source storage at Episode scope.
+- Added the `AddTvEpisodeDefaultMediaFile` migration. The migration adds the column, a unique index, and the foreign key; database update was not executed.
+- Added an Episode collection command to set the default source after verifying the `MediaFileId` belongs to the current Episode, is an active video source, and is not deleted.
+- Episode detail source rows now expose `设为默认`. The current default row is shown as `当前默认` and keeps the existing default badge.
+- Episode detail reloads after setting the default source, so the source list, badge, and top play target refresh immediately.
+- Episode detail query now reads the persisted Episode default and marks the effective default source.
+- Episode playback sessions now separate effective default from explicit selected source: `OpenEpisodeAsync(episodeId)` uses the effective default, while source-row playback keeps the selected `MediaFileId`.
+- Season detail Episode play continues to call `OpenEpisodeAsync(episodeId)`, so it inherits the same persisted-default priority through `PlaybackSourceService`.
+- Resetting a source to unidentified clears `TvEpisode.DefaultMediaFileId` when the reset source was the persisted default. The reset still preserves real files, metadata, watched/progress state, watch history, subtitle bindings, and probe fields.
+- The shared Episode default-source rule now prefers persisted active usable default, then preferred source for detail resolution, then accessible local, recent / in-progress, WebDAV, and stable first fallback.
+
+Not done:
+
+- No watched / unwatched button, real correction flow, AI correction, TMDB candidate search, batch correction, manual Season aggregation, physical source delete, online subtitles, scan-rule change, TV Watch Insights input, TV recommendation input, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Episode detail multi-source rows can set one source as default.
+2. The selected row shows the default marker and `当前默认`.
+3. Episode detail top play uses the persisted default source.
+4. Season detail Episode play uses the same persisted default through `OpenEpisodeAsync(episodeId)`.
+5. `PlaybackSourceService.GetEpisodePlaybackSessionAsync(episodeId)` returns the same effective default.
+6. Source-row playback with an explicit `MediaFileId` still plays the selected source and is not overridden by the persisted default.
+7. Resetting the persisted default source to unidentified clears the stored default and falls back to the remaining derived source.
+8. Missing / inactive / inaccessible persisted default sources are ignored during automatic selection.
+9. Failed unidentified Episodes use the same set-default path as recognized Episodes.
+10. No-source Episodes still show no sources and keep playback disabled.
+11. Movie default-source behavior is not changed.
+12. The migration is present and no database update is executed.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: cross-page real-time refresh for an already-open Season detail page remains deferred; reloading the page resolves the new default for playback.
+- Noise: the persisted default can remain stored for an inaccessible local file; playback selection ignores it and falls back until the file becomes accessible again.
+
+## Phase 4.12e Follow-up - Unidentified source reset disabled state
+
+Completed:
+
+- Disabled `重置为未识别` on Episode detail with an explicit page-level enabled binding when the loaded Episode is already in an unidentified Season.
+- Disabled `重置为未识别` on Movie detail for failed / unidentified Movie placeholders, including single-source Other / orphan carriers.
+- Added a Movie service-side guard so already-unidentified Movie placeholders cannot be reset into another unidentified placeholder through non-UI calls.
+- Kept `设为默认`, playback, manual probe, Episode source reset for recognized Episodes, and migration behavior unchanged.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: none for this follow-up.
+- Noise: historical logs may still contain earlier reset attempts from before the disabled-state fix.
+
+## Phase 4.12e-fix - Rescan reattach after reset to unidentified
+
+Completed:
+
+- Added a rescan reattach service that runs after TV / Movie identification and before placeholder / orphan grouping.
+- Episode reattach now attempts to bind active unbound video sources, or failed Movie placeholder sources, back to an existing matched / manually confirmed Season Episode when the filename parses to a safe single Episode and an existing same-source same-directory or sibling-directory Season context is available.
+- Reattached files are appended as Episode playback sources. The flow does not overwrite Episode / Season metadata, does not clear watched / progress state, and does not clear watch history, subtitles, or probe fields.
+- Local scanning now records unchanged active unbound videos as restricted reattach candidates, so reset-only files can be considered without sending every unchanged file through full identification again.
+- WebDAV scanning applies the same restricted unchanged-unbound candidate rule.
+- Added scan classification diagnostics for new, deleted-reappeared, changed, unchanged-unbound, post-process, reattach, and placeholder-fallback counts.
+- Added reattach diagnostics for candidate, succeeded, skipped, summary, and error cases. Logs use IDs, counts, source kind, protocol, parsed season / episode, and sanitized directory displays.
+- Movie reattach is intentionally conservative in this fix: safe candidates are logged as deferred instead of being automatically attached.
+
+Not done:
+
+- No delete-record history retention, tombstone, ignore-file feature, migration, database update, AI prompt change, TMDB gate change, real correction flow, SP / OAD / OVA / special mapping, Watch Insights input, recommendation input, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Local reset-only unchanged unbound videos are counted as `unchangedUnboundVideoCount` and passed to restricted reattach.
+2. WebDAV reset-only unchanged unbound videos follow the same restricted candidate path.
+3. New, changed, and deleted-reappeared videos still enter `postProcessVideoMediaFileIds`.
+4. Existing TV first pass, AI-on-uncertain, TV retry, and Movie fallback still run before placeholder grouping.
+5. Safe Episode reattach happens before placeholder / orphan grouping.
+6. Reattach appends the file as an Episode source and preserves Episode / Season metadata.
+7. Failed Movie placeholders can be moved into a safe matched Episode when the Episode reattach conditions pass.
+8. Ambiguous, multi-episode, part-hint, SP / OAD / OVA / special, or contextless candidates are skipped and fall back to the existing flow.
+9. Movie auto-reattach is not performed in this fix; candidates are logged for a later product decision.
+10. Scan diagnostics expose classification and reattach counts without raw paths or full WebDAV URLs.
+11. Placeholder grouping remains the fallback for sources that cannot be safely reattached.
+12. No new migration is created by this fix.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: automatic Movie reattach remains deferred because title / year matching without a prior-association tombstone can attach the wrong file in ambiguous folders.
+- Noise: historical scans before this fix do not contain the new reattach classification counters.
+
+## Phase 4.12e UI Semantics Follow-up - Split source labels
+
+Completed:
+
+- Episode detail source-row reset action is now labeled `从当前集拆分`; the underlying operation still detaches the selected source from the current Episode without deleting real local / WebDAV files or clearing Episode / Season metadata, watched state, progress, history, subtitles, or probe fields.
+- Recognized Episodes can still split any active source, including the last source, leaving the Episode visible with no sources.
+- Failed / unidentified Episodes now allow `从当前集拆分` only when the Episode has multiple active sources. A single-source unidentified Episode remains disabled and protected by the service layer.
+- Movie detail reset UI is now labeled `从当前电影拆分`; failed / unidentified Movie placeholders and orphan carriers remain disabled.
+
+Not done:
+
+- No service behavior beyond the unidentified multi-source safety gate, migration, database update, real correction flow, physical file delete, Watch Insights input, recommendation input, commit, or push was added.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: none for this wording / enabled-state follow-up.
+- Noise: historical docs and logs may still use the earlier `重置为未识别` wording.
+
+## Phase 4.12f - Episode watched / unwatched controls
+
+Completed:
+
+- Added an Episode detail watched toggle that shows `标记已看`, `取消已看`, or `更新中...` while the command is running.
+- Reused `ITvSeasonCollectionService.SetEpisodeWatchedAsync` instead of adding a second watched-state implementation.
+- Recognized Episodes, failed unidentified Episodes, and no-source Episodes can be marked watched / unwatched from Episode detail.
+- After a toggle, Episode detail reloads immediately and playback / collection refresh notifications are emitted so Season detail and library projections use the existing aggregate progress rules on reload.
+- The operation updates `TvEpisode.IsWatched` and existing Season state summaries only; it does not create `WatchHistory`, does not alter playback sources, and does not touch Movie watched state.
+
+Not done:
+
+- No TV Watch Insights input, Watch Profile input, recommendation fingerprint input, real correction flow, batch correction, manual Season aggregation, scan-rule change, default-source change, source reset change, migration, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Recognized Episode detail can mark an unwatched Episode as watched.
+2. Recognized Episode detail can cancel watched state.
+3. Failed unidentified Episode detail uses the same watched toggle.
+4. No-source Episode detail keeps playback disabled but still allows watched / unwatched.
+5. The watched button disables and shows a busy label while the operation is running.
+6. Episode detail reloads its watched text and progress summary after the operation.
+7. Season detail shows the updated Episode state after reload / return.
+8. Season watched count and progress summary follow the existing aggregate rules.
+9. Source list, playback, default source, manual probe, and split-source behavior remain unchanged.
+10. Movie watched / Movie detail behavior remains unchanged.
+11. TV still does not feed Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
+12. No new migration is created by this phase.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: cross-page real-time refresh for an already-open Season detail page remains best-effort; returning to or refreshing the page reloads the state.
+- Noise: historical docs and logs may still describe Episode detail watched / unwatched as deferred.

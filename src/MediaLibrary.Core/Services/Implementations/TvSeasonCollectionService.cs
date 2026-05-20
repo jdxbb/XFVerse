@@ -272,6 +272,45 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task SetEpisodeDefaultMediaFileAsync(
+        int tvEpisodeId,
+        int mediaFileId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var episode = await dbContext.TvEpisodes
+            .FirstOrDefaultAsync(x => x.Id == tvEpisodeId, cancellationToken)
+            ?? throw new InvalidOperationException("剧集不存在。");
+
+        var mediaFile = await dbContext.MediaFiles
+            .Include(x => x.SourceConnection)
+            .FirstOrDefaultAsync(
+                x => x.Id == mediaFileId
+                     && x.EpisodeId == tvEpisodeId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted,
+                cancellationToken)
+            ?? throw new InvalidOperationException("默认播放源必须是当前剧集下的有效视频源。");
+
+        var now = DateTime.UtcNow;
+        var staleDefaultEpisodes = await dbContext.TvEpisodes
+            .Where(x => x.Id != tvEpisodeId && x.DefaultMediaFileId == mediaFileId)
+            .ToListAsync(cancellationToken);
+        foreach (var staleDefaultEpisode in staleDefaultEpisodes)
+        {
+            staleDefaultEpisode.DefaultMediaFileId = null;
+            staleDefaultEpisode.UpdatedAt = now;
+        }
+
+        episode.DefaultMediaFileId = mediaFile.Id;
+        episode.UpdatedAt = now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=tv-episode-default-source-set episodeId={tvEpisodeId} mediaFileId={mediaFileId} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType)} staleDefaultEpisodeCount={staleDefaultEpisodes.Count}");
+    }
+
     public async Task ResetEpisodeSourceToUnidentifiedAsync(
         int tvEpisodeId,
         int mediaFileId,
@@ -312,15 +351,29 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             throw new InvalidOperationException("该播放源记录已不可用。");
         }
 
-        if (mediaFile.Episode.Season?.IdentificationStatus == IdentificationStatus.Failed)
-        {
-            ScanIdentificationDiagnostics.Write(
-                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=already-unidentified");
-            throw new InvalidOperationException("该剧集已是未识别状态。");
-        }
-
         var now = DateTime.UtcNow;
         var oldEpisodeId = mediaFile.EpisodeId;
+        var remainingActiveSourceCount = await dbContext.MediaFiles
+            .CountAsync(
+                x => x.EpisodeId == tvEpisodeId
+                     && x.Id != mediaFileId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted,
+                cancellationToken);
+        if (mediaFile.Episode.Season?.IdentificationStatus == IdentificationStatus.Failed
+            && remainingActiveSourceCount <= 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=already-unidentified-single-source");
+            throw new InvalidOperationException("该未识别集只有一个播放源，不能继续拆分。");
+        }
+
+        var defaultSourceCleared = mediaFile.Episode.DefaultMediaFileId == mediaFile.Id;
+        if (defaultSourceCleared)
+        {
+            mediaFile.Episode.DefaultMediaFileId = null;
+        }
+
         mediaFile.EpisodeId = null;
         mediaFile.MovieId = null;
         mediaFile.UpdatedAt = now;
@@ -330,15 +383,8 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             mediaFile.Episode.Season.UpdatedAt = now;
         }
 
-        var remainingActiveSourceCount = await dbContext.MediaFiles
-            .CountAsync(
-                x => x.EpisodeId == tvEpisodeId
-                     && x.Id != mediaFileId
-                     && x.MediaType == MediaType.Video
-                     && !x.IsDeleted,
-                cancellationToken);
         ScanIdentificationDiagnostics.Write(
-            $"event=tv-episode-source-reset-unidentified episodeId={tvEpisodeId} mediaFileId={mediaFileId} oldEpisodeId={oldEpisodeId} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType)} remainingActiveSourceCount={remainingActiveSourceCount}");
+            $"event=tv-episode-source-reset-unidentified episodeId={tvEpisodeId} mediaFileId={mediaFileId} oldEpisodeId={oldEpisodeId} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType)} defaultSourceCleared={defaultSourceCleared} remainingActiveSourceCount={remainingActiveSourceCount}");
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -512,6 +558,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             .FirstOrDefaultAsync(x => x.Id == tvSeasonId, cancellationToken)
             ?? throw new InvalidOperationException("电视剧季不存在。");
         var seriesId = season.TvSeriesId;
+        var now = DateTime.UtcNow;
 
         var episodeIds = await dbContext.TvEpisodes
             .Where(x => x.TvSeasonId == tvSeasonId)
@@ -551,6 +598,20 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                 .Where(x => mediaFileIdSet.Contains(x.MediaFileId) || mediaFileIdSet.Contains(x.SubtitleMediaFileId))
                 .ToListAsync(cancellationToken);
             dbContext.SubtitleBindings.RemoveRange(subtitleBindings);
+
+            var defaultEpisodes = await dbContext.TvEpisodes
+                .Where(x => x.DefaultMediaFileId.HasValue && mediaFileIdSet.Contains(x.DefaultMediaFileId.Value))
+                .ToListAsync(cancellationToken);
+            foreach (var defaultEpisode in defaultEpisodes)
+            {
+                defaultEpisode.DefaultMediaFileId = null;
+                defaultEpisode.UpdatedAt = now;
+            }
+
+            if (defaultEpisodes.Count > 0 || subtitleBindings.Count > 0)
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
 
             var mediaFiles = await dbContext.MediaFiles
                 .Where(x => mediaFileIdSet.Contains(x.Id))

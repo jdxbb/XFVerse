@@ -72,6 +72,11 @@
                             Content="{Binding PrimaryPlayButtonText}"
                             IsEnabled="{Binding CanOpenPlayer}"
                             Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button Command="{Binding ToggleWatchedCommand}"
+                            Margin="0,10,0,0"
+                            Content="{Binding WatchedButtonText}"
+                            IsEnabled="{Binding CanToggleWatched}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
                     <Button Command="{Binding NavigateBackToSeasonCommand}"
                             Margin="0,10,0,0"
                             Content="返回季详情"
@@ -270,6 +275,21 @@
                                             IsEnabled="{Binding DataContext.CanOpenPlayer, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             Style="{StaticResource SecondaryButtonStyle}" />
                                     <Button Margin="0,10,0,0"
+                                            Command="{Binding DataContext.SetDefaultSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}">
+                                        <Button.Style>
+                                            <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                                                <Setter Property="Content" Value="设为默认" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDefault}" Value="True">
+                                                        <Setter Property="Content" Value="当前默认" />
+                                                        <Setter Property="IsEnabled" Value="False" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <Button Margin="0,10,0,0"
                                             Command="{Binding DataContext.ManualProbeSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Content="立即探测"
@@ -277,7 +297,8 @@
                                     <Button Margin="0,10,0,0"
                                             Command="{Binding DataContext.ResetSourceRecognitionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
-                                            Content="重置为未识别"
+                                            Content="从当前集拆分"
+                                            IsEnabled="{Binding DataContext.CanResetSourcesToUnidentified, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             Style="{StaticResource SecondaryButtonStyle}" />
                                 </StackPanel>
                             </Grid>

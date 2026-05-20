@@ -6,6 +6,7 @@ internal static class EpisodeSourceSelectionHelper
 {
     public static int? ResolveDefaultMediaFileId<TSource>(
         IReadOnlyList<TSource> sources,
+        int? storedDefaultMediaFileId,
         int? preferredMediaFileId,
         Func<TSource, int> mediaFileIdSelector,
         Func<TSource, ProtocolType> protocolTypeSelector,
@@ -20,12 +21,27 @@ internal static class EpisodeSourceSelectionHelper
             return null;
         }
 
+        var storedDefaultSource = storedDefaultMediaFileId.HasValue
+            ? sources.FirstOrDefault(source => mediaFileIdSelector(source) == storedDefaultMediaFileId.Value)
+            : default;
+        if (storedDefaultSource is not null
+            && IsAvailableForAutomaticSelection(
+                protocolTypeSelector(storedDefaultSource),
+                filePathSelector(storedDefaultSource)))
+        {
+            return mediaFileIdSelector(storedDefaultSource);
+        }
+
         var preferredSource = preferredMediaFileId.HasValue
             ? sources.FirstOrDefault(source => mediaFileIdSelector(source) == preferredMediaFileId.Value)
             : default;
-        if (preferredMediaFileId.HasValue && preferredSource is not null)
+        if (preferredMediaFileId.HasValue
+            && preferredSource is not null
+            && IsAvailableForAutomaticSelection(
+                protocolTypeSelector(preferredSource),
+                filePathSelector(preferredSource)))
         {
-            return preferredMediaFileId.Value;
+            return mediaFileIdSelector(preferredSource);
         }
 
         var localSource = StableOrder(sources, stableNameSelector, mediaFileIdSelector)

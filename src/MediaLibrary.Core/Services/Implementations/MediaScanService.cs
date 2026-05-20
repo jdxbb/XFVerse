@@ -17,6 +17,7 @@ public sealed class MediaScanService : IMediaScanService
     private readonly ITvScanDirectoryAnalysisService _tvScanDirectoryAnalysisService;
     private readonly ITvSeasonIdentificationService _tvSeasonIdentificationService;
     private readonly IMovieIdentificationService _movieIdentificationService;
+    private readonly IRescanReattachService _rescanReattachService;
     private readonly ISubtitleBindingService _subtitleBindingService;
     private readonly IAiClassificationService _aiClassificationService;
 
@@ -26,6 +27,7 @@ public sealed class MediaScanService : IMediaScanService
         ITvScanDirectoryAnalysisService tvScanDirectoryAnalysisService,
         ITvSeasonIdentificationService tvSeasonIdentificationService,
         IMovieIdentificationService movieIdentificationService,
+        IRescanReattachService rescanReattachService,
         ISubtitleBindingService subtitleBindingService,
         IAiClassificationService aiClassificationService)
     {
@@ -34,6 +36,7 @@ public sealed class MediaScanService : IMediaScanService
         _tvScanDirectoryAnalysisService = tvScanDirectoryAnalysisService;
         _tvSeasonIdentificationService = tvSeasonIdentificationService;
         _movieIdentificationService = movieIdentificationService;
+        _rescanReattachService = rescanReattachService;
         _subtitleBindingService = subtitleBindingService;
         _aiClassificationService = aiClassificationService;
     }
@@ -132,8 +135,11 @@ public sealed class MediaScanService : IMediaScanService
 
         var seenFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var postProcessVideoMediaFileIds = new HashSet<int>();
+        var reattachCandidateMediaFileIds = new HashSet<int>();
         var subtitleBindingVideoMediaFileIds = new HashSet<int>();
+        var videoStats = new ScanVideoClassificationStats();
         var successfulLogIds = new List<int>();
+        var scanStartedAtUtc = DateTime.UtcNow;
         var totalResult = new ScanExecutionResult
         {
             ProcessedPathCount = enabledScanPaths.Count
@@ -146,7 +152,9 @@ public sealed class MediaScanService : IMediaScanService
                 scanPath,
                 seenFilePaths,
                 postProcessVideoMediaFileIds,
+                reattachCandidateMediaFileIds,
                 subtitleBindingVideoMediaFileIds,
+                videoStats,
                 cancellationToken);
 
             totalResult.TotalScannedCount += pathResult.TotalScannedCount;
@@ -170,6 +178,18 @@ public sealed class MediaScanService : IMediaScanService
 
         try
         {
+            var retryMovieMediaFileIds = await CollectFailedMoviePlaceholderRetryCandidatesAsync(
+                connection.Id.Value,
+                enabledScanPaths.Select(x => x.Id).ToArray(),
+                seenFilePaths,
+                scanStartedAtUtc,
+                "webdav",
+                cancellationToken);
+            foreach (var mediaFileId in retryMovieMediaFileIds)
+            {
+                postProcessVideoMediaFileIds.Add(mediaFileId);
+            }
+
             var tmdbSearchCache = new ScanTmdbSearchCache();
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-identification-stage-start source=webdav videoIds={postProcessVideoMediaFileIds.Count}");
@@ -246,6 +266,24 @@ public sealed class MediaScanService : IMediaScanService
             postStage.Absorb(identificationResult);
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-movie-stage-complete source=webdav requested={movieMediaFileIds.Length} attempted={identificationResult.AttemptedCount} bound={identificationResult.BoundCount} placeholders={identificationResult.PlaceholderCount} warnings={identificationResult.WarningCount} errors={identificationResult.ErrorCount}");
+            RescanReattachResult reattachResult;
+            try
+            {
+                reattachResult = await _rescanReattachService.TryReattachAsync(
+                    postProcessVideoMediaFileIds.Concat(reattachCandidateMediaFileIds).ToArray(),
+                    "webdav",
+                    cancellationToken);
+            }
+            catch (Exception reattachException)
+            {
+                reattachResult = new RescanReattachResult();
+                postStage.AddWarning("Rescan.Reattach", reattachException.GetType().Name);
+                ScanIdentificationDiagnostics.Write(
+                    $"event=rescan-reattach-error sourceKind=webdav error={ScanIdentificationDiagnostics.FormatValue(reattachException.GetType().Name)} fallbackToPlaceholderGrouping=true");
+            }
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-video-classification source=webdav newVideoCount={videoStats.NewVideoCount} deletedReappearedVideoCount={videoStats.DeletedReappearedVideoCount} changedVideoCount={videoStats.ChangedVideoCount} unchangedUnboundVideoCount={videoStats.UnchangedUnboundVideoCount} postProcessVideoCount={postProcessVideoMediaFileIds.Count} reattachCandidateCount={reattachResult.CandidateCount} reattachSucceededCount={reattachResult.SucceededCount} reattachSkippedCount={reattachResult.SkippedCount} placeholderFallbackCount={reattachResult.PlaceholderFallbackCount}");
             await _movieIdentificationService.AggregateUnidentifiedMediaFilesAsync(
                 enabledScanPaths.Select(x => x.Id).ToArray(),
                 cancellationToken);
@@ -326,7 +364,9 @@ public sealed class MediaScanService : IMediaScanService
         ScanPath scanPath,
         HashSet<string> seenFilePaths,
         HashSet<int> postProcessVideoMediaFileIds,
+        HashSet<int> reattachCandidateMediaFileIds,
         HashSet<int> subtitleBindingVideoMediaFileIds,
+        ScanVideoClassificationStats videoStats,
         CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -393,6 +433,7 @@ public sealed class MediaScanService : IMediaScanService
 
                 var isNewFile = false;
                 var hasMaterialChange = false;
+                var wasDeleted = false;
                 if (!existingFiles.TryGetValue(remoteEntry.Path, out var mediaFile))
                 {
                     isNewFile = true;
@@ -407,9 +448,16 @@ public sealed class MediaScanService : IMediaScanService
                 }
                 else
                 {
+                    wasDeleted = mediaFile.IsDeleted;
                     hasMaterialChange = HasMaterialChange(mediaFile, remoteEntry, mediaType, scanPath.Id);
                     if (!hasMaterialChange)
                     {
+                        if (mediaType == MediaType.Video && IsActiveUnboundVideo(mediaFile))
+                        {
+                            reattachCandidateMediaFileIds.Add(mediaFile.Id);
+                            videoStats.UnchangedUnboundVideoCount++;
+                        }
+
                         continue;
                     }
 
@@ -430,6 +478,19 @@ public sealed class MediaScanService : IMediaScanService
 
                 if (mediaType == MediaType.Video)
                 {
+                    if (isNewFile)
+                    {
+                        videoStats.NewVideoCount++;
+                    }
+                    else if (wasDeleted)
+                    {
+                        videoStats.DeletedReappearedVideoCount++;
+                    }
+                    else
+                    {
+                        videoStats.ChangedVideoCount++;
+                    }
+
                     changedVideoFiles.Add(mediaFile);
                 }
                 else if (mediaType == MediaType.Subtitle && (isNewFile || hasMaterialChange))
@@ -541,6 +602,103 @@ public sealed class MediaScanService : IMediaScanService
                || mediaFile.LastModifiedAt != remoteEntry.LastModifiedAt
                || mediaFile.MediaType != mediaType
                || mediaFile.IsDeleted;
+    }
+
+    private static bool IsActiveUnboundVideo(MediaFile mediaFile)
+    {
+        return mediaFile.MediaType == MediaType.Video
+               && !mediaFile.IsDeleted
+               && !mediaFile.MovieId.HasValue
+               && !mediaFile.EpisodeId.HasValue;
+    }
+
+    private static async Task<IReadOnlyCollection<int>> CollectFailedMoviePlaceholderRetryCandidatesAsync(
+        int sourceConnectionId,
+        IReadOnlyCollection<int> scanPathIds,
+        HashSet<string> seenFilePaths,
+        DateTime scanStartedAtUtc,
+        string sourceKind,
+        CancellationToken cancellationToken)
+    {
+        if (scanPathIds.Count == 0 || seenFilePaths.Count == 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-movie-retry-candidates source={sourceKind} previousTmdbSearchErrorScanPaths=0 candidateCount=0 queuedCount=0 skippedCount=0 reason=no-scan-scope");
+            return [];
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var previousLogs = await dbContext.ScanTaskLogs
+            .AsNoTracking()
+            .Where(
+                x => x.SourceConnectionId == sourceConnectionId
+                     && x.ScanPathId.HasValue
+                     && scanPathIds.Contains(x.ScanPathId.Value)
+                     && x.StartedAt < scanStartedAtUtc)
+            .OrderByDescending(x => x.StartedAt)
+            .Select(
+                x => new RetryScanLogWindow
+                {
+                    ScanPathId = x.ScanPathId!.Value,
+                    StartedAt = x.StartedAt,
+                    ErrorCount = x.ErrorCount,
+                    ErrorMessage = x.ErrorMessage ?? string.Empty
+                })
+            .ToListAsync(cancellationToken);
+
+        var retryWindows = previousLogs
+            .GroupBy(x => x.ScanPathId)
+            .Select(x => x.First())
+            .Where(x => x.ErrorCount > 0
+                        && x.ErrorMessage.Contains("TMDB.Search", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (retryWindows.Count == 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-movie-retry-candidates source={sourceKind} previousTmdbSearchErrorScanPaths=0 candidateCount=0 queuedCount=0 skippedCount=0 reason=no-previous-tmdb-search-error");
+            return [];
+        }
+
+        var retryPathIds = retryWindows.Select(x => x.ScanPathId).Distinct().ToArray();
+        var retryWindowsByPath = retryWindows.ToDictionary(x => x.ScanPathId);
+        var candidates = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(
+                x => x.SourceConnectionId == sourceConnectionId
+                     && x.ScanPathId.HasValue
+                     && retryPathIds.Contains(x.ScanPathId.Value)
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted
+                     && !x.EpisodeId.HasValue
+                     && x.MovieId.HasValue
+                     && x.Movie != null
+                     && !x.Movie.TmdbId.HasValue
+                     && x.Movie.IdentificationStatus == IdentificationStatus.Failed)
+            .Select(
+                x => new FailedMoviePlaceholderRetryCandidate
+                {
+                    MediaFileId = x.Id,
+                    ScanPathId = x.ScanPathId!.Value,
+                    FilePath = x.FilePath,
+                    MovieUpdatedAt = x.Movie!.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+
+        var queuedIds = candidates
+            .Where(x => seenFilePaths.Contains(x.FilePath))
+            .Where(
+                x => retryWindowsByPath.TryGetValue(x.ScanPathId, out var retryWindow)
+                     && x.MovieUpdatedAt >= retryWindow.StartedAt
+                     && x.MovieUpdatedAt < scanStartedAtUtc)
+            .Select(x => x.MediaFileId)
+            .Distinct()
+            .ToArray();
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=scan-movie-retry-candidates source={sourceKind} previousTmdbSearchErrorScanPaths={retryWindows.Count} candidateCount={candidates.Count} queuedCount={queuedIds.Length} skippedCount={Math.Max(0, candidates.Count - queuedIds.Length)} reason=previous-tmdb-search-error");
+
+        return queuedIds;
     }
 
     private static async Task<IReadOnlyCollection<int>> MarkMissingFilesDeletedAsync(
@@ -788,6 +946,39 @@ public sealed class MediaScanService : IMediaScanService
             IgnoredFileCount++;
             IgnoredFiles.Add(reason, fileNameOrPath);
         }
+    }
+
+    private sealed class ScanVideoClassificationStats
+    {
+        public int NewVideoCount { get; set; }
+
+        public int DeletedReappearedVideoCount { get; set; }
+
+        public int ChangedVideoCount { get; set; }
+
+        public int UnchangedUnboundVideoCount { get; set; }
+    }
+
+    private sealed class RetryScanLogWindow
+    {
+        public int ScanPathId { get; set; }
+
+        public DateTime StartedAt { get; set; }
+
+        public int ErrorCount { get; set; }
+
+        public string ErrorMessage { get; set; } = string.Empty;
+    }
+
+    private sealed class FailedMoviePlaceholderRetryCandidate
+    {
+        public int MediaFileId { get; set; }
+
+        public int ScanPathId { get; set; }
+
+        public string FilePath { get; set; } = string.Empty;
+
+        public DateTime MovieUpdatedAt { get; set; }
     }
 
     private sealed class PostScanStageResult

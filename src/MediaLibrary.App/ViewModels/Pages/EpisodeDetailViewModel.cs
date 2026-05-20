@@ -42,6 +42,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     private bool _isUnidentified;
     private bool _hasSources;
     private bool _isOpeningPlayer;
+    private bool _isWatched;
+    private bool _isUpdatingWatched;
 
     public EpisodeDetailViewModel(
         INavigationStateService navigationStateService,
@@ -64,7 +66,9 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         OpenPlayerCommand = new AsyncRelayCommand(OpenPlayerAsync, _ => CanOpenPlayer);
         PlaySourceCommand = new AsyncRelayCommand(PlaySourceAsync, _ => CanOpenPlayer);
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
+        SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync, CanSetDefaultSource);
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
+        ToggleWatchedCommand = new AsyncRelayCommand(ToggleWatchedAsync, () => CanToggleWatched);
         CorrectionPlaceholderCommand = new RelayCommand(ShowCorrectionPlaceholder, () => HasEpisode);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
@@ -81,7 +85,11 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     public RelayCommand ManualProbeSourceCommand { get; }
 
+    public AsyncRelayCommand SetDefaultSourceCommand { get; }
+
     public AsyncRelayCommand ResetSourceRecognitionCommand { get; }
+
+    public AsyncRelayCommand ToggleWatchedCommand { get; }
 
     public RelayCommand CorrectionPlaceholderCommand { get; }
 
@@ -129,8 +137,11 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             if (SetProperty(ref _hasEpisode, value))
             {
                 OnPropertyChanged(nameof(HasNoEpisode));
+                OnPropertyChanged(nameof(CanResetSourcesToUnidentified));
                 CorrectionPlaceholderCommand.RaiseCanExecuteChanged();
+                SetDefaultSourceCommand.RaiseCanExecuteChanged();
                 ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
+                RefreshWatchedCommandState();
                 RefreshPlayerCommandState();
             }
         }
@@ -145,6 +156,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isUnidentified, value))
             {
+                OnPropertyChanged(nameof(CanResetSourcesToUnidentified));
                 ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
             }
         }
@@ -158,6 +170,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             if (SetProperty(ref _hasSources, value))
             {
                 OnPropertyChanged(nameof(HasNoSources));
+                SetDefaultSourceCommand.RaiseCanExecuteChanged();
                 ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
                 RefreshPlayerCommandState();
             }
@@ -165,6 +178,42 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     }
 
     public bool HasNoSources => !HasSources;
+
+    public bool CanResetSourcesToUnidentified => HasEpisode
+                                                 && HasSources
+                                                 && (!IsUnidentified || Sources.Count > 1);
+
+    public bool IsWatched
+    {
+        get => _isWatched;
+        private set
+        {
+            if (SetProperty(ref _isWatched, value))
+            {
+                OnPropertyChanged(nameof(WatchedButtonText));
+            }
+        }
+    }
+
+    public bool CanToggleWatched => HasEpisode && !IsUpdatingWatched;
+
+    public string WatchedButtonText => IsUpdatingWatched
+        ? "更新中..."
+        : IsWatched
+            ? "取消已看"
+            : "标记已看";
+
+    public bool IsUpdatingWatched
+    {
+        get => _isUpdatingWatched;
+        private set
+        {
+            if (SetProperty(ref _isUpdatingWatched, value))
+            {
+                RefreshWatchedCommandState();
+            }
+        }
+    }
 
     public bool IsOpeningPlayer
     {
@@ -224,6 +273,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             AirDateText = model.AirDateText;
             RuntimeText = model.RuntimeText;
             WatchedText = model.WatchedText;
+            IsWatched = model.IsWatched;
             ProgressText = model.ProgressText;
             SourceCountText = model.SourceCountText;
             SourceSummary = model.SourceSummary;
@@ -237,8 +287,11 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
                 Sources.Add(source);
             }
 
+            OnPropertyChanged(nameof(CanResetSourcesToUnidentified));
             NavigateBackToSeasonCommand.RaiseCanExecuteChanged();
+            SetDefaultSourceCommand.RaiseCanExecuteChanged();
             ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
+            RefreshWatchedCommandState();
             RefreshPlayerCommandState();
             StatusMessage = model.HasSources
                 ? $"已加载 {model.EpisodeNumberText}，可从默认源或指定播放源打开播放器。"
@@ -308,22 +361,21 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
                && !_probingMediaFileIds.Contains(source.MediaFileId);
     }
 
-    private bool CanResetSourceRecognition(object? parameter)
+    private bool CanSetDefaultSource(object? parameter)
     {
         return parameter is TvEpisodeSourceItem source
                && _episodeId.HasValue
                && HasEpisode
-               && !IsUnidentified
-               && !IsOpeningPlayer
-               && !_playerWindowService.IsPlayerOpen
+               && HasSources
+               && !source.IsDefault
                && Sources.Any(item => item.MediaFileId == source.MediaFileId);
     }
 
-    private async Task ResetSourceRecognitionAsync(object? parameter)
+    private async Task SetDefaultSourceAsync(object? parameter)
     {
         if (parameter is not TvEpisodeSourceItem source)
         {
-            StatusMessage = "请先选择要重置的播放源。";
+            StatusMessage = "请先选择要设为默认的播放源。";
             return;
         }
 
@@ -333,20 +385,66 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             return;
         }
 
-        if (IsUnidentified)
+        try
         {
-            StatusMessage = "该剧集已是未识别状态，无需重复重置。";
+            await _tvSeasonCollectionService.SetEpisodeDefaultMediaFileAsync(
+                _episodeId.Value,
+                source.MediaFileId,
+                CancellationToken.None);
+            _dataRefreshService.NotifyPlaybackChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+            StatusMessage = $"默认播放源已切换为：{source.SourceTypeText} · {source.DisplayFileName}";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"设置默认播放源失败：{DescribeException(exception)}";
+        }
+        finally
+        {
+            SetDefaultSourceCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private bool CanResetSourceRecognition(object? parameter)
+    {
+        return parameter is TvEpisodeSourceItem source
+               && _episodeId.HasValue
+               && HasEpisode
+               && (!IsUnidentified || Sources.Count > 1)
+               && !IsOpeningPlayer
+               && !_playerWindowService.IsPlayerOpen
+               && Sources.Any(item => item.MediaFileId == source.MediaFileId);
+    }
+
+    private async Task ResetSourceRecognitionAsync(object? parameter)
+    {
+        if (parameter is not TvEpisodeSourceItem source)
+        {
+            StatusMessage = "请先选择要拆分的播放源。";
+            return;
+        }
+
+        if (!_episodeId.HasValue || !Sources.Any(item => item.MediaFileId == source.MediaFileId))
+        {
+            StatusMessage = "该播放源不属于当前剧集。";
+            return;
+        }
+
+        if (IsUnidentified && Sources.Count <= 1)
+        {
+            StatusMessage = "该未识别集只有一个播放源，不能继续拆分。";
             return;
         }
 
         var confirmed = await _confirmationDialogService.ConfirmAsync(
-            "确认重置为未识别？",
+            "确认从当前集拆分？",
             $"会将该播放源从当前剧集中拆出，并回到 Other / 未识别项承接；不会删除本地或网盘中的真实文件，也不会清空剧集 metadata、已看状态或进度。\n\n播放源：{source.DisplayFileName}",
-            "重置为未识别",
+            "从当前集拆分",
             "取消");
         if (!confirmed)
         {
-            StatusMessage = "已取消重置播放源。";
+            StatusMessage = "已取消拆分播放源。";
             return;
         }
 
@@ -362,15 +460,16 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             _dataRefreshService.NotifyCollectionChanged();
             await ActivateAsync();
             StatusMessage = HasSources
-                ? "播放源已重置为未识别，真实文件未被删除。"
-                : "最后一个播放源已重置为未识别，真实文件未被删除；该剧集仍保留。";
+                ? "播放源已从当前集拆分，真实文件未被删除。"
+                : "最后一个播放源已从当前集拆分，真实文件未被删除；该剧集仍保留。";
         }
         catch (Exception exception)
         {
-            StatusMessage = $"重置播放源失败：{DescribeException(exception)}";
+            StatusMessage = $"拆分播放源失败：{DescribeException(exception)}";
         }
         finally
         {
+            SetDefaultSourceCommand.RaiseCanExecuteChanged();
             ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
             ManualProbeSourceCommand.RaiseCanExecuteChanged();
         }
@@ -516,6 +615,39 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         }
     }
 
+    private async Task ToggleWatchedAsync()
+    {
+        if (!_episodeId.HasValue)
+        {
+            StatusMessage = "请先选择剧集。";
+            return;
+        }
+
+        var targetWatched = !IsWatched;
+        IsUpdatingWatched = true;
+        try
+        {
+            await _tvSeasonCollectionService.SetEpisodeWatchedAsync(
+                _episodeId.Value,
+                targetWatched,
+                CancellationToken.None,
+                "Manual");
+            _dataRefreshService.NotifyPlaybackChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+            StatusMessage = targetWatched ? "已标记为已看。" : "已标记为未看。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"更新观看状态失败：{DescribeException(exception)}";
+        }
+        finally
+        {
+            IsUpdatingWatched = false;
+            RefreshWatchedCommandState();
+        }
+    }
+
     private async Task OpenPlayerAsync(object? parameter)
     {
         if (!_episodeId.HasValue)
@@ -608,6 +740,13 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         ResetSourceRecognitionCommand?.RaiseCanExecuteChanged();
     }
 
+    private void RefreshWatchedCommandState()
+    {
+        OnPropertyChanged(nameof(CanToggleWatched));
+        OnPropertyChanged(nameof(WatchedButtonText));
+        ToggleWatchedCommand?.RaiseCanExecuteChanged();
+    }
+
     private void OnPlayerWindowClosed(object? sender, EventArgs e)
     {
         SetOpeningPlayer(false);
@@ -657,11 +796,14 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         LastPlayedText = "-";
         IdentificationStatusText = "未加载";
         IsUnidentified = false;
+        IsWatched = false;
         HasSources = false;
         Sources.Clear();
         StatusMessage = statusMessage;
         NavigateBackToSeasonCommand.RaiseCanExecuteChanged();
+        SetDefaultSourceCommand.RaiseCanExecuteChanged();
         ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
+        RefreshWatchedCommandState();
         RefreshPlayerCommandState();
     }
 

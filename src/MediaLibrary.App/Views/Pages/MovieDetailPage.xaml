@@ -303,7 +303,8 @@
                                                 <Button Margin="0,10,0,0"
                                                         Command="{Binding DataContext.ResetSourceRecognitionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
-                                                        Content="重置为未识别"
+                                                        Content="从当前电影拆分"
+                                                        IsEnabled="{Binding DataContext.CanResetSourcesToUnidentified, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         Style="{StaticResource SecondaryButtonStyle}" />
                                             </StackPanel>
                                         </Grid>

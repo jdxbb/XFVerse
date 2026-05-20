@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Diagnostics;
 using System.Security.Cryptography;
@@ -42,7 +43,11 @@ public sealed class TmdbService : ITmdbService
     private static readonly SemaphoreSlim TmdbHttpLimiter = new(HttpConcurrencyLimit, HttpConcurrencyLimit);
     private static int TmdbHttpInFlight;
 
-    private readonly HttpClient _httpClient = new()
+    private readonly HttpClient _httpClient = new(
+        new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
+        })
     {
         Timeout = TimeSpan.FromSeconds(30)
     };
