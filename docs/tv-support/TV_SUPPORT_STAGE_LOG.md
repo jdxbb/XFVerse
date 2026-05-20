@@ -2094,3 +2094,89 @@ Known Issues:
 - Blocker: none.
 - Deferred: cross-page real-time refresh for an already-open Season detail page remains best-effort; returning to or refreshing the page reloads the state.
 - Noise: historical docs and logs may still describe Episode detail watched / unwatched as deferred.
+
+## Phase 4.12g - Episode detail regression and polish
+
+Completed:
+
+- Regressed Episode detail source-list, playback, persistent default source, split-source, lazy / manual probe, watched / unwatched, no-source, unidentified Episode, and Movie detail boundary behavior.
+- Kept the source split wording as `从当前集拆分` / `从当前电影拆分`; this replaces the earlier `重置为未识别` UI wording while keeping the safe detach semantics.
+- Episode detail now exposes the same visual disabled state for `从当前集拆分` while an Episode player is opening or open, matching the service / command guard. Media probing still disables only probe actions and does not disable source split.
+- Movie split diagnostics now report retained history / progress instead of the old misleading resume-cleared wording. The underlying Movie split behavior still does not delete real files.
+- Confirmed Episode detail watched / unwatched uses the existing TV collection service and does not create WatchHistory or feed TV into Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
+
+Not done:
+
+- No real correction entry, AI correction, TMDB candidate search, batch correction, manual Season aggregation, online subtitles, new scan strategy, TV Watch Insights input, TV recommendation input, database update, commit, or push was added.
+
+Manual acceptance matrix:
+
+1. Recognized Episode detail loads from Season detail and keeps metadata fallback safe.
+2. Failed unidentified Episode detail uses the same source list, playback, probe, default-source, split-source, and watched toggle surface.
+3. No-source Episodes stay visible, show `暂无播放源`, keep playback disabled, and still allow watched / unwatched.
+4. Episode source rows keep safe location display and do not expose full local paths or full WebDAV URLs.
+5. Top play, source-row play, Season detail play, and `OpenEpisodeAsync(episodeId)` use the shared Episode source-selection path.
+6. Persistent default sources remain preferred and fall back when inactive, unbound, deleted, or inaccessible.
+7. `从当前集拆分` preserves real files, Episode / Season metadata, watched / progress state, watch history, subtitles, and probe fields.
+8. Manual probe and detail lazy probe remain scoped to current detail sources and refresh source rows after status changes.
+9. Movie detail split, default-source, source probe, and watched behavior remain within existing Movie semantics.
+10. TV still does not enter Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: cross-page real-time refresh for Season detail after Episode detail changes remains best-effort; reload / return shows the updated state.
+- Noise: earlier historical sections may still use `重置为未识别` wording for the same split-source operation.
+
+## Phase 4.12h - Episode detail docs and stage closeout
+
+Scope:
+
+- Documentation closeout only. No business logic, schema, scan strategy, correction workflow, Watch Insights input, recommendation input, database update, commit, or push was added.
+- Confirmed the current source split labels are `从当前集拆分` in Episode detail and `从当前电影拆分` in Movie detail.
+- Confirmed the Episode persistent default source migration `20260519201559_AddTvEpisodeDefaultMediaFile` is present and tracked, while the current migrations diff is empty.
+
+Completed summary:
+
+- Episode detail supports recognized Episodes, failed unidentified Episodes, no-source Episodes, source list, top play, source-row play, persistent default source, `设为默认`, `从当前集拆分`, detail lazy probe, manual probe, and watched / unwatched.
+- Season detail Episode play uses the same `OpenEpisodeAsync(episodeId)` source-selection path as Episode detail top play.
+- Source list supports local-only, WebDAV-only, and local + WebDAV mixed sources while keeping location display sanitized.
+- Orphan / Other unknown files continue to use the failed Movie detail carrier and inherit Movie source probe / split boundaries where applicable.
+- Source split is a safe detach operation. It removes the current Movie / Episode binding and returns the source to unidentified / Other carrying without deleting real files or clearing WatchHistory, progress, probe fields, subtitles, or metadata.
+- Failed unidentified Episodes allow `从当前集拆分` only when multiple active sources exist; single-source unidentified Episodes and orphan unknown carriers stay disabled.
+- Manual watched / unwatched updates Episode state and existing Season aggregates only. It does not create WatchHistory and does not feed TV into Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
+
+Final acceptance matrix:
+
+1. Recognized Episode detail is available from Season detail.
+2. Failed unidentified Episode detail uses the same detail shell and source-management surface.
+3. Orphan / Other unknown files open through failed Movie detail carrying.
+4. Episode source list shows active sources with sanitized display fields.
+5. Episode top play uses the effective default source.
+6. Episode source-row play uses the selected source.
+7. Season detail play uses the shared Episode playback path.
+8. WebDAV + local mixed sources stay distinct and playable through their own rows.
+9. Full local paths, full WebDAV URLs, credentials, and tokens are not shown in UI or diagnostic docs.
+10. Persistent default source and `设为默认` are supported by `TvEpisode.DefaultMediaFileId`.
+11. Source split labels are `从当前电影拆分` / `从当前集拆分`.
+12. Failed unidentified Episode multi-source split is allowed.
+13. Failed unidentified Episode single-source split is disabled.
+14. Orphan unknown carrier split is disabled.
+15. No-source Episode keeps the detail page and disables playback.
+16. Detail lazy probe and manual probe remain scoped to current detail sources.
+17. Episode watched / unwatched works for recognized, failed unidentified, and no-source Episodes.
+18. Movie detail playback, source probe, default source, watched state, and split semantics are not regressed.
+19. TV remains excluded from Watch Insights, Watch Profile, AI recommendations, and recommendation fingerprints.
+20. Build verification passes with 0 warnings and 0 errors.
+21. Migration state is explicit: the Episode default-source migration exists; current migrations diff is empty.
+22. Database update was not executed.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: real unified correction entry, AI correction, TMDB candidate search, batch correction, manual Season aggregation, SP / OAD / OVA / special mapping, theatrical / course / collection-specific handling, stronger rescan / reattach hardening, richer probe task-center UI, online subtitles, final UI polish, and any TV Watch Insights / AI recommendation integration.
+- Noise: WebDAV probing remains best-effort and can fail because of network, permissions, server behavior, or ffprobe limits; historical docs may still contain earlier `重置为未识别` wording for the split-source operation.
+
+Recommendation:
+
+- Phase 4.12 is ready to close. Next recommended phase is Phase 4.13 for unified correction entry, batch correction, and manual grouping / correction workflows.

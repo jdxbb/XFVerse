@@ -1,5 +1,21 @@
 # 影片发现 Known Issues
 
+## Phase 4.12h Movie Boundary
+
+Blocker:
+
+- None for Movie Discovery from the Episode detail closeout.
+
+Deferred:
+
+- Cross-type correction, Movie / TV candidate correction, batch correction, manual grouping, and unidentified carrier correction remain outside Movie Discovery.
+
+Noise:
+
+- Movie detail now uses `从当前电影拆分` for the old reset-to-unidentified source action. The logic still detaches the source from the current Movie into unidentified carrying and does not delete real files.
+- Failed Movie placeholders and orphan unknown carriers remain unidentified detail carriers; their split action stays disabled.
+- Phase 4.12 does not change Movie Discovery ranking, search, recommendation inputs, Watch Insights, visibility semantics, schema, or migrations.
+
 ## Phase 4.10 TV Notes
 
 - TV search / ranking not-in-library Series clicks now write metadata-only TV rows and enter `SeriesOverviewPage`.

@@ -1,5 +1,28 @@
 # TV Support Known Issues
 
+## Phase 4.12h Closeout Known Issues
+
+Blocker:
+
+- None for Phase 4.12 Episode detail closeout.
+
+Deferred:
+
+- Real unified correction entry remains Phase 4.13 work.
+- AI correction, TMDB candidate search, batch correction, and manual Season grouping remain deferred.
+- SP / OAD / OVA / special mapping, theatrical / course / collection-specific handling, folk season splits, and multi-episode file splitting remain outside Phase 4.12.
+- More complete scan / rescan hardening can build on the existing reset-only reattach logs and conservative Episode reattach behavior.
+- Richer probe task-center UI, manual retry policy controls, and broader live progress surfaces remain deferred; current detail lazy probe and manual probe are best-effort.
+- TV Watch Insights, Watch Profile, AI recommendations, persona inputs, and recommendation fingerprints remain excluded and need a separate design if product direction changes.
+- Final UI visual polish remains deferred.
+
+Noise:
+
+- WebDAV probe can fail because of network instability, server behavior, permissions, ffprobe limits, or unavailable stream metadata. It is not a Phase 4.12 blocker.
+- Movie placeholders / Other counts can remain high in ambiguous libraries; 4.12 provides detail carrying and source management, not full correction.
+- Historical docs and logs may still use `重置为未识别`; current UI wording is `从当前集拆分` / `从当前电影拆分`.
+- The current worktree may contain cumulative Phase 4.12 changes; this closeout only records current status and does not execute database update.
+
 ## Blocker
 
 - No known Phase 4.3 code blocker after service-layer build validation.

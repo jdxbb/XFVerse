@@ -181,7 +181,9 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     public bool CanResetSourcesToUnidentified => HasEpisode
                                                  && HasSources
-                                                 && (!IsUnidentified || Sources.Count > 1);
+                                                 && (!IsUnidentified || Sources.Count > 1)
+                                                 && !IsOpeningPlayer
+                                                 && !_playerWindowService.IsPlayerOpen;
 
     public bool IsWatched
     {
@@ -410,10 +412,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     {
         return parameter is TvEpisodeSourceItem source
                && _episodeId.HasValue
-               && HasEpisode
-               && (!IsUnidentified || Sources.Count > 1)
-               && !IsOpeningPlayer
-               && !_playerWindowService.IsPlayerOpen
+               && CanResetSourcesToUnidentified
                && Sources.Any(item => item.MediaFileId == source.MediaFileId);
     }
 
@@ -733,6 +732,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     private void RefreshPlayerCommandState()
     {
         OnPropertyChanged(nameof(CanOpenPlayer));
+        OnPropertyChanged(nameof(CanResetSourcesToUnidentified));
         OnPropertyChanged(nameof(PrimaryPlayButtonText));
         OnPropertyChanged(nameof(SourcePlayButtonText));
         OpenPlayerCommand?.RaiseCanExecuteChanged();

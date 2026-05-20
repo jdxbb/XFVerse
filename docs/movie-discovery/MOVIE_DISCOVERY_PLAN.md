@@ -396,6 +396,12 @@
 - Movie source rows share the updated probe wording: a successful ffprobe run with no readable media fields is shown as `已探测（未读取到媒体信息）`.
 - Probe lifecycle logs now include graceful cancellation / abandoned-queue diagnostics and use extension plus stable hash fingerprints for sample file identifiers.
 - This does not change Movie detail lazy probe eligibility, manual probe behavior, scan-time probe disablement, Movie Discovery search/ranking/recommendation inputs, Watch Insights inputs, correction flows, schema, or migrations.
+
+## Phase 4.12h Movie Detail Boundary
+
+- Movie detail source split wording is `从当前电影拆分`.
+- The operation remains the same safe unidentified-carrying boundary: detach the selected source from the current Movie without deleting real local / WebDAV files or changing WatchHistory, progress, probe fields, Movie Discovery ranking/search, recommendation inputs, Watch Insights, schema, or migrations.
+- Failed Movie placeholders and orphan unknown carriers continue to reuse Movie detail as their unidentified carrier, with source split disabled for that carrier state.
 # Phase 4.11f-fix-9 Scan Boundary Note
 
 Movie discovery semantics are unchanged. Scan closeout now routes additional verified TV-like sequence patterns away from Movie placeholder scatter when there is same-parent sequence evidence, while short bare-number collection-like folders without TV evidence stay in Other / unknown collection handling instead of unidentified TV season projection. TV.Parse scan warnings are warning telemetry and no longer count as scan errors.

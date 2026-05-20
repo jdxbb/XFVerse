@@ -706,7 +706,7 @@ public sealed class MovieManagementService : IMovieManagementService
             $"media-identification-reset-boundary mediaFileId={mediaFile.Id} oldMovieId={movie.Id} "
             + $"newMovieId={placeholderMovie.Id} movedWatchHistory=false");
         WatchCompletionDiagnostics.Write(
-            $"media-identification-reset-resume-cleared mediaFileId={mediaFile.Id} reason=reset-to-unidentified");
+            $"media-identification-reset-history-retained mediaFileId={mediaFile.Id} reason=split-from-current-movie");
 
         placeholderMovie.DefaultMediaFileId = mediaFile.Id;
         placeholderMovie.UpdatedAt = now;

@@ -544,3 +544,15 @@
 - Failed / unidentified Movie placeholders, including orphan carriers shown through Movie detail, remain disabled for this action.
 - Episode detail uses the parallel `从当前集拆分` wording; unidentified Episodes enable it only for multi-source Episodes, while single-source unidentified Episodes remain disabled.
 - Movie Discovery ranking, search, recommendation inputs, Watch Insights, Movie fallback thresholds, visibility semantics, schema, and migrations are unchanged.
+
+# Phase 4.12g Movie Detail Regression Boundary
+
+- Movie detail source split semantics remain unchanged: `从当前电影拆分` moves the selected source into unidentified carrying without deleting real files.
+- The diagnostic message for Movie source split now reports retained history / progress instead of the older resume-cleared wording.
+- Movie detail playback, default source, source probe, watched state, Movie Discovery ranking / search / recommendation inputs, Watch Insights, visibility semantics, schema, and migrations are unchanged.
+
+# Phase 4.12h Movie Detail Closeout Boundary
+
+- Phase 4.12 closes with Movie detail source split wording set to `从当前电影拆分`.
+- Failed Movie placeholders and orphan unknown carriers remain the Movie-side unidentified detail carrier. The split action stays disabled there because an orphan carrier has no multi-source current Movie boundary to split from.
+- The underlying Movie split operation still detaches the selected source from the current Movie into unidentified carrying without deleting real files or changing Movie Discovery, Watch Insights, recommendation inputs, ranking, search, schema, or migration behavior.

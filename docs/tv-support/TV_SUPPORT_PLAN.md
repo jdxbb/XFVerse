@@ -1130,3 +1130,37 @@ Phase 4.12f adds Episode detail watched / unwatched controls without changing pl
 - Toggling an Episode watched state refreshes the current Episode detail and notifies playback / collection listeners so Season detail and library projections reload with the existing Season aggregate progress rules.
 - Manual Episode watched / unwatched does not create `WatchHistory`, does not affect Movie watched state, and does not add TV inputs to Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
 - This update does not change source lists, playback, default-source selection, manual probe, split-source behavior, correction placeholders, scan rules, migrations, or database update behavior.
+
+## Phase 4.12g Update
+
+Phase 4.12g is the Episode detail regression / polish pass for the completed 4.12 surface.
+
+- Recognized Episode, failed unidentified Episode, no-source Episode, source list, playback, persistent default source, split-source, lazy / manual probe, and watched / unwatched flows were rechecked together.
+- Source split UI keeps the newer wording: `从当前集拆分` for Episode detail and `从当前电影拆分` for Movie detail. The operation remains a safe detach from the current container, not a physical file delete.
+- Episode detail visibly disables `从当前集拆分` while an Episode player is opening or open, matching the command guard. Probe work continues to disable only probe buttons.
+- Movie split diagnostics now describe retained history / progress instead of implying resume state was cleared.
+- No real correction flow, scan-strategy change, Watch Insights TV input, recommendation TV input, new migration, database update, commit, or push is part of this pass.
+
+## Phase 4.12h Closeout
+
+Phase 4.12 is closed as the Episode detail and source-management stage.
+
+Completed surface:
+
+- Episode detail exists for recognized Episodes and failed unidentified Episodes.
+- Orphan / Other unknown files are carried by the existing failed Movie detail shell.
+- Episode detail shows basic Episode / Season / Series metadata, identification status, source count, progress, watched state, and no-source fallback.
+- Episode source rows show safe file name, local / WebDAV source type, sanitized location, size / format / duration / resolution / codec / bitrate where available, probe stage, failure text, playback history, and default-source state.
+- Top play, source-row play, Season detail Episode play, and `OpenEpisodeAsync(episodeId)` use the shared Episode source-selection path.
+- WebDAV-only, local-only, and WebDAV + local mixed Episode sources are supported without changing Movie source behavior.
+- `TvEpisode.DefaultMediaFileId` stores the user-selected persistent default source through migration `20260519201559_AddTvEpisodeDefaultMediaFile`; database update is not executed by the agent.
+- Source split wording is finalized as `从当前集拆分` for Episode detail and `从当前电影拆分` for Movie detail.
+- Source split detaches the source from the current Episode / Movie only. It does not delete real local / WebDAV files and does not clear WatchHistory, progress, subtitle bindings, probe fields, or metadata.
+- Failed unidentified Episodes allow `从当前集拆分` only when multiple active sources exist. Single-source unidentified Episodes and orphan unknown carriers stay disabled.
+- Detail-page lazy probe and source-row manual probe are the active probe entry points. Scan-time probe enqueue remains disabled.
+- Episode detail watched / unwatched is supported for recognized, failed unidentified, and no-source Episodes through existing TV collection state logic.
+
+Closed boundaries:
+
+- Phase 4.12 does not implement real correction, AI correction, TMDB candidate search, batch correction, manual Season aggregation, online subtitles, new scan strategy, final UI redesign, TV Watch Insights input, TV recommendation input, database update, commit, or push.
+- Phase 4.13 should start from the unified correction entry and batch / manual correction scope.
