@@ -181,7 +181,6 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     public bool CanResetSourcesToUnidentified => HasEpisode
                                                  && HasSources
-                                                 && (!IsUnidentified || Sources.Count > 1)
                                                  && !IsOpeningPlayer
                                                  && !_playerWindowService.IsPlayerOpen;
 
@@ -427,12 +426,6 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         if (!_episodeId.HasValue || !Sources.Any(item => item.MediaFileId == source.MediaFileId))
         {
             StatusMessage = "该播放源不属于当前剧集。";
-            return;
-        }
-
-        if (IsUnidentified && Sources.Count <= 1)
-        {
-            StatusMessage = "该未识别集只有一个播放源，不能继续拆分。";
             return;
         }
 

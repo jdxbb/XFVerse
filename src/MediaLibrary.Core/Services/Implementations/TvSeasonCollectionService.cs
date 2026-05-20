@@ -360,13 +360,6 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                      && x.MediaType == MediaType.Video
                      && !x.IsDeleted,
                 cancellationToken);
-        if (mediaFile.Episode.Season?.IdentificationStatus == IdentificationStatus.Failed
-            && remainingActiveSourceCount <= 0)
-        {
-            ScanIdentificationDiagnostics.Write(
-                $"event=tv-episode-source-reset-unidentified-rejected episodeId={tvEpisodeId} mediaFileId={mediaFileId} reason=already-unidentified-single-source");
-            throw new InvalidOperationException("该未识别集只有一个播放源，不能继续拆分。");
-        }
 
         var defaultSourceCleared = mediaFile.Episode.DefaultMediaFileId == mediaFile.Id;
         if (defaultSourceCleared)
@@ -384,7 +377,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         }
 
         ScanIdentificationDiagnostics.Write(
-            $"event=tv-episode-source-reset-unidentified episodeId={tvEpisodeId} mediaFileId={mediaFileId} oldEpisodeId={oldEpisodeId} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType)} defaultSourceCleared={defaultSourceCleared} remainingActiveSourceCount={remainingActiveSourceCount}");
+            $"event=tv-episode-source-reset-unidentified episodeId={tvEpisodeId} mediaFileId={mediaFileId} oldEpisodeId={oldEpisodeId} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType)} defaultSourceCleared={defaultSourceCleared} remainingActiveSourceCount={remainingActiveSourceCount} lastSourceSplit={(remainingActiveSourceCount <= 0).ToString().ToLowerInvariant()}");
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

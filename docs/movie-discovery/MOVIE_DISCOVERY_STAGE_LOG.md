@@ -550,7 +550,7 @@
 
 - Movie detail now labels the source reset action as `从当前电影拆分`; the underlying operation still moves the selected source out of the current Movie into unidentified carrying without deleting real files.
 - Failed / unidentified Movie placeholders, including orphan carriers shown through Movie detail, remain disabled for this action.
-- Episode detail uses the parallel `从当前集拆分` wording; unidentified Episodes enable it only for multi-source Episodes, while single-source unidentified Episodes remain disabled.
+- Episode detail uses the parallel `从当前集拆分` wording. Failed / unidentified Episodes now also allow single-source detach so wrongly auto-grouped TV sources can return to Other; Movie failed placeholders and orphan carriers remain disabled for Movie-side split.
 - Movie Discovery ranking, search, recommendation inputs, Watch Insights, Movie fallback thresholds, visibility semantics, schema, and migrations are unchanged.
 
 # Phase 4.12g Movie Detail Regression Boundary
@@ -572,3 +572,8 @@
 - Reused unknown TV containers preserve existing names; later placeholder ranges no longer overwrite the Series / Season display names.
 - Movie Discovery ranking, Movie matching, Movie recommendations, Watch Insights inputs, Movie detail source split semantics, schema, and migrations are unchanged.
 - Existing failed Movie placeholders may remain visible under Other when the conservative TV grouping safety gate skips them; Phase 4.13 correction workflows should handle manual grouping / correction.
+
+# Phase 4.12-post Episode Split Boundary Follow-up
+
+- TV Episode detail now allows `从当前集拆分` for single-source failed / unidentified Episodes, so an incorrectly auto-grouped TV source can be detached back to Other without deleting the real file.
+- This is a TV Episode source-management boundary change only. Movie failed placeholders, orphan unknown carriers, Movie Discovery ranking / search, Movie recommendations, Watch Insights inputs, Movie matching, schema, and migrations are unchanged.

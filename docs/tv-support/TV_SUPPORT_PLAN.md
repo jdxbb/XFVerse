@@ -1177,7 +1177,7 @@ Completed surface:
 - `TvEpisode.DefaultMediaFileId` stores the user-selected persistent default source through migration `20260519201559_AddTvEpisodeDefaultMediaFile`; database update is not executed by the agent.
 - Source split wording is finalized as `从当前集拆分` for Episode detail and `从当前电影拆分` for Movie detail.
 - Source split detaches the source from the current Episode / Movie only. It does not delete real local / WebDAV files and does not clear WatchHistory, progress, subtitle bindings, probe fields, or metadata.
-- Failed unidentified Episodes allow `从当前集拆分` only when multiple active sources exist. Single-source unidentified Episodes and orphan unknown carriers stay disabled.
+- Failed unidentified Episodes allow `从当前集拆分` whenever at least one active source exists. Single-source unidentified Episodes can be detached so wrongly auto-grouped sources can return to Other; orphan unknown carriers on the Movie detail boundary stay disabled.
 - Detail-page lazy probe and source-row manual probe are the active probe entry points. Scan-time probe enqueue remains disabled.
 - Episode detail watched / unwatched is supported for recognized, failed unidentified, and no-source Episodes through existing TV collection state logic.
 

@@ -2118,7 +2118,7 @@ Completed:
 
 - Episode detail source-row reset action is now labeled `从当前集拆分`; the underlying operation still detaches the selected source from the current Episode without deleting real local / WebDAV files or clearing Episode / Season metadata, watched state, progress, history, subtitles, or probe fields.
 - Recognized Episodes can still split any active source, including the last source, leaving the Episode visible with no sources.
-- Failed / unidentified Episodes now allow `从当前集拆分` only when the Episode has multiple active sources. A single-source unidentified Episode remains disabled and protected by the service layer.
+- Failed / unidentified Episodes now allow `从当前集拆分` whenever the Episode has an active source. A single-source unidentified Episode can be detached back to Other, while the service layer still protects unrelated / deleted / non-video sources.
 - Movie detail reset UI is now labeled `从当前电影拆分`; failed / unidentified Movie placeholders and orphan carriers remain disabled.
 
 Not done:
@@ -2214,7 +2214,7 @@ Completed summary:
 - Source list supports local-only, WebDAV-only, and local + WebDAV mixed sources while keeping location display sanitized.
 - Orphan / Other unknown files continue to use the failed Movie detail carrier and inherit Movie source probe / split boundaries where applicable.
 - Source split is a safe detach operation. It removes the current Movie / Episode binding and returns the source to unidentified / Other carrying without deleting real files or clearing WatchHistory, progress, probe fields, subtitles, or metadata.
-- Failed unidentified Episodes allow `从当前集拆分` only when multiple active sources exist; single-source unidentified Episodes and orphan unknown carriers stay disabled.
+- Failed unidentified Episodes allow `从当前集拆分` whenever they still have at least one active source. This includes single-source unidentified Episodes, so a wrongly auto-grouped source can be detached from the current Episode and returned to Other without deleting the real file.
 - Manual watched / unwatched updates Episode state and existing Season aggregates only. It does not create WatchHistory and does not feed TV into Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
 
 Final acceptance matrix:
@@ -2231,7 +2231,7 @@ Final acceptance matrix:
 10. Persistent default source and `设为默认` are supported by `TvEpisode.DefaultMediaFileId`.
 11. Source split labels are `从当前电影拆分` / `从当前集拆分`.
 12. Failed unidentified Episode multi-source split is allowed.
-13. Failed unidentified Episode single-source split is disabled.
+13. Failed unidentified Episode single-source split is allowed and leaves the Episode / Season metadata in place after the last source is detached.
 14. Orphan unknown carrier split is disabled.
 15. No-source Episode keeps the detail page and disables playback.
 16. Detail lazy probe and manual probe remain scoped to current detail sources.
@@ -2279,3 +2279,28 @@ Known Issues:
 - Blocker: none in the emergency code path after build verification.
 - Deferred: libraries already polluted by the previous aggressive unknown append / grouping logic still require clear-library rescan, manual cleanup, or a later repair tool. This phase prevents future automatic bridge pollution but does not rewrite existing data.
 - Noise: the conservative special-directory skip can leave more items in Other / placeholder review until Phase 4.13 manual correction exists.
+
+## Phase 4.12-post Episode split follow-up - Single-source unidentified Episodes
+
+Completed:
+
+- Enabled `从当前集拆分` for single-source failed / unidentified Episodes. This gives users a safe escape hatch when automatic unknown Season grouping puts a file into the wrong Episode.
+- Removed the service-side rejection for the last active source of a failed unidentified Episode. The operation still detaches only the selected `MediaFile` binding and does not delete local or WebDAV files.
+- Kept the Episode / Season rows, watched state, playback progress, probe fields, subtitles, and metadata intact when the last source is detached.
+- Added `lastSourceSplit` to the split diagnostic so logs distinguish multi-source detach from last-source detach without exposing full paths.
+- Kept Movie failed placeholders and orphan unknown carriers on the Movie detail boundary unchanged.
+
+Not done:
+
+- No automatic historical ungrouping, manual correction entry, batch correction, data cleanup, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` should be run after this follow-up and must remain 0 warnings / 0 errors.
+- Current migrations diff should remain empty.
+
+Known Issues:
+
+- Blocker: none expected in this narrow split path.
+- Deferred: the real manual correction / regrouping entry remains Phase 4.13 work.
+- Noise: detaching the only source leaves an empty unidentified Episode shell until a refresh, rescan, or later manual cleanup path handles it.
