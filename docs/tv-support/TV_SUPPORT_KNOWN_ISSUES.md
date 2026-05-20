@@ -1,5 +1,41 @@
 # TV Support Known Issues
 
+## Phase 4.12-post-fix-follow-up Known Issues
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- Existing wrong recognized Episode source bindings are not automatically removed by the same-directory reattach gate.
+- Cross-directory source correction for recognized TV remains manual-correction / batch-correction work for Phase 4.13 or later.
+- SP/OAD/OVA/special, theatrical, derivative-series, course, and collection-specific mapping remain outside automatic reattach.
+
+Noise:
+
+- Recognized Episode reattach can now leave more sibling-folder numeric files in placeholder / Other flows by design.
+- Directory diagnostics for this gate use hashes, so logs can prove same/different directory decisions without exposing private directory text.
+
+## Phase 4.12-post-fix Known Issues
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- Historical duplicate unknown Series / Season containers are not bulk-merged automatically.
+- Manual aggregate-to-Season, manual correction into an existing unknown Season episode number, batch button rule changes, AI-assisted correction strategy changes, and unified Movie / TV correction entry remain Phase 4.13 work.
+- SP/OAD/OVA/special, theatrical, course, collection, folk season numbering, and multi-episode expansion remain specialty or manual-correction work.
+
+Noise:
+
+- Unknown grouping keys are derived at scan time from current source context and are not stored as schema fields.
+- When source/root/title context conflicts or more than one compatible unknown Season is found, automatic append skips and leaves the file for existing placeholder / Other handling.
+- Duplicate-copy suffix normalization is scoped to TV-like parsing / grouping and does not imply broad duplicate-file cleanup outside unknown Season append.
+- Existing placeholder / Other counts may remain high for ambiguous folders; this phase prevents more unsafe duplicates instead of claiming broad identification.
+
 ## Phase 4.12h Closeout Known Issues
 
 Blocker:
@@ -309,3 +345,20 @@ Noise:
 - Movie placeholders can remain high in mixed anime / movie / course folders; this is expected unresolved data, not a scan failure.
 - AI refined title top1 can still require human correction when TMDB naming, folk season splits, or source folders disagree.
 - AppleDouble `._*` files from older scans may require delete-record cleanup if they were inserted before the ignore rule existed.
+
+## Phase 4.12-post Emergency Safety Fix Known Issues
+
+Blocker:
+
+- None for the tightened unknown grouping / append safety path after build verification.
+
+Deferred:
+
+- Existing unknown Series / Season containers that were already polluted by the previous aggressive reuse logic are not automatically repaired. Use clear-library rescan, manual cleanup, or a later repair tool.
+- Special, recap, remake, OVA / OAD, theatrical / movie, side-story, course, and collection directories are intentionally not auto-appended into regular unknown Seasons. Phase 4.13 should provide user-controlled correction / grouping for these cases.
+- Broader TV recognition quality work remains separate: TMDB candidate conflict handling, year-gate tuning, AI prompt changes, and folk-season mapping are not part of this emergency fix.
+
+Noise:
+
+- The conservative skip may leave more sources visible as Other / placeholder items until manual correction exists.
+- Strict-key mismatch logs are expected when files share episode numbers but are in different directories or already mixed unknown containers.

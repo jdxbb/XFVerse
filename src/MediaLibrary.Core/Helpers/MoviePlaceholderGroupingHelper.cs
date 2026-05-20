@@ -60,15 +60,9 @@ public static partial class MoviePlaceholderGroupingHelper
                 continue;
             }
 
-            if (parentItems.GroupBy(x => x.Pattern.Number).Any(x => x.Count() > 1))
-            {
-                AddCount(skippedRunReasons, "mixed-duplicate-episode-number");
-                continue;
-            }
-
             foreach (var run in BuildStrictContinuousRuns(parentItems.OrderBy(x => x.Pattern.Number).ToList()))
             {
-                if (run.Count < 3)
+                if (DistinctEpisodeNumberCount(run) < 3)
                 {
                     AddCount(skippedRunReasons, "mixed-run-too-short");
                     continue;
@@ -107,16 +101,10 @@ public static partial class MoviePlaceholderGroupingHelper
                      .Where(x => !consumedMediaFileIds.Contains(x.Placeholder.MediaFileId))
                      .GroupBy(x => (x.Placeholder.ParentPath, x.Pattern.PatternKey)))
         {
-            if (group.GroupBy(x => x.Pattern.Number).Any(x => x.Count() > 1))
-            {
-                AddCount(skippedRunReasons, "duplicate-episode-number");
-                continue;
-            }
-
             var ordered = group.OrderBy(x => x.Pattern.Number).ToList();
             foreach (var run in BuildStrictContinuousRuns(ordered))
             {
-                if (run.Count < 3)
+                if (DistinctEpisodeNumberCount(run) < 3)
                 {
                     AddCount(skippedRunReasons, "run-too-short");
                     continue;
@@ -184,16 +172,21 @@ public static partial class MoviePlaceholderGroupingHelper
     {
         var runs = new List<List<MoviePlaceholderGroupingParsedCandidate>>();
         var current = new List<MoviePlaceholderGroupingParsedCandidate>();
-        foreach (var item in ordered)
+        var currentNumber = 0;
+        foreach (var group in ordered
+                     .GroupBy(x => x.Pattern.Number)
+                     .OrderBy(x => x.Key))
         {
-            if (current.Count == 0 || item.Pattern.Number == current[^1].Pattern.Number + 1)
+            if (current.Count == 0 || group.Key == currentNumber + 1)
             {
-                current.Add(item);
+                current.AddRange(group.OrderBy(x => x.Placeholder.FileName, StringComparer.OrdinalIgnoreCase));
+                currentNumber = group.Key;
                 continue;
             }
 
             runs.Add(current);
-            current = [item];
+            current = group.OrderBy(x => x.Placeholder.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+            currentNumber = group.Key;
         }
 
         if (current.Count > 0)
@@ -220,27 +213,24 @@ public static partial class MoviePlaceholderGroupingHelper
     {
         range = new MoviePlaceholderGroupingRange(string.Empty, string.Empty, string.Empty, 0, 0, []);
         skippedReason = string.Empty;
-        if (parentItems.Count < 10)
+        var numberGroups = parentItems
+            .GroupBy(x => x.Pattern.Number)
+            .OrderBy(x => x.Key)
+            .ToArray();
+        if (numberGroups.Length < 10)
         {
             return false;
         }
 
-        if (parentItems.GroupBy(x => x.Pattern.Number).Any(x => x.Count() > 1))
-        {
-            skippedReason = "long-running-duplicate-episode-number";
-            return false;
-        }
-
-        var ordered = parentItems.OrderBy(x => x.Pattern.Number).ToList();
-        var start = ordered[0].Pattern.Number;
-        var end = ordered[^1].Pattern.Number;
+        var start = numberGroups[0].Key;
+        var end = numberGroups[^1].Key;
         var span = end - start + 1;
         if (end < 100 && span < 20)
         {
             return false;
         }
 
-        var numbers = ordered.Select(x => x.Pattern.Number).ToHashSet();
+        var numbers = numberGroups.Select(x => x.Key).ToHashSet();
         var missing = Enumerable.Range(start, span).Where(x => !numbers.Contains(x)).ToArray();
         var missingRatio = span == 0 ? 1 : (double)missing.Length / span;
         if (missing.Length == 0 || missingRatio > 0.2)
@@ -249,6 +239,9 @@ public static partial class MoviePlaceholderGroupingHelper
             return false;
         }
 
+        var ordered = numberGroups
+            .SelectMany(x => x.OrderBy(y => y.Placeholder.FileName, StringComparer.OrdinalIgnoreCase))
+            .ToList();
         var parentPath = ordered[0].Placeholder.ParentPath;
         range = new MoviePlaceholderGroupingRange(
             parentPath,
@@ -299,6 +292,17 @@ public static partial class MoviePlaceholderGroupingHelper
         {
             skippedReason = "empty-name";
             return false;
+        }
+
+        if (TvEpisodeFileNameParser.Parse(fileName).IsMultiEpisode)
+        {
+            skippedReason = "multi-episode";
+            return false;
+        }
+
+        if (TvEpisodeFileNameParser.TryStripTrailingDuplicateCopySuffix(name, out var duplicateBaseName))
+        {
+            name = duplicateBaseName;
         }
 
         if (ExcludedTokenRegex().IsMatch(name))
@@ -434,7 +438,7 @@ public static partial class MoviePlaceholderGroupingHelper
 
     private static string TrimBracketContent(string value)
     {
-        return value.Trim().Trim('[', ']', '(', ')', '{', '}').Trim();
+        return value.Trim().Trim('[', ']', '(', ')', '{', '}', '\uFF08', '\uFF09').Trim();
     }
 
     private static bool TryParseBracketedEpisodeSegment(string value, out int number)
@@ -518,6 +522,11 @@ public static partial class MoviePlaceholderGroupingHelper
                && number > 0;
     }
 
+    private static int DistinctEpisodeNumberCount(IEnumerable<MoviePlaceholderGroupingParsedCandidate> run)
+    {
+        return run.Select(x => x.Pattern.Number).Distinct().Count();
+    }
+
     private static bool IsReleaseNumber(int value)
     {
         return value is 480 or 720 or 1080 or 2160 or 4320
@@ -539,7 +548,7 @@ public static partial class MoviePlaceholderGroupingHelper
     private static IReadOnlyDictionary<string, int> EmptySkippedReasons { get; } =
         new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|\uFF08[^\uFF09]+\uFF09", RegexOptions.CultureInvariant)]
     private static partial Regex BracketedContentRegex();
 
     [GeneratedRegex(@"[._\-]+", RegexOptions.CultureInvariant)]

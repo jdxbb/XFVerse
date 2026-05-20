@@ -1,5 +1,76 @@
 # TV Support Stage Log
 
+## Phase 4.12-post-fix-follow-up - Restrict Recognized Reattach To Same Directory
+
+Completed:
+
+- Recognized Episode automatic reattach now requires the candidate source directory to match an existing active source directory on the target recognized Episode.
+- Sibling directories are no longer accepted for recognized Episode reattach, even when they share source connection, scan root, parent folder, and bare numeric episode names.
+- Same-directory duplicate / multi-version files remain eligible for recognized Episode multi-source attachment.
+- Reattach candidate and skipped diagnostics now emit directory hashes instead of directory text for this safety gate.
+- Skip logs use `recognized-reattach-requires-same-directory` when a recognized target exists but only in a different directory.
+- Unknown Season append logic was not changed by this follow-up and keeps its existing safe-unknown matching rules.
+
+Not done:
+
+- No historical cleanup was added for already-wrong Episode source bindings.
+- No manual correction entry, batch correction, AI strategy change, SP/OAD/OVA mapping, migration, database update, commit, or push was performed.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. Migration diff is empty.
+3. A derivative / sibling show folder with `01` through `08` files no longer recognized-reattaches to an already matched Season 1 in a neighboring folder.
+4. Sibling folders such as `S01` and `S01 1080p` no longer auto-reattach to the same recognized Season.
+5. Same-directory `502` plus duplicate-copy variants can still attach as multiple sources for the same recognized Episode.
+6. Same-directory `S01E02` plus duplicate-copy variants can still attach as multiple sources for the same recognized Episode.
+7. Different-directory reattach skips include `recognized-reattach-requires-same-directory` and directory hashes.
+8. Skipped sibling sources continue into normal identification, unknown append, placeholder, or later manual correction paths.
+9. Unknown Season append for compatible failed no-TMDB Seasons still runs after recognized reattach and before placeholder grouping.
+10. TV remains excluded from Watch Insights, Watch Profile, AI recommendation input, and recommendation fingerprints.
+
+## Phase 4.12-post-fix - Safe Unknown Series Display, Grouping, And Append
+
+Completed:
+
+- Normal media-library mode now projects persisted all-failed no-TMDB TV-like containers as `Other` Series items, including one-Season unknown Series, so users enter Series overview before Season detail.
+- Batch media-library mode still expands TV-like content to Season / grouped-item granularity for focused correction and bulk operations.
+- Local and WebDAV scans now run unknown-Season append after recognized reattach and before placeholder / orphan grouping.
+- Unknown append handles active unbound videos and failed Movie placeholders only when a single normal Episode number is parsed and the target failed no-TMDB Season is uniquely compatible.
+- Existing target Episode numbers receive the new source as an additional playback source; missing target Episode numbers create only that Episode and never create middle empty Episodes.
+- Local/WebDAV append now scans the whole active scan-path unknown candidate set, so unchanged failed Movie placeholders as well as unchanged orphans can still attach to existing unknown Seasons.
+- Episode parsing and grouped placeholder ranges now treat trailing duplicate-copy suffixes such as `(1)` / full-width `(1)` as the same Episode number in strong TV context, enabling same-folder duplicate files to become multi-source rows.
+- Duplicate-copy suffix stripping now removes only known file extensions before suffix matching, so dotted episode names such as title-plus-episode-number keep the episode token intact.
+- Unknown append now skips structural non-episode tokens such as part / disc / trailer forms before strong title-number fallback can attach them to a normal Season.
+- Grouped unknown placeholder parsing now skips multi-episode file names before duplicate-copy suffix normalization, keeping combined-episode files out of automatic single-Episode grouping.
+- Grouped unknown creation now derives a temporary source/root/title key from existing `MediaFile` context, reuses one safe compatible no-TMDB Series / failed Season when possible, and falls back to a new container on conflict.
+- The temporary key uses source connection, scan path, series root or carrying directory, season directory, and normalized title context; logs emit hashes / normalized titles instead of complete paths or URLs.
+- No historical bulk merge of existing duplicate unknown containers was added.
+
+Not done:
+
+- No manual aggregate-to-Season workflow, correction-to-existing-unknown-Season UI, batch button rule change, AI strategy change, unified Movie / TV correction entry, SP/OAD/OVA mapping, course / collection specialty handling, migration, database update, commit, or push was performed.
+
+Manual acceptance matrix:
+
+1. Build succeeds with 0 warnings and 0 errors.
+2. Migration diff is empty.
+3. Normal `Other` shows persisted unknown TV-like containers as unknown Series items.
+4. Unknown Series with one Season opens Series overview and shows that Season.
+5. Batch mode still exposes unknown Season / grouped item granularity.
+6. Recognized TV Series remain `Series` items and recognized Seasons remain unchanged in batch mode.
+7. Orphan single files and failed Movie placeholders remain `Other` items.
+8. Compatible grouped ranges under the same source/root/title reuse one unknown Series when unique.
+9. Same range titles under different source connections or unrelated parent roots do not merge.
+10. Re-scanned E703 can append to an existing compatible unknown Season containing E700-E702.
+11. Re-scanned duplicate E701 appends as another source on E701.
+12. Re-scanned E799 creates only E799 and does not create E704-E798.
+13. SP/OAD/OVA/special and multi-episode candidates are skipped by automatic append.
+14. TV remains excluded from Watch Insights, Watch Profile, AI recommendation input, and recommendation fingerprints.
+15. Same-folder duplicate-copy names such as `502 (1)` or full-width-parenthesis variants attach to E502 when a compatible unknown Season exists.
+16. Dotted title-number duplicate-copy names keep the episode number during parsing.
+17. Part / disc / trailer duplicate-copy names and multi-episode duplicate-copy names stay out of automatic append / grouping.
+
 ## Phase 4.11g - TV Scan Final Acceptance And Closeout
 
 Completed:
@@ -2180,3 +2251,31 @@ Known Issues:
 Recommendation:
 
 - Phase 4.12 is ready to close. Next recommended phase is Phase 4.13 for unified correction entry, batch correction, and manual grouping / correction workflows.
+
+## Phase 4.12-post Emergency Safety Fix - Unknown grouping / append stability
+
+Completed:
+
+- Kept the recognized Episode reattach same-directory rule. Sibling folders are still blocked from automatic recognized Episode multi-source append.
+- Tightened unknown Series reuse to a strict derived grouping key. Existing no-TMDB Series with mixed derived Series keys is treated as ambiguous and is no longer reused automatically.
+- Tightened unknown Season reuse / append to a strict derived Season grouping key. Existing unknown Seasons with mixed derived Season keys are treated as ambiguous and are no longer automatic append targets.
+- Removed the old bridge behavior where one compatible source inside an unknown Series or Season could make the whole container compatible with later unrelated directories.
+- Preserved existing unknown Series / Season names on reuse. Names are only assigned for new containers or when the existing name is blank.
+- Added a conservative skip for special / non-regular TV directories in automatic unknown append and grouped placeholder persistence, including specials, OVA / OAD, theatrical / movie, side-story, course, collection, recap, and remake style folders.
+- Kept same-directory duplicate-copy multi-source behavior. Files such as numeric copies or SxxExx copies can still append to the same unknown Episode when the strict Season key matches.
+- Automatic append still creates only the actual target Episode when needed and does not create empty intermediate Episodes.
+
+Not done:
+
+- No historical unknown container merge, historical wrong-binding cleanup, manual grouping, unified correction entry, batch correction, AI prompt change, TMDB gate change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors during implementation.
+- Current migrations diff remained empty during implementation.
+
+Known Issues:
+
+- Blocker: none in the emergency code path after build verification.
+- Deferred: libraries already polluted by the previous aggressive unknown append / grouping logic still require clear-library rescan, manual cleanup, or a later repair tool. This phase prevents future automatic bridge pollution but does not rewrite existing data.
+- Noise: the conservative special-directory skip can leave more items in Other / placeholder review until Phase 4.13 manual correction exists.

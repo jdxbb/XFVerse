@@ -235,7 +235,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             }
         }
 
-        await PersistMoviePlaceholderGroupingAsync(placeholderGroupingCandidates, cancellationToken);
+        await PersistMoviePlaceholderGroupingAsync(placeholderGroupingCandidates, "movie-identify", cancellationToken);
         ScanIdentificationDiagnostics.Write(
             $"event=movie-identify-complete requested={distinctIds.Length} attempted={result.AttemptedCount} bound={result.BoundCount} placeholders={result.PlaceholderCount} warnings={result.WarningCount} errors={result.ErrorCount}");
         return result;
@@ -243,7 +243,8 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
     public async Task AggregateUnidentifiedMediaFilesAsync(
         IReadOnlyCollection<int> scanPathIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string sourceKind = "unknown")
     {
         var ids = scanPathIds
             .Where(x => x > 0)
@@ -279,7 +280,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
         ScanIdentificationDiagnostics.Write(
             $"event=orphan-grouping-start orphanGroupingAttempted=true scanPaths={ids.Length} orphanGroupingMediaFileCount={candidates.Count}");
-        var summary = await PersistMoviePlaceholderGroupingAsync(candidates, cancellationToken);
+        var summary = await PersistMoviePlaceholderGroupingAsync(candidates, sourceKind, cancellationToken);
         ScanIdentificationDiagnostics.Write(
             $"event=orphan-grouping-summary orphanGroupingAttempted=true orphanGroupingMediaFileCount={summary.CandidateFiles} orphanGroupingCreatedSeasonCount={summary.PersistedRanges} orphanGroupingGroupedMediaFileCount={summary.PersistedFiles} orphanGroupingSkippedReason={ScanIdentificationDiagnostics.FormatValue(summary.SkippedReasons)}");
     }
@@ -310,11 +311,14 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
     private static async Task<MoviePlaceholderGroupingPersistenceSummary> PersistMoviePlaceholderGroupingAsync(
         IReadOnlyCollection<MoviePlaceholderGroupingInput> placeholders,
+        string sourceKind,
         CancellationToken cancellationToken)
     {
         var groupingResult = MoviePlaceholderGroupingHelper.BuildRanges(placeholders);
         if (groupingResult.CandidateFiles == 0)
         {
+            ScanIdentificationDiagnostics.Write(
+                $"event=unknown-season-grouping-summary sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} candidateFiles=0 groupedRangeCount=0 persistedRangeCount=0 groupedMediaFileCount=0 reusedSeriesCount=0 createdSeriesCount=0 reusedSeasonCount=0 createdSeasonCount=0 skippedReasons=(none)");
             ScanIdentificationDiagnostics.Write(
                 "event=movie-placeholder-grouping-summary moviePlaceholderGroupingAttempted=false moviePlaceholderGroupingCandidateFiles=0 groupedMoviePlaceholdersCount=0 groupedTvLikePlaceholderRangesCount=0 groupedPlaceholdersHiddenFromMovieList=0 groupedRangesVisibleToLibrary=0 groupedRangeProjectionMode=unidentified-tv-season moviePlaceholderGroupingPersistence=unidentified-tv-season groupingSkippedReasons=(none)");
             return new MoviePlaceholderGroupingPersistenceSummary(0, 0, 0, "(none)");
@@ -322,6 +326,10 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
         var persistedRanges = 0;
         var persistedFiles = 0;
+        var reusedSeriesCount = 0;
+        var createdSeriesCount = 0;
+        var reusedSeasonCount = 0;
+        var createdSeasonCount = 0;
         var skippedRanges = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         await using (var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create()))
@@ -329,11 +337,28 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         {
             foreach (var range in groupingResult.Ranges)
             {
-                var persistenceResult = await PersistGroupedTvLikePlaceholderRangeAsync(dbContext, range, cancellationToken);
+                var persistenceResult = await PersistGroupedTvLikePlaceholderRangeAsync(dbContext, range, sourceKind, cancellationToken);
                 if (persistenceResult.Created)
                 {
                     persistedRanges++;
                     persistedFiles += persistenceResult.FileCount;
+                    if (persistenceResult.ReusedSeries)
+                    {
+                        reusedSeriesCount++;
+                    }
+                    else
+                    {
+                        createdSeriesCount++;
+                    }
+
+                    if (persistenceResult.ReusedSeason)
+                    {
+                        reusedSeasonCount++;
+                    }
+                    else
+                    {
+                        createdSeasonCount++;
+                    }
                 }
                 else
                 {
@@ -355,6 +380,8 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             ? "(none)"
             : string.Join("|", allSkippedReasons.OrderBy(x => x.Key).Select(x => $"{x.Key}:{x.Value}"));
 
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-season-grouping-summary sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} candidateFiles={groupingResult.CandidateFiles} groupedRangeCount={groupingResult.Ranges.Count} persistedRangeCount={persistedRanges} groupedMediaFileCount={persistedFiles} reusedSeriesCount={reusedSeriesCount} createdSeriesCount={createdSeriesCount} reusedSeasonCount={reusedSeasonCount} createdSeasonCount={createdSeasonCount} skippedReasons={ScanIdentificationDiagnostics.FormatValue(skippedText)}");
         ScanIdentificationDiagnostics.Write(
             $"event=movie-placeholder-grouping-summary moviePlaceholderGroupingAttempted=true moviePlaceholderGroupingCandidateFiles={groupingResult.CandidateFiles} parsedEpisodeLikePlaceholderFiles={groupingResult.ParsedEpisodeLikeFiles} groupedMoviePlaceholdersCount={persistedFiles} groupedTvLikePlaceholderRangesCount={persistedRanges} groupedPlaceholdersHiddenFromMovieList={persistedFiles} groupedRangesVisibleToLibrary={persistedRanges} groupedRangeProjectionMode=unidentified-tv-season moviePlaceholderGroupingPersistence=unidentified-tv-season groupingSkippedReasons={ScanIdentificationDiagnostics.FormatValue(skippedText)}");
         return new MoviePlaceholderGroupingPersistenceSummary(
@@ -379,12 +406,13 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             : string.Empty;
 
         ScanIdentificationDiagnostics.Write(
-            $"event=movie-placeholder-grouping parentDir={ScanIdentificationDiagnostics.FormatPath(range.ParentPath)} moviePlaceholderGroupingAttempted=true moviePlaceholderGroupingFileCount={range.FileCount} groupedRangeMediaFileCount={range.MediaFileIds.Count} moviePlaceholderGroupingPattern={ScanIdentificationDiagnostics.FormatValue(range.Pattern)} moviePlaceholderGroupingPatternKey={ScanIdentificationDiagnostics.FormatValue(range.PatternKey)} mixedPatternGrouping={isMixedPattern.ToString().ToLowerInvariant()} longRunningRangeGrouping={isLongRunning.ToString().ToLowerInvariant()} longRunningRangeMissingNumbers={ScanIdentificationDiagnostics.FormatValue(missingNumbers)} missingCount={range.MissingCount} patterns={ScanIdentificationDiagnostics.FormatValue(range.Pattern)} moviePlaceholderGroupingStartNumber={range.StartNumber} moviePlaceholderGroupingEndNumber={range.EndNumber} groupedRangeNumberStart={range.StartNumber} groupedRangeNumberEnd={range.EndNumber} groupedRangeParentDisplay={ScanIdentificationDiagnostics.FormatValue(MoviePlaceholderGroupingHelper.GetParentFolderDisplay(range.ParentPath))} moviePlaceholderGroupingCreated={result.Created.ToString().ToLowerInvariant()} moviePlaceholderGroupingPersistence=unidentified-tv-season moviePlaceholderGroupingSkippedReason={ScanIdentificationDiagnostics.FormatValue(result.SkippedReason)} groupedMoviePlaceholdersCount={result.FileCount} groupedTvLikePlaceholderRangesCount={(result.Created ? 1 : 0)} persistedTvSeriesId={ScanIdentificationDiagnostics.FormatNullable(result.TvSeriesId)} persistedTvSeasonId={ScanIdentificationDiagnostics.FormatNullable(result.TvSeasonId)} persistedTvEpisodes={result.EpisodeCount} placeholderReasons={ScanIdentificationDiagnostics.FormatValue(reasons)} sampleDirectVideoFiles={ScanIdentificationDiagnostics.FormatValue(sampleFiles)} finalDecision={(result.Created ? "tv-like-placeholder-season-persisted" : "tv-like-placeholder-season-skipped")}");
+            $"event=movie-placeholder-grouping parentDir={ScanIdentificationDiagnostics.FormatPath(range.ParentPath)} moviePlaceholderGroupingAttempted=true moviePlaceholderGroupingFileCount={range.FileCount} groupedRangeMediaFileCount={range.MediaFileIds.Count} moviePlaceholderGroupingPattern={ScanIdentificationDiagnostics.FormatValue(range.Pattern)} moviePlaceholderGroupingPatternKey={ScanIdentificationDiagnostics.FormatValue(range.PatternKey)} mixedPatternGrouping={isMixedPattern.ToString().ToLowerInvariant()} longRunningRangeGrouping={isLongRunning.ToString().ToLowerInvariant()} longRunningRangeMissingNumbers={ScanIdentificationDiagnostics.FormatValue(missingNumbers)} missingCount={range.MissingCount} patterns={ScanIdentificationDiagnostics.FormatValue(range.Pattern)} moviePlaceholderGroupingStartNumber={range.StartNumber} moviePlaceholderGroupingEndNumber={range.EndNumber} groupedRangeNumberStart={range.StartNumber} groupedRangeNumberEnd={range.EndNumber} groupedRangeParentDisplay={ScanIdentificationDiagnostics.FormatValue(MoviePlaceholderGroupingHelper.GetParentFolderDisplay(range.ParentPath))} moviePlaceholderGroupingCreated={result.Created.ToString().ToLowerInvariant()} unknownSeriesReused={result.ReusedSeries.ToString().ToLowerInvariant()} unknownSeasonReused={result.ReusedSeason.ToString().ToLowerInvariant()} moviePlaceholderGroupingPersistence=unidentified-tv-season moviePlaceholderGroupingSkippedReason={ScanIdentificationDiagnostics.FormatValue(result.SkippedReason)} groupedMoviePlaceholdersCount={result.FileCount} groupedTvLikePlaceholderRangesCount={(result.Created ? 1 : 0)} persistedTvSeriesId={ScanIdentificationDiagnostics.FormatNullable(result.TvSeriesId)} persistedTvSeasonId={ScanIdentificationDiagnostics.FormatNullable(result.TvSeasonId)} persistedTvEpisodes={result.EpisodeCount} placeholderReasons={ScanIdentificationDiagnostics.FormatValue(reasons)} sampleDirectVideoFiles={ScanIdentificationDiagnostics.FormatValue(sampleFiles)} finalDecision={(result.Created ? "tv-like-placeholder-season-persisted" : "tv-like-placeholder-season-skipped")}");
     }
 
     private static async Task<GroupedTvLikePlaceholderPersistenceResult> PersistGroupedTvLikePlaceholderRangeAsync(
         AppDbContext dbContext,
         MoviePlaceholderGroupingRange range,
+        string sourceKind,
         CancellationToken cancellationToken)
     {
         var requestedIds = range.MediaFileIds.Where(x => x > 0).Distinct().ToArray();
@@ -412,24 +440,51 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         }
 
         var now = DateTime.UtcNow;
-        var parentDisplay = MoviePlaceholderGroupingHelper.GetParentFolderDisplay(range.ParentPath);
-        var seriesName = TruncateRequired(
-            string.IsNullOrWhiteSpace(parentDisplay) ? UnidentifiedTvSeriesCandidateTitle : parentDisplay,
-            300);
-        var tvSeries = await dbContext.TvSeries
-            .FirstOrDefaultAsync(
-                x => !x.TmdbSeriesId.HasValue
-                     && x.Name == seriesName,
-                cancellationToken);
-        if (tvSeries is null)
+        var orderedMediaFiles = orderedItems
+            .Select(x => mediaFileIndex[x.Input.MediaFileId])
+            .ToArray();
+        var episodeNumbers = orderedItems.Select(x => x.EpisodeNumber).Distinct().ToArray();
+        var hasGroupingContext = UnknownTvGroupingKeyHelper.TryBuildContext(
+            orderedMediaFiles,
+            range.ParentPath,
+            range.StartNumber,
+            range.EndNumber,
+            out var groupingContext,
+            out var groupingSkippedReason);
+
+        if (hasGroupingContext)
         {
-            tvSeries = new TvSeries
-            {
-                Name = seriesName,
-                CreatedAt = now
-            };
-            dbContext.TvSeries.Add(tvSeries);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            WriteUnknownSeriesGroupingCandidate(sourceKind, groupingContext);
+        }
+        else
+        {
+            WriteUnknownSeriesSkipped(sourceKind, groupingContext, groupingSkippedReason, 0);
+        }
+
+        if (hasGroupingContext && UnknownTvGroupingKeyHelper.HasSpecialDirectoryToken(groupingContext))
+        {
+            const string specialSkippedReason = "special-directory-auto-append-disabled";
+            WriteUnknownSeriesSkipped(sourceKind, groupingContext, specialSkippedReason, 0);
+            WriteUnknownSeasonSkipped(sourceKind, groupingContext, specialSkippedReason, 0, 0);
+            return GroupedTvLikePlaceholderPersistenceResult.Skipped(specialSkippedReason);
+        }
+
+        var fallbackSeriesName = MoviePlaceholderGroupingHelper.GetParentFolderDisplay(range.ParentPath);
+        var seriesResolution = await ResolveUnknownSeriesForGroupedRangeAsync(
+            dbContext,
+            groupingContext,
+            hasGroupingContext,
+            groupingSkippedReason,
+            fallbackSeriesName,
+            sourceKind,
+            now,
+            cancellationToken);
+        var tvSeries = seriesResolution.Series;
+
+        var seriesNamePreserved = seriesResolution.Reused && !string.IsNullOrWhiteSpace(tvSeries.Name);
+        if (!seriesNamePreserved)
+        {
+            tvSeries.Name = TruncateRequired(BuildGroupedUnknownSeriesName(groupingContext, hasGroupingContext, fallbackSeriesName), 300);
         }
 
         tvSeries.OriginalName = null;
@@ -442,22 +497,31 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         tvSeries.GenresText = null;
         tvSeries.UpdatedAt = now;
 
-        var seasonNumber = await ResolveGroupedPlaceholderSeasonNumberAsync(dbContext, tvSeries.Id, cancellationToken);
-        var tvSeason = new TvSeason
-        {
-            TvSeriesId = tvSeries.Id,
-            SeasonNumber = seasonNumber,
-            CreatedAt = now
-        };
-        dbContext.TvSeasons.Add(tvSeason);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var seasonResolution = await ResolveUnknownSeasonForGroupedRangeAsync(
+            dbContext,
+            tvSeries,
+            groupingContext,
+            hasGroupingContext,
+            groupingSkippedReason,
+            episodeNumbers,
+            sourceKind,
+            now,
+            cancellationToken);
+        var tvSeason = seasonResolution.Season;
 
         tvSeason.TmdbSeasonId = null;
-        tvSeason.Name = TruncateRequired(UnidentifiedTvSeasonCandidateTitle, 300);
+        var seasonNamePreserved = seasonResolution.Reused && !string.IsNullOrWhiteSpace(tvSeason.Name);
+        if (!seasonNamePreserved)
+        {
+            tvSeason.Name = TruncateRequired(BuildGroupedUnknownSeasonName(groupingContext, hasGroupingContext), 300);
+        }
+
         tvSeason.Overview = "由同一目录下严格连续编号的未识别文件聚合生成，尚未绑定 TMDB。";
         tvSeason.PosterRemoteUrl = null;
         tvSeason.AirDate = null;
-        tvSeason.TmdbEpisodeCount = orderedItems.Count;
+        tvSeason.TmdbEpisodeCount = Math.Max(
+            tvSeason.TmdbEpisodeCount.GetValueOrDefault(),
+            tvSeason.Episodes.Select(x => x.EpisodeNumber).Concat(episodeNumbers).Distinct().Count());
         tvSeason.IdentifiedConfidence = null;
         tvSeason.IdentificationStatus = IdentificationStatus.Failed;
         tvSeason.UpdatedAt = now;
@@ -484,6 +548,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             mediaFile.Episode = episode;
             mediaFile.EpisodeId = episode.Id;
             mediaFile.UpdatedAt = now;
+            episode.DefaultMediaFileId ??= mediaFile.Id;
             movedMediaFileIds.Add(mediaFile.Id);
         }
 
@@ -500,7 +565,301 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             tvSeries.Id,
             tvSeason.Id,
             orderedItems.Count,
-            orderedItems.Count);
+            orderedItems.Count,
+            seriesResolution.Reused,
+            seasonResolution.Reused);
+    }
+
+    private static async Task<UnknownSeriesResolution> ResolveUnknownSeriesForGroupedRangeAsync(
+        AppDbContext dbContext,
+        UnknownTvGroupingContext context,
+        bool hasGroupingContext,
+        string groupingSkippedReason,
+        string fallbackSeriesName,
+        string sourceKind,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (hasGroupingContext)
+        {
+            var candidateSeries = await dbContext.TvSeries
+                .Include(x => x.Seasons)
+                .ThenInclude(x => x.Episodes)
+                .ThenInclude(x => x.MediaFiles)
+                .Where(
+                    x => !x.TmdbSeriesId.HasValue
+                         && x.Seasons.Any(
+                             season => !season.TmdbSeasonId.HasValue
+                                       && season.IdentificationStatus == IdentificationStatus.Failed
+                                       && season.Episodes.Any(
+                                           episode => episode.MediaFiles.Any(
+                                               source => source.SourceConnectionId == context.SourceConnectionId
+                                                         && source.ScanPathId == context.ScanPathId
+                                                         && source.MediaType == MediaType.Video
+                                                         && !source.IsDeleted))))
+                .ToListAsync(cancellationToken);
+
+            var compatibleSeries = new List<TvSeries>();
+            var skippedReasons = new List<string>();
+            foreach (var series in candidateSeries)
+            {
+                if (UnknownTvGroupingKeyHelper.IsCompatibleSeries(series, context, out var skippedReason))
+                {
+                    compatibleSeries.Add(series);
+                }
+                else if (!string.IsNullOrWhiteSpace(skippedReason))
+                {
+                    skippedReasons.Add(skippedReason);
+                }
+            }
+
+            if (compatibleSeries.Count == 1)
+            {
+                var reusedSeries = compatibleSeries[0];
+                WriteUnknownSeriesReused(sourceKind, context, reusedSeries.Id);
+                return new UnknownSeriesResolution(reusedSeries, true);
+            }
+
+            if (compatibleSeries.Count != 1 && candidateSeries.Count > 0)
+            {
+                WriteUnknownSeriesSkipped(
+                    sourceKind,
+                    context,
+                    compatibleSeries.Count > 1
+                        ? "multiple-compatible-unknown-series"
+                        : SelectUnknownGroupingSkippedReason(skippedReasons, "no-compatible-unknown-series"),
+                    candidateSeries.Count);
+            }
+        }
+        else
+        {
+            WriteUnknownSeriesSkipped(sourceKind, context, groupingSkippedReason, 0);
+        }
+
+        var seriesName = TruncateRequired(BuildGroupedUnknownSeriesName(context, hasGroupingContext, fallbackSeriesName), 300);
+        var tvSeries = new TvSeries
+        {
+            Name = seriesName,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        dbContext.TvSeries.Add(tvSeries);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        WriteUnknownSeriesCreated(sourceKind, context, tvSeries.Id, hasGroupingContext ? string.Empty : groupingSkippedReason);
+        return new UnknownSeriesResolution(tvSeries, false);
+    }
+
+    private static async Task<UnknownSeasonResolution> ResolveUnknownSeasonForGroupedRangeAsync(
+        AppDbContext dbContext,
+        TvSeries tvSeries,
+        UnknownTvGroupingContext context,
+        bool hasGroupingContext,
+        string groupingSkippedReason,
+        IReadOnlyCollection<int> episodeNumbers,
+        string sourceKind,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (hasGroupingContext)
+        {
+            var candidateSeasons = await dbContext.TvSeasons
+                .Include(x => x.Series)
+                .Include(x => x.Episodes)
+                .ThenInclude(x => x.MediaFiles)
+                .Where(
+                    x => x.TvSeriesId == tvSeries.Id
+                         && !x.TmdbSeasonId.HasValue
+                         && x.IdentificationStatus == IdentificationStatus.Failed)
+                .ToListAsync(cancellationToken);
+            var compatibleSeasons = new List<TvSeason>();
+            var skippedReasons = new List<string>();
+            foreach (var season in candidateSeasons)
+            {
+                if (UnknownTvGroupingKeyHelper.IsCompatibleSeason(season, context, episodeNumbers, out var skippedReason))
+                {
+                    compatibleSeasons.Add(season);
+                }
+                else if (!string.IsNullOrWhiteSpace(skippedReason))
+                {
+                    skippedReasons.Add(skippedReason);
+                }
+            }
+
+            if (compatibleSeasons.Count == 1)
+            {
+                var reusedSeason = compatibleSeasons[0];
+                WriteUnknownSeasonReused(sourceKind, context, reusedSeason.TvSeriesId, reusedSeason.Id);
+                return new UnknownSeasonResolution(reusedSeason, true);
+            }
+
+            if (compatibleSeasons.Count != 1 && candidateSeasons.Count > 0)
+            {
+                WriteUnknownSeasonSkipped(
+                    sourceKind,
+                    context,
+                    compatibleSeasons.Count > 1
+                        ? "multiple-compatible-unknown-seasons"
+                        : SelectUnknownGroupingSkippedReason(skippedReasons, "no-compatible-unknown-season"),
+                    candidateSeasons.Count,
+                    tvSeries.Id);
+            }
+        }
+        else
+        {
+            WriteUnknownSeasonSkipped(sourceKind, context, groupingSkippedReason, 0, tvSeries.Id);
+        }
+
+        var seasonNumber = await ResolveGroupedPlaceholderSeasonNumberAsync(dbContext, tvSeries.Id, cancellationToken);
+        var tvSeason = new TvSeason
+        {
+            TvSeriesId = tvSeries.Id,
+            SeasonNumber = seasonNumber,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        dbContext.TvSeasons.Add(tvSeason);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        WriteUnknownSeasonCreated(sourceKind, context, tvSeries.Id, tvSeason.Id, seasonNumber);
+        return new UnknownSeasonResolution(tvSeason, false);
+    }
+
+    private static string SelectUnknownGroupingSkippedReason(
+        IReadOnlyCollection<string> skippedReasons,
+        string fallbackReason)
+    {
+        if (skippedReasons.Contains("ambiguous-existing-unknown-season-context", StringComparer.OrdinalIgnoreCase))
+        {
+            return "ambiguous-existing-unknown-season-context";
+        }
+
+        if (skippedReasons.Contains("ambiguous-existing-unknown-series-context", StringComparer.OrdinalIgnoreCase))
+        {
+            return "ambiguous-existing-unknown-series-context";
+        }
+
+        if (skippedReasons.Contains("strict-season-key-mismatch", StringComparer.OrdinalIgnoreCase))
+        {
+            return "strict-season-key-mismatch";
+        }
+
+        if (skippedReasons.Contains("strict-series-key-mismatch", StringComparer.OrdinalIgnoreCase))
+        {
+            return "strict-series-key-mismatch";
+        }
+
+        if (skippedReasons.Contains("no-existing-unknown-season-context", StringComparer.OrdinalIgnoreCase))
+        {
+            return "no-existing-unknown-season-context";
+        }
+
+        if (skippedReasons.Contains("no-existing-unknown-series-context", StringComparer.OrdinalIgnoreCase))
+        {
+            return "no-existing-unknown-series-context";
+        }
+
+        return fallbackReason;
+    }
+
+    private static string BuildGroupedUnknownSeriesName(
+        UnknownTvGroupingContext context,
+        bool hasGroupingContext,
+        string fallbackSeriesName)
+    {
+        if (hasGroupingContext && !string.IsNullOrWhiteSpace(context.SeriesDisplayTitle))
+        {
+            return context.SeriesDisplayTitle;
+        }
+
+        return string.IsNullOrWhiteSpace(fallbackSeriesName)
+            ? UnidentifiedTvSeriesCandidateTitle
+            : fallbackSeriesName;
+    }
+
+    private static string BuildGroupedUnknownSeasonName(
+        UnknownTvGroupingContext context,
+        bool hasGroupingContext)
+    {
+        if (hasGroupingContext)
+        {
+            if (!string.IsNullOrWhiteSpace(context.SeasonDisplayTitle))
+            {
+                return context.SeasonDisplayTitle;
+            }
+
+            if (!string.IsNullOrWhiteSpace(context.SeasonRange))
+            {
+                return context.SeasonRange;
+            }
+        }
+
+        return UnidentifiedTvSeasonCandidateTitle;
+    }
+
+    private static void WriteUnknownSeriesGroupingCandidate(string sourceKind, UnknownTvGroupingContext context)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-series-grouping-candidate sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} sourceConnectionId={context.SourceConnectionId} scanPathId={ScanIdentificationDiagnostics.FormatNullable(context.ScanPathId)} parentDirectoryHash={ScanIdentificationDiagnostics.FormatValue(context.ParentDirectoryHash)} normalizedTitle={ScanIdentificationDiagnostics.FormatValue(context.NormalizedSeriesTitle)} groupingKey={ScanIdentificationDiagnostics.FormatValue(context.SeriesGroupingKeyHash)} seasonRange={ScanIdentificationDiagnostics.FormatValue(context.SeasonRange)}");
+    }
+
+    private static void WriteUnknownSeriesReused(
+        string sourceKind,
+        UnknownTvGroupingContext context,
+        int targetSeriesId)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-series-reused sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} sourceConnectionId={context.SourceConnectionId} scanPathId={ScanIdentificationDiagnostics.FormatNullable(context.ScanPathId)} parentDirectoryHash={ScanIdentificationDiagnostics.FormatValue(context.ParentDirectoryHash)} normalizedTitle={ScanIdentificationDiagnostics.FormatValue(context.NormalizedSeriesTitle)} groupingKey={ScanIdentificationDiagnostics.FormatValue(context.SeriesGroupingKeyHash)} targetSeriesId={targetSeriesId} namePreserved=true");
+    }
+
+    private static void WriteUnknownSeriesCreated(
+        string sourceKind,
+        UnknownTvGroupingContext context,
+        int targetSeriesId,
+        string skippedReason)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-series-created sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} sourceConnectionId={ScanIdentificationDiagnostics.FormatNullable(context.SourceConnectionId > 0 ? context.SourceConnectionId : null)} scanPathId={ScanIdentificationDiagnostics.FormatNullable(context.ScanPathId)} parentDirectoryHash={ScanIdentificationDiagnostics.FormatValue(context.ParentDirectoryHash)} normalizedTitle={ScanIdentificationDiagnostics.FormatValue(context.NormalizedSeriesTitle)} groupingKey={ScanIdentificationDiagnostics.FormatValue(context.SeriesGroupingKeyHash)} targetSeriesId={targetSeriesId} skippedReason={ScanIdentificationDiagnostics.FormatValue(skippedReason)}");
+    }
+
+    private static void WriteUnknownSeriesSkipped(
+        string sourceKind,
+        UnknownTvGroupingContext context,
+        string skippedReason,
+        int existingSeriesCandidates)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-series-skipped sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} sourceConnectionId={ScanIdentificationDiagnostics.FormatNullable(context.SourceConnectionId > 0 ? context.SourceConnectionId : null)} scanPathId={ScanIdentificationDiagnostics.FormatNullable(context.ScanPathId)} parentDirectoryHash={ScanIdentificationDiagnostics.FormatValue(context.ParentDirectoryHash)} normalizedTitle={ScanIdentificationDiagnostics.FormatValue(context.NormalizedSeriesTitle)} groupingKey={ScanIdentificationDiagnostics.FormatValue(context.SeriesGroupingKeyHash)} existingSeriesCandidates={existingSeriesCandidates} skippedReason={ScanIdentificationDiagnostics.FormatValue(skippedReason)}");
+    }
+
+    private static void WriteUnknownSeasonReused(
+        string sourceKind,
+        UnknownTvGroupingContext context,
+        int targetSeriesId,
+        int targetSeasonId)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-season-reused sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} sourceConnectionId={context.SourceConnectionId} scanPathId={ScanIdentificationDiagnostics.FormatNullable(context.ScanPathId)} parentDirectoryHash={ScanIdentificationDiagnostics.FormatValue(context.ParentDirectoryHash)} normalizedTitle={ScanIdentificationDiagnostics.FormatValue(context.NormalizedSeasonTitle)} groupingKey={ScanIdentificationDiagnostics.FormatValue(context.SeasonGroupingKeyHash)} seasonRange={ScanIdentificationDiagnostics.FormatValue(context.SeasonRange)} targetSeriesId={targetSeriesId} targetSeasonId={targetSeasonId} namePreserved=true");
+    }
+
+    private static void WriteUnknownSeasonCreated(
+        string sourceKind,
+        UnknownTvGroupingContext context,
+        int targetSeriesId,
+        int targetSeasonId,
+        int seasonNumber)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-season-created sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} sourceConnectionId={ScanIdentificationDiagnostics.FormatNullable(context.SourceConnectionId > 0 ? context.SourceConnectionId : null)} scanPathId={ScanIdentificationDiagnostics.FormatNullable(context.ScanPathId)} parentDirectoryHash={ScanIdentificationDiagnostics.FormatValue(context.ParentDirectoryHash)} normalizedTitle={ScanIdentificationDiagnostics.FormatValue(context.NormalizedSeasonTitle)} groupingKey={ScanIdentificationDiagnostics.FormatValue(context.SeasonGroupingKeyHash)} seasonRange={ScanIdentificationDiagnostics.FormatValue(context.SeasonRange)} targetSeriesId={targetSeriesId} targetSeasonId={targetSeasonId} seasonNumber={seasonNumber}");
+    }
+
+    private static void WriteUnknownSeasonSkipped(
+        string sourceKind,
+        UnknownTvGroupingContext context,
+        string skippedReason,
+        int existingSeasonCandidates,
+        int targetSeriesId)
+    {
+        ScanIdentificationDiagnostics.Write(
+            $"event=unknown-season-skipped sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} sourceConnectionId={ScanIdentificationDiagnostics.FormatNullable(context.SourceConnectionId > 0 ? context.SourceConnectionId : null)} scanPathId={ScanIdentificationDiagnostics.FormatNullable(context.ScanPathId)} parentDirectoryHash={ScanIdentificationDiagnostics.FormatValue(context.ParentDirectoryHash)} normalizedTitle={ScanIdentificationDiagnostics.FormatValue(context.NormalizedSeasonTitle)} groupingKey={ScanIdentificationDiagnostics.FormatValue(context.SeasonGroupingKeyHash)} seasonRange={ScanIdentificationDiagnostics.FormatValue(context.SeasonRange)} targetSeriesId={targetSeriesId} existingSeasonCandidates={existingSeasonCandidates} skippedReason={ScanIdentificationDiagnostics.FormatValue(skippedReason)}");
     }
 
     private static async Task<TvEpisode> UpsertGroupedPlaceholderEpisodeAsync(
@@ -522,9 +881,11 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             {
                 TvSeasonId = tvSeason.Id,
                 EpisodeNumber = episodeNumber,
+                DefaultMediaFileId = null,
                 CreatedAt = now
             };
             dbContext.TvEpisodes.Add(episode);
+            tvSeason.Episodes.Add(episode);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -534,6 +895,12 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         episode.StillRemoteUrl = null;
         episode.AirDate = null;
         episode.RuntimeMinutes = null;
+        episode.DefaultMediaFileId ??= tvSeason.Episodes
+            .Where(x => x.Id == episode.Id)
+            .SelectMany(x => x.MediaFiles)
+            .OrderBy(x => x.FileName)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefault();
         episode.UpdatedAt = now;
         return episode;
     }
@@ -1959,13 +2326,19 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         int? TvSeriesId,
         int? TvSeasonId,
         int FileCount,
-        int EpisodeCount)
+        int EpisodeCount,
+        bool ReusedSeries,
+        bool ReusedSeason)
     {
         public static GroupedTvLikePlaceholderPersistenceResult Skipped(string reason)
         {
-            return new GroupedTvLikePlaceholderPersistenceResult(false, reason, null, null, 0, 0);
+            return new GroupedTvLikePlaceholderPersistenceResult(false, reason, null, null, 0, 0, false, false);
         }
     }
+
+    private sealed record UnknownSeriesResolution(TvSeries Series, bool Reused);
+
+    private sealed record UnknownSeasonResolution(TvSeason Season, bool Reused);
 
     private sealed record MoviePlaceholderGroupingPersistenceSummary(
         int CandidateFiles,

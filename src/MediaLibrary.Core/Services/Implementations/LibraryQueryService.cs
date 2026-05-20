@@ -22,11 +22,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
         }
         else
         {
-            var seriesItems = await GetTvSeriesLibraryItemsAsync(cancellationToken);
-            var unidentifiedSeasonItems = (await GetTvSeasonLibraryItemsAsync(cancellationToken))
-                .Where(x => x.IsOther)
-                .ToList();
-            tvItems = seriesItems.Concat(unidentifiedSeasonItems).ToList();
+            tvItems = await GetTvSeriesLibraryItemsAsync(includeUnknownSeriesAsOther: true, cancellationToken);
         }
 
         var items = movies
@@ -795,6 +791,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
     }
 
     private static async Task<IReadOnlyList<LibraryMovieListItem>> GetTvSeriesLibraryItemsAsync(
+        bool includeUnknownSeriesAsOther,
         CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -882,6 +879,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var seasons = seasonsBySeries.GetValueOrDefault(series.Id) ?? [];
                     var hasRecognizedSeason = seasons.Any(
                         season => season.IdentificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed);
+                    var isUnknownSeriesProjection = includeUnknownSeriesAsOther
+                                                    && !series.TmdbSeriesId.HasValue
+                                                    && !hasRecognizedSeason
+                                                    && seasons.Any(season => season.IdentificationStatus == IdentificationStatus.Failed);
                     var sources = seasons
                         .SelectMany(season => sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
                         .ToList();
@@ -909,7 +910,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .Where(x => visibleSeasonIds.Contains(x.SeasonId))
                         .ToList();
                     var hasActiveSource = visibleSources.Count > 0;
-                    var isVisibleInLibrary = visibleSeasonCount > 0 && hasRecognizedSeason;
+                    var isVisibleInLibrary = visibleSeasonCount > 0
+                                             && (hasRecognizedSeason || isUnknownSeriesProjection);
                     var inLibraryEpisodeCount = visibleSources.Select(x => x.EpisodeId).Distinct().Count();
                     var watchedEpisodeCount = seasons
                         .SelectMany(season => episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
@@ -927,7 +929,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         ?? string.Empty;
                     return new LibraryMovieListItem
                     {
-                        ItemKind = LibraryMediaItemKind.Series,
+                        ItemKind = isUnknownSeriesProjection ? LibraryMediaItemKind.Other : LibraryMediaItemKind.Series,
                         SeriesId = series.Id,
                         TmdbId = series.TmdbSeriesId,
                         Title = series.Name,

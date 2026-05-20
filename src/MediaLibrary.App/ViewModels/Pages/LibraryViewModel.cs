@@ -1679,7 +1679,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
-        if (movie.IsSeries && movie.SeriesId > 0)
+        if ((movie.IsSeries || (movie.IsOther && movie.SeriesId > 0 && movie.SeasonId == 0))
+            && movie.SeriesId > 0)
         {
             _navigationStateService.RequestTvSeriesOverview(movie.SeriesId);
             return;

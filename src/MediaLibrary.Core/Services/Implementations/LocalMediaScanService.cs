@@ -16,6 +16,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
     private readonly ITvSeasonIdentificationService _tvSeasonIdentificationService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly IRescanReattachService _rescanReattachService;
+    private readonly IUnknownTvSeasonAppendService _unknownTvSeasonAppendService;
     private readonly ISubtitleBindingService _subtitleBindingService;
     private readonly IAiClassificationService _aiClassificationService;
 
@@ -25,6 +26,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         ITvSeasonIdentificationService tvSeasonIdentificationService,
         IMovieIdentificationService movieIdentificationService,
         IRescanReattachService rescanReattachService,
+        IUnknownTvSeasonAppendService unknownTvSeasonAppendService,
         ISubtitleBindingService subtitleBindingService,
         IAiClassificationService aiClassificationService)
     {
@@ -33,6 +35,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         _tvSeasonIdentificationService = tvSeasonIdentificationService;
         _movieIdentificationService = movieIdentificationService;
         _rescanReattachService = rescanReattachService;
+        _unknownTvSeasonAppendService = unknownTvSeasonAppendService;
         _subtitleBindingService = subtitleBindingService;
         _aiClassificationService = aiClassificationService;
     }
@@ -335,9 +338,26 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-video-classification source=local newVideoCount={videoStats.NewVideoCount} deletedReappearedVideoCount={videoStats.DeletedReappearedVideoCount} changedVideoCount={videoStats.ChangedVideoCount} unchangedUnboundVideoCount={videoStats.UnchangedUnboundVideoCount} postProcessVideoCount={postProcessVideoMediaFileIds.Count} reattachCandidateCount={reattachResult.CandidateCount} reattachSucceededCount={reattachResult.SucceededCount} reattachSkippedCount={reattachResult.SkippedCount} placeholderFallbackCount={reattachResult.PlaceholderFallbackCount}");
+            try
+            {
+                var unknownAppendResult = await _unknownTvSeasonAppendService.TryAppendScanPathsAsync(
+                    scanPaths.Select(x => x.Id).ToArray(),
+                    "local",
+                    cancellationToken);
+                ScanIdentificationDiagnostics.Write(
+                    $"event=scan-unknown-season-append-complete source=local candidateCount={unknownAppendResult.CandidateCount} episodeCandidateCount={unknownAppendResult.EpisodeCandidateCount} succeeded={unknownAppendResult.SucceededCount} skipped={unknownAppendResult.SkippedCount} createdEpisodeCount={unknownAppendResult.CreatedEpisodeCount} appendedSourceCount={unknownAppendResult.AppendedSourceCount}");
+            }
+            catch (Exception appendException)
+            {
+                postStage.AddWarning("UnknownTv.Append", FormatExceptionType(appendException));
+                ScanIdentificationDiagnostics.Write(
+                    $"event=unknown-season-append-error sourceKind=local error={ScanIdentificationDiagnostics.FormatValue(FormatExceptionType(appendException))} fallbackToPlaceholderGrouping=true");
+            }
+
             await _movieIdentificationService.AggregateUnidentifiedMediaFilesAsync(
                 scanPaths.Select(x => x.Id).ToArray(),
-                cancellationToken);
+                cancellationToken,
+                "local");
             ScanIdentificationDiagnostics.Write(
                 $"event=tmdb-search-cache-summary source=local tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbTvSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries} tmdbMovieSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
         }

@@ -15,7 +15,8 @@ public interface IMovieIdentificationService
 
     Task AggregateUnidentifiedMediaFilesAsync(
         IReadOnlyCollection<int> scanPathIds,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string sourceKind = "unknown");
 
     Task<IReadOnlyList<MetadataSearchCandidate>> SearchCandidatesAsync(
         string query,

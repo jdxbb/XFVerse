@@ -75,6 +75,14 @@
 - 0 warning
 - 0 error
 
+## Phase 4.12-post-fix Unknown TV-Like Other Projection
+
+- Media-library normal mode now keeps recognized Movie, recognized TV, and unknown TV-like containers separated by item kind: all-failed no-TMDB TV-like containers are projected as `Other` Series items instead of loose unknown Season items.
+- Batch mode still expands to Season / grouped item granularity so unresolved unknown ranges remain selectable for future correction.
+- Failed Movie placeholders and orphan single files remain `Other` and are not converted into TV containers by display projection alone.
+- TV remains excluded from Movie Discovery AI recommendation input, Watch Insights, Watch Profile, persona input, and recommendation fingerprints.
+- No migration was added and database update was not executed.
+
 ## Phase 4.8 TV Discovery Extension
 
 - 影片发现页仍保持三个顶层 Tab：影片搜索、榜单、AI 推荐。
@@ -556,3 +564,11 @@
 - Phase 4.12 closes with Movie detail source split wording set to `从当前电影拆分`.
 - Failed Movie placeholders and orphan unknown carriers remain the Movie-side unidentified detail carrier. The split action stays disabled there because an orphan carrier has no multi-source current Movie boundary to split from.
 - The underlying Movie split operation still detaches the selected source from the current Movie into unidentified carrying without deleting real files or changing Movie Discovery, Watch Insights, recommendation inputs, ranking, search, schema, or migration behavior.
+
+# Phase 4.12-post Emergency Unknown TV Grouping Boundary
+
+- TV-like failed Movie placeholder grouping now uses strict unknown TV Series / Season grouping keys before reusing existing no-TMDB unknown containers.
+- Special / non-regular TV directories are skipped by automatic unknown append and grouped placeholder persistence instead of being absorbed into regular numbered unknown Seasons.
+- Reused unknown TV containers preserve existing names; later placeholder ranges no longer overwrite the Series / Season display names.
+- Movie Discovery ranking, Movie matching, Movie recommendations, Watch Insights inputs, Movie detail source split semantics, schema, and migrations are unchanged.
+- Existing failed Movie placeholders may remain visible under Other when the conservative TV grouping safety gate skips them; Phase 4.13 correction workflows should handle manual grouping / correction.

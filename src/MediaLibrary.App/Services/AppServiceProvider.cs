@@ -36,6 +36,7 @@ public static class AppServiceProvider
         services.AddSingleton<ITvSeasonIdentificationService, TvSeasonIdentificationService>();
         services.AddSingleton<IMovieIdentificationService, MovieIdentificationService>();
         services.AddSingleton<IRescanReattachService, RescanReattachService>();
+        services.AddSingleton<IUnknownTvSeasonAppendService, UnknownTvSeasonAppendService>();
         services.AddSingleton<IMediaProbeService, MediaProbeService>();
         services.AddSingleton<IMediaScanService, MediaScanService>();
         services.AddSingleton<ILocalMediaScanService, LocalMediaScanService>();

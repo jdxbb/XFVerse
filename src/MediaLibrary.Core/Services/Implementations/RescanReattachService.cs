@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
@@ -170,20 +172,28 @@ public sealed class RescanReattachService : IRescanReattachService
             .ToListAsync(cancellationToken);
 
         var safeSeasons = candidateSeasons
-            .Where(season => HasSafeSeasonSourceContext(season, mediaFile))
+            .Where(season => HasSafeEpisodeSourceContext(season, mediaFile, episodeNumber))
             .ToList();
         if (safeSeasons.Count != 1)
         {
+            var directorySkipContext = BuildDirectorySkipContext(candidateSeasons, mediaFile, episodeNumber);
+            var skippedReason = safeSeasons.Count == 0
+                ? directorySkipContext.HasDifferentDirectorySource
+                    ? "recognized-reattach-requires-same-directory"
+                    : "no-safe-existing-season-context"
+                : "multiple-safe-season-contexts";
             WriteSkipped(
                 sourceKind,
                 mediaFile,
                 "episode",
                 seasonNumber,
                 episodeNumber,
-                safeSeasons.Count == 0 ? "no-safe-existing-season-context" : "multiple-safe-season-contexts",
+                skippedReason,
                 fallbackToPlaceholderGrouping: true,
-                existingSeasonCandidates: safeSeasons.Count,
-                existingSeriesCandidates: safeSeasons.Select(x => x.TvSeriesId).Distinct().Count());
+                existingSeasonCandidates: candidateSeasons.Count,
+                existingSeriesCandidates: candidateSeasons.Select(x => x.TvSeriesId).Distinct().Count(),
+                candidateDirectoryHash: directorySkipContext.CandidateDirectoryHash,
+                existingDirectoryHash: directorySkipContext.ExistingDirectoryHash);
             return false;
         }
 
@@ -262,32 +272,59 @@ public sealed class RescanReattachService : IRescanReattachService
         dbContext.Movies.Remove(movie);
     }
 
-    private static bool HasSafeSeasonSourceContext(TvSeason season, MediaFile mediaFile)
+    private static bool HasSafeEpisodeSourceContext(TvSeason season, MediaFile mediaFile, int episodeNumber)
     {
-        var candidateDirectory = GetDirectoryPath(mediaFile.FilePath);
+        var candidateDirectory = NormalizeDirectoryPath(GetDirectoryPath(mediaFile.FilePath));
         return season.Episodes
+            .Where(episode => episode.EpisodeNumber == episodeNumber)
             .SelectMany(x => x.MediaFiles)
             .Any(
                 source => source.Id != mediaFile.Id
                           && source.SourceConnectionId == mediaFile.SourceConnectionId
                           && source.MediaType == MediaType.Video
                           && !source.IsDeleted
-                          && IsSameOrSiblingDirectory(candidateDirectory, source.FilePath));
+                          && IsSameDirectory(candidateDirectory, GetDirectoryPath(source.FilePath)));
     }
 
-    private static bool IsSameOrSiblingDirectory(string candidateDirectory, string existingFilePath)
+    private static ReattachDirectorySkipContext BuildDirectorySkipContext(IEnumerable<TvSeason> candidateSeasons, MediaFile mediaFile, int episodeNumber)
     {
-        var existingDirectory = GetDirectoryPath(existingFilePath);
-        if (string.Equals(candidateDirectory, existingDirectory, StringComparison.OrdinalIgnoreCase))
+        var candidateDirectory = NormalizeDirectoryPath(GetDirectoryPath(mediaFile.FilePath));
+        string? existingDirectory = null;
+        foreach (var source in candidateSeasons
+                     .SelectMany(season => season.Episodes)
+                     .Where(episode => episode.EpisodeNumber == episodeNumber)
+                     .SelectMany(episode => episode.MediaFiles))
         {
-            return true;
+            if (source.Id == mediaFile.Id
+                || source.SourceConnectionId != mediaFile.SourceConnectionId
+                || source.MediaType != MediaType.Video
+                || source.IsDeleted)
+            {
+                continue;
+            }
+
+            existingDirectory = NormalizeDirectoryPath(GetDirectoryPath(source.FilePath));
+            if (IsSameDirectory(candidateDirectory, existingDirectory))
+            {
+                return new ReattachDirectorySkipContext(
+                    HashDirectoryPath(candidateDirectory),
+                    HashDirectoryPath(existingDirectory),
+                    HasDifferentDirectorySource: false);
+            }
         }
 
-        var candidateParent = GetDirectoryPath(candidateDirectory);
-        var existingParent = GetDirectoryPath(existingDirectory);
-        return !string.IsNullOrWhiteSpace(candidateParent)
-               && candidateParent != "/"
-               && string.Equals(candidateParent, existingParent, StringComparison.OrdinalIgnoreCase);
+        return new ReattachDirectorySkipContext(
+            HashDirectoryPath(candidateDirectory),
+            existingDirectory is null ? null : HashDirectoryPath(existingDirectory),
+            HasDifferentDirectorySource: existingDirectory is not null);
+    }
+
+    private static bool IsSameDirectory(string leftDirectory, string rightDirectory)
+    {
+        return string.Equals(
+            NormalizeDirectoryPath(leftDirectory),
+            NormalizeDirectoryPath(rightDirectory),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static int? ResolveDirectorySeasonNumber(string filePath)
@@ -347,6 +384,25 @@ public sealed class RescanReattachService : IRescanReattachService
         return lastSeparatorIndex <= 0 ? "/" : normalized[..lastSeparatorIndex];
     }
 
+    private static string NormalizeDirectoryPath(string? path)
+    {
+        var normalized = (path ?? string.Empty).Replace('\\', '/').Trim();
+        while (normalized.Length > 1 && normalized.EndsWith("/", StringComparison.Ordinal))
+        {
+            normalized = normalized[..^1];
+        }
+
+        return string.IsNullOrWhiteSpace(normalized) ? "/" : normalized;
+    }
+
+    private static string HashDirectoryPath(string? path)
+    {
+        var normalized = NormalizeDirectoryPath(path).ToLowerInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))
+            .ToLowerInvariant();
+        return hash[..12];
+    }
+
     private static void WriteCandidate(
         string sourceKind,
         MediaFile mediaFile,
@@ -354,8 +410,9 @@ public sealed class RescanReattachService : IRescanReattachService
         int? parsedSeason,
         int? parsedEpisode)
     {
+        var candidateDirectoryHash = HashDirectoryPath(GetDirectoryPath(mediaFile.FilePath));
         ScanIdentificationDiagnostics.Write(
-            $"event=rescan-reattach-candidate sourceKind={FormatValue(sourceKind)} targetKind={targetKind} mediaFileId={mediaFile.Id} protocol={FormatValue(mediaFile.SourceConnection?.ProtocolType.ToString())} parsedSeason={FormatNullable(parsedSeason)} parsedEpisode={FormatNullable(parsedEpisode)} directory={ScanIdentificationDiagnostics.FormatPath(GetDirectoryPath(mediaFile.FilePath))}");
+            $"event=rescan-reattach-candidate sourceKind={FormatValue(sourceKind)} targetKind={targetKind} mediaFileId={mediaFile.Id} protocol={FormatValue(mediaFile.SourceConnection?.ProtocolType.ToString())} parsedSeason={FormatNullable(parsedSeason)} parsedEpisode={FormatNullable(parsedEpisode)} candidateDirectoryHash={FormatValue(candidateDirectoryHash)}");
     }
 
     private static void WriteSkipped(
@@ -367,10 +424,16 @@ public sealed class RescanReattachService : IRescanReattachService
         string skippedReason,
         bool fallbackToPlaceholderGrouping,
         int existingSeasonCandidates = 0,
-        int existingSeriesCandidates = 0)
+        int existingSeriesCandidates = 0,
+        string? candidateDirectoryHash = null,
+        string? existingDirectoryHash = null)
     {
+        var effectiveCandidateDirectoryHash = candidateDirectoryHash ?? HashDirectoryPath(GetDirectoryPath(mediaFile.FilePath));
+        var existingDirectorySegment = string.IsNullOrWhiteSpace(existingDirectoryHash)
+            ? string.Empty
+            : $" existingDirectoryHash={FormatValue(existingDirectoryHash)}";
         ScanIdentificationDiagnostics.Write(
-            $"event=rescan-reattach-skipped sourceKind={FormatValue(sourceKind)} targetKind={targetKind} mediaFileId={mediaFile.Id} protocol={FormatValue(mediaFile.SourceConnection?.ProtocolType.ToString())} parsedSeason={FormatNullable(parsedSeason)} parsedEpisode={FormatNullable(parsedEpisode)} existingSeriesCandidates={existingSeriesCandidates} existingSeasonCandidates={existingSeasonCandidates} skippedReason={FormatValue(skippedReason)} fallbackToPlaceholderGrouping={fallbackToPlaceholderGrouping.ToString().ToLowerInvariant()}");
+            $"event=rescan-reattach-skipped sourceKind={FormatValue(sourceKind)} targetKind={targetKind} mediaFileId={mediaFile.Id} protocol={FormatValue(mediaFile.SourceConnection?.ProtocolType.ToString())} parsedSeason={FormatNullable(parsedSeason)} parsedEpisode={FormatNullable(parsedEpisode)} existingSeriesCandidates={existingSeriesCandidates} existingSeasonCandidates={existingSeasonCandidates} candidateDirectoryHash={FormatValue(effectiveCandidateDirectoryHash)}{existingDirectorySegment} skippedReason={FormatValue(skippedReason)} fallbackToPlaceholderGrouping={fallbackToPlaceholderGrouping.ToString().ToLowerInvariant()}");
     }
 
     private static void WriteSummary(string sourceKind, RescanReattachResult result)
@@ -388,4 +451,9 @@ public sealed class RescanReattachService : IRescanReattachService
     {
         return ScanIdentificationDiagnostics.FormatValue(value ?? string.Empty);
     }
+
+    private readonly record struct ReattachDirectorySkipContext(
+        string CandidateDirectoryHash,
+        string? ExistingDirectoryHash,
+        bool HasDifferentDirectorySource);
 }

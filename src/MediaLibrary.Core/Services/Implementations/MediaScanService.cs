@@ -18,6 +18,7 @@ public sealed class MediaScanService : IMediaScanService
     private readonly ITvSeasonIdentificationService _tvSeasonIdentificationService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly IRescanReattachService _rescanReattachService;
+    private readonly IUnknownTvSeasonAppendService _unknownTvSeasonAppendService;
     private readonly ISubtitleBindingService _subtitleBindingService;
     private readonly IAiClassificationService _aiClassificationService;
 
@@ -28,6 +29,7 @@ public sealed class MediaScanService : IMediaScanService
         ITvSeasonIdentificationService tvSeasonIdentificationService,
         IMovieIdentificationService movieIdentificationService,
         IRescanReattachService rescanReattachService,
+        IUnknownTvSeasonAppendService unknownTvSeasonAppendService,
         ISubtitleBindingService subtitleBindingService,
         IAiClassificationService aiClassificationService)
     {
@@ -37,6 +39,7 @@ public sealed class MediaScanService : IMediaScanService
         _tvSeasonIdentificationService = tvSeasonIdentificationService;
         _movieIdentificationService = movieIdentificationService;
         _rescanReattachService = rescanReattachService;
+        _unknownTvSeasonAppendService = unknownTvSeasonAppendService;
         _subtitleBindingService = subtitleBindingService;
         _aiClassificationService = aiClassificationService;
     }
@@ -284,9 +287,26 @@ public sealed class MediaScanService : IMediaScanService
 
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-video-classification source=webdav newVideoCount={videoStats.NewVideoCount} deletedReappearedVideoCount={videoStats.DeletedReappearedVideoCount} changedVideoCount={videoStats.ChangedVideoCount} unchangedUnboundVideoCount={videoStats.UnchangedUnboundVideoCount} postProcessVideoCount={postProcessVideoMediaFileIds.Count} reattachCandidateCount={reattachResult.CandidateCount} reattachSucceededCount={reattachResult.SucceededCount} reattachSkippedCount={reattachResult.SkippedCount} placeholderFallbackCount={reattachResult.PlaceholderFallbackCount}");
+            try
+            {
+                var unknownAppendResult = await _unknownTvSeasonAppendService.TryAppendScanPathsAsync(
+                    enabledScanPaths.Select(x => x.Id).ToArray(),
+                    "webdav",
+                    cancellationToken);
+                ScanIdentificationDiagnostics.Write(
+                    $"event=scan-unknown-season-append-complete source=webdav candidateCount={unknownAppendResult.CandidateCount} episodeCandidateCount={unknownAppendResult.EpisodeCandidateCount} succeeded={unknownAppendResult.SucceededCount} skipped={unknownAppendResult.SkippedCount} createdEpisodeCount={unknownAppendResult.CreatedEpisodeCount} appendedSourceCount={unknownAppendResult.AppendedSourceCount}");
+            }
+            catch (Exception appendException)
+            {
+                postStage.AddWarning("UnknownTv.Append", appendException.GetType().Name);
+                ScanIdentificationDiagnostics.Write(
+                    $"event=unknown-season-append-error sourceKind=webdav error={ScanIdentificationDiagnostics.FormatValue(appendException.GetType().Name)} fallbackToPlaceholderGrouping=true");
+            }
+
             await _movieIdentificationService.AggregateUnidentifiedMediaFilesAsync(
                 enabledScanPaths.Select(x => x.Id).ToArray(),
-                cancellationToken);
+                cancellationToken,
+                "webdav");
             ScanIdentificationDiagnostics.Write(
                 $"event=tmdb-search-cache-summary source=webdav tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbTvSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries} tmdbMovieSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
         }

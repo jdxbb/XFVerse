@@ -1,5 +1,26 @@
 # TV Support Plan
 
+## Phase 4.12-post-fix Scope
+
+Phase 4.12-post-fix is an automatic-scan legacy fix before Phase 4.13. It keeps the existing schema and derives non-persistent unknown TV grouping keys from active source context only.
+
+The phase changes normal media-library `Other` projection so persisted all-failed no-TMDB TV-like content is shown as an unknown Series container. Batch mode continues to show Season / grouped item granularity.
+
+Automatic grouping and append use conservative safety gates:
+
+- Same source connection.
+- Same scan path.
+- Same series root or same carrying directory when no explicit series root exists.
+- Compatible normalized parent/title context.
+- Unique compatible failed no-TMDB Series / Season candidate.
+- Single normal Episode number for append.
+- Trailing duplicate-copy suffixes such as `(1)` or full-width parenthesis variants are normalized only in TV-like context, so same-folder duplicate files can attach as additional sources.
+- No SP/OAD/OVA/special, multi-episode, course, collection, or theatrical mapping.
+
+If any condition is ambiguous, automatic reuse / append is skipped and existing placeholder grouping remains the fallback. The phase never creates empty Episode rows; it creates or updates only Episodes backed by real sources.
+
+Out of scope remains Phase 4.13 work: manual aggregate-to-Season, manual correction to an existing unknown Season episode number, batch button rule changes, AI-assisted correction strategy changes, unified Movie / TV correction entry, and historical bulk merge of duplicate unknown containers.
+
 ## Phase 4.11f-fix-9 Scope
 
 Phase 4.11f-fix-9 is a scan closeout parser and telemetry pass. It broadens only verified sequence patterns that already have folder-level evidence: fansub bracket episode numbers, bracket episode segments reused at TV apply time, and leading-number-title files with explicit season context. It also allows long-running numeric unknown ranges to contain small gaps without creating missing episodes.
@@ -1164,3 +1185,12 @@ Closed boundaries:
 
 - Phase 4.12 does not implement real correction, AI correction, TMDB candidate search, batch correction, manual Season aggregation, online subtitles, new scan strategy, final UI redesign, TV Watch Insights input, TV recommendation input, database update, commit, or push.
 - Phase 4.13 should start from the unified correction entry and batch / manual correction scope.
+
+## Phase 4.12-post Emergency Safety Boundary
+
+- Automatic unknown TV Series / Season reuse now requires strict derived grouping keys and refuses ambiguous existing unknown containers.
+- Unknown append now targets an existing unknown Season only when the strict Season grouping key matches; same-directory duplicate-copy multi-source remains supported.
+- Special / non-regular TV directories are skipped by automatic unknown append / grouped placeholder persistence and are left for Phase 4.13 manual correction.
+- Reusing an unknown Series / Season no longer overwrites its existing display name.
+- Recognized Episode reattach remains same-directory only; sibling-directory recognized reattach is still disabled.
+- Historical polluted unknown containers are not repaired by this emergency fix.

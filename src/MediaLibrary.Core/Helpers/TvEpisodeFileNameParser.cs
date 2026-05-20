@@ -48,18 +48,39 @@ public static partial class TvEpisodeFileNameParser
             nameWithoutExtension,
             seasonNumberHint,
             allowStrongContextFallbacks);
-        return contextMatch is null
-            ? new TvEpisodeFileNameParseResult
-            {
-                MultiEpisodeFalsePositiveAvoided = multiEpisodeFalsePositiveAvoided
-            }
-            : BuildResult(
+        if (contextMatch is not null)
+        {
+            return BuildResult(
                 nameWithoutExtension,
                 contextMatch.Value,
                 contextMatch.Value.Kind,
                 isMultiEpisode: false,
                 isSeasonContextOnly: true,
                 multiEpisodeFalsePositiveAvoided: multiEpisodeFalsePositiveAvoided);
+        }
+
+        if (TryStripTrailingDuplicateCopySuffix(nameWithoutExtension, out var duplicateBaseName))
+        {
+            contextMatch = FindContextEpisodeMatch(
+                duplicateBaseName,
+                seasonNumberHint,
+                allowStrongContextFallbacks);
+            if (contextMatch is not null)
+            {
+                return BuildResult(
+                    duplicateBaseName,
+                    contextMatch.Value,
+                    contextMatch.Value.Kind,
+                    isMultiEpisode: false,
+                    isSeasonContextOnly: true,
+                    multiEpisodeFalsePositiveAvoided: multiEpisodeFalsePositiveAvoided);
+            }
+        }
+
+        return new TvEpisodeFileNameParseResult
+        {
+            MultiEpisodeFalsePositiveAvoided = multiEpisodeFalsePositiveAvoided
+        };
     }
 
     public static int? TryParseSeasonNumber(string value)
@@ -93,7 +114,7 @@ public static partial class TvEpisodeFileNameParser
             return false;
         }
 
-        var normalized = Path.GetFileNameWithoutExtension(value).Trim();
+        var normalized = RemoveKnownFileExtension(value).Trim();
         return SeasonTokenRegex().IsMatch(normalized)
                || ChineseSeasonTokenRegex().IsMatch(normalized)
                || EnglishSeasonTokenRegex().IsMatch(normalized);
@@ -186,8 +207,14 @@ public static partial class TvEpisodeFileNameParser
 
     public static bool IsBareNumberEpisodeFileName(string value)
     {
-        var normalized = Path.GetFileNameWithoutExtension(value).Trim();
-        return BareNumberEpisodeRegex().IsMatch(normalized);
+        var normalized = RemoveKnownFileExtension(value).Trim();
+        if (BareNumberEpisodeRegex().IsMatch(normalized))
+        {
+            return true;
+        }
+
+        return TryStripTrailingDuplicateCopySuffix(normalized, out var duplicateBaseName)
+               && BareNumberEpisodeRegex().IsMatch(duplicateBaseName);
     }
 
     public static bool IsTitleNumberEpisodeFileName(string value)
@@ -307,6 +334,25 @@ public static partial class TvEpisodeFileNameParser
         return TryParseEpisodeSequencePatternFromBaseName(GetBaseNameFromRawFileName(fileName), out pattern);
     }
 
+    public static bool TryStripTrailingDuplicateCopySuffix(string value, out string baseName)
+    {
+        baseName = string.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = RemoveKnownFileExtension(value).Trim();
+        var match = DuplicateCopySuffixRegex().Match(normalized);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        baseName = match.Groups["base"].Value.Trim();
+        return !string.IsNullOrWhiteSpace(baseName);
+    }
+
     private static bool TryParseEpisodeSequencePatternFromBaseName(string baseName, out TvEpisodeSequencePattern pattern)
     {
         pattern = new TvEpisodeSequencePattern(string.Empty, string.Empty, string.Empty, 0);
@@ -314,6 +360,11 @@ public static partial class TvEpisodeFileNameParser
         if (string.IsNullOrWhiteSpace(name))
         {
             return false;
+        }
+
+        if (TryStripTrailingDuplicateCopySuffix(name, out var duplicateBaseName))
+        {
+            name = duplicateBaseName;
         }
 
         if (TryParseTitleSeasonPartEpisodeSequencePattern(name, out pattern))
@@ -369,6 +420,28 @@ public static partial class TvEpisodeFileNameParser
     private static string GetBaseNameFromRawFileName(string fileName)
     {
         return Path.GetFileNameWithoutExtension(fileName).Trim();
+    }
+
+    private static string RemoveKnownFileExtension(string value)
+    {
+        var normalized = value.Replace('\\', '/').Trim();
+        var lastSeparatorIndex = normalized.LastIndexOf('/');
+        if (lastSeparatorIndex >= 0)
+        {
+            normalized = normalized[(lastSeparatorIndex + 1)..];
+        }
+
+        var extension = Path.GetExtension(normalized);
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            return normalized;
+        }
+
+        var extensionBody = extension.TrimStart('.');
+        return extensionBody.Length is >= 1 and <= 8
+               && extensionBody.All(char.IsLetterOrDigit)
+            ? normalized[..^extension.Length]
+            : normalized;
     }
 
     private static bool TryParseTitleSeasonPartEpisodeSequencePattern(
@@ -569,6 +642,11 @@ public static partial class TvEpisodeFileNameParser
         }
 
         var normalized = Path.GetFileNameWithoutExtension(value).Trim();
+        if (TryStripTrailingDuplicateCopySuffix(normalized, out var duplicateBaseName))
+        {
+            normalized = duplicateBaseName;
+        }
+
         normalized = BracketedContentRegex().Replace(normalized, " ");
         normalized = MultiEpisodeTokenRegex().Replace(normalized, " ");
         normalized = MultiEpisodeCompactRegex().Replace(normalized, " ");
@@ -863,13 +941,13 @@ public static partial class TvEpisodeFileNameParser
         sequence = TvEpisodeSequenceAnalysis.Empty;
         foreach (var group in patterns.GroupBy(x => x.PatternKey, StringComparer.OrdinalIgnoreCase))
         {
-            if (group.GroupBy(x => x.Number).Any(x => x.Count() > 1))
-            {
-                continue;
-            }
-
+            var distinctByNumber = group
+                .GroupBy(x => x.Number)
+                .Select(x => x.First())
+                .OrderBy(x => x.Number)
+                .ToArray();
             var current = new List<TvEpisodeSequencePattern>();
-            foreach (var item in group.OrderBy(x => x.Number))
+            foreach (var item in distinctByNumber)
             {
                 if (current.Count == 0 || item.Number == current[^1].Number + 1)
                 {
@@ -985,8 +1063,11 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"\bSeason\s*(?<season>\d{1,2})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EnglishSeasonTokenRegex();
 
-    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|\u3010[^\u3011]+\u3011", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|\u3010[^\u3011]+\u3011|\uFF08[^\uFF09]+\uFF09", RegexOptions.CultureInvariant)]
     private static partial Regex BracketedContentRegex();
+
+    [GeneratedRegex(@"^(?<base>.+?)\s*(?:\((?<copy>[1-9]\d{0,2})\)|\uFF08(?<copy>[1-9]\d{0,2})\uFF09)\s*$", RegexOptions.CultureInvariant)]
+    private static partial Regex DuplicateCopySuffixRegex();
 
     [GeneratedRegex(@"^\s*(?:E|EP|Episode\s*)?(?<episode>\d{1,4})\s*(?:[-:：].*)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex BracketEpisodeSegmentRegex();
