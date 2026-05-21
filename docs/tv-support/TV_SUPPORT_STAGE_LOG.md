@@ -2387,3 +2387,35 @@ Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
+
+## Phase 4.13b - Attach single source to existing unknown Season
+
+Completed:
+
+- Added a third single-source correction target: `加入已有未识别季`.
+- Movie detail and Episode detail share the new target. Selecting it hides Movie / recognized-TV candidate search and shows a positive episode-number input plus a `选择未识别季...` dialog button.
+- The modal picker dialog lists only no-TMDB unknown Seasons, not recognized Seasons, Movies, or orphan single files.
+- Picker results are grouped by unknown Series. Each Series row expands to its Seasons sorted by Season number, with distinct Series / Season colors to reduce same-name confusion.
+- Picker rows include unknown Series title, Season title / number, episode range, source count, source-kind summary, and a hashed context hint. Full local paths and full WebDAV URLs are not displayed.
+- Applying the target binds the selected `MediaFile` to the selected unknown Season and input episode number.
+- If the target Episode already exists, the selected source is appended as another playback source.
+- If the target Episode does not exist, only that Episode is created. Missing intermediate episode numbers are not created.
+- The corrected source becomes the target Episode default source.
+- If the source moved away from a Movie or Episode where it was the default source, the old container recalculates default source with the local-first fallback strategy.
+- Existing probe fields, subtitle bindings, watch history, user Movie / TV states, and real local / WebDAV files are preserved.
+- Added sanitized diagnostics for unknown Season correction start / success / failure, including ids, input episode number, created/appended flags, default-source flags, and failure reason.
+
+Not done:
+
+- No manual Season aggregation, grouped unknown Season to recognized Season correction, batch AI correction, recognized Season target picker, historical wrong-binding cleanup, ignore / blacklist, scan-rule change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` should remain 0 warnings / 0 errors after this phase.
+- Current migrations diff should remain empty.
+
+Known Issues:
+
+- Blocker: none expected in the implemented single-source path.
+- Deferred: batch correction, manual grouping, grouped Season correction, and historical cleanup remain later Phase 4.13 work.
+- Noise: the picker dialog uses hashed context hints rather than readable paths, so users distinguish same-name unknown Seasons by title, range, source count, source kind, and context hash.

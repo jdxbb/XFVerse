@@ -27,4 +27,14 @@ public interface ISingleSourceCorrectionService
         int seasonNumber,
         int episodeNumber,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<UnknownTvSeasonCorrectionTargetItem>> SearchUnknownSeasonTargetsAsync(
+        string? query = null,
+        CancellationToken cancellationToken = default);
+
+    Task<SingleSourceCorrectionApplyResult> ApplyUnknownSeasonEpisodeCorrectionAsync(
+        int mediaFileId,
+        int targetSeasonId,
+        int episodeNumber,
+        CancellationToken cancellationToken = default);
 }

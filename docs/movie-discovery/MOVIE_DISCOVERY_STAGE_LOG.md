@@ -604,3 +604,13 @@
 - TV Episode AI assist can fill Season / Episode inputs when the AI response or local filename fallback provides a safe single-episode hint.
 - Corrected-source default-source rules from Phase 4.13a are unchanged.
 - Movie Discovery ranking / search / recommendation inputs, Watch Insights inputs, Movie fallback thresholds, scan identification rules, schema, migrations, and batch AI correction are unchanged.
+
+# Phase 4.13b Join-existing Unknown Season Boundary
+
+- Movie detail single-source correction now includes `加入已有未识别季` as an explicit target for the selected source.
+- Choosing this target hides Movie and recognized-TV candidate search and shows a positive episode-number input plus a modal unknown Season picker.
+- The picker groups target Seasons under expandable unknown Series rows and sorts Seasons by Season number.
+- Applying it clears the source's Movie binding and binds the source to the selected unknown TV Episode.
+- If the source was the old Movie default source, the old Movie recalculates default source with the local-first fallback.
+- Failed Movie placeholders with no remaining source can be cleaned up by the existing safe orphan cleanup semantics; real files, probe fields, subtitle bindings, and Movie user states are not deleted or migrated.
+- Movie Discovery ranking, search, recommendation inputs, Watch Insights inputs, Movie fallback thresholds, scan identification rules, schema, migrations, and batch AI correction are unchanged.

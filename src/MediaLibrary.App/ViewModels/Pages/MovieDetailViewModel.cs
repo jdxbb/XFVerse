@@ -17,6 +17,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private const string ExternalAiMissingText = "尚未分类";
     private const string CorrectionTargetMovieText = "修正为电影";
     private const string CorrectionTargetTvEpisodeText = "修正为电视剧集";
+    private const string CorrectionTargetUnknownSeasonText = "加入已有未识别季";
     private static readonly TimeSpan CorrectionApplyTimeout = TimeSpan.FromSeconds(45);
 
     private static readonly ConcurrentDictionary<int, AiMovieTags> ExternalAiTagCache = new();
@@ -68,10 +69,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private string _tvCorrectionQuery = string.Empty;
     private string _correctionSeasonNumber = "1";
     private string _correctionEpisodeNumber = "1";
+    private string _unknownSeasonSearchQuery = string.Empty;
+    private string _unknownSeasonEpisodeNumber = "1";
     private string _selectedCorrectionTarget = CorrectionTargetMovieText;
     private string _correctionSourceDisplay = "请选择一个播放源。";
     private string _correctionPreviewText = string.Empty;
     private string _correctionSourceFileName = string.Empty;
+    private UnknownTvSeasonCorrectionTargetItem? _selectedUnknownSeasonTarget;
     private int? _correctionMediaFileId;
     private int _selectedDetailTabIndex;
     private IdentificationStatus _identificationStatus;
@@ -90,6 +94,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _isAddingToLibrary;
     private bool _hasCorrectionPreview;
     private bool _isCorrectionBusy;
+    private bool _isUnknownSeasonPickerDialogOpen;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
 
     public MovieDetailViewModel(
@@ -124,6 +129,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ApplyManualMatchCommand = new AsyncRelayCommand(ApplyMovieCandidateCorrectionAsync, CanApplyMovieCandidateCorrection);
         BeginSourceCorrectionCommand = new RelayCommand(BeginSourceCorrection, CanBeginSourceCorrection);
         PreviewTvEpisodeCorrectionCommand = new AsyncRelayCommand(ApplyTvEpisodeCandidateCorrectionAsync, CanApplyTvEpisodeCandidateCorrection);
+        SearchUnknownSeasonTargetsCommand = new AsyncRelayCommand(SearchUnknownSeasonTargetsAsync, CanSearchUnknownSeasonTargets);
+        OpenUnknownSeasonPickerCommand = new AsyncRelayCommand(OpenUnknownSeasonPickerAsync, CanOpenUnknownSeasonPicker);
+        CloseUnknownSeasonPickerCommand = new RelayCommand(CloseUnknownSeasonPicker, () => IsUnknownSeasonPickerDialogOpen);
+        SelectUnknownSeasonTargetCommand = new RelayCommand(SelectUnknownSeasonTarget, CanSelectUnknownSeasonTarget);
+        ApplyUnknownSeasonCorrectionCommand = new AsyncRelayCommand(ApplyUnknownSeasonCorrectionAsync, CanApplyUnknownSeasonCorrection);
         CancelCorrectionCommand = new RelayCommand(CancelCorrection, () => IsCorrectionPanelVisible);
         SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync);
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
@@ -149,10 +159,15 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public ObservableCollection<TmdbTvSeriesSearchItem> TvSearchCandidates { get; } = [];
 
+    public ObservableCollection<UnknownTvSeasonCorrectionTargetItem> UnknownSeasonTargets { get; } = [];
+
+    public ObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
+
     public IReadOnlyList<string> CorrectionTargetOptions { get; } =
     [
         CorrectionTargetMovieText,
-        CorrectionTargetTvEpisodeText
+        CorrectionTargetTvEpisodeText,
+        CorrectionTargetUnknownSeasonText
     ];
 
     public AsyncRelayCommand SearchCandidatesCommand { get; }
@@ -162,6 +177,16 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public RelayCommand BeginSourceCorrectionCommand { get; }
 
     public AsyncRelayCommand PreviewTvEpisodeCorrectionCommand { get; }
+
+    public AsyncRelayCommand SearchUnknownSeasonTargetsCommand { get; }
+
+    public AsyncRelayCommand OpenUnknownSeasonPickerCommand { get; }
+
+    public RelayCommand CloseUnknownSeasonPickerCommand { get; }
+
+    public RelayCommand SelectUnknownSeasonTargetCommand { get; }
+
+    public AsyncRelayCommand ApplyUnknownSeasonCorrectionCommand { get; }
 
     public RelayCommand CancelCorrectionCommand { get; }
 
@@ -245,6 +270,20 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string CorrectionEpisodeNumber { get => _correctionEpisodeNumber; set => SetProperty(ref _correctionEpisodeNumber, value); }
 
+    public string UnknownSeasonSearchQuery { get => _unknownSeasonSearchQuery; set => SetProperty(ref _unknownSeasonSearchQuery, value); }
+
+    public string UnknownSeasonEpisodeNumber
+    {
+        get => _unknownSeasonEpisodeNumber;
+        set
+        {
+            if (SetProperty(ref _unknownSeasonEpisodeNumber, value))
+            {
+                ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public string SelectedCorrectionTarget
     {
         get => _selectedCorrectionTarget;
@@ -255,9 +294,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 ClearCorrectionPreview();
                 OnPropertyChanged(nameof(IsCorrectionTargetMovie));
                 OnPropertyChanged(nameof(IsCorrectionTargetTvEpisode));
+                OnPropertyChanged(nameof(IsCorrectionTargetUnknownSeason));
                 ClearCandidatesForInactiveCorrectionTarget();
                 ApplyManualMatchCommand.RaiseCanExecuteChanged();
                 PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+                SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
+                OpenUnknownSeasonPickerCommand.RaiseCanExecuteChanged();
+                SelectUnknownSeasonTargetCommand.RaiseCanExecuteChanged();
+                ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
                 AiSuggestSearchCommand.RaiseCanExecuteChanged();
             }
         }
@@ -267,11 +311,47 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string CorrectionPreviewText { get => _correctionPreviewText; private set => SetProperty(ref _correctionPreviewText, value); }
 
+    public UnknownTvSeasonCorrectionTargetItem? SelectedUnknownSeasonTarget
+    {
+        get => _selectedUnknownSeasonTarget;
+        private set
+        {
+            if (SetProperty(ref _selectedUnknownSeasonTarget, value))
+            {
+                OnPropertyChanged(nameof(HasSelectedUnknownSeasonTarget));
+                OnPropertyChanged(nameof(SelectedUnknownSeasonTargetDisplay));
+                ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool HasSelectedUnknownSeasonTarget => SelectedUnknownSeasonTarget is not null;
+
+    public string SelectedUnknownSeasonTargetDisplay => SelectedUnknownSeasonTarget is null
+        ? "尚未选择未识别季。"
+        : $"{SelectedUnknownSeasonTarget.DisplayTitle} · {SelectedUnknownSeasonTarget.DisplaySubtitle}";
+
+    public bool IsUnknownSeasonPickerDialogOpen
+    {
+        get => _isUnknownSeasonPickerDialogOpen;
+        private set
+        {
+            if (SetProperty(ref _isUnknownSeasonPickerDialogOpen, value))
+            {
+                CloseUnknownSeasonPickerCommand.RaiseCanExecuteChanged();
+                OpenUnknownSeasonPickerCommand.RaiseCanExecuteChanged();
+                SelectUnknownSeasonTargetCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public bool IsCorrectionPanelVisible => _correctionMediaFileId.HasValue;
 
     public bool IsCorrectionTargetMovie => SelectedCorrectionTarget == CorrectionTargetMovieText;
 
     public bool IsCorrectionTargetTvEpisode => SelectedCorrectionTarget == CorrectionTargetTvEpisodeText;
+
+    public bool IsCorrectionTargetUnknownSeason => SelectedCorrectionTarget == CorrectionTargetUnknownSeasonText;
 
     public int SelectedDetailTabIndex { get => _selectedDetailTabIndex; set => SetProperty(ref _selectedDetailTabIndex, value); }
 
@@ -293,6 +373,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             {
                 ApplyManualMatchCommand.RaiseCanExecuteChanged();
                 PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+                SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
+                OpenUnknownSeasonPickerCommand.RaiseCanExecuteChanged();
+                SelectUnknownSeasonTargetCommand.RaiseCanExecuteChanged();
+                ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
                 AiSuggestSearchCommand.RaiseCanExecuteChanged();
             }
         }
@@ -418,6 +502,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public bool HasSearchCandidates => SearchCandidates.Count > 0;
 
     public bool HasTvSearchCandidates => TvSearchCandidates.Count > 0;
+
+    public bool HasUnknownSeasonTargets => UnknownSeasonSeriesGroups.Count > 0;
 
     public bool CanUseIdentificationCorrection => HasMovie && IsLibraryMovie;
 
@@ -571,6 +657,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             {
                 SearchCandidates.Clear();
                 TvSearchCandidates.Clear();
+                ClearUnknownSeasonTargets();
+                SelectedUnknownSeasonTarget = null;
+                IsUnknownSeasonPickerDialogOpen = false;
                 _correctionMediaFileId = null;
                 OnPropertyChanged(nameof(IsCorrectionPanelVisible));
                 SelectedDetailTabIndex = 0;
@@ -583,6 +672,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 ManualSearchQuery = detail.Title;
                 ManualSearchYear = detail.ReleaseYear?.ToString() ?? string.Empty;
                 TvCorrectionQuery = detail.Title;
+                UnknownSeasonSearchQuery = detail.Title;
             }
             else if (_correctionMediaFileId.HasValue && Sources.All(source => source.MediaFileId != _correctionMediaFileId.Value))
             {
@@ -592,11 +682,16 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 ClearCorrectionPreview();
                 SearchCandidates.Clear();
                 TvSearchCandidates.Clear();
+                ClearUnknownSeasonTargets();
+                SelectedUnknownSeasonTarget = null;
+                IsUnknownSeasonPickerDialogOpen = false;
                 OnPropertyChanged(nameof(HasSearchCandidates));
                 OnPropertyChanged(nameof(HasTvSearchCandidates));
                 CancelCorrectionCommand.RaiseCanExecuteChanged();
                 ApplyManualMatchCommand.RaiseCanExecuteChanged();
                 PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+                SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
+                ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
                 AiSuggestSearchCommand.RaiseCanExecuteChanged();
             }
 
@@ -1511,7 +1606,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private bool CanAiSuggestSearch()
     {
-        return !IsCorrectionBusy && CanUseIdentificationCorrection && IsCorrectionPanelVisible;
+        return !IsCorrectionBusy
+               && CanUseIdentificationCorrection
+               && IsCorrectionPanelVisible
+               && !IsCorrectionTargetUnknownSeason;
     }
 
     private bool CanBeginSourceCorrection(object? parameter)
@@ -1535,11 +1633,16 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _correctionSourceFileName = source.FileName;
         ManualSearchQuery = string.IsNullOrWhiteSpace(ManualSearchQuery) ? TitleText : ManualSearchQuery;
         TvCorrectionQuery = string.IsNullOrWhiteSpace(TvCorrectionQuery) ? TitleText : TvCorrectionQuery;
+        UnknownSeasonSearchQuery = string.IsNullOrWhiteSpace(UnknownSeasonSearchQuery) ? TitleText : UnknownSeasonSearchQuery;
+        UnknownSeasonEpisodeNumber = "1";
         CorrectionSeasonNumber = "1";
         CorrectionEpisodeNumber = "1";
         ClearCorrectionPreview();
         SearchCandidates.Clear();
         TvSearchCandidates.Clear();
+        ClearUnknownSeasonTargets();
+        SelectedUnknownSeasonTarget = null;
+        IsUnknownSeasonPickerDialogOpen = false;
         _correctionMediaFileId = source.MediaFileId;
         SelectedDetailTabIndex = 3;
         OnPropertyChanged(nameof(HasSearchCandidates));
@@ -1548,6 +1651,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         CancelCorrectionCommand.RaiseCanExecuteChanged();
         ApplyManualMatchCommand.RaiseCanExecuteChanged();
         PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+        SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
+        ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
         AiSuggestSearchCommand.RaiseCanExecuteChanged();
         StatusMessage = $"已选择播放源“{source.FileName}”，请搜索目标；点击候选后会直接修正。";
     }
@@ -1563,11 +1668,16 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ClearCorrectionPreview();
         SearchCandidates.Clear();
         TvSearchCandidates.Clear();
+        ClearUnknownSeasonTargets();
+        SelectedUnknownSeasonTarget = null;
+        IsUnknownSeasonPickerDialogOpen = false;
         OnPropertyChanged(nameof(HasSearchCandidates));
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         CancelCorrectionCommand.RaiseCanExecuteChanged();
         ApplyManualMatchCommand.RaiseCanExecuteChanged();
         PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+        SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
+        ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
         AiSuggestSearchCommand.RaiseCanExecuteChanged();
         StatusMessage = "已取消本次修正，未修改任何数据。";
     }
@@ -1589,6 +1699,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         if (IsCorrectionTargetTvEpisode)
         {
             await SearchTvCandidatesAsync();
+            return;
+        }
+
+        if (IsCorrectionTargetUnknownSeason)
+        {
+            await SearchUnknownSeasonTargetsAsync();
             return;
         }
 
@@ -1655,6 +1771,85 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             TvSearchCandidates.Clear();
             OnPropertyChanged(nameof(HasTvSearchCandidates));
             StatusMessage = DescribeTmdbSearchFailure(exception);
+        }
+    }
+
+    private bool CanSearchUnknownSeasonTargets()
+    {
+        return !IsCorrectionBusy
+               && CanUseIdentificationCorrection
+               && IsCorrectionPanelVisible
+               && IsCorrectionTargetUnknownSeason;
+    }
+
+    private bool CanOpenUnknownSeasonPicker()
+    {
+        return CanSearchUnknownSeasonTargets() && !IsUnknownSeasonPickerDialogOpen;
+    }
+
+    private async Task OpenUnknownSeasonPickerAsync()
+    {
+        if (!CanOpenUnknownSeasonPicker())
+        {
+            StatusMessage = "请先选择播放源，并把目标类型切换为“加入已有未识别季”。";
+            return;
+        }
+
+        await SearchUnknownSeasonTargetsAsync();
+        IsUnknownSeasonPickerDialogOpen = true;
+    }
+
+    private void CloseUnknownSeasonPicker()
+    {
+        IsUnknownSeasonPickerDialogOpen = false;
+    }
+
+    private bool CanSelectUnknownSeasonTarget(object? parameter)
+    {
+        return IsUnknownSeasonPickerDialogOpen
+               && parameter is UnknownTvSeasonCorrectionTargetItem;
+    }
+
+    private void SelectUnknownSeasonTarget(object? parameter)
+    {
+        if (parameter is not UnknownTvSeasonCorrectionTargetItem target)
+        {
+            return;
+        }
+
+        SelectedUnknownSeasonTarget = target;
+        IsUnknownSeasonPickerDialogOpen = false;
+        StatusMessage = $"已选择未识别季：{target.DisplayTitle}。请输入集号后加入。";
+    }
+
+    private async Task SearchUnknownSeasonTargetsAsync()
+    {
+        if (!CanSearchUnknownSeasonTargets())
+        {
+            StatusMessage = "请先选择播放源，并把目标类型切换为“加入已有未识别季”。";
+            return;
+        }
+
+        try
+        {
+            IsCorrectionBusy = true;
+            var targets = await _singleSourceCorrectionService.SearchUnknownSeasonTargetsAsync(
+                null,
+                CancellationToken.None);
+
+            SetUnknownSeasonTargets(targets);
+            StatusMessage = UnknownSeasonTargets.Count == 0
+                ? "没有找到可加入的 no-TMDB / 未识别季。"
+                : $"已找到 {UnknownSeasonTargets.Count} 个可加入的未识别季。";
+        }
+        catch (Exception exception)
+        {
+            ClearUnknownSeasonTargets();
+            StatusMessage = $"加载未识别季失败：{DescribeException(exception)}";
+        }
+        finally
+        {
+            IsCorrectionBusy = false;
         }
     }
 
@@ -1777,6 +1972,70 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
     }
 
+    private bool CanApplyUnknownSeasonCorrection(object? parameter)
+    {
+        return !IsCorrectionBusy
+               && IsCorrectionPanelVisible
+               && IsCorrectionTargetUnknownSeason
+               && (parameter is UnknownTvSeasonCorrectionTargetItem || SelectedUnknownSeasonTarget is not null)
+               && int.TryParse(UnknownSeasonEpisodeNumber, out var episodeNumber)
+               && episodeNumber > 0;
+    }
+
+    private async Task ApplyUnknownSeasonCorrectionAsync(object? parameter)
+    {
+        var target = parameter as UnknownTvSeasonCorrectionTargetItem ?? SelectedUnknownSeasonTarget;
+        if (_correctionMediaFileId is null || target is null)
+        {
+            StatusMessage = "请先选择播放源和未识别季。";
+            return;
+        }
+
+        if (!int.TryParse(UnknownSeasonEpisodeNumber, out var episodeNumber) || episodeNumber <= 0)
+        {
+            StatusMessage = "集号必须是正整数。";
+            return;
+        }
+
+        try
+        {
+            IsCorrectionBusy = true;
+            StatusMessage = $"正在加入未识别季：{target.DisplayTitle} E{episodeNumber:00}。";
+            await Task.Yield();
+            using var timeout = new CancellationTokenSource(CorrectionApplyTimeout);
+            var mediaFileId = _correctionMediaFileId.Value;
+            var result = await Task.Run(
+                () => _singleSourceCorrectionService.ApplyUnknownSeasonEpisodeCorrectionAsync(
+                    mediaFileId,
+                    target.SeasonId,
+                    episodeNumber,
+                    timeout.Token),
+                timeout.Token);
+            _dataRefreshService.NotifyMetadataChanged();
+            if (result.TargetEpisodeId.HasValue)
+            {
+                _navigationStateService.RequestEpisodeDetail(result.TargetEpisodeId.Value);
+            }
+
+            StatusMessage = result.CreatedEpisode
+                ? $"已创建并加入未识别季 E{episodeNumber:00}。"
+                : $"已加入未识别季 E{episodeNumber:00}，并设为默认播放源。";
+            ClearCorrectionAfterApply();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "应用修正超时，事务已回滚；请稍后重试。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"应用修正失败，事务已回滚：{DescribeException(exception)}";
+        }
+        finally
+        {
+            IsCorrectionBusy = false;
+        }
+    }
+
     private void SetCorrectionPreview(SingleSourceCorrectionPreview preview)
     {
         CorrectionPreviewText = preview.PreviewText;
@@ -1789,17 +2048,59 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         HasCorrectionPreview = false;
     }
 
+    private void ClearUnknownSeasonTargets()
+    {
+        UnknownSeasonTargets.Clear();
+        UnknownSeasonSeriesGroups.Clear();
+        OnPropertyChanged(nameof(HasUnknownSeasonTargets));
+    }
+
+    private void SetUnknownSeasonTargets(IEnumerable<UnknownTvSeasonCorrectionTargetItem> targets)
+    {
+        var orderedTargets = targets
+            .OrderBy(x => x.SeriesTitle, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.SeasonNumber)
+            .ThenBy(x => x.SeasonTitle, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.SeasonId)
+            .ToList();
+
+        UnknownSeasonTargets.Clear();
+        foreach (var target in orderedTargets)
+        {
+            UnknownSeasonTargets.Add(target);
+        }
+
+        UnknownSeasonSeriesGroups.Clear();
+        foreach (var group in UnknownTvSeasonCorrectionSeriesGroup.FromTargets(orderedTargets))
+        {
+            UnknownSeasonSeriesGroups.Add(group);
+        }
+
+        OnPropertyChanged(nameof(HasUnknownSeasonTargets));
+    }
+
     private void ClearCandidatesForInactiveCorrectionTarget()
     {
         if (IsCorrectionTargetMovie)
         {
             TvSearchCandidates.Clear();
+            ClearUnknownSeasonTargets();
             OnPropertyChanged(nameof(HasTvSearchCandidates));
             return;
         }
 
+        if (IsCorrectionTargetTvEpisode)
+        {
+            SearchCandidates.Clear();
+            ClearUnknownSeasonTargets();
+            OnPropertyChanged(nameof(HasSearchCandidates));
+            return;
+        }
+
         SearchCandidates.Clear();
+        TvSearchCandidates.Clear();
         OnPropertyChanged(nameof(HasSearchCandidates));
+        OnPropertyChanged(nameof(HasTvSearchCandidates));
     }
 
     private static int? TryParsePositive(string value)
@@ -1849,9 +2150,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ClearCorrectionPreview();
         SearchCandidates.Clear();
         TvSearchCandidates.Clear();
+        ClearUnknownSeasonTargets();
+        SelectedUnknownSeasonTarget = null;
+        IsUnknownSeasonPickerDialogOpen = false;
         OnPropertyChanged(nameof(HasSearchCandidates));
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         CancelCorrectionCommand.RaiseCanExecuteChanged();
+        SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
+        ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
         AiSuggestSearchCommand.RaiseCanExecuteChanged();
     }
 
@@ -1948,6 +2254,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         Sources.Clear();
         SearchCandidates.Clear();
         TvSearchCandidates.Clear();
+        ClearUnknownSeasonTargets();
+        SelectedUnknownSeasonTarget = null;
+        IsUnknownSeasonPickerDialogOpen = false;
         _correctionMediaFileId = null;
         _correctionSourceFileName = string.Empty;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
@@ -1958,6 +2267,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasSearchCandidates));
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
+        ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
         AiSuggestSearchCommand.RaiseCanExecuteChanged();
     }
 

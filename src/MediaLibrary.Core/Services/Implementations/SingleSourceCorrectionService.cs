@@ -5,6 +5,8 @@ using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MediaLibrary.Core.Services.Implementations;
 
@@ -200,6 +202,184 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
         }
     }
 
+    public async Task<IReadOnlyList<UnknownTvSeasonCorrectionTargetItem>> SearchUnknownSeasonTargetsAsync(
+        string? query = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedQuery = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        var queryable = dbContext.TvSeasons
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(x => x.Series)
+            .Include(x => x.Episodes)
+            .ThenInclude(x => x.MediaFiles)
+            .ThenInclude(x => x.SourceConnection)
+            .Where(x => x.Series != null
+                        && x.Series.TmdbSeriesId == null
+                        && x.TmdbSeasonId == null
+                        && x.Episodes.Any(episode => episode.MediaFiles.Any(mediaFile =>
+                            mediaFile.MediaType == MediaType.Video
+                            && !mediaFile.IsDeleted)));
+
+        if (!string.IsNullOrWhiteSpace(normalizedQuery))
+        {
+            queryable = queryable.Where(x =>
+                x.Name.Contains(normalizedQuery)
+                || (x.Series != null && x.Series.Name.Contains(normalizedQuery)));
+        }
+
+        var seasons = await queryable
+            .OrderByDescending(x => x.UpdatedAt)
+            .ThenByDescending(x => x.Id)
+            .Take(150)
+            .ToListAsync(cancellationToken);
+
+        return seasons
+            .Select(BuildUnknownSeasonTargetItem)
+            .Where(x => x.SourceCount > 0)
+            .ToList();
+    }
+
+    public async Task<SingleSourceCorrectionApplyResult> ApplyUnknownSeasonEpisodeCorrectionAsync(
+        int mediaFileId,
+        int targetSeasonId,
+        int episodeNumber,
+        CancellationToken cancellationToken = default)
+    {
+        if (mediaFileId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(mediaFileId));
+        }
+
+        if (targetSeasonId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetSeasonId));
+        }
+
+        if (episodeNumber <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(episodeNumber));
+        }
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=correction-target-unknown-season-started mediaFileId={mediaFileId} targetSeasonId={targetSeasonId} inputEpisodeNumber={episodeNumber}");
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var mediaFile = await dbContext.MediaFiles
+                .Include(x => x.SourceConnection)
+                .Include(x => x.Movie)
+                .Include(x => x.Episode)
+                .FirstOrDefaultAsync(
+                    x => x.Id == mediaFileId
+                         && x.MediaType == MediaType.Video
+                         && !x.IsDeleted,
+                    cancellationToken)
+                ?? throw new InvalidOperationException("待修正的播放源不存在。");
+
+            var targetSeason = await dbContext.TvSeasons
+                .Include(x => x.Series)
+                .Include(x => x.Episodes)
+                .ThenInclude(x => x.MediaFiles)
+                .ThenInclude(x => x.SourceConnection)
+                .FirstOrDefaultAsync(x => x.Id == targetSeasonId, cancellationToken)
+                ?? throw new InvalidOperationException("目标未识别季不存在。");
+
+            if (!IsUnknownSeason(targetSeason))
+            {
+                throw new InvalidOperationException("只能加入 no-TMDB / 未识别电视剧季。");
+            }
+
+            var previousMovieId = mediaFile.MovieId;
+            var previousEpisodeId = mediaFile.EpisodeId;
+            var targetEpisode = targetSeason.Episodes.FirstOrDefault(x => x.EpisodeNumber == episodeNumber);
+            var createdEpisode = targetEpisode is null;
+            if (targetEpisode is null)
+            {
+                targetEpisode = new TvEpisode
+                {
+                    TvSeasonId = targetSeason.Id,
+                    Season = targetSeason,
+                    EpisodeNumber = episodeNumber,
+                    Title = $"E{episodeNumber:00}",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                dbContext.TvEpisodes.Add(targetEpisode);
+            }
+
+            var existingSourceCount = targetEpisode.MediaFiles.Count(x =>
+                x.Id != mediaFile.Id
+                && x.MediaType == MediaType.Video
+                && !x.IsDeleted);
+            var overwrittenTargetDefaultSource = targetEpisode.DefaultMediaFileId.HasValue
+                                                 && targetEpisode.DefaultMediaFileId.Value != mediaFile.Id;
+
+            mediaFile.MovieId = null;
+            mediaFile.Movie = null;
+            mediaFile.EpisodeId = targetEpisode.Id == 0 ? null : targetEpisode.Id;
+            mediaFile.Episode = targetEpisode;
+            mediaFile.UpdatedAt = DateTime.UtcNow;
+            targetEpisode.DefaultMediaFileId = mediaFile.Id;
+            targetEpisode.UpdatedAt = DateTime.UtcNow;
+            targetSeason.UpdatedAt = DateTime.UtcNow;
+            if (targetSeason.Series is not null)
+            {
+                targetSeason.Series.UpdatedAt = DateTime.UtcNow;
+            }
+
+            var oldDefaultFallback = false;
+            if (previousMovieId.HasValue)
+            {
+                oldDefaultFallback |= await ReconcileMovieAfterSourceMoveAsync(
+                    dbContext,
+                    previousMovieId.Value,
+                    mediaFile.Id,
+                    cancellationToken);
+                await CleanupMovieIfOrphanedAsync(dbContext, previousMovieId.Value, cancellationToken);
+            }
+
+            if (previousEpisodeId.HasValue && (!targetEpisode.Id.Equals(previousEpisodeId.Value)))
+            {
+                oldDefaultFallback |= await ReconcileEpisodeAfterSourceMoveAsync(
+                    dbContext,
+                    previousEpisodeId.Value,
+                    mediaFile.Id,
+                    cancellationToken);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=correction-target-unknown-season-succeeded mediaFileId={mediaFileId} oldMovieId={ScanIdentificationDiagnostics.FormatNullable(previousMovieId)} oldEpisodeId={ScanIdentificationDiagnostics.FormatNullable(previousEpisodeId)} targetSeasonId={targetSeason.Id} targetEpisodeId={targetEpisode.Id} inputEpisodeNumber={episodeNumber} createdEpisode={createdEpisode.ToString().ToLowerInvariant()} appendedAsAdditionalSource={(existingSourceCount > 0).ToString().ToLowerInvariant()} overwrittenTargetDefaultSource={overwrittenTargetDefaultSource.ToString().ToLowerInvariant()} oldDefaultFallback={oldDefaultFallback.ToString().ToLowerInvariant()}");
+
+            return new SingleSourceCorrectionApplyResult
+            {
+                MediaFileId = mediaFileId,
+                TargetKind = SingleSourceCorrectionTargetKind.UnknownSeasonEpisode,
+                TargetSeasonId = targetSeason.Id,
+                TargetEpisodeId = targetEpisode.Id,
+                CreatedEpisode = createdEpisode,
+                AppendedAsAdditionalSource = existingSourceCount > 0,
+                OverwrittenTargetDefaultSource = overwrittenTargetDefaultSource,
+                OldDefaultFallback = oldDefaultFallback,
+                Message = "播放源已加入已有未识别季。"
+            };
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=correction-target-unknown-season-failed mediaFileId={mediaFileId} targetSeasonId={targetSeasonId} inputEpisodeNumber={episodeNumber} reason={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
+            throw;
+        }
+    }
+
     private static async Task<MediaFile?> LoadCorrectionSourceAsync(
         AppDbContext dbContext,
         int mediaFileId,
@@ -217,6 +397,235 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
                      && x.MediaType == MediaType.Video
                      && !x.IsDeleted,
                 cancellationToken);
+    }
+
+    private static UnknownTvSeasonCorrectionTargetItem BuildUnknownSeasonTargetItem(TvSeason season)
+    {
+        var activeSources = season.Episodes
+            .SelectMany(x => x.MediaFiles)
+            .Where(IsActiveVideo)
+            .ToList();
+        var episodeNumbers = season.Episodes
+            .Where(episode => episode.MediaFiles.Any(IsActiveVideo))
+            .Select(x => x.EpisodeNumber)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        return new UnknownTvSeasonCorrectionTargetItem
+        {
+            SeasonId = season.Id,
+            SeriesTitle = string.IsNullOrWhiteSpace(season.Series?.Name) ? "-" : season.Series.Name.Trim(),
+            SeasonTitle = string.IsNullOrWhiteSpace(season.Name) ? $"Season {season.SeasonNumber}" : season.Name.Trim(),
+            SeasonNumber = season.SeasonNumber,
+            EpisodeRangeText = FormatEpisodeRange(episodeNumbers),
+            SourceCount = activeSources.Count,
+            SourceKindSummary = FormatSourceKindSummary(activeSources),
+            ContextHint = BuildContextHint(activeSources)
+        };
+    }
+
+    private static bool IsUnknownSeason(TvSeason season)
+    {
+        return season.Series?.TmdbSeriesId is null
+               && season.TmdbSeasonId is null;
+    }
+
+    private static bool IsActiveVideo(MediaFile mediaFile)
+    {
+        return mediaFile.MediaType == MediaType.Video && !mediaFile.IsDeleted;
+    }
+
+    private static string FormatEpisodeRange(IReadOnlyList<int> episodeNumbers)
+    {
+        if (episodeNumbers.Count == 0)
+        {
+            return "episodes:-";
+        }
+
+        if (episodeNumbers.Count == 1)
+        {
+            return $"E{episodeNumbers[0]:00}";
+        }
+
+        return $"E{episodeNumbers[0]:00}-E{episodeNumbers[^1]:00}";
+    }
+
+    private static string FormatSourceKindSummary(IReadOnlyCollection<MediaFile> mediaFiles)
+    {
+        var protocolGroups = mediaFiles
+            .Select(x => x.SourceConnection?.ProtocolType.ToString().ToLowerInvariant() ?? "unknown")
+            .GroupBy(x => x)
+            .OrderBy(x => x.Key)
+            .Select(x => $"{x.Key}:{x.Count()}")
+            .ToArray();
+        return protocolGroups.Length == 0 ? "source:unknown" : string.Join(" ", protocolGroups);
+    }
+
+    private static string BuildContextHint(IReadOnlyCollection<MediaFile> mediaFiles)
+    {
+        var directoryKeys = mediaFiles
+            .Select(BuildDirectoryKey)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (directoryKeys.Length == 0)
+        {
+            return "ctx:-";
+        }
+
+        return directoryKeys.Length == 1
+            ? $"ctx:{ShortHash(directoryKeys[0])}"
+            : $"ctx:{ShortHash(string.Join("|", directoryKeys))}/multi:{directoryKeys.Length}";
+    }
+
+    private static string BuildDirectoryKey(MediaFile mediaFile)
+    {
+        var source = !string.IsNullOrWhiteSpace(mediaFile.RemoteUri)
+            ? mediaFile.RemoteUri
+            : mediaFile.FilePath;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Path.GetDirectoryName(source.Trim()) ?? source.Trim();
+        }
+        catch
+        {
+            return source.Trim();
+        }
+    }
+
+    private static string ShortHash(string value)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(bytes, 0, 6).ToLowerInvariant();
+    }
+
+    private static async Task<bool> ReconcileMovieAfterSourceMoveAsync(
+        AppDbContext dbContext,
+        int movieId,
+        int movedMediaFileId,
+        CancellationToken cancellationToken)
+    {
+        var movie = await dbContext.Movies
+            .Include(x => x.MediaFiles)
+            .ThenInclude(x => x.SourceConnection)
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+        if (movie is null || movie.DefaultMediaFileId != movedMediaFileId)
+        {
+            return false;
+        }
+
+        movie.DefaultMediaFileId = SelectPreferredDefaultMediaFileId(movie.MediaFiles, movedMediaFileId);
+        movie.UpdatedAt = DateTime.UtcNow;
+        return true;
+    }
+
+    private static async Task<bool> ReconcileEpisodeAfterSourceMoveAsync(
+        AppDbContext dbContext,
+        int episodeId,
+        int movedMediaFileId,
+        CancellationToken cancellationToken)
+    {
+        var episode = await dbContext.TvEpisodes
+            .FirstOrDefaultAsync(x => x.Id == episodeId, cancellationToken);
+        if (episode is null || episode.DefaultMediaFileId != movedMediaFileId)
+        {
+            return false;
+        }
+
+        var remainingSources = await dbContext.MediaFiles
+            .Include(x => x.SourceConnection)
+            .Where(x => x.EpisodeId == episodeId
+                        && x.Id != movedMediaFileId
+                        && x.MediaType == MediaType.Video
+                        && !x.IsDeleted)
+            .ToListAsync(cancellationToken);
+        episode.DefaultMediaFileId = SelectPreferredDefaultMediaFileId(remainingSources, movedMediaFileId);
+        episode.UpdatedAt = DateTime.UtcNow;
+        return true;
+    }
+
+    private static int? SelectPreferredDefaultMediaFileId(
+        IEnumerable<MediaFile> mediaFiles,
+        int excludedMediaFileId)
+    {
+        var candidates = mediaFiles
+            .Where(x => x.Id != excludedMediaFileId && x.MediaType == MediaType.Video && !x.IsDeleted)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        return candidates
+            .Where(IsPlayableLocalVideo)
+            .OrderByDescending(x => x.LastSeenAt ?? x.UpdatedAt)
+            .ThenByDescending(x => x.Id)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefault()
+            ?? candidates
+                .OrderByDescending(x => x.LastSeenAt ?? x.UpdatedAt)
+                .ThenByDescending(x => x.Id)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefault();
+    }
+
+    private static bool IsPlayableLocalVideo(MediaFile mediaFile)
+    {
+        return mediaFile.SourceConnection?.ProtocolType == ProtocolType.Local
+               && IsExistingLocalFile(mediaFile.FilePath);
+    }
+
+    private static bool IsExistingLocalFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(filePath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task CleanupMovieIfOrphanedAsync(
+        AppDbContext dbContext,
+        int movieId,
+        CancellationToken cancellationToken)
+    {
+        var movie = await dbContext.Movies
+            .Include(x => x.MediaFiles)
+            .Include(x => x.RatingSources)
+            .Include(x => x.WatchHistories)
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+        if (movie is null)
+        {
+            return;
+        }
+
+        if (movie.MediaFiles.Count == 0
+            && movie.WatchHistories.Count == 0
+            && !movie.IsFavorite
+            && !movie.IsWatched)
+        {
+            if (movie.RatingSources.Count > 0)
+            {
+                dbContext.RatingSources.RemoveRange(movie.RatingSources);
+            }
+
+            dbContext.Movies.Remove(movie);
+        }
     }
 
     private static SingleSourceCorrectionPreview BuildMoviePreview(

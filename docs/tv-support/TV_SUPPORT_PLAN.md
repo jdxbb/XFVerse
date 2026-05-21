@@ -1222,3 +1222,16 @@ Phase 4.13a starts the active correction work with a narrow single-source founda
 - The correction target selector must not change by mouse-wheel scrolling while the dropdown is closed.
 - TV Episode AI assist fills the Series search query and, when available, the Season / Episode number inputs.
 - Batch AI correction, manual grouping, join-existing unknown Season, grouped Season correction, schema changes, migrations, and scan-safety gate changes remain out of scope.
+
+## Phase 4.13b Join-existing Unknown Season Boundary
+
+- Single-source correction now supports `加入已有未识别季`.
+- The target picker is a modal dialog limited to no-TMDB unknown Seasons and does not show recognized Seasons, Movies, or orphan single files.
+- The picker groups Seasons under their unknown Series rows. Expanding a Series reveals Seasons sorted by Season number with separate visual treatment for Series and Season rows.
+- The user must provide a positive integer episode number. `0`, negative values, empty input, non-numeric values, SP / OVA / OAD / special mappings, and multi-episode mapping remain out of scope.
+- Existing target Episodes receive the corrected source as an additional playback source.
+- Missing target Episodes are created one at a time. Intermediate empty Episodes are not created.
+- The corrected source becomes the target Episode default source. The old Movie / Episode recalculates default source with the local-first fallback only when the moved source was its default.
+- The path preserves the physical source file, probe fields, subtitle bindings, and existing user states. Cross-type user state migration is still not performed.
+- Picker diagnostics and UI context hints remain sanitized; full local paths and full WebDAV URLs are not displayed.
+- This phase does not add manual Season aggregation, batch AI correction, grouped unknown Season to recognized Season correction, recognized Season target selection, historical data cleanup, schema changes, migrations, or scan-safety changes.
