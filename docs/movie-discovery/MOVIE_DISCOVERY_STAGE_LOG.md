@@ -577,3 +577,30 @@
 
 - TV Episode detail now allows `从当前集拆分` for single-source failed / unidentified Episodes, so an incorrectly auto-grouped TV source can be detached back to Other without deleting the real file.
 - This is a TV Episode source-management boundary change only. Movie failed placeholders, orphan unknown carriers, Movie Discovery ranking / search, Movie recommendations, Watch Insights inputs, Movie matching, schema, and migrations are unchanged.
+
+# Phase 4.13a Single Source Correction Boundary
+
+- Movie detail now routes per-source `修正信息` through the unified single-source correction flow. Selecting a source switches to the correction tab, and clicking a Movie candidate applies the correction directly.
+- The Movie target path still uses the existing Movie metadata binding logic; when the target Movie already has sources, the corrected source is appended as an additional playback source.
+- The corrected source becomes the target Movie default source. If it was the old Movie default source, the old Movie recalculates default source with the local-first fallback strategy.
+- Candidate-click correction now yields the UI thread, runs the apply path off the WPF dispatcher, and uses a 45-second timeout so slow TMDB calls return an error state instead of leaving the app apparently frozen.
+- Movie single-source correction no longer waits for non-critical OMDb rating fetches inside the transactional apply path. TMDB metadata remains the source of the corrected Movie identity.
+- Additional correction phase logs record Movie detail load, DB transaction start, DB apply, and commit without full paths or credentials.
+- The correction panel now resets the target type before exposing the selected source, preventing first-entry UI flicker between TV and Movie target fields.
+- Movie detail source correction resets to `修正为电影`, including failed Movie placeholders and orphan carriers. Episode detail owns the default `修正为电视剧集` behavior for unidentified Episodes.
+- The TV Episode target path clears `MovieId`, binds `EpisodeId`, preserves the selected `MediaFile`, probe fields, and subtitle bindings, and does not migrate Movie collection states to TV.
+- Movie Discovery ranking, search, recommendation inputs, Watch Insights inputs, Movie fallback thresholds, delete-record semantics, schema, and migrations are unchanged.
+- Phase 4.13a does not add batch AI correction, manual grouping, unknown Season target selection, ignore / blacklist, or historical data cleanup.
+
+# Phase 4.13a-fix Target-kind Constrained AI Correction Boundary
+
+- Movie detail single-source correction AI assist now reads the selected target kind before generating search terms.
+- Movie target uses only the Movie search suggestion and Movie correction path; TV candidates are not shown or applied from that target.
+- TV Episode target uses only the TV Series search suggestion and TV Episode correction path; Movie candidates are not shown or applied from that target.
+- Episode detail now exposes the same target-kind constrained AI assist behavior as Movie detail.
+- Detail page load returns to playback sources instead of retaining the correction tab.
+- Same-detail refreshes from media probe completion preserve the user's current tab and selected correction source.
+- The correction target selector ignores mouse-wheel changes while closed, avoiding accidental Movie / TV target switches during form scrolling.
+- TV Episode AI assist can fill Season / Episode inputs when the AI response or local filename fallback provides a safe single-episode hint.
+- Corrected-source default-source rules from Phase 4.13a are unchanged.
+- Movie Discovery ranking / search / recommendation inputs, Watch Insights inputs, Movie fallback thresholds, scan identification rules, schema, migrations, and batch AI correction are unchanged.

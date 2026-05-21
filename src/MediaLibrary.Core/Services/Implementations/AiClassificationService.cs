@@ -227,6 +227,146 @@ public sealed class AiClassificationService : IAiClassificationService
         }
     }
 
+    public Task<AiSearchSuggestionResult> SuggestMovieCorrectionSearchQueryAsync(
+        string currentTitle,
+        string? sourceFileName,
+        int? releaseYear = null,
+        string? overview = null,
+        CancellationToken cancellationToken = default)
+    {
+        var fallbackSuggestion = BuildFallbackSearchSuggestion(
+            currentTitle,
+            sourceFileName,
+            releaseYear,
+            preferSourceFileName: true,
+            cleanForTv: false);
+
+        var context = string.Join(
+            '\n',
+            $"targetKind=Movie",
+            $"sourceFileName={sourceFileName}",
+            $"currentTitle={currentTitle}",
+            $"releaseYear={releaseYear}",
+            $"overview={overview}");
+
+        return SuggestCorrectionSearchQueryAsync(
+            """
+            You are a single-source movie correction assistant.
+            The user has already selected targetKind=Movie.
+            Only generate a TMDB movie search title and optional year.
+            Do not classify the item as TV, do not suggest TV fields, and do not switch target kind.
+            Return JSON only:
+            {"title":"movie search title","year":2002}
+            Use null for year when it cannot be inferred safely.
+            """,
+            context,
+            fallbackSuggestion,
+            cancellationToken);
+    }
+
+    public Task<AiSearchSuggestionResult> SuggestTvEpisodeCorrectionSearchQueryAsync(
+        string currentTitle,
+        string? sourceFileName,
+        string? seriesTitle = null,
+        int? seasonNumber = null,
+        int? episodeNumber = null,
+        string? overview = null,
+        CancellationToken cancellationToken = default)
+    {
+        var fallbackTitle = FirstNonEmpty(seriesTitle, currentTitle);
+        var fallbackSuggestion = BuildFallbackSearchSuggestion(
+            fallbackTitle,
+            sourceFileName,
+            releaseYear: null,
+            preferSourceFileName: false,
+            cleanForTv: true,
+            seasonNumber,
+            episodeNumber);
+
+        var context = string.Join(
+            '\n',
+            $"targetKind=TvEpisode",
+            $"sourceFileName={sourceFileName}",
+            $"currentTitle={currentTitle}",
+            $"seriesTitle={seriesTitle}",
+            $"seasonNumber={seasonNumber}",
+            $"episodeNumber={episodeNumber}",
+            $"overview={overview}");
+
+        return SuggestCorrectionSearchQueryAsync(
+            """
+            You are a single-source TV episode correction assistant.
+            The user has already selected targetKind=TvEpisode.
+            Generate a TMDB TV series search title plus the most likely season and episode numbers.
+            Do not classify the item as a movie.
+            Do not switch target kind and do not return movie candidates.
+            Return JSON only:
+            {"title":"tv series search title","year":null,"seasonNumber":1,"episodeNumber":2}
+            Use null for year unless a first-air year is clearly useful for search.
+            Use null for seasonNumber or episodeNumber only when it cannot be inferred safely.
+            """,
+            context,
+            fallbackSuggestion,
+            cancellationToken);
+    }
+
+    private async Task<AiSearchSuggestionResult> SuggestCorrectionSearchQueryAsync(
+        string instruction,
+        string context,
+        AiSearchSuggestion fallbackSuggestion,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var text = await _aiService.GenerateTextAsync(
+                instruction,
+                context,
+                cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return new AiSearchSuggestionResult
+                {
+                    Status = AiSearchSuggestionStatus.NoResult,
+                    FallbackSuggestion = fallbackSuggestion,
+                    Message = "AI 未返回可用搜索词。"
+                };
+            }
+
+            var suggestion = ParseSearchSuggestion(text);
+            if (string.IsNullOrWhiteSpace(suggestion.Query))
+            {
+                return new AiSearchSuggestionResult
+                {
+                    Status = AiSearchSuggestionStatus.NoResult,
+                    FallbackSuggestion = fallbackSuggestion,
+                    Message = "AI 未返回可用搜索标题。"
+                };
+            }
+
+            suggestion.ReleaseYear ??= fallbackSuggestion.ReleaseYear;
+            return new AiSearchSuggestionResult
+            {
+                Status = AiSearchSuggestionStatus.Success,
+                Suggestion = suggestion,
+                FallbackSuggestion = fallbackSuggestion
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return new AiSearchSuggestionResult
+            {
+                Status = AiSearchSuggestionStatus.Failed,
+                FallbackSuggestion = fallbackSuggestion,
+                Message = TrimMessage(exception.Message)
+            };
+        }
+    }
+
     private static AiSearchSuggestion BuildFallbackSearchSuggestion(SearchSuggestionMovieContext movie)
     {
         var parsedFileName = !string.IsNullOrWhiteSpace(movie.SourceFileName)
@@ -240,6 +380,56 @@ public sealed class AiClassificationService : IAiClassificationService
         {
             Query = fallbackQuery,
             ReleaseYear = parsedFileName.ReleaseYear
+        };
+    }
+
+    private static AiSearchSuggestion BuildFallbackSearchSuggestion(
+        string currentTitle,
+        string? sourceFileName,
+        int? releaseYear,
+        bool preferSourceFileName,
+        bool cleanForTv,
+        int? seasonNumber = null,
+        int? episodeNumber = null)
+    {
+        var parsedQuery = string.Empty;
+        int? parsedYear = null;
+        int? parsedSeasonNumber = null;
+        int? parsedEpisodeNumber = null;
+        if (!string.IsNullOrWhiteSpace(sourceFileName))
+        {
+            if (cleanForTv)
+            {
+                parsedQuery = TvEpisodeFileNameParser.CleanSeriesNameCandidate(sourceFileName);
+                var parsedEpisode = TvEpisodeFileNameParser.Parse(
+                    sourceFileName,
+                    allowSeasonContextOnly: true,
+                    seasonNumberHint: seasonNumber,
+                    allowStrongContextFallbacks: true);
+                if (parsedEpisode.IsEpisodeLike && !parsedEpisode.IsMultiEpisode)
+                {
+                    parsedSeasonNumber = parsedEpisode.SeasonNumber > 0 ? parsedEpisode.SeasonNumber : null;
+                    parsedEpisodeNumber = parsedEpisode.EpisodeNumber > 0 ? parsedEpisode.EpisodeNumber : null;
+                }
+            }
+            else
+            {
+                var parsedFileName = MovieFileNameParser.Parse(sourceFileName);
+                parsedQuery = parsedFileName.CleanTitle;
+                parsedYear = parsedFileName.ReleaseYear;
+            }
+        }
+
+        var fallbackQuery = preferSourceFileName
+            ? FirstNonEmpty(parsedQuery, currentTitle)
+            : FirstNonEmpty(currentTitle, parsedQuery);
+
+        return new AiSearchSuggestion
+        {
+            Query = fallbackQuery,
+            ReleaseYear = parsedYear ?? releaseYear,
+            SeasonNumber = parsedSeasonNumber ?? seasonNumber,
+            EpisodeNumber = parsedEpisodeNumber ?? episodeNumber
         };
     }
 
@@ -267,6 +457,12 @@ public sealed class AiClassificationService : IAiClassificationService
                 : string.Empty;
 
             int? year = null;
+            var seasonNumber = ReadNullableInt(root, "seasonNumber")
+                               ?? ReadNullableInt(root, "season")
+                               ?? ReadNullableInt(root, "season_no");
+            var episodeNumber = ReadNullableInt(root, "episodeNumber")
+                                ?? ReadNullableInt(root, "episode")
+                                ?? ReadNullableInt(root, "episode_no");
             if (root.TryGetProperty("year", out var yearProperty))
             {
                 if (yearProperty.ValueKind == JsonValueKind.Number && yearProperty.TryGetInt32(out var parsedYear))
@@ -289,7 +485,9 @@ public sealed class AiClassificationService : IAiClassificationService
             return new AiSearchSuggestion
             {
                 Query = title,
-                ReleaseYear = year
+                ReleaseYear = year,
+                SeasonNumber = seasonNumber,
+                EpisodeNumber = episodeNumber
             };
         }
         catch
@@ -301,6 +499,24 @@ public sealed class AiClassificationService : IAiClassificationService
                 ReleaseYear = parsed.ReleaseYear
             };
         }
+    }
+
+    private static int? ReadNullableInt(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var parsedNumber))
+        {
+            return parsedNumber;
+        }
+
+        return property.ValueKind == JsonValueKind.String
+               && int.TryParse(property.GetString(), out parsedNumber)
+            ? parsedNumber
+            : null;
     }
 
     private static void ApplyLocalTags(Movie movie, (string aiTags, string emotionTags, string sceneTags) local)
@@ -365,6 +581,11 @@ public sealed class AiClassificationService : IAiClassificationService
     private static string TrimMessage(string message)
     {
         return string.IsNullOrWhiteSpace(message) ? "未知错误" : message.Trim();
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
     }
 
     private sealed class SearchSuggestionMovieContext

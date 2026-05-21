@@ -13,4 +13,20 @@ public interface IAiClassificationService
     Task<AiSearchSuggestion> SuggestSearchQueryAsync(int movieId, CancellationToken cancellationToken = default);
 
     Task<AiSearchSuggestionResult> SuggestSearchQueryWithStatusAsync(int movieId, CancellationToken cancellationToken = default);
+
+    Task<AiSearchSuggestionResult> SuggestMovieCorrectionSearchQueryAsync(
+        string currentTitle,
+        string? sourceFileName,
+        int? releaseYear = null,
+        string? overview = null,
+        CancellationToken cancellationToken = default);
+
+    Task<AiSearchSuggestionResult> SuggestTvEpisodeCorrectionSearchQueryAsync(
+        string currentTitle,
+        string? sourceFileName,
+        string? seriesTitle = null,
+        int? seasonNumber = null,
+        int? episodeNumber = null,
+        string? overview = null,
+        CancellationToken cancellationToken = default);
 }

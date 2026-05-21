@@ -2304,3 +2304,86 @@ Known Issues:
 - Blocker: none expected in this narrow split path.
 - Deferred: the real manual correction / regrouping entry remains Phase 4.13 work.
 - Noise: detaching the only source leaves an empty unidentified Episode shell until a refresh, rescan, or later manual cleanup path handles it.
+
+## Phase 4.13a - Single source correction foundation
+
+Completed:
+
+- Added a single-source correction apply service for Movie and TV Episode targets.
+- Movie detail source rows now expose a unified `修正信息` entry. The flow selects one source, jumps to the correction tab, searches TMDB, and applies the selected candidate directly.
+- Episode detail source rows and the top `修正信息` action now use the same single-source correction flow. Source-row correction scrolls the correction panel into view.
+- The correction panel shows only the active target type fields. Movie target shows movie title / year inputs; TV Episode target shows series / season / episode inputs.
+- Movie targets bind the selected `MediaFile` to the target Movie and clear `EpisodeId`.
+- TV Episode targets bind the selected `MediaFile` to the target Episode and clear `MovieId`.
+- Existing target Movie / Episode rows accept the corrected source as an additional playback source.
+- The corrected source becomes the target Movie / Episode default source, regardless of whether it is local or WebDAV.
+- If the corrected source was the previous Movie / Episode default source, the previous container recalculates its default source with the local-first fallback strategy.
+- New TV Episode target binding reuses existing TV metadata / hydration logic and sets the target Episode default source to the corrected source.
+- Moving a source away from an Episode now reconciles that Episode's default source if the moved source was default.
+- Correction apply keeps the existing transactional manual Movie / TV binding paths and logs `correction-apply-started`, `correction-apply-succeeded`, and `correction-apply-failed` without full paths or credentials.
+- Follow-up: candidate-click correction now yields the UI thread, runs the apply path off the WPF dispatcher, and uses a 45-second timeout so a slow TMDB request fails visibly instead of making the app appear frozen.
+- Follow-up: TV Episode correction commits the selected source binding first and queues full Series hydration in the background. The selected Episode and source list can refresh without waiting for full-series metadata completion.
+- Follow-up: Movie single-source correction skips non-critical OMDb rating fetch during the transactional apply path and logs detail / DB phases for future diagnosis.
+- Follow-up: Episode detail correction now uses tabs for `播放源` and `识别修正`; selecting a source switches to the correction tab, and users can switch back to the source list without leaving the page.
+- Follow-up: the correction panel is shown only after the target type has been reset to Movie, avoiding the first-entry flicker where TV fields appeared briefly before Movie fields.
+- Follow-up: Episode detail source correction now defaults to `修正为电视剧集`, including failed / unidentified Episodes. Movie detail, including orphan carriers, resets to `修正为电影`.
+
+Not done:
+
+- No join-existing unknown Season target, manual Season aggregation, grouped unknown Season to recognized Season correction, batch AI correction, historical wrong-binding cleanup, ignore / blacklist, database update, migration, commit, or push was added.
+- TV still does not enter Watch Insights, Watch Profile, AI recommendations, or recommendation fingerprints.
+- Existing 4.12-post automatic scan safety gates remain unchanged.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors during implementation.
+- Current migrations diff remained empty during implementation.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: correction to existing unknown Season, manual grouping, batch AI correction, grouped Season correction, richer correction diff, and data cleanup remain Phase 4.13 follow-up work.
+- Noise: candidate-click direct apply follows the latest product adjustment and no longer has a separate preview panel.
+
+## Phase 4.13a-fix - Target-kind constrained single-source AI correction
+
+Completed:
+
+- Movie detail and Episode detail now share the same single-source AI assist semantics.
+- The correction AI path is constrained by the currently selected target type. `Movie` target calls only the Movie search suggestion path and renders only Movie candidates.
+- `TV Episode` target calls only the TV Series search suggestion path and renders only TV candidates plus the existing Season / Episode inputs.
+- Episode detail now has the same AI assist entry as Movie detail.
+- AI assist only fills the search fields and triggers the existing target-specific candidate search. Candidate click still uses the 4.13a single-source correction apply path.
+- AI assist diagnostics record start / succeeded / failed, target kind, media file id, status, and candidate count without full paths or credentials.
+- Corrected-source default-source behavior remains unchanged: the corrected source becomes the target Movie / Episode default, and the old container recalculates default source with the local-first fallback if needed.
+
+Not done:
+
+- No batch AI correction, AI target-type auto judgment, manual Season aggregation, join-existing unknown Season target, scan rule change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors during implementation.
+- Current migrations diff remained empty during implementation.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: batch AI correction, manual grouping, unknown Season target selection, grouped Season correction, and correction history / richer preview remain later Phase 4.13 work.
+- Noise: TV AI assist currently suggests the Series search query only; Season / Episode numbers still come from the current inputs and remain user-editable before candidate click.
+
+### Follow-up: correction UI stability and TV AI episode hints
+
+Completed:
+
+- Detail page load now resets to the playback-source tab instead of retaining the previous correction tab.
+- Starting a new source correction hides the correction panel before resetting target kind, then reopens it after the selected source and default target are ready. This prevents the correction UI from briefly showing the previous Movie / TV target fields.
+- The correction target ComboBox ignores mouse-wheel changes while the dropdown is closed, so scrolling the correction form does not accidentally switch Movie / TV target kind.
+- TV Episode AI assist now asks for Series title plus season / episode numbers, parses those fields, and fills the Season / Episode inputs automatically when available.
+- Local fallback for TV AI also derives Season / Episode from the source file name when the parser can infer a single episode.
+- Same-detail refreshes from media probe completion preserve the current correction tab and selected correction source. The playback-source tab reset now applies only when navigating into a different Movie / Episode detail.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.

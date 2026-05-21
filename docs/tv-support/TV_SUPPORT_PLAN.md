@@ -1194,3 +1194,31 @@ Closed boundaries:
 - Reusing an unknown Series / Season no longer overwrites its existing display name.
 - Recognized Episode reattach remains same-directory only; sibling-directory recognized reattach is still disabled.
 - Historical polluted unknown containers are not repaired by this emergency fix.
+
+## Phase 4.13a Update
+
+Phase 4.13a starts the active correction work with a narrow single-source foundation.
+
+- Movie detail and Episode detail now expose a per-source `修正信息` flow.
+- The flow supports two target types only: Movie and TV Episode.
+- The user selects one source, jumps to the correction interface, searches a TMDB target, and clicks a candidate to apply the correction directly.
+- The correction interface shows only the selected target type fields: Movie title / year for Movie, and Series / Season / Episode for TV Episode.
+- Apply uses existing transactional Movie / TV manual binding paths. A failed apply rolls back through those transactions.
+- Correcting to Movie sets `MediaFile.MovieId` and clears `EpisodeId`.
+- Correcting to TV Episode sets `MediaFile.EpisodeId` and clears `MovieId`; TV remains excluded from Watch Insights, Watch Profile, AI recommendations, and recommendation fingerprints.
+- The corrected source becomes the target Movie / Episode default source. If it was the previous container's default source, that previous Movie / Episode recalculates its default source with the local-first fallback strategy.
+- Target Movie / Episode rows can receive the corrected source as an additional playback source.
+- No join-existing unknown Season target, manual Season aggregation, grouped Season correction, batch AI correction, ignore / blacklist, migration, database update, commit, or push is part of this update.
+
+## Phase 4.13a-fix AI Assist Boundary
+
+- Single-source correction AI assist is target-kind constrained.
+- When the user selects Movie, AI only generates a Movie search query, searches Movie candidates, and applies only the Movie correction path after candidate click.
+- When the user selects TV Episode, AI only generates a TV Series search query, searches TV candidates, and applies only the TV Episode correction path after candidate click.
+- AI does not decide Movie vs TV and cannot switch the selected target kind.
+- Movie detail and Episode detail expose the same AI assist behavior.
+- Detail page load returns to the playback-source tab; the correction tab is entered only after the user chooses a source to correct.
+- Same-detail refreshes, including media probe completion refreshes, preserve the current correction tab and selected correction source.
+- The correction target selector must not change by mouse-wheel scrolling while the dropdown is closed.
+- TV Episode AI assist fills the Series search query and, when available, the Season / Episode number inputs.
+- Batch AI correction, manual grouping, join-existing unknown Season, grouped Season correction, schema changes, migrations, and scan-safety gate changes remain out of scope.

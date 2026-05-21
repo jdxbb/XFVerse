@@ -1370,8 +1370,13 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         var details = await _tmdbService.GetMovieDetailsAsync(tmdbId, cancellationToken)
             ?? throw new InvalidOperationException("无法读取 TMDB 影片详情。");
 
+        ScanIdentificationDiagnostics.Write(
+            $"event=correction-movie-details-loaded mediaFileId={mediaFileId} tmdbId={tmdbId} hasImdbId={(!string.IsNullOrWhiteSpace(details.ImdbId)).ToString().ToLowerInvariant()}");
+
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        ScanIdentificationDiagnostics.Write(
+            $"event=correction-movie-db-transaction-started mediaFileId={mediaFileId} tmdbId={tmdbId} includeOmdbRating=false");
         var mediaFile = await dbContext.MediaFiles
             .Include(x => x.SourceConnection)
             .Include(x => x.Movie)
@@ -1384,6 +1389,8 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
                 cancellationToken)
             ?? throw new InvalidOperationException("待修正的播放源不存在。");
 
+        var previousMovieId = mediaFile.MovieId;
+        var previousEpisodeId = mediaFile.EpisodeId;
         mediaFile.EpisodeId = null;
         mediaFile.Episode = null;
         await ApplyCandidateAsync(
@@ -1392,11 +1399,28 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             details,
             IdentificationStatus.ManualConfirmed,
             new IdentificationRunResult(),
-            cancellationToken);
+            cancellationToken,
+            includeOmdbRating: false);
+        ScanIdentificationDiagnostics.Write(
+            $"event=correction-movie-db-applied mediaFileId={mediaFileId} tmdbId={tmdbId}");
 
+        var targetMovieId = mediaFile.MovieId ?? mediaFile.Movie?.Id ?? throw new InvalidOperationException("影片修正结果无效。");
+        if (previousMovieId.HasValue && previousMovieId.Value != targetMovieId)
+        {
+            await ReconcileMovieAfterSourceMoveAsync(dbContext, previousMovieId.Value, mediaFile.Id, cancellationToken);
+        }
+
+        if (previousEpisodeId.HasValue)
+        {
+            await ReconcileEpisodeAfterSourceMoveAsync(dbContext, previousEpisodeId.Value, mediaFile.Id, cancellationToken);
+        }
+
+        await SetMovieDefaultSourceAsync(dbContext, targetMovieId, mediaFile.Id, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return mediaFile.MovieId ?? mediaFile.Movie?.Id ?? throw new InvalidOperationException("影片修正结果无效。");
+        ScanIdentificationDiagnostics.Write(
+            $"event=correction-movie-db-committed mediaFileId={mediaFileId} targetMovieId={targetMovieId}");
+        return targetMovieId;
     }
 
     private async Task<int> ApplyManualMatchCoreAsync(
@@ -1557,7 +1581,8 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         MetadataSearchCandidate candidate,
         IdentificationStatus status,
         IdentificationRunResult result,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeOmdbRating = true)
     {
         var currentMovie = mediaFile.MovieId.HasValue
             ? await LoadMovieAggregateAsync(dbContext, mediaFile.MovieId.Value, cancellationToken)
@@ -1593,7 +1618,15 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             }
         }
 
-        await ApplyMetadataAsync(dbContext, targetMovie, candidate, status, candidate.Confidence, result, cancellationToken);
+        await ApplyMetadataAsync(
+            dbContext,
+            targetMovie,
+            candidate,
+            status,
+            candidate.Confidence,
+            result,
+            cancellationToken,
+            includeOmdbRating);
 
         if (currentMovie is not null && currentMovie.Id != targetMovie.Id)
         {
@@ -2217,6 +2250,108 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
             dbContext.Movies.Remove(movie);
         }
+    }
+
+    private static async Task ReconcileEpisodeAfterSourceMoveAsync(
+        AppDbContext dbContext,
+        int episodeId,
+        int movedMediaFileId,
+        CancellationToken cancellationToken)
+    {
+        var episode = await dbContext.TvEpisodes
+            .FirstOrDefaultAsync(x => x.Id == episodeId, cancellationToken);
+        if (episode is null || episode.DefaultMediaFileId != movedMediaFileId)
+        {
+            return;
+        }
+
+        episode.DefaultMediaFileId = await dbContext.MediaFiles
+            .Where(x => x.EpisodeId == episodeId
+                        && x.Id != movedMediaFileId
+                        && x.MediaType == MediaType.Video
+                        && !x.IsDeleted)
+            .OrderByDescending(x => x.LastSeenAt ?? x.UpdatedAt)
+            .ThenByDescending(x => x.Id)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        episode.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static async Task ReconcileMovieAfterSourceMoveAsync(
+        AppDbContext dbContext,
+        int movieId,
+        int movedMediaFileId,
+        CancellationToken cancellationToken)
+    {
+        var trackedMovie = dbContext.ChangeTracker
+            .Entries<Movie>()
+            .FirstOrDefault(x => x.Entity.Id == movieId);
+        if (trackedMovie?.State == EntityState.Deleted)
+        {
+            return;
+        }
+
+        var movie = await dbContext.Movies
+            .Include(x => x.MediaFiles)
+            .ThenInclude(x => x.SourceConnection)
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+        if (movie is null || movie.DefaultMediaFileId != movedMediaFileId)
+        {
+            return;
+        }
+
+        movie.DefaultMediaFileId = SelectPreferredDefaultMediaFileId(movie.MediaFiles, movedMediaFileId);
+        movie.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static async Task SetMovieDefaultSourceAsync(
+        AppDbContext dbContext,
+        int movieId,
+        int mediaFileId,
+        CancellationToken cancellationToken)
+    {
+        var movie = await dbContext.Movies
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken)
+            ?? throw new InvalidOperationException("目标影片不存在。");
+        var belongsToTarget = await dbContext.MediaFiles
+            .AnyAsync(
+                x => x.Id == mediaFileId
+                     && x.MovieId == movieId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted,
+                cancellationToken);
+        if (!belongsToTarget)
+        {
+            throw new InvalidOperationException("修正后的播放源未绑定到目标影片。");
+        }
+
+        movie.DefaultMediaFileId = mediaFileId;
+        movie.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static int? SelectPreferredDefaultMediaFileId(
+        IEnumerable<MediaFile> mediaFiles,
+        int excludedMediaFileId)
+    {
+        var candidates = mediaFiles
+            .Where(x => x.Id != excludedMediaFileId && x.MediaType == MediaType.Video && !x.IsDeleted)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        return candidates
+            .Where(IsPlayableLocalVideo)
+            .OrderByDescending(x => x.LastSeenAt ?? x.UpdatedAt)
+            .ThenByDescending(x => x.Id)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefault()
+            ?? candidates
+                .OrderByDescending(x => x.LastSeenAt ?? x.UpdatedAt)
+                .ThenByDescending(x => x.Id)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefault();
     }
 
     private static string TrimMessage(string message)

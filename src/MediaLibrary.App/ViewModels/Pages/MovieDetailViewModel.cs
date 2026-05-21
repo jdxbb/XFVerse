@@ -15,18 +15,24 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 {
     private const string ExternalAiAnalyzingText = "AI 正在分析影片";
     private const string ExternalAiMissingText = "尚未分类";
+    private const string CorrectionTargetMovieText = "修正为电影";
+    private const string CorrectionTargetTvEpisodeText = "修正为电视剧集";
+    private static readonly TimeSpan CorrectionApplyTimeout = TimeSpan.FromSeconds(45);
 
     private static readonly ConcurrentDictionary<int, AiMovieTags> ExternalAiTagCache = new();
 
     private readonly INavigationStateService _navigationStateService;
     private readonly IPlayerWindowService _playerWindowService;
     private readonly IMovieDetailQueryService _movieDetailQueryService;
+    private readonly ITmdbService _tmdbService;
     private readonly IMovieIdentificationService _movieIdentificationService;
+    private readonly ISingleSourceCorrectionService _singleSourceCorrectionService;
     private readonly IMovieManagementService _movieManagementService;
     private readonly IAiClassificationService _aiClassificationService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IUserCollectionService _userCollectionService;
     private readonly IMediaProbeService _mediaProbeService;
+    private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly HashSet<int> _lazyProbeCheckedMediaFileIds = [];
     private readonly HashSet<int> _probingMediaFileIds = [];
     private bool _isProbeCompletionRefreshQueued;
@@ -59,6 +65,15 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private string _notInterestedButtonText = "不想看";
     private string _manualSearchQuery = string.Empty;
     private string _manualSearchYear = string.Empty;
+    private string _tvCorrectionQuery = string.Empty;
+    private string _correctionSeasonNumber = "1";
+    private string _correctionEpisodeNumber = "1";
+    private string _selectedCorrectionTarget = CorrectionTargetMovieText;
+    private string _correctionSourceDisplay = "请选择一个播放源。";
+    private string _correctionPreviewText = string.Empty;
+    private string _correctionSourceFileName = string.Empty;
+    private int? _correctionMediaFileId;
+    private int _selectedDetailTabIndex;
     private IdentificationStatus _identificationStatus;
     private bool _hasMovie;
     private bool _isLibraryMovie;
@@ -73,32 +88,43 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _isNotInterested;
     private bool _isVisibleInLibrary;
     private bool _isAddingToLibrary;
+    private bool _hasCorrectionPreview;
+    private bool _isCorrectionBusy;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
 
     public MovieDetailViewModel(
         INavigationStateService navigationStateService,
         IPlayerWindowService playerWindowService,
         IMovieDetailQueryService movieDetailQueryService,
+        ITmdbService tmdbService,
         IMovieIdentificationService movieIdentificationService,
+        ISingleSourceCorrectionService singleSourceCorrectionService,
         IMovieManagementService movieManagementService,
         IAiClassificationService aiClassificationService,
         IDataRefreshService dataRefreshService,
         IUserCollectionService userCollectionService,
-        IMediaProbeService mediaProbeService)
+        IMediaProbeService mediaProbeService,
+        IConfirmationDialogService confirmationDialogService)
         : base("详情", "查看影片信息、播放源、字幕、评分、识别修正和观看记录。")
     {
         _navigationStateService = navigationStateService;
         _playerWindowService = playerWindowService;
         _movieDetailQueryService = movieDetailQueryService;
+        _tmdbService = tmdbService;
         _movieIdentificationService = movieIdentificationService;
+        _singleSourceCorrectionService = singleSourceCorrectionService;
         _movieManagementService = movieManagementService;
         _aiClassificationService = aiClassificationService;
         _dataRefreshService = dataRefreshService;
         _userCollectionService = userCollectionService;
         _mediaProbeService = mediaProbeService;
+        _confirmationDialogService = confirmationDialogService;
 
         SearchCandidatesCommand = new AsyncRelayCommand(SearchCandidatesAsync);
-        ApplyManualMatchCommand = new AsyncRelayCommand(ApplyManualMatchAsync);
+        ApplyManualMatchCommand = new AsyncRelayCommand(ApplyMovieCandidateCorrectionAsync, CanApplyMovieCandidateCorrection);
+        BeginSourceCorrectionCommand = new RelayCommand(BeginSourceCorrection, CanBeginSourceCorrection);
+        PreviewTvEpisodeCorrectionCommand = new AsyncRelayCommand(ApplyTvEpisodeCandidateCorrectionAsync, CanApplyTvEpisodeCandidateCorrection);
+        CancelCorrectionCommand = new RelayCommand(CancelCorrection, () => IsCorrectionPanelVisible);
         SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync);
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
@@ -108,7 +134,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ToggleWantToWatchCommand = new AsyncRelayCommand(ToggleWantToWatchAsync, () => CanToggleWantToWatch);
         ToggleNotInterestedCommand = new AsyncRelayCommand(ToggleNotInterestedAsync, () => CanToggleNotInterested);
         AddToLibraryCommand = new AsyncRelayCommand(AddToLibraryAsync, () => CanAddToLibrary);
-        AiSuggestSearchCommand = new AsyncRelayCommand(AiSuggestSearchAsync);
+        AiSuggestSearchCommand = new AsyncRelayCommand(AiSuggestSearchAsync, CanAiSuggestSearch);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
 
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
@@ -121,9 +147,23 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public ObservableCollection<MetadataSearchCandidate> SearchCandidates { get; } = [];
 
+    public ObservableCollection<TmdbTvSeriesSearchItem> TvSearchCandidates { get; } = [];
+
+    public IReadOnlyList<string> CorrectionTargetOptions { get; } =
+    [
+        CorrectionTargetMovieText,
+        CorrectionTargetTvEpisodeText
+    ];
+
     public AsyncRelayCommand SearchCandidatesCommand { get; }
 
     public AsyncRelayCommand ApplyManualMatchCommand { get; }
+
+    public RelayCommand BeginSourceCorrectionCommand { get; }
+
+    public AsyncRelayCommand PreviewTvEpisodeCorrectionCommand { get; }
+
+    public RelayCommand CancelCorrectionCommand { get; }
 
     public AsyncRelayCommand SetDefaultSourceCommand { get; }
 
@@ -198,6 +238,65 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public string ManualSearchQuery { get => _manualSearchQuery; set => SetProperty(ref _manualSearchQuery, value); }
 
     public string ManualSearchYear { get => _manualSearchYear; set => SetProperty(ref _manualSearchYear, value); }
+
+    public string TvCorrectionQuery { get => _tvCorrectionQuery; set => SetProperty(ref _tvCorrectionQuery, value); }
+
+    public string CorrectionSeasonNumber { get => _correctionSeasonNumber; set => SetProperty(ref _correctionSeasonNumber, value); }
+
+    public string CorrectionEpisodeNumber { get => _correctionEpisodeNumber; set => SetProperty(ref _correctionEpisodeNumber, value); }
+
+    public string SelectedCorrectionTarget
+    {
+        get => _selectedCorrectionTarget;
+        set
+        {
+            if (SetProperty(ref _selectedCorrectionTarget, value))
+            {
+                ClearCorrectionPreview();
+                OnPropertyChanged(nameof(IsCorrectionTargetMovie));
+                OnPropertyChanged(nameof(IsCorrectionTargetTvEpisode));
+                ClearCandidatesForInactiveCorrectionTarget();
+                ApplyManualMatchCommand.RaiseCanExecuteChanged();
+                PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+                AiSuggestSearchCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string CorrectionSourceDisplay { get => _correctionSourceDisplay; private set => SetProperty(ref _correctionSourceDisplay, value); }
+
+    public string CorrectionPreviewText { get => _correctionPreviewText; private set => SetProperty(ref _correctionPreviewText, value); }
+
+    public bool IsCorrectionPanelVisible => _correctionMediaFileId.HasValue;
+
+    public bool IsCorrectionTargetMovie => SelectedCorrectionTarget == CorrectionTargetMovieText;
+
+    public bool IsCorrectionTargetTvEpisode => SelectedCorrectionTarget == CorrectionTargetTvEpisodeText;
+
+    public int SelectedDetailTabIndex { get => _selectedDetailTabIndex; set => SetProperty(ref _selectedDetailTabIndex, value); }
+
+    public bool HasCorrectionPreview
+    {
+        get => _hasCorrectionPreview;
+        private set
+        {
+            SetProperty(ref _hasCorrectionPreview, value);
+        }
+    }
+
+    public bool IsCorrectionBusy
+    {
+        get => _isCorrectionBusy;
+        private set
+        {
+            if (SetProperty(ref _isCorrectionBusy, value))
+            {
+                ApplyManualMatchCommand.RaiseCanExecuteChanged();
+                PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+                AiSuggestSearchCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
 
     public bool HasMovie
     {
@@ -318,6 +417,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public bool HasSearchCandidates => SearchCandidates.Count > 0;
 
+    public bool HasTvSearchCandidates => TvSearchCandidates.Count > 0;
+
     public bool CanUseIdentificationCorrection => HasMovie && IsLibraryMovie;
 
     public bool ShowLibrarySections => HasMovie && IsLibraryMovie;
@@ -406,6 +507,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 return;
             }
 
+            var isNewMovie = _movieId != detail.MovieId;
             _movieId = detail.MovieId;
             _tmdbId = detail.TmdbId;
             _externalRecommendation = null;
@@ -465,10 +567,38 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             CanPlay = Sources.Count > 0;
             PlayButtonText = CanPlay ? "播放默认源" : "暂无可播放源";
 
-            SearchCandidates.Clear();
-            OnPropertyChanged(nameof(HasSearchCandidates));
-            ManualSearchQuery = detail.Title;
-            ManualSearchYear = detail.ReleaseYear?.ToString() ?? string.Empty;
+            if (isNewMovie)
+            {
+                SearchCandidates.Clear();
+                TvSearchCandidates.Clear();
+                _correctionMediaFileId = null;
+                OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+                SelectedDetailTabIndex = 0;
+                SelectedCorrectionTarget = CorrectionTargetMovieText;
+                CorrectionSourceDisplay = "请选择一个播放源。";
+                _correctionSourceFileName = string.Empty;
+                ClearCorrectionPreview();
+                OnPropertyChanged(nameof(HasSearchCandidates));
+                OnPropertyChanged(nameof(HasTvSearchCandidates));
+                ManualSearchQuery = detail.Title;
+                ManualSearchYear = detail.ReleaseYear?.ToString() ?? string.Empty;
+                TvCorrectionQuery = detail.Title;
+            }
+            else if (_correctionMediaFileId.HasValue && Sources.All(source => source.MediaFileId != _correctionMediaFileId.Value))
+            {
+                _correctionMediaFileId = null;
+                _correctionSourceFileName = string.Empty;
+                OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+                ClearCorrectionPreview();
+                SearchCandidates.Clear();
+                TvSearchCandidates.Clear();
+                OnPropertyChanged(nameof(HasSearchCandidates));
+                OnPropertyChanged(nameof(HasTvSearchCandidates));
+                CancelCorrectionCommand.RaiseCanExecuteChanged();
+                ApplyManualMatchCommand.RaiseCanExecuteChanged();
+                PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+                AiSuggestSearchCommand.RaiseCanExecuteChanged();
+            }
 
             var defaultSource = detail.Sources.FirstOrDefault(source => source.IsDefault);
             DefaultSourceDisplay = defaultSource is null
@@ -1285,19 +1415,161 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private async Task AiSuggestSearchAsync()
     {
-        if (!CanUseIdentificationCorrection || _movieId is null)
+        if (!CanAiSuggestSearch())
         {
-            StatusMessage = "只有已入库影片才能执行 AI 辅助识别。";
+            StatusMessage = "请先在播放源列表中选择要修正的单个播放源。";
             return;
         }
 
-        var suggestion = await _aiClassificationService.SuggestSearchQueryAsync(_movieId.Value);
+        var targetKind = IsCorrectionTargetTvEpisode ? "tv-episode" : "movie";
+        ScanIdentificationDiagnostics.Write(
+            $"event=single-source-correction-ai-assist-started page=movie targetKind={targetKind} mediaFileId={_correctionMediaFileId}");
+
+        try
+        {
+            IsCorrectionBusy = true;
+            if (IsCorrectionTargetTvEpisode)
+            {
+                await AiSuggestTvSearchAsync();
+            }
+            else
+            {
+                await AiSuggestMovieSearchAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "AI 辅助搜索已取消。";
+            ScanIdentificationDiagnostics.Write(
+                $"event=single-source-correction-ai-assist-failed page=movie targetKind={targetKind} mediaFileId={_correctionMediaFileId} reason=cancelled");
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"AI 辅助搜索失败：{DescribeException(exception)}";
+            ScanIdentificationDiagnostics.Write(
+                $"event=single-source-correction-ai-assist-failed page=movie targetKind={targetKind} mediaFileId={_correctionMediaFileId} reason=exception");
+        }
+        finally
+        {
+            IsCorrectionBusy = false;
+        }
+    }
+
+    private async Task AiSuggestMovieSearchAsync()
+    {
+        var releaseYear = int.TryParse(ManualSearchYear, out var parsedYear) ? parsedYear : (int?)null;
+        var suggestionResult = await _aiClassificationService.SuggestMovieCorrectionSearchQueryAsync(
+            TitleText,
+            _correctionSourceFileName,
+            releaseYear,
+            Overview);
+        var suggestion = suggestionResult.Status == AiSearchSuggestionStatus.Success
+            ? suggestionResult.Suggestion
+            : suggestionResult.FallbackSuggestion;
+
         ManualSearchQuery = suggestion.Query;
         ManualSearchYear = suggestion.ReleaseYear?.ToString() ?? string.Empty;
-        StatusMessage = suggestion.ReleaseYear.HasValue
-            ? $"AI 建议搜索：{suggestion.Query}（{suggestion.ReleaseYear}）"
-            : $"AI 建议搜索：{suggestion.Query}";
+        StatusMessage = suggestionResult.Status == AiSearchSuggestionStatus.Success
+            ? FormatAiSearchSuggestionStatus("电影", suggestion)
+            : $"AI 未返回电影搜索词，已使用本地建议：{suggestion.Query}";
         await SearchCandidatesAsync();
+        ScanIdentificationDiagnostics.Write(
+            $"event=single-source-correction-ai-assist-succeeded page=movie targetKind=movie mediaFileId={_correctionMediaFileId} status={FormatAiSuggestionStatus(suggestionResult.Status)} candidateCount={SearchCandidates.Count}");
+    }
+
+    private async Task AiSuggestTvSearchAsync()
+    {
+        var suggestionResult = await _aiClassificationService.SuggestTvEpisodeCorrectionSearchQueryAsync(
+            TitleText,
+            _correctionSourceFileName,
+            seriesTitle: TvCorrectionQuery,
+            seasonNumber: TryParsePositiveOrZero(CorrectionSeasonNumber),
+            episodeNumber: TryParsePositive(CorrectionEpisodeNumber),
+            overview: Overview);
+        var suggestion = suggestionResult.Status == AiSearchSuggestionStatus.Success
+            ? suggestionResult.Suggestion
+            : suggestionResult.FallbackSuggestion;
+
+        TvCorrectionQuery = suggestion.Query;
+        if (suggestion.SeasonNumber.HasValue && suggestion.SeasonNumber.Value >= 0)
+        {
+            CorrectionSeasonNumber = suggestion.SeasonNumber.Value.ToString();
+        }
+
+        if (suggestion.EpisodeNumber.HasValue && suggestion.EpisodeNumber.Value > 0)
+        {
+            CorrectionEpisodeNumber = suggestion.EpisodeNumber.Value.ToString();
+        }
+
+        StatusMessage = suggestionResult.Status == AiSearchSuggestionStatus.Success
+            ? FormatAiTvSearchSuggestionStatus(suggestion)
+            : $"AI 未返回电视剧搜索词，已使用本地建议：{suggestion.Query}";
+        await SearchCandidatesAsync();
+        ScanIdentificationDiagnostics.Write(
+            $"event=single-source-correction-ai-assist-succeeded page=movie targetKind=tv-episode mediaFileId={_correctionMediaFileId} status={FormatAiSuggestionStatus(suggestionResult.Status)} candidateCount={TvSearchCandidates.Count}");
+    }
+
+    private bool CanAiSuggestSearch()
+    {
+        return !IsCorrectionBusy && CanUseIdentificationCorrection && IsCorrectionPanelVisible;
+    }
+
+    private bool CanBeginSourceCorrection(object? parameter)
+    {
+        return CanUseIdentificationCorrection
+               && parameter is MovieSourceItem source
+               && Sources.Any(item => item.MediaFileId == source.MediaFileId);
+    }
+
+    private void BeginSourceCorrection(object? parameter)
+    {
+        if (parameter is not MovieSourceItem source || !CanBeginSourceCorrection(parameter))
+        {
+            return;
+        }
+
+        _correctionMediaFileId = null;
+        OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        SelectedCorrectionTarget = CorrectionTargetMovieText;
+        CorrectionSourceDisplay = $"{source.SourceTypeText} · {source.FileName}";
+        _correctionSourceFileName = source.FileName;
+        ManualSearchQuery = string.IsNullOrWhiteSpace(ManualSearchQuery) ? TitleText : ManualSearchQuery;
+        TvCorrectionQuery = string.IsNullOrWhiteSpace(TvCorrectionQuery) ? TitleText : TvCorrectionQuery;
+        CorrectionSeasonNumber = "1";
+        CorrectionEpisodeNumber = "1";
+        ClearCorrectionPreview();
+        SearchCandidates.Clear();
+        TvSearchCandidates.Clear();
+        _correctionMediaFileId = source.MediaFileId;
+        SelectedDetailTabIndex = 3;
+        OnPropertyChanged(nameof(HasSearchCandidates));
+        OnPropertyChanged(nameof(HasTvSearchCandidates));
+        OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        CancelCorrectionCommand.RaiseCanExecuteChanged();
+        ApplyManualMatchCommand.RaiseCanExecuteChanged();
+        PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+        AiSuggestSearchCommand.RaiseCanExecuteChanged();
+        StatusMessage = $"已选择播放源“{source.FileName}”，请搜索目标；点击候选后会直接修正。";
+    }
+
+    private void CancelCorrection()
+    {
+        _correctionMediaFileId = null;
+        _correctionSourceFileName = string.Empty;
+        OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        SelectedDetailTabIndex = 0;
+        SelectedCorrectionTarget = CorrectionTargetMovieText;
+        CorrectionSourceDisplay = "请选择一个播放源。";
+        ClearCorrectionPreview();
+        SearchCandidates.Clear();
+        TvSearchCandidates.Clear();
+        OnPropertyChanged(nameof(HasSearchCandidates));
+        OnPropertyChanged(nameof(HasTvSearchCandidates));
+        CancelCorrectionCommand.RaiseCanExecuteChanged();
+        ApplyManualMatchCommand.RaiseCanExecuteChanged();
+        PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+        AiSuggestSearchCommand.RaiseCanExecuteChanged();
+        StatusMessage = "已取消本次修正，未修改任何数据。";
     }
 
     private async Task SearchCandidatesAsync()
@@ -1305,6 +1577,18 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         if (!CanUseIdentificationCorrection)
         {
             StatusMessage = "只有已入库影片才能执行识别修正。";
+            return;
+        }
+
+        if (!IsCorrectionPanelVisible)
+        {
+            StatusMessage = "请先在播放源列表中选择要修正的单个播放源。";
+            return;
+        }
+
+        if (IsCorrectionTargetTvEpisode)
+        {
+            await SearchTvCandidatesAsync();
             return;
         }
 
@@ -1341,25 +1625,234 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
     }
 
-    private async Task ApplyManualMatchAsync(object? parameter)
+    private async Task SearchTvCandidatesAsync()
     {
-        if (!CanUseIdentificationCorrection || _movieId is null || parameter is not MetadataSearchCandidate candidate)
+        var query = string.IsNullOrWhiteSpace(TvCorrectionQuery) ? TitleText : TvCorrectionQuery.Trim();
+        if (string.IsNullOrWhiteSpace(query))
         {
+            TvSearchCandidates.Clear();
+            OnPropertyChanged(nameof(HasTvSearchCandidates));
+            StatusMessage = "请输入要搜索的电视剧名。";
             return;
         }
 
         try
         {
-            var targetMovieId = await _movieIdentificationService.ApplyManualMatchAsync(_movieId.Value, candidate.TmdbId);
-            StatusMessage = $"已应用人工修正：{candidate.Title}";
-            _dataRefreshService.NotifyMetadataChanged();
-            _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, targetMovieId);
-            await LoadMovieAsync(targetMovieId, CancellationToken.None);
+            var page = await _tmdbService.SearchTvSeriesAsync(query, 1);
+            TvSearchCandidates.Clear();
+            foreach (var candidate in page.Results.Take(12))
+            {
+                TvSearchCandidates.Add(candidate);
+            }
+
+            OnPropertyChanged(nameof(HasTvSearchCandidates));
+            StatusMessage = TvSearchCandidates.Count == 0
+                ? "没有找到符合条件的 TMDB 电视剧结果。"
+                : $"已找到 {TvSearchCandidates.Count} 个电视剧候选结果。";
         }
         catch (Exception exception)
         {
-            StatusMessage = $"应用人工修正失败：{DescribeException(exception)}";
+            TvSearchCandidates.Clear();
+            OnPropertyChanged(nameof(HasTvSearchCandidates));
+            StatusMessage = DescribeTmdbSearchFailure(exception);
         }
+    }
+
+    private bool CanApplyMovieCandidateCorrection(object? parameter)
+    {
+        return !IsCorrectionBusy
+               && IsCorrectionPanelVisible
+               && IsCorrectionTargetMovie
+               && parameter is MetadataSearchCandidate;
+    }
+
+    private async Task ApplyMovieCandidateCorrectionAsync(object? parameter)
+    {
+        if (_correctionMediaFileId is null || parameter is not MetadataSearchCandidate candidate)
+        {
+            StatusMessage = "请先选择播放源和电影候选。";
+            return;
+        }
+
+        try
+        {
+            IsCorrectionBusy = true;
+            StatusMessage = $"正在修正为电影：{candidate.Title}。";
+            await Task.Yield();
+            using var timeout = new CancellationTokenSource(CorrectionApplyTimeout);
+            var mediaFileId = _correctionMediaFileId.Value;
+            var result = await Task.Run(
+                () => _singleSourceCorrectionService.ApplyMovieCorrectionAsync(
+                    mediaFileId,
+                    candidate.TmdbId,
+                    timeout.Token),
+                timeout.Token);
+            _dataRefreshService.NotifyMetadataChanged();
+            if (result.TargetMovieId.HasValue)
+            {
+                _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, result.TargetMovieId.Value);
+                await LoadMovieAsync(result.TargetMovieId.Value, CancellationToken.None);
+            }
+
+            StatusMessage = $"已修正为电影：{candidate.Title}";
+            ClearCorrectionAfterApply();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "应用修正超时，事务已回滚；请稍后重试或先确认 TMDB 网络状态。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"应用修正失败，事务已回滚：{DescribeException(exception)}";
+        }
+        finally
+        {
+            IsCorrectionBusy = false;
+        }
+    }
+
+    private bool CanApplyTvEpisodeCandidateCorrection(object? parameter)
+    {
+        return !IsCorrectionBusy
+               && IsCorrectionPanelVisible
+               && IsCorrectionTargetTvEpisode
+               && parameter is TmdbTvSeriesSearchItem;
+    }
+
+    private async Task ApplyTvEpisodeCandidateCorrectionAsync(object? parameter)
+    {
+        if (_correctionMediaFileId is null || parameter is not TmdbTvSeriesSearchItem candidate)
+        {
+            StatusMessage = "请先选择播放源和电视剧候选。";
+            return;
+        }
+
+        if (!int.TryParse(CorrectionSeasonNumber, out var seasonNumber) || seasonNumber < 0)
+        {
+            StatusMessage = "季号必须是 0 或正整数。";
+            return;
+        }
+
+        if (!int.TryParse(CorrectionEpisodeNumber, out var episodeNumber) || episodeNumber <= 0)
+        {
+            StatusMessage = "集号必须是正整数。";
+            return;
+        }
+
+        try
+        {
+            IsCorrectionBusy = true;
+            StatusMessage = $"正在修正为电视剧集：{candidate.Name} S{seasonNumber:00}E{episodeNumber:00}。";
+            await Task.Yield();
+            using var timeout = new CancellationTokenSource(CorrectionApplyTimeout);
+            var mediaFileId = _correctionMediaFileId.Value;
+            var result = await Task.Run(
+                () => _singleSourceCorrectionService.ApplyTvEpisodeCorrectionAsync(
+                    mediaFileId,
+                    candidate.TmdbId,
+                    seasonNumber,
+                    episodeNumber,
+                    timeout.Token),
+                timeout.Token);
+            _dataRefreshService.NotifyMetadataChanged();
+            if (result.TargetEpisodeId.HasValue)
+            {
+                _navigationStateService.RequestEpisodeDetail(result.TargetEpisodeId.Value);
+            }
+
+            StatusMessage = $"已修正为电视剧集：{candidate.Name} S{seasonNumber:00}E{episodeNumber:00}";
+            ClearCorrectionAfterApply();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "应用修正超时，事务已回滚；请稍后重试或先确认 TMDB 网络状态。";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"应用修正失败，事务已回滚：{DescribeException(exception)}";
+        }
+        finally
+        {
+            IsCorrectionBusy = false;
+        }
+    }
+
+    private void SetCorrectionPreview(SingleSourceCorrectionPreview preview)
+    {
+        CorrectionPreviewText = preview.PreviewText;
+        HasCorrectionPreview = preview.IsValid;
+    }
+
+    private void ClearCorrectionPreview()
+    {
+        CorrectionPreviewText = string.Empty;
+        HasCorrectionPreview = false;
+    }
+
+    private void ClearCandidatesForInactiveCorrectionTarget()
+    {
+        if (IsCorrectionTargetMovie)
+        {
+            TvSearchCandidates.Clear();
+            OnPropertyChanged(nameof(HasTvSearchCandidates));
+            return;
+        }
+
+        SearchCandidates.Clear();
+        OnPropertyChanged(nameof(HasSearchCandidates));
+    }
+
+    private static int? TryParsePositive(string value)
+    {
+        return int.TryParse(value, out var parsed) && parsed > 0 ? parsed : null;
+    }
+
+    private static int? TryParsePositiveOrZero(string value)
+    {
+        return int.TryParse(value, out var parsed) && parsed >= 0 ? parsed : null;
+    }
+
+    private static string FormatAiSearchSuggestionStatus(string targetName, AiSearchSuggestion suggestion)
+    {
+        return suggestion.ReleaseYear.HasValue
+            ? $"AI 建议{targetName}搜索：{suggestion.Query}（{suggestion.ReleaseYear}）"
+            : $"AI 建议{targetName}搜索：{suggestion.Query}";
+    }
+
+    private static string FormatAiTvSearchSuggestionStatus(AiSearchSuggestion suggestion)
+    {
+        var episodeText = suggestion.SeasonNumber.HasValue && suggestion.EpisodeNumber.HasValue
+            ? $" S{suggestion.SeasonNumber.Value:00}E{suggestion.EpisodeNumber.Value:00}"
+            : string.Empty;
+        return $"AI 建议电视剧搜索：{suggestion.Query}{episodeText}";
+    }
+
+    private static string FormatAiSuggestionStatus(AiSearchSuggestionStatus status)
+    {
+        return status switch
+        {
+            AiSearchSuggestionStatus.Success => "success",
+            AiSearchSuggestionStatus.NoResult => "no-result",
+            AiSearchSuggestionStatus.Failed => "failed",
+            _ => "unknown"
+        };
+    }
+
+    private void ClearCorrectionAfterApply()
+    {
+        _correctionMediaFileId = null;
+        _correctionSourceFileName = string.Empty;
+        OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        SelectedDetailTabIndex = 0;
+        SelectedCorrectionTarget = CorrectionTargetMovieText;
+        CorrectionSourceDisplay = "请选择一个播放源。";
+        ClearCorrectionPreview();
+        SearchCandidates.Clear();
+        TvSearchCandidates.Clear();
+        OnPropertyChanged(nameof(HasSearchCandidates));
+        OnPropertyChanged(nameof(HasTvSearchCandidates));
+        CancelCorrectionCommand.RaiseCanExecuteChanged();
+        AiSuggestSearchCommand.RaiseCanExecuteChanged();
     }
 
     private async Task SetDefaultSourceAsync(object? parameter)
@@ -1454,7 +1947,18 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         Ratings.Clear();
         Sources.Clear();
         SearchCandidates.Clear();
+        TvSearchCandidates.Clear();
+        _correctionMediaFileId = null;
+        _correctionSourceFileName = string.Empty;
+        OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        SelectedDetailTabIndex = 0;
+        SelectedCorrectionTarget = CorrectionTargetMovieText;
+        CorrectionSourceDisplay = "请选择一个播放源。";
+        ClearCorrectionPreview();
         OnPropertyChanged(nameof(HasSearchCandidates));
+        OnPropertyChanged(nameof(HasTvSearchCandidates));
+        OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        AiSuggestSearchCommand.RaiseCanExecuteChanged();
     }
 
     private bool CanResetSourceRecognition(object? parameter)
