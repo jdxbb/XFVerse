@@ -304,6 +304,22 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                 })
             .Where(item => ShouldShowEpisodeInSeasonDetail(season.SeriesTmdbId, season.IdentificationStatus, item))
             .ToList();
+        var correctionSourceItems = episodes
+            .OrderBy(x => x.EpisodeNumber)
+            .ThenBy(x => x.Id)
+            .SelectMany(
+                episode => (sourceRowsByEpisode.GetValueOrDefault(episode.Id) ?? [])
+                    .OrderBy(x => x.MediaFileId)
+                    .Select(
+                        source => new TvSeasonCorrectionSourceItem
+                        {
+                            MediaFileId = source.MediaFileId,
+                            EpisodeId = episode.Id,
+                            EpisodeNumber = episode.EpisodeNumber,
+                            FileName = source.FileName,
+                            SourceSummary = TvDetailDisplayText.FormatSourceSummary([source.ProtocolType])
+                        }))
+            .ToList();
 
         var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(
             season.SeriesTmdbId,
@@ -356,7 +372,8 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             UnidentifiedSummary = season.IdentificationStatus == IdentificationStatus.Failed
                 ? "未识别电视剧季。可先查看已解析集数和播放源，修正入口将在后续阶段接入。"
                 : string.Empty,
-            Episodes = episodeItems
+            Episodes = episodeItems,
+            CorrectionSources = correctionSourceItems
         };
     }
 

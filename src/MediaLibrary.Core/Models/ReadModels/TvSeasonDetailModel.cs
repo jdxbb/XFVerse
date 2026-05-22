@@ -58,6 +58,8 @@ public sealed class TvSeasonDetailModel
 
     public IReadOnlyList<TvSeasonEpisodeListItem> Episodes { get; set; } = [];
 
+    public IReadOnlyList<TvSeasonCorrectionSourceItem> CorrectionSources { get; set; } = [];
+
     public bool IsUnidentified => IdentificationStatus == IdentificationStatus.Failed;
 
     public string SeasonNumberText => SeasonNumber == 0 ? "特别篇" : $"S{SeasonNumber:D2}";
@@ -136,6 +138,30 @@ public sealed class TvSeasonEpisodeListItem
     public string WatchedActionText => IsWatched ? "已看" : "标记已看";
 
     public string UnwatchedActionText => IsWatched ? "标记未看" : "未看";
+}
+
+public sealed class TvSeasonCorrectionSourceItem
+{
+    public int MediaFileId { get; set; }
+
+    public int EpisodeId { get; set; }
+
+    public int EpisodeNumber { get; set; }
+
+    public string FileName { get; set; } = string.Empty;
+
+    public string SourceSummary { get; set; } = string.Empty;
+
+    public string EpisodeNumberText => $"E{EpisodeNumber:D2}";
+
+    public string SafeFileName
+    {
+        get
+        {
+            var name = string.IsNullOrWhiteSpace(FileName) ? string.Empty : Path.GetFileName(FileName.Trim());
+            return string.IsNullOrWhiteSpace(name) ? $"MediaFile {MediaFileId}" : name;
+        }
+    }
 }
 
 internal static class TvDetailDisplayText

@@ -2575,3 +2575,73 @@ Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
+
+### Phase 4.13d-fix-1 - Unknown Season correction episode-number mapping
+
+Completed:
+
+- The unknown Season to recognized Season correction panel now lists every active source in the source Season with its current Episode number and a target Episode-number input.
+- Target Episode numbers default to the current unknown Episode numbers, so the previous preserve-number behavior remains unchanged unless the user edits a row.
+- Apply now validates source-level mappings by `MediaFileId`; empty, `0`, negative, decimal, non-numeric, stale, or conflicting mappings are rejected before moving sources.
+- Multiple sources can target the same Episode number. The target Episode is reused and the sources become multiple playback sources.
+- Target Episodes are created only for mapped source rows. Missing intermediate Episodes are not created.
+- Correction logs now include sanitized mapping counts and `original->target` Episode-number summaries without local paths, WebDAV URLs, or credentials.
+
+Not done:
+
+- No recognized Season to recognized Season, unknown Season to existing unknown Season, recognized Season to existing unknown Season, batch AI, top1, special / OVA / OAD mapping, scan-rule change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: the same mapping UI can be reused later for the other three Season-level correction directions.
+- Noise: default-source behavior remains the existing correction rule; if multiple migrated sources target one Episode, the last migrated source becomes default.
+
+### Phase 4.13d-fix-2 - Extended Season correction targets
+
+Completed:
+
+- Season detail correction is now available for any Season with active source rows, not only no-TMDB / unidentified Seasons.
+- The Season correction panel now has two target modes: recognized Season and existing unknown Season.
+- Recognized targets continue to use the expandable local recognized-Series picker.
+- Existing unknown targets use a new expandable unknown-Series picker and exclude the current source Season from the selectable target list.
+- The existing source-level target Episode-number mapping table is reused for all Season-level correction directions.
+- Added service methods for recognized-to-recognized, unknown-to-existing-unknown, and recognized-to-existing-unknown Season correction paths.
+- All paths move sources only, clear `MovieId`, bind `EpisodeId`, set the moved source as the target Episode default source, and recalculate the old Episode default source with the existing local-first fallback when needed.
+- Target Episodes are reused by target Episode number or created only for mapped source rows. Missing intermediate Episodes are not created.
+- Source no-TMDB / failed unknown Seasons are hidden after their sources are moved. Source recognized Seasons preserve metadata and are not converted into unknown containers.
+- Apply remains transaction-protected and logs sanitized source / target kind, ids, counts, mapping summaries, default fallback, and source-container handling.
+
+Not done:
+
+- No batch AI, aggregation-after-identification, automatic top1, historical wrong-binding cleanup, ignore / blacklist, special / OVA / OAD / movie-special mapping, scan-rule change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: richer Season-target search, special-episode mapping, and historical cleanup remain later work.
+- Noise: target picker display uses sanitized titles / summaries rather than full local paths or WebDAV URLs.
+
+### Phase 4.13d-fix-2 follow-up - Season correction default-source cycle guard
+
+Completed:
+
+- Season-level correction now avoids saving `MediaFile.EpisodeId` moves and `TvEpisode.DefaultMediaFileId` changes in the same EF dependency graph.
+- Apply first clears default-source references that point at any source being moved, moves the sources, and saves inside the existing transaction.
+- Apply then recalculates old Episode default sources with the existing local-first fallback and sets target Episode defaults to the migrated sources in a second save step.
+- This preserves the product rule that migrated sources become target defaults while avoiding circular dependencies during Season-to-Season correction loops.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.

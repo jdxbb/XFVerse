@@ -188,6 +188,33 @@
                     </StackPanel>
                 </Border>
 
+                <Border Padding="14"
+                        Background="{DynamicResource BrushSurfaceAlt}"
+                        CornerRadius="16">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CanShowRecognizedSeasonCorrectionEntry}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="季级修正" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Style="{StaticResource BodyTextStyle}"
+                                   Text="将当前季的播放源整体修正到另一个已识别季或已有未识别季。"
+                                   TextWrapping="Wrap" />
+                        <Button Margin="0,12,0,0"
+                                HorizontalAlignment="Left"
+                                Command="{Binding OpenSeasonCorrectionCommand}"
+                                Content="修正季"
+                                Style="{StaticResource PrimaryButtonStyle}" />
+                    </StackPanel>
+                </Border>
+
                 <ScrollViewer Grid.Row="2"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
@@ -362,8 +389,23 @@
                             <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="目标季" />
                             <Button Margin="0,10,0,0"
                                     HorizontalAlignment="Left"
+                                    Command="{Binding SelectSeasonCorrectionRecognizedTargetKindCommand}"
+                                    Content="{Binding SeasonCorrectionRecognizedTargetButtonText}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                            <Button Margin="0,10,0,0"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding SelectSeasonCorrectionUnknownTargetKindCommand}"
+                                    Content="{Binding SeasonCorrectionUnknownTargetButtonText}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                            <Button Margin="0,10,0,0"
+                                    HorizontalAlignment="Left"
                                     Command="{Binding SearchSeasonCorrectionCandidatesCommand}"
                                     Content="选择已识别季..."
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                            <Button Margin="0,10,0,0"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding OpenUnknownSeasonCorrectionPickerCommand}"
+                                    Content="选择已有未识别季..."
                                     Style="{StaticResource SecondaryButtonStyle}" />
                             <TextBlock Margin="0,8,0,0"
                                        Style="{StaticResource BodyMutedTextStyle}"
@@ -371,12 +413,74 @@
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,10,0,0"
                                        Style="{StaticResource BodyMutedTextStyle}"
-                                       Text="{Binding SelectedRecognizedSeasonTargetDisplay}"
+                                       Text="{Binding SelectedSeasonCorrectionTargetDisplay}"
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,8,0,0"
                                        Style="{StaticResource BodyTextStyle}"
                                        Text="{Binding SeasonCorrectionConfirmationText}"
                                        TextWrapping="Wrap" />
+                            <TextBlock Margin="0,18,0,0"
+                                       Style="{StaticResource SectionTitleTextStyle}"
+                                       Text="目标集号映射" />
+                            <TextBlock Margin="0,6,0,0"
+                                       Style="{StaticResource BodyMutedTextStyle}"
+                                       Text="默认按当前集号迁移；可逐行改为目标已识别季中的集号。重复目标集号会追加为同一集的多个播放源。"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Text="目标集号必须是正整数。">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasInvalidSeasonCorrectionMappings}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Setter Property="Foreground" Value="{DynamicResource BrushDanger}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding SeasonCorrectionMappings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8"
+                                                Padding="12"
+                                                Background="{DynamicResource BrushSurfaceAlt}"
+                                                BorderBrush="{DynamicResource BrushBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="88" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="104" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="当前" />
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               Style="{StaticResource SectionTitleTextStyle}"
+                                                               Text="{Binding OriginalEpisodeNumberText}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="10,0">
+                                                    <TextBlock Style="{StaticResource BodyTextStyle}"
+                                                               Text="{Binding FileName}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               Style="{StaticResource BodyMutedTextStyle}"
+                                                               Text="{Binding SourceSummary}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="目标集号" />
+                                                    <TextBox Margin="0,4,0,0"
+                                                             Text="{Binding TargetEpisodeNumberText, UpdateSourceTrigger=PropertyChanged}"
+                                                             Style="{StaticResource FormTextBoxStyle}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
                     </ScrollViewer>
 
@@ -521,6 +625,140 @@
                             HorizontalAlignment="Right"
                             Width="120"
                             Command="{Binding CloseRecognizedSeasonPickerCommand}"
+                            Content="取消"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                </Grid>
+            </Border>
+        </Border>
+
+        <Border Grid.RowSpan="3"
+                Background="#99000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsUnknownSeasonPickerDialogOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border Width="780"
+                    MaxHeight="640"
+                    Padding="22"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PageCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="16" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="选择已有未识别季" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Style="{StaticResource BodyMutedTextStyle}"
+                                   Text="按未识别剧折叠展示，展开后按季号选择目标季。"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Border Grid.Row="2"
+                            Padding="14"
+                            Background="{DynamicResource BrushSurfaceAlt}"
+                            CornerRadius="14">
+                        <TextBlock Text="没有可选择的未识别季。">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasUnknownSeasonTargets}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
+
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding UnknownSeasonSeriesGroups}"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.Style>
+                            <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasUnknownSeasonTargets}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.Style>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Expander IsExpanded="False">
+                                    <Expander.Header>
+                                        <Border Padding="14"
+                                                Background="{DynamicResource BrushAccentSoft}"
+                                                BorderBrush="{DynamicResource BrushBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="12">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding SeriesTitle}" />
+                                                <TextBlock Margin="0,5,0,0"
+                                                           Style="{StaticResource BodyMutedTextStyle}"
+                                                           Text="{Binding HeaderSubtitle}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Expander.Header>
+                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Seasons}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="20,0,0,8"
+                                                        Padding="0"
+                                                        Background="{DynamicResource BrushSurfaceAlt}"
+                                                        BorderBrush="{DynamicResource BrushBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="12">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="120" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Background="{DynamicResource BrushAccent}" CornerRadius="12,0,0,12" />
+                                                        <StackPanel Grid.Column="1" Margin="12">
+                                                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding DisplayTitle}" />
+                                                            <TextBlock Margin="0,5,0,0"
+                                                                       Style="{StaticResource BodyMutedTextStyle}"
+                                                                       Text="{Binding DisplaySubtitle}"
+                                                                       TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2"
+                                                                Margin="0,12,12,12"
+                                                                VerticalAlignment="Center"
+                                                                Command="{Binding DataContext.SelectUnknownSeasonTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                CommandParameter="{Binding}"
+                                                                Content="选择"
+                                                                Style="{StaticResource PrimaryButtonStyle}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Expander>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <Button Grid.Row="4"
+                            HorizontalAlignment="Right"
+                            Width="120"
+                            Command="{Binding CloseUnknownSeasonPickerCommand}"
                             Content="取消"
                             Style="{StaticResource SecondaryButtonStyle}" />
                 </Grid>

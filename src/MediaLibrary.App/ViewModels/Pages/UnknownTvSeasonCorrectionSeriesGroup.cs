@@ -19,7 +19,7 @@ public sealed class UnknownTvSeasonCorrectionSeriesGroup
         }
 
         SourceCount = Seasons.Sum(x => x.SourceCount);
-        HeaderSubtitle = $"{Seasons.Count} 季 · {SourceCount} 个播放源 · {BuildRangeSummary(Seasons)}";
+        HeaderSubtitle = $"{Seasons.Count} seasons | {SourceCount} sources | {BuildRangeSummary(Seasons)}";
     }
 
     public string SeriesTitle { get; }
@@ -48,6 +48,6 @@ public sealed class UnknownTvSeasonCorrectionSeriesGroup
             .Distinct(StringComparer.CurrentCultureIgnoreCase)
             .Take(3)
             .ToArray();
-        return ranges.Length == 0 ? "集数:-" : string.Join(" / ", ranges);
+        return ranges.Length == 0 ? "episodes:-" : string.Join(" / ", ranges);
     }
 }

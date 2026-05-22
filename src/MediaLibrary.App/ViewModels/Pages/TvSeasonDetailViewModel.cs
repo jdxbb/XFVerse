@@ -10,6 +10,8 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class TvSeasonDetailViewModel : PageViewModelBase
 {
+    private const string SeasonCorrectionTargetRecognized = "recognized";
+    private const string SeasonCorrectionTargetUnknown = "unknown";
     private const string TmdbRatingLoadingText = "TMDB 季评分加载中...";
     private const string ImdbRatingLoadingText = "IMDb 剧集评分加载中...";
     private const string RatingUnavailableText = "暂无评分";
@@ -21,6 +23,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IUnknownSeasonCorrectionService _unknownSeasonCorrectionService;
+    private readonly ISingleSourceCorrectionService _singleSourceCorrectionService;
     private int? _seasonId;
     private int? _seriesId;
     private string _seriesName = "-";
@@ -55,8 +58,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private string _seasonCorrectionSeasonNumber = "1";
     private string _seasonCorrectionStatusMessage = string.Empty;
     private string _seasonCorrectionConfirmationText = string.Empty;
+    private string _selectedSeasonCorrectionTargetKind = SeasonCorrectionTargetRecognized;
     private bool _isRecognizedSeasonPickerDialogOpen;
+    private bool _isUnknownSeasonPickerDialogOpen;
     private RecognizedTvSeasonCorrectionSeasonItem? _selectedRecognizedSeasonTarget;
+    private UnknownTvSeasonCorrectionTargetItem? _selectedUnknownSeasonTarget;
 
     public TvSeasonDetailViewModel(
         INavigationStateService navigationStateService,
@@ -65,7 +71,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         IPlayerWindowService playerWindowService,
         ITvSeasonCollectionService tvSeasonCollectionService,
         IDataRefreshService dataRefreshService,
-        IUnknownSeasonCorrectionService unknownSeasonCorrectionService)
+        IUnknownSeasonCorrectionService unknownSeasonCorrectionService,
+        ISingleSourceCorrectionService singleSourceCorrectionService)
         : base("电视剧季", "查看电视剧季详情、聚合进度和集列表。")
     {
         _navigationStateService = navigationStateService;
@@ -75,6 +82,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _dataRefreshService = dataRefreshService;
         _unknownSeasonCorrectionService = unknownSeasonCorrectionService;
+        _singleSourceCorrectionService = singleSourceCorrectionService;
         NavigateBackToSeriesCommand = new RelayCommand(NavigateBackToSeries, () => _seriesId.HasValue);
         OpenEpisodeDetailCommand = new RelayCommand(OpenEpisodeDetail);
         PlayEpisodeCommand = new AsyncRelayCommand(PlayEpisodeAsync, CanPlayEpisode);
@@ -89,16 +97,31 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
         OpenSeasonCorrectionCommand = new RelayCommand(OpenSeasonCorrection, () => CanCorrectSeasonToRecognized);
         CancelSeasonCorrectionCommand = new RelayCommand(CancelSeasonCorrection, () => IsSeasonCorrectionPanelOpen && !IsSeasonCorrectionBusy);
-        SearchSeasonCorrectionCandidatesCommand = new AsyncRelayCommand(SearchSeasonCorrectionCandidatesAsync, () => IsSeasonCorrectionPanelOpen && !IsSeasonCorrectionBusy);
+        SearchSeasonCorrectionCandidatesCommand = new AsyncRelayCommand(SearchSeasonCorrectionCandidatesAsync, () => IsSeasonCorrectionPanelOpen && IsSeasonCorrectionTargetRecognized && !IsSeasonCorrectionBusy);
         CloseRecognizedSeasonPickerCommand = new RelayCommand(CloseRecognizedSeasonPicker, () => IsRecognizedSeasonPickerDialogOpen && !IsSeasonCorrectionBusy);
         SelectRecognizedSeasonTargetCommand = new RelayCommand(SelectRecognizedSeasonTarget, CanSelectRecognizedSeasonTarget);
-        ApplySeasonCorrectionCommand = new AsyncRelayCommand(ApplySeasonCorrectionAsync, () => CanApplySeasonCorrection);
+        SelectSeasonCorrectionRecognizedTargetKindCommand = new RelayCommand(
+            () => SetSeasonCorrectionTargetKind(SeasonCorrectionTargetRecognized),
+            () => IsSeasonCorrectionPanelOpen && !IsSeasonCorrectionBusy);
+        SelectSeasonCorrectionUnknownTargetKindCommand = new RelayCommand(
+            () => SetSeasonCorrectionTargetKind(SeasonCorrectionTargetUnknown),
+            () => IsSeasonCorrectionPanelOpen && !IsSeasonCorrectionBusy);
+        OpenUnknownSeasonCorrectionPickerCommand = new AsyncRelayCommand(
+            OpenUnknownSeasonCorrectionPickerAsync,
+            () => IsSeasonCorrectionPanelOpen && IsSeasonCorrectionTargetUnknown && !IsSeasonCorrectionBusy);
+        CloseUnknownSeasonPickerCommand = new RelayCommand(CloseUnknownSeasonPicker, () => IsUnknownSeasonPickerDialogOpen && !IsSeasonCorrectionBusy);
+        SelectUnknownSeasonTargetCommand = new RelayCommand(SelectUnknownSeasonTarget, CanSelectUnknownSeasonTarget);
+        ApplySeasonCorrectionCommand = new AsyncRelayCommand(ApplySeasonCorrectionV2Async, () => CanApplySeasonCorrection);
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
     }
 
     public ObservableCollection<TvSeasonEpisodeListItem> Episodes { get; } = [];
 
+    public ObservableCollection<SeasonCorrectionSourceMappingRowViewModel> SeasonCorrectionMappings { get; } = [];
+
     public ObservableCollection<RecognizedTvSeasonCorrectionSeriesGroup> RecognizedSeasonSeriesGroups { get; } = [];
+
+    public ObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
 
     public RelayCommand NavigateBackToSeriesCommand { get; }
 
@@ -133,6 +156,16 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public RelayCommand CloseRecognizedSeasonPickerCommand { get; }
 
     public RelayCommand SelectRecognizedSeasonTargetCommand { get; }
+
+    public RelayCommand SelectSeasonCorrectionRecognizedTargetKindCommand { get; }
+
+    public RelayCommand SelectSeasonCorrectionUnknownTargetKindCommand { get; }
+
+    public AsyncRelayCommand OpenUnknownSeasonCorrectionPickerCommand { get; }
+
+    public RelayCommand CloseUnknownSeasonPickerCommand { get; }
+
+    public RelayCommand SelectUnknownSeasonTargetCommand { get; }
 
     public AsyncRelayCommand ApplySeasonCorrectionCommand { get; }
 
@@ -227,15 +260,17 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isUnidentified, value))
             {
                 OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+                OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
                 RaiseSeasonCorrectionCommandStates();
             }
         }
     }
 
     public bool CanCorrectSeasonToRecognized => HasSeason
-                                                && IsUnidentified
-                                                && Episodes.Any(x => x.ActiveSourceCount > 0)
+                                                && HasSeasonCorrectionMappings
                                                 && !IsSeasonCorrectionBusy;
+
+    public bool CanShowRecognizedSeasonCorrectionEntry => CanCorrectSeasonToRecognized && !IsUnidentified;
 
     public bool IsSeasonCorrectionPanelOpen
     {
@@ -257,6 +292,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isSeasonCorrectionBusy, value))
             {
                 OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+                OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
                 RaiseSeasonCorrectionCommandStates();
             }
         }
@@ -301,17 +337,64 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public bool HasRecognizedSeasonTargets => RecognizedSeasonSeriesGroups.Count > 0;
 
-    public bool HasSelectedSeasonCorrectionTarget => _selectedRecognizedSeasonTarget is not null
-                                                     && TryGetSeasonCorrectionSeasonNumber(out _);
+    public bool IsUnknownSeasonPickerDialogOpen
+    {
+        get => _isUnknownSeasonPickerDialogOpen;
+        private set
+        {
+            if (SetProperty(ref _isUnknownSeasonPickerDialogOpen, value))
+            {
+                RaiseSeasonCorrectionCommandStates();
+            }
+        }
+    }
+
+    public bool HasUnknownSeasonTargets => UnknownSeasonSeriesGroups.Count > 0;
+
+    public bool IsSeasonCorrectionTargetRecognized => _selectedSeasonCorrectionTargetKind == SeasonCorrectionTargetRecognized;
+
+    public bool IsSeasonCorrectionTargetUnknown => _selectedSeasonCorrectionTargetKind == SeasonCorrectionTargetUnknown;
+
+    public string SeasonCorrectionRecognizedTargetButtonText => IsSeasonCorrectionTargetRecognized ? "Selected: recognized season" : "Correct to recognized season";
+
+    public string SeasonCorrectionUnknownTargetButtonText => IsSeasonCorrectionTargetUnknown ? "Selected: existing unknown season" : "Correct to existing unknown season";
+
+    public bool HasSelectedSeasonCorrectionTarget =>
+        IsSeasonCorrectionTargetRecognized
+            ? _selectedRecognizedSeasonTarget is not null && TryGetSeasonCorrectionSeasonNumber(out _)
+            : _selectedUnknownSeasonTarget is not null;
+
+    public bool HasSeasonCorrectionMappings => SeasonCorrectionMappings.Count > 0;
 
     public string SelectedRecognizedSeasonTargetDisplay => _selectedRecognizedSeasonTarget is null
         ? "尚未选择目标已识别季。"
         : _selectedRecognizedSeasonTarget.DisplayTitle;
 
+    public string SelectedSeasonCorrectionTargetDisplay
+    {
+        get
+        {
+            if (IsSeasonCorrectionTargetRecognized)
+            {
+                return _selectedRecognizedSeasonTarget is null
+                    ? "No recognized season selected."
+                    : _selectedRecognizedSeasonTarget.DisplayTitle;
+            }
+
+            return _selectedUnknownSeasonTarget is null
+                ? "No unknown season selected."
+                : _selectedUnknownSeasonTarget.DisplayTitle;
+        }
+    }
+
     public bool CanApplySeasonCorrection => IsSeasonCorrectionPanelOpen
                                             && !IsSeasonCorrectionBusy
                                             && _seasonId.HasValue
-                                            && HasSelectedSeasonCorrectionTarget;
+                                            && HasSelectedSeasonCorrectionTarget
+                                            && HasValidSeasonCorrectionMappings();
+
+    public bool HasInvalidSeasonCorrectionMappings => SeasonCorrectionMappings.Count > 0
+                                                      && SeasonCorrectionMappings.Any(x => !x.ParsedTargetEpisodeNumber.HasValue);
 
     public bool IsFavorite
     {
@@ -460,7 +543,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 Episodes.Add(episode);
             }
 
+            RefreshSeasonCorrectionMappings(model.CorrectionSources);
             OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+            OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
             if (!CanCorrectSeasonToRecognized)
             {
                 ClearSeasonCorrectionState();
@@ -479,6 +564,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             OnPropertyChanged(nameof(HasEpisodes));
             OnPropertyChanged(nameof(HasNoEpisodes));
             OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+            OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
             var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
             StatusMessage = selectedEpisodeId.HasValue
                 ? $"已加载集列表，目标集 ID：{selectedEpisodeId.Value}。"
@@ -533,6 +619,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 Episodes.Add(episode);
             }
 
+            RefreshSeasonCorrectionMappings(model.CorrectionSources);
             ProgressText = model.ProgressText;
             InLibraryText = model.InLibraryText;
             IsSeasonWatched = model.IsSeasonWatched;
@@ -541,6 +628,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             OnPropertyChanged(nameof(HasEpisodes));
             OnPropertyChanged(nameof(HasNoEpisodes));
             OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+            OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
             RaiseSeasonStateCommandCanExecuteChanged();
             RaiseSeasonCorrectionCommandStates();
             RefreshEpisodePlayCommandState();
@@ -645,11 +733,38 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         }
 
         IsSeasonCorrectionPanelOpen = true;
+        SetSeasonCorrectionTargetKind(SeasonCorrectionTargetRecognized);
         SeasonCorrectionSeasonNumber = TryParseDisplaySeasonNumber(SeasonNumberText, out var seasonNumber)
             ? seasonNumber.ToString()
             : "1";
+        foreach (var mapping in SeasonCorrectionMappings)
+        {
+            mapping.TargetEpisodeNumberText = mapping.OriginalEpisodeNumber.ToString();
+        }
+
         SeasonCorrectionStatusMessage = "搜索并从弹窗中选择目标已识别季。";
         UpdateSeasonCorrectionConfirmation();
+    }
+
+    private void RefreshSeasonCorrectionMappings(IEnumerable<TvSeasonCorrectionSourceItem> sources)
+    {
+        SeasonCorrectionMappings.Clear();
+        foreach (var source in sources.OrderBy(x => x.EpisodeNumber).ThenBy(x => x.MediaFileId))
+        {
+            SeasonCorrectionMappings.Add(new SeasonCorrectionSourceMappingRowViewModel(source, OnSeasonCorrectionMappingChanged));
+        }
+
+        OnSeasonCorrectionMappingChanged();
+        OnPropertyChanged(nameof(HasSeasonCorrectionMappings));
+    }
+
+    private void OnSeasonCorrectionMappingChanged()
+    {
+        OnPropertyChanged(nameof(HasInvalidSeasonCorrectionMappings));
+        OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+        OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
+        UpdateSeasonCorrectionConfirmation();
+        RaiseSeasonCorrectionCommandStates();
     }
 
     private void CancelSeasonCorrection()
@@ -657,8 +772,49 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         ClearSeasonCorrectionState();
     }
 
+    private void SetSeasonCorrectionTargetKind(string targetKind)
+    {
+        var normalizedTargetKind = string.Equals(targetKind, SeasonCorrectionTargetUnknown, StringComparison.Ordinal)
+            ? SeasonCorrectionTargetUnknown
+            : SeasonCorrectionTargetRecognized;
+        if (_selectedSeasonCorrectionTargetKind == normalizedTargetKind)
+        {
+            return;
+        }
+
+        _selectedSeasonCorrectionTargetKind = normalizedTargetKind;
+        _selectedRecognizedSeasonTarget = null;
+        _selectedUnknownSeasonTarget = null;
+        IsRecognizedSeasonPickerDialogOpen = false;
+        IsUnknownSeasonPickerDialogOpen = false;
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetRecognized));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetUnknown));
+        OnPropertyChanged(nameof(SeasonCorrectionRecognizedTargetButtonText));
+        OnPropertyChanged(nameof(SeasonCorrectionUnknownTargetButtonText));
+        OnPropertyChanged(nameof(SelectedRecognizedSeasonTargetDisplay));
+        OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetRecognized));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetUnknown));
+        OnPropertyChanged(nameof(SeasonCorrectionRecognizedTargetButtonText));
+        OnPropertyChanged(nameof(SeasonCorrectionUnknownTargetButtonText));
+        OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
+        OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
+        OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
+        SeasonCorrectionStatusMessage = IsSeasonCorrectionTargetRecognized
+            ? "Target: recognized season."
+            : "Target: existing unknown season.";
+        UpdateSeasonCorrectionConfirmation();
+        RaiseSeasonCorrectionCommandStates();
+    }
+
     private async Task SearchSeasonCorrectionCandidatesAsync()
     {
+        if (!IsSeasonCorrectionTargetRecognized)
+        {
+            SeasonCorrectionStatusMessage = "Switch to recognized season target first.";
+            return;
+        }
+
         try
         {
             IsSeasonCorrectionBusy = true;
@@ -666,7 +822,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             RecognizedSeasonSeriesGroups.Clear();
             OnPropertyChanged(nameof(HasRecognizedSeasonTargets));
             _selectedRecognizedSeasonTarget = null;
+            _selectedUnknownSeasonTarget = null;
             OnPropertyChanged(nameof(SelectedRecognizedSeasonTargetDisplay));
+            OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
             UpdateSeasonCorrectionConfirmation();
 
             var targets = await _tvDetailQueryService.GetRecognizedSeasonCorrectionTargetsAsync();
@@ -707,9 +865,17 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         }
 
         _selectedRecognizedSeasonTarget = target;
+        _selectedUnknownSeasonTarget = null;
+        _selectedSeasonCorrectionTargetKind = SeasonCorrectionTargetRecognized;
         SeasonCorrectionSeasonNumber = target.SeasonNumber.ToString();
         IsRecognizedSeasonPickerDialogOpen = false;
         OnPropertyChanged(nameof(SelectedRecognizedSeasonTargetDisplay));
+        OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetRecognized));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetUnknown));
+        OnPropertyChanged(nameof(SeasonCorrectionRecognizedTargetButtonText));
+        OnPropertyChanged(nameof(SeasonCorrectionUnknownTargetButtonText));
+        OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
         SeasonCorrectionStatusMessage = $"已选择：{target.DisplayTitle}。";
         UpdateSeasonCorrectionConfirmation();
         LogSeasonCorrectionPreview();
@@ -718,6 +884,170 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private void CloseRecognizedSeasonPicker()
     {
         IsRecognizedSeasonPickerDialogOpen = false;
+    }
+
+    private async Task OpenUnknownSeasonCorrectionPickerAsync()
+    {
+        if (!IsSeasonCorrectionTargetUnknown)
+        {
+            SeasonCorrectionStatusMessage = "Switch to existing unknown season target first.";
+            return;
+        }
+
+        try
+        {
+            IsSeasonCorrectionBusy = true;
+            SeasonCorrectionStatusMessage = "Loading existing unknown seasons...";
+            UnknownSeasonSeriesGroups.Clear();
+            OnPropertyChanged(nameof(HasUnknownSeasonTargets));
+            _selectedUnknownSeasonTarget = null;
+            _selectedRecognizedSeasonTarget = null;
+            OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
+            OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
+            UpdateSeasonCorrectionConfirmation();
+
+            var targets = await _singleSourceCorrectionService.SearchUnknownSeasonTargetsAsync(null, CancellationToken.None);
+            var filteredTargets = targets
+                .Where(x => !_seasonId.HasValue || x.SeasonId != _seasonId.Value)
+                .ToList();
+            foreach (var group in UnknownTvSeasonCorrectionSeriesGroup.FromTargets(filteredTargets))
+            {
+                UnknownSeasonSeriesGroups.Add(group);
+            }
+
+            OnPropertyChanged(nameof(HasUnknownSeasonTargets));
+            IsUnknownSeasonPickerDialogOpen = true;
+            SeasonCorrectionStatusMessage = UnknownSeasonSeriesGroups.Count == 0
+                ? "No existing unknown season target is available."
+                : $"Loaded {UnknownSeasonSeriesGroups.Count} unknown series groups.";
+        }
+        catch (Exception exception)
+        {
+            UnknownSeasonSeriesGroups.Clear();
+            OnPropertyChanged(nameof(HasUnknownSeasonTargets));
+            SeasonCorrectionStatusMessage = $"Load unknown seasons failed: {DescribeException(exception)}";
+        }
+        finally
+        {
+            IsSeasonCorrectionBusy = false;
+        }
+    }
+
+    private void CloseUnknownSeasonPicker()
+    {
+        IsUnknownSeasonPickerDialogOpen = false;
+    }
+
+    private bool CanSelectUnknownSeasonTarget(object? parameter)
+    {
+        return IsUnknownSeasonPickerDialogOpen
+               && !IsSeasonCorrectionBusy
+               && parameter is UnknownTvSeasonCorrectionTargetItem target
+               && (!_seasonId.HasValue || target.SeasonId != _seasonId.Value);
+    }
+
+    private void SelectUnknownSeasonTarget(object? parameter)
+    {
+        if (parameter is not UnknownTvSeasonCorrectionTargetItem target)
+        {
+            SeasonCorrectionStatusMessage = "Choose a target unknown season.";
+            return;
+        }
+
+        if (_seasonId.HasValue && target.SeasonId == _seasonId.Value)
+        {
+            SeasonCorrectionStatusMessage = "Source season cannot be selected as the target.";
+            return;
+        }
+
+        _selectedUnknownSeasonTarget = target;
+        _selectedRecognizedSeasonTarget = null;
+        _selectedSeasonCorrectionTargetKind = SeasonCorrectionTargetUnknown;
+        IsUnknownSeasonPickerDialogOpen = false;
+        OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
+        OnPropertyChanged(nameof(SelectedRecognizedSeasonTargetDisplay));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetRecognized));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetUnknown));
+        OnPropertyChanged(nameof(SeasonCorrectionRecognizedTargetButtonText));
+        OnPropertyChanged(nameof(SeasonCorrectionUnknownTargetButtonText));
+        OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
+        SeasonCorrectionStatusMessage = $"Selected unknown season: {target.DisplayTitle}.";
+        UpdateSeasonCorrectionConfirmation();
+        LogSeasonCorrectionPreview();
+    }
+
+    private async Task ApplySeasonCorrectionV2Async()
+    {
+        if (!_seasonId.HasValue)
+        {
+            SeasonCorrectionStatusMessage = "Source season is not loaded.";
+            return;
+        }
+
+        if (IsSeasonCorrectionTargetRecognized && _selectedRecognizedSeasonTarget is null)
+        {
+            SeasonCorrectionStatusMessage = "Choose a target recognized season.";
+            return;
+        }
+
+        if (IsSeasonCorrectionTargetUnknown && _selectedUnknownSeasonTarget is null)
+        {
+            SeasonCorrectionStatusMessage = "Choose a target unknown season.";
+            return;
+        }
+
+        if (!TryBuildSeasonCorrectionMappings(out var mappings, out var mappingError))
+        {
+            SeasonCorrectionStatusMessage = mappingError;
+            return;
+        }
+
+        var sourceSeasonId = _seasonId.Value;
+        try
+        {
+            IsSeasonCorrectionBusy = true;
+            SeasonCorrectionStatusMessage = IsSeasonCorrectionTargetRecognized
+                ? "Applying recognized season correction..."
+                : "Applying unknown season correction...";
+            UnknownSeasonCorrectionApplyResult result;
+            if (IsSeasonCorrectionTargetRecognized)
+            {
+                if (!TryGetSeasonCorrectionSeasonNumber(out var seasonNumber))
+                {
+                    SeasonCorrectionStatusMessage = "Season number must be a positive integer.";
+                    return;
+                }
+
+                result = await _unknownSeasonCorrectionService.ApplySeasonToRecognizedSeasonAsync(
+                    sourceSeasonId,
+                    _selectedRecognizedSeasonTarget!.TmdbSeriesId,
+                    seasonNumber,
+                    mappings);
+            }
+            else
+            {
+                result = await _unknownSeasonCorrectionService.ApplySeasonToUnknownSeasonAsync(
+                    sourceSeasonId,
+                    _selectedUnknownSeasonTarget!.SeasonId,
+                    mappings);
+            }
+
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyMetadataChanged();
+            _dataRefreshService.NotifyPlaybackChanged();
+            _navigationStateService.RequestTvSeasonDetail(result.TargetSeasonId);
+            ClearSeasonCorrectionState();
+            await ActivateAsync();
+            StatusMessage = $"Season correction applied. Moved {result.MovedSourceCount} sources; created {result.CreatedEpisodeCount} episodes.";
+        }
+        catch (Exception exception)
+        {
+            SeasonCorrectionStatusMessage = $"Season correction failed: {DescribeException(exception)}";
+        }
+        finally
+        {
+            IsSeasonCorrectionBusy = false;
+        }
     }
 
     private async Task ApplySeasonCorrectionAsync()
@@ -734,6 +1064,12 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             return;
         }
 
+        if (!TryBuildSeasonCorrectionMappings(out var mappings, out var mappingError))
+        {
+            SeasonCorrectionStatusMessage = mappingError;
+            return;
+        }
+
         var sourceSeasonId = _seasonId.Value;
         var targetSeriesTmdbId = _selectedRecognizedSeasonTarget.TmdbSeriesId;
         try
@@ -743,7 +1079,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             var result = await _unknownSeasonCorrectionService.ApplyUnknownSeasonToRecognizedSeasonAsync(
                 sourceSeasonId,
                 targetSeriesTmdbId,
-                seasonNumber);
+                seasonNumber,
+                mappings);
 
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyMetadataChanged();
@@ -966,13 +1303,23 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         IsSeasonCorrectionPanelOpen = false;
         IsSeasonCorrectionBusy = false;
         IsRecognizedSeasonPickerDialogOpen = false;
+        IsUnknownSeasonPickerDialogOpen = false;
         RecognizedSeasonSeriesGroups.Clear();
+        UnknownSeasonSeriesGroups.Clear();
         _selectedRecognizedSeasonTarget = null;
+        _selectedUnknownSeasonTarget = null;
+        _selectedSeasonCorrectionTargetKind = SeasonCorrectionTargetRecognized;
         SeasonCorrectionConfirmationText = string.Empty;
         SeasonCorrectionStatusMessage = string.Empty;
         OnPropertyChanged(nameof(HasRecognizedSeasonTargets));
+        OnPropertyChanged(nameof(HasUnknownSeasonTargets));
         OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
         OnPropertyChanged(nameof(SelectedRecognizedSeasonTargetDisplay));
+        OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetRecognized));
+        OnPropertyChanged(nameof(IsSeasonCorrectionTargetUnknown));
+        OnPropertyChanged(nameof(SeasonCorrectionRecognizedTargetButtonText));
+        OnPropertyChanged(nameof(SeasonCorrectionUnknownTargetButtonText));
         RaiseSeasonCorrectionCommandStates();
     }
 
@@ -980,6 +1327,28 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
         OnPropertyChanged(nameof(SelectedRecognizedSeasonTargetDisplay));
+        OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
+        if (IsSeasonCorrectionTargetUnknown)
+        {
+            if (_selectedUnknownSeasonTarget is null)
+            {
+                SeasonCorrectionConfirmationText = string.Empty;
+                return;
+            }
+
+            if (!TryBuildSeasonCorrectionMappings(out var unknownMappings, out var unknownMappingError))
+            {
+                SeasonCorrectionConfirmationText = unknownMappingError;
+                return;
+            }
+
+            var unknownTargetEpisodeCount = unknownMappings.Select(x => x.TargetEpisodeNumber).Distinct().Count();
+            var unknownRemappedCount = unknownMappings.Count(x => x.OriginalEpisodeNumber != x.TargetEpisodeNumber);
+            SeasonCorrectionConfirmationText =
+                $"Move {unknownMappings.Count} sources to {_selectedUnknownSeasonTarget.DisplayTitle}; target episodes {unknownTargetEpisodeCount}; remapped {unknownRemappedCount}. No real files are deleted and no empty episodes are created.";
+            return;
+        }
+
         if (_selectedRecognizedSeasonTarget is null)
         {
             SeasonCorrectionConfirmationText = string.Empty;
@@ -992,26 +1361,117 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             return;
         }
 
-        var sourceCount = Episodes.Sum(x => x.ActiveSourceCount);
+        if (!TryBuildSeasonCorrectionMappings(out var mappings, out var mappingError))
+        {
+            SeasonCorrectionConfirmationText = mappingError;
+            return;
+        }
+
+        var targetEpisodeCount = mappings.Select(x => x.TargetEpisodeNumber).Distinct().Count();
+        var remappedCount = mappings.Count(x => x.OriginalEpisodeNumber != x.TargetEpisodeNumber);
         SeasonCorrectionConfirmationText =
-            $"将把当前未识别季的 {sourceCount} 个播放源修正到《{_selectedRecognizedSeasonTarget.SeriesTitle}》S{seasonNumber:D2}。不会删除真实文件，不补空集。";
+            $"将把当前未识别季的 {mappings.Count} 个播放源修正到 {_selectedRecognizedSeasonTarget.SeriesTitle} S{seasonNumber:D2}，目标集 {targetEpisodeCount} 个，改集号 {remappedCount} 个。不删除真实文件，不补空集。";
     }
 
     private void LogSeasonCorrectionPreview()
     {
+        if (IsSeasonCorrectionTargetUnknown)
+        {
+            if (!_seasonId.HasValue || _selectedUnknownSeasonTarget is null)
+            {
+                return;
+            }
+
+            if (!TryBuildSeasonCorrectionMappings(out var unknownMappings, out _))
+            {
+                return;
+            }
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=season-correction-preview-created sourceSeasonId={_seasonId.Value} targetKind=unknown targetSeasonId={_selectedUnknownSeasonTarget.SeasonId} movedSourceCount={unknownMappings.Count} mappingSummary={ScanIdentificationDiagnostics.FormatValue(BuildSeasonCorrectionMappingSummary(unknownMappings), 220)}");
+            return;
+        }
+
         if (!_seasonId.HasValue || _selectedRecognizedSeasonTarget is null || !TryGetSeasonCorrectionSeasonNumber(out var seasonNumber))
         {
             return;
         }
 
+        if (!TryBuildSeasonCorrectionMappings(out var mappings, out _))
+        {
+            return;
+        }
+
         ScanIdentificationDiagnostics.Write(
-            $"event=season-correction-preview-created sourceSeasonId={_seasonId.Value} targetSeriesTmdbId={_selectedRecognizedSeasonTarget.TmdbSeriesId} targetSeasonNumber={seasonNumber} movedSourceCount={Episodes.Sum(x => x.ActiveSourceCount)}");
+            $"event=season-correction-preview-created sourceSeasonId={_seasonId.Value} targetSeriesTmdbId={_selectedRecognizedSeasonTarget.TmdbSeriesId} targetSeasonNumber={seasonNumber} movedSourceCount={mappings.Count} mappingSummary={ScanIdentificationDiagnostics.FormatValue(BuildSeasonCorrectionMappingSummary(mappings), 220)}");
     }
 
     private bool TryGetSeasonCorrectionSeasonNumber(out int seasonNumber)
     {
         return int.TryParse(SeasonCorrectionSeasonNumber?.Trim(), out seasonNumber)
                && seasonNumber > 0;
+    }
+
+    private bool HasValidSeasonCorrectionMappings()
+    {
+        return SeasonCorrectionMappings.Count > 0
+               && SeasonCorrectionMappings.All(x => x.ParsedTargetEpisodeNumber.HasValue);
+    }
+
+    private bool TryBuildSeasonCorrectionMappings(
+        out IReadOnlyCollection<UnknownSeasonCorrectionEpisodeMapping> mappings,
+        out string errorMessage)
+    {
+        var rows = SeasonCorrectionMappings.ToList();
+        var result = new List<UnknownSeasonCorrectionEpisodeMapping>(rows.Count);
+        if (rows.Count == 0)
+        {
+            mappings = [];
+            errorMessage = "当前未识别季没有可迁移的播放源。";
+            return false;
+        }
+
+        foreach (var row in rows)
+        {
+            if (row.ParsedTargetEpisodeNumber is not { } targetEpisodeNumber)
+            {
+                mappings = [];
+                errorMessage = $"目标集号必须是正整数：{row.OriginalEpisodeNumberText} · {row.FileName}";
+                return false;
+            }
+
+            result.Add(
+                new UnknownSeasonCorrectionEpisodeMapping
+                {
+                    MediaFileId = row.MediaFileId,
+                    OriginalEpisodeNumber = row.OriginalEpisodeNumber,
+                    TargetEpisodeNumber = targetEpisodeNumber
+                });
+        }
+
+        mappings = result;
+        errorMessage = string.Empty;
+        return true;
+    }
+
+    private static string BuildSeasonCorrectionMappingSummary(
+        IReadOnlyCollection<UnknownSeasonCorrectionEpisodeMapping> mappings)
+    {
+        if (mappings.Count == 0)
+        {
+            return "none";
+        }
+
+        var groups = mappings
+            .GroupBy(x => new { x.OriginalEpisodeNumber, x.TargetEpisodeNumber })
+            .OrderBy(x => x.Key.OriginalEpisodeNumber)
+            .ThenBy(x => x.Key.TargetEpisodeNumber)
+            .Take(20)
+            .Select(x => $"E{x.Key.OriginalEpisodeNumber}->E{x.Key.TargetEpisodeNumber}x{x.Count()}");
+        var totalGroupCount = mappings
+            .GroupBy(x => new { x.OriginalEpisodeNumber, x.TargetEpisodeNumber })
+            .Count();
+        return string.Join(",", groups) + (totalGroupCount > 20 ? ",..." : string.Empty);
     }
 
     private static bool TryParseDisplaySeasonNumber(string value, out int seasonNumber)
@@ -1058,6 +1518,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
         StatusMessage = statusMessage;
         Episodes.Clear();
+        SeasonCorrectionMappings.Clear();
+        OnPropertyChanged(nameof(HasSeasonCorrectionMappings));
+        OnPropertyChanged(nameof(HasInvalidSeasonCorrectionMappings));
         ClearSeasonCorrectionState();
         NavigateBackToSeriesCommand.RaiseCanExecuteChanged();
         RaiseSeasonStateCommandCanExecuteChanged();
@@ -1066,6 +1529,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasEpisodes));
         OnPropertyChanged(nameof(HasNoEpisodes));
         OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+        OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
     }
 
     private void RaiseSeasonStateCommandCanExecuteChanged()
@@ -1085,6 +1549,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         SearchSeasonCorrectionCandidatesCommand.RaiseCanExecuteChanged();
         CloseRecognizedSeasonPickerCommand.RaiseCanExecuteChanged();
         SelectRecognizedSeasonTargetCommand.RaiseCanExecuteChanged();
+        SelectSeasonCorrectionRecognizedTargetKindCommand.RaiseCanExecuteChanged();
+        SelectSeasonCorrectionUnknownTargetKindCommand.RaiseCanExecuteChanged();
+        OpenUnknownSeasonCorrectionPickerCommand.RaiseCanExecuteChanged();
+        CloseUnknownSeasonPickerCommand.RaiseCanExecuteChanged();
+        SelectUnknownSeasonTargetCommand.RaiseCanExecuteChanged();
         ApplySeasonCorrectionCommand.RaiseCanExecuteChanged();
     }
 
