@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using MediaLibrary.Core.Models.Enums;
 
 namespace MediaLibrary.Core.Models.ReadModels;
 
@@ -49,6 +50,10 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
     public string SceneTagsText { get; set; } = string.Empty;
 
     public bool IsInLibrary { get; set; }
+
+    public bool IsVisibleInLibrary { get; set; }
+
+    public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
     public bool IsWatched
     {
@@ -100,7 +105,9 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
         set => SetField(ref _watchStateText, value);
     }
 
-    public string DetailButtonText => IsInLibrary ? "查看详情并播放" : "查看详情（外部候选）";
+    public string DetailButtonText => MovieId > 0
+        ? IsInLibrary ? "查看详情并播放" : "查看详情（暂无播放源）"
+        : "查看详情（外部候选）";
 
     public bool CanAddWantToWatch => !IsWatched && !IsWantToWatch;
 

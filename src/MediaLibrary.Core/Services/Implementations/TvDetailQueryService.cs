@@ -128,9 +128,17 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                 season =>
                 {
                     var seasonEpisodes = episodeRows.Where(x => x.TvSeasonId == season.Id).ToList();
-                    var totalEpisodeCount = season.TmdbEpisodeCount.GetValueOrDefault() > 0
-                        ? season.TmdbEpisodeCount!.Value
-                        : seasonEpisodes.Count;
+                    var countableSeasonEpisodes = seasonEpisodes
+                        .Where(x => ShouldCountEpisodeInSeasonProgress(
+                            series.TmdbSeriesId,
+                            season.IdentificationStatus,
+                            inLibraryEpisodeIds.Contains(x.Id)))
+                        .ToList();
+                    var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(
+                        series.TmdbSeriesId,
+                        season.IdentificationStatus,
+                        season.TmdbEpisodeCount,
+                        countableSeasonEpisodes.Count);
                     var protocols = sourceProtocolsBySeason.GetValueOrDefault(season.Id) ?? [];
                     collectionBySeason.TryGetValue(season.Id, out var collection);
                     var activeSourceCount = inLibraryEpisodeCountsBySeason.GetValueOrDefault(season.Id);
@@ -138,7 +146,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     var hasCurrentState = collection?.IsFavorite == true
                                           || collection?.IsWantToWatch == true
                                           || collection?.IsNotInterested == true
-                                          || seasonEpisodes.Any(x => x.IsWatched);
+                                          || countableSeasonEpisodes.Any(x => x.IsWatched);
                     return new TvSeriesSeasonListItem
                     {
                         SeasonId = season.Id,
@@ -148,7 +156,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         PosterLocalPath = season.PosterLocalPath ?? string.Empty,
                         AirDate = season.AirDate,
                         AirYear = season.AirYear,
-                        WatchedEpisodeCount = seasonEpisodes.Count(x => x.IsWatched),
+                        WatchedEpisodeCount = countableSeasonEpisodes.Count(x => x.IsWatched),
                         TotalEpisodeCount = totalEpisodeCount,
                         InLibraryEpisodeCount = activeSourceCount,
                         LibraryVisibilityState = visibilityState,
@@ -157,6 +165,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         IdentificationStatus = season.IdentificationStatus
                     };
                 })
+            .Where(item => ShouldShowSeasonInSeriesOverview(series.TmdbSeriesId, item))
             .ToList();
 
         var posterFallback = seasonItems
@@ -184,7 +193,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             FirstAirYear = series.FirstAirYear,
             GenresText = series.GenresText ?? string.Empty,
             SourceSummary = sourceSummary,
-            TotalSeasonCount = seasons.Count,
+            TotalSeasonCount = seasonItems.Count,
             InLibrarySeasonCount = seasonItems.Count(x => x.InLibraryEpisodeCount > 0),
             Seasons = seasonItems
         };
@@ -293,11 +302,14 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         ActiveSourceCount = sources.Count
                     };
                 })
+            .Where(item => ShouldShowEpisodeInSeasonDetail(season.SeriesTmdbId, season.IdentificationStatus, item))
             .ToList();
 
-        var totalEpisodeCount = season.TmdbEpisodeCount.GetValueOrDefault() > 0
-            ? season.TmdbEpisodeCount!.Value
-            : episodeItems.Count;
+        var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(
+            season.SeriesTmdbId,
+            season.IdentificationStatus,
+            season.TmdbEpisodeCount,
+            episodeItems.Count);
         var watchedEpisodeCount = episodeItems.Count(x => x.IsWatched);
         var isSeasonWatched = totalEpisodeCount > 0
             ? episodeItems.Count >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount
@@ -513,6 +525,39 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         };
     }
 
+    public async Task<IReadOnlyList<RecognizedTvSeasonCorrectionTargetItem>> GetRecognizedSeasonCorrectionTargetsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+
+        return await dbContext.TvSeasons
+            .AsNoTracking()
+            .Where(x => x.Series != null
+                        && x.Series.TmdbSeriesId.HasValue
+                        && x.SeasonNumber > 0
+                        && x.IdentificationStatus != IdentificationStatus.Failed)
+            .OrderBy(x => x.Series!.Name)
+            .ThenBy(x => x.SeasonNumber)
+            .ThenBy(x => x.Id)
+            .Select(
+                x => new RecognizedTvSeasonCorrectionTargetItem
+                {
+                    SeriesId = x.TvSeriesId,
+                    TmdbSeriesId = x.Series!.TmdbSeriesId!.Value,
+                    SeriesTitle = x.Series.Name,
+                    OriginalSeriesTitle = x.Series.OriginalName ?? string.Empty,
+                    FirstAirYear = x.Series.FirstAirYear,
+                    SeasonId = x.Id,
+                    SeasonNumber = x.SeasonNumber,
+                    SeasonTitle = x.Name,
+                    TmdbSeasonId = x.TmdbSeasonId,
+                    EpisodeCount = x.TmdbEpisodeCount,
+                    AirDate = x.AirDate
+                })
+            .Take(500)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<string> GetSeasonTmdbRatingDisplayAsync(
         int seasonId,
         CancellationToken cancellationToken = default)
@@ -574,6 +619,60 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             LibraryVisibilityState.Visible => true,
             _ => hasActiveSource || hasCurrentState
         };
+    }
+
+    private static bool ShouldShowSeasonInSeriesOverview(int? tmdbSeriesId, TvSeriesSeasonListItem season)
+    {
+        if (IsNoTmdbFailedUnknownSeason(tmdbSeriesId, season.IdentificationStatus)
+            && season.InLibraryEpisodeCount <= 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool ShouldShowEpisodeInSeasonDetail(
+        int? tmdbSeriesId,
+        IdentificationStatus seasonIdentificationStatus,
+        TvSeasonEpisodeListItem episode)
+    {
+        if (!ShouldCountEpisodeInSeasonProgress(tmdbSeriesId, seasonIdentificationStatus, episode.HasPlayableSource))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static int ResolveSeasonProgressTotalEpisodeCount(
+        int? tmdbSeriesId,
+        IdentificationStatus seasonIdentificationStatus,
+        int? tmdbEpisodeCount,
+        int countableEpisodeCount)
+    {
+        if (IsNoTmdbFailedUnknownSeason(tmdbSeriesId, seasonIdentificationStatus))
+        {
+            return countableEpisodeCount;
+        }
+
+        return tmdbEpisodeCount.GetValueOrDefault() > 0
+            ? tmdbEpisodeCount!.Value
+            : countableEpisodeCount;
+    }
+
+    private static bool ShouldCountEpisodeInSeasonProgress(
+        int? tmdbSeriesId,
+        IdentificationStatus seasonIdentificationStatus,
+        bool hasPlayableSource)
+    {
+        return !IsNoTmdbFailedUnknownSeason(tmdbSeriesId, seasonIdentificationStatus)
+               || hasPlayableSource;
+    }
+
+    private static bool IsNoTmdbFailedUnknownSeason(int? tmdbSeriesId, IdentificationStatus seasonIdentificationStatus)
+    {
+        return tmdbSeriesId is null && seasonIdentificationStatus == IdentificationStatus.Failed;
     }
 
     private static async Task<IReadOnlyList<SourceRow>> LoadSourceRowsAsync(

@@ -1,5 +1,36 @@
 # TV Support Known Issues
 
+## Phase 4.13c Manual Aggregation Known Issues
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- `聚合后识别`, AI top1, batch AI correction, grouped unknown Season to recognized Season correction, and historical wrong-binding cleanup remain later Phase 4.13 work.
+- Manual aggregation creates a new unknown Series / Season and does not try to merge into existing unknown containers; existing-container repair remains a separate correction path.
+
+Noise:
+
+- Dialog source context uses hashed hints instead of readable paths to avoid exposing full local paths or WebDAV URLs.
+- Episode-number prefill remains parser-based; unusual SP / OVA / special naming can still require manual number edits or later specialty correction.
+
+## Phase 4.13c-fix Manual Aggregation Duplicate Guard Known Issues
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- Joining an existing unknown Season or recognized Season remains a correction workflow, not manual aggregation.
+- Same-title unknown-to-recognized migration is not automatic and remains later Season-level correction work.
+
+Noise:
+
+- The duplicate guard is normalized-equality based. It catches whitespace, case, wrapping-symbol, and common full-width / half-width differences, but it does not infer aliases or semantic title equivalence.
+
 ## Phase 4.12-post-fix-follow-up Known Issues
 
 Blocker:
@@ -362,3 +393,20 @@ Noise:
 
 - The conservative skip may leave more sources visible as Other / placeholder items until manual correction exists.
 - Strict-key mismatch logs are expected when files share episode numbers but are in different directories or already mixed unknown containers.
+
+## Phase 4.13d Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Partial unknown Season correction is not implemented; Phase 4.13d moves the whole source Season.
+- SP / OVA / OAD / specials / theatrical mappings remain manual future work and are not inferred during Season correction.
+- Historical wrong-binding cleanup and automatic top1 / batch AI correction remain separate phases.
+
+Noise:
+
+- The target Season number is user-entered. Folk-season naming that differs from TMDB numbering still depends on the user choosing the correct TMDB Season.
+- If TMDB lacks metadata for a moved Episode number, the local Episode is still created with minimal metadata so the source is not discarded.

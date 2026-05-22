@@ -17,6 +17,9 @@ public interface ITvDetailQueryService
         int? preferredMediaFileId = null,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<RecognizedTvSeasonCorrectionTargetItem>> GetRecognizedSeasonCorrectionTargetsAsync(
+        CancellationToken cancellationToken = default);
+
     Task<string> GetSeasonTmdbRatingDisplayAsync(
         int seasonId,
         CancellationToken cancellationToken = default);

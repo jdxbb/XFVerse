@@ -614,3 +614,42 @@
 - If the source was the old Movie default source, the old Movie recalculates default source with the local-first fallback.
 - Failed Movie placeholders with no remaining source can be cleaned up by the existing safe orphan cleanup semantics; real files, probe fields, subtitle bindings, and Movie user states are not deleted or migrated.
 - Movie Discovery ranking, search, recommendation inputs, Watch Insights inputs, Movie fallback thresholds, scan identification rules, schema, migrations, and batch AI correction are unchanged.
+
+# Phase 4.13b-fix No-source Movie Detail Semantics
+
+- Movie detail now distinguishes three states: external not-in-library candidate, in-library Movie with no active sources, and failed / unidentified placeholder.
+- Follow-up semantic tightening: Movie detail no longer keeps a separate not-in-library details section. The page has only source-backed and no-source detail states; library membership is exposed through labels and available actions.
+- External TMDB candidates now use the same detail tabs and no-source source-list empty state as local no-source Movies. They remain non-playable, and `Add to library` remains an action rather than a separate page mode.
+- Search and ranking cards preserve local `MovieId` status separately from active source status. Clicking a local Movie with zero active sources now opens the local Movie detail instead of the external not-in-library detail.
+- Search and ranking card clicks refresh the current local Movie status before routing, so cached TMDB cards do not keep opening the external not-in-library detail after a source correction changes local state.
+- Discovery cards now label local Movies with zero active sources as `暂无播放源`; true external candidates remain `未加入媒体库`.
+- Movie detail shows `已入库 / 暂无播放源`, disables playback, keeps the library tabs visible, and displays an empty source-list state instead of the external not-in-library explanation.
+- Media-library movie queries keep recognized local Movies visible even when active source count is zero. Hidden rows still respect `LibraryVisibilityState.Hidden`.
+- Single-source correction and manual correction cleanup now preserve recognized Movies after their last source moves away. The old safe cleanup remains limited to failed / unidentified placeholders with no remaining sources.
+- Movie correction clears or recalculates the old Movie default source before the moved source becomes the target Movie default source, avoiding duplicate default-source ownership during cross-Movie correction.
+- Movie single-source correction now materializes a newly created target Movie before moving watch-history / collection foreign keys to it, avoiding SQLite foreign-key failure when correcting into a Movie that did not already exist locally.
+- External no-source Movie candidates keep the previous not-in-library detail `Add to library` write semantics: the action writes user collection visibility state, not a fake playback source. Movie detail carries that visible-in-library state so reopening shows the `no source / in library` label and hides the add button.
+- Media-library projection includes visible external no-source Movie collection rows even without a local Movie record, including rows written by the previous not-in-library detail flow.
+- No-source Movie detail hides the correction tab because there is no selected playback source to correct; source-backed failed placeholders still keep single-source correction.
+- Recommendations and home / collection entry clicks now open local Movie detail whenever a local `MovieId` exists, even when the item has no active source.
+- Failed Movie placeholders and orphan carriers keep the unidentified / 待修正 semantics and are not reclassified as no-source recognized Movies.
+- Verification: `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors; migrations diff remained empty.
+
+# Phase 4.13c Manual Unknown Season Aggregation Cross-impact
+
+- Media-library batch mode can now move selected failed Movie placeholder sources into a newly created no-TMDB unknown TV Season.
+- This path clears `MediaFile.MovieId`, binds the same `MediaFile` to an unknown Episode, preserves real local / WebDAV files, probe fields, subtitle bindings, and Movie user states, and recalculates old Movie default source with the existing local-first fallback when needed.
+- Empty failed Movie placeholders continue to use the existing safe placeholder cleanup semantics. Recognized Movies and no-source Movies are not valid inputs for manual Season aggregation.
+- Movie Discovery ranking / search, Watch Insights, recommendations, Movie metadata matching, schema, migrations, and batch AI correction are unchanged.
+
+# Phase 4.13c-fix Manual Aggregation Duplicate Guard Cross-impact
+
+- Manual aggregation now blocks creating a new unknown Series when the entered Series title normalized-equals an existing TV Series title.
+- This keeps the Movie-side failed placeholder aggregation path from silently creating duplicate same-name TV containers. Users should use correction to join existing unknown / recognized Seasons.
+- Movie Discovery ranking / search, Watch Insights, recommendations, Movie metadata matching, schema, migrations, and batch AI correction are unchanged.
+
+# Phase 4.13d Unknown Season Correction Cross-impact
+
+- Unknown TV Season detail can now move an entire failed / no-TMDB Season into a recognized TMDB Series / Season.
+- This path only moves TV Episode sources already inside the unknown Season and does not change Movie discovery ranking, search, recommendations, Watch Insights, Movie metadata matching, Movie source correction, schema, or migrations.
+- The operation preserves physical local / WebDAV files, probe fields, subtitle bindings, and Movie / TV user states; no Movie source is moved unless it was already part of the unknown TV Season.

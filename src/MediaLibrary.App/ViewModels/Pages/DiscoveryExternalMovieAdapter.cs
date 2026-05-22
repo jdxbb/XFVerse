@@ -8,7 +8,7 @@ internal static class DiscoveryExternalMovieAdapter
     {
         return new AiRecommendationItem
         {
-            MovieId = movie.IsInLibrary && movie.MovieId.HasValue ? movie.MovieId.Value : 0,
+            MovieId = movie.MovieId ?? 0,
             TmdbId = movie.TmdbId,
             Title = movie.Title,
             OriginalTitle = movie.OriginalTitle,
@@ -26,6 +26,8 @@ internal static class DiscoveryExternalMovieAdapter
             EmotionTagsText = movie.EmotionTagsText,
             SceneTagsText = movie.SceneTagsText,
             IsInLibrary = movie.IsInLibrary,
+            IsVisibleInLibrary = movie.IsVisibleInLibrary,
+            LibraryVisibilityState = movie.LibraryVisibilityState,
             IsWatched = movie.IsWatched,
             IsWantToWatch = movie.IsWantToWatch,
             IsNotInterested = movie.IsNotInterested,

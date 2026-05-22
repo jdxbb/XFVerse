@@ -313,6 +313,10 @@
                             Content="删除记录"
                             Command="{Binding BatchDeleteMovieRecordsCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Margin="0,0,10,10"
+                            Content="人工聚合为季"
+                            Command="{Binding OpenManualAggregationCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}" />
                 </WrapPanel>
             </Grid>
         </Border>
@@ -578,6 +582,204 @@
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsManualAggregationDialogOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border Width="980"
+                    MaxHeight="700"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PageCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="人工聚合为未识别季" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="只为当前选中的未识别播放源创建集；重复集号会作为同一集的多播放源，不会补空集。"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="1" Margin="0,18,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="剧名" Style="{StaticResource BodyMutedTextStyle}" />
+                            <TextBox Margin="0,6,0,0"
+                                     Text="{Binding ManualAggregationSeriesTitle, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+                                        <Setter Property="IsEnabled" Value="True" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsManualAggregationBusy}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="季号" Style="{StaticResource BodyMutedTextStyle}" />
+                            <TextBox Margin="0,6,0,0"
+                                     Text="{Binding ManualAggregationSeasonNumberText, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+                                        <Setter Property="IsEnabled" Value="True" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsManualAggregationBusy}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="季名称" Style="{StaticResource BodyMutedTextStyle}" />
+                            <TextBox Margin="0,6,0,0"
+                                     Text="{Binding ManualAggregationSeasonTitle, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+                                        <Setter Property="IsEnabled" Value="True" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsManualAggregationBusy}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                            <TextBlock Margin="0,6,0,0"
+                                       Text="{Binding ManualAggregationSeasonDisplayText}"
+                                       Style="{StaticResource BodyMutedTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Text="没有可聚合的播放源">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasManualAggregationSources}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <ListBox ItemsSource="{Binding ManualAggregationSources}">
+                            <ListBox.Style>
+                                <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasManualAggregationSources}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.Style>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,8"
+                                            Padding="12"
+                                            Background="{DynamicResource BrushSurfaceAlt}"
+                                            BorderBrush="{DynamicResource BrushBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="120" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Margin="0,0,16,0">
+                                                <TextBlock Text="{Binding FileName}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Style="{StaticResource BodyTextStyle}" />
+                                                <TextBlock Margin="0,5,0,0"
+                                                           Text="{Binding SourceSummary}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="0,0,14,0"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding CurrentBindingText}"
+                                                       TextWrapping="Wrap"
+                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Grid.Column="2"
+                                                       Margin="0,0,14,0"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding EpisodeNumberSourceText}"
+                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBox Grid.Column="3"
+                                                     VerticalAlignment="Center"
+                                                     Text="{Binding EpisodeNumberText, UpdateSourceTrigger=PropertyChanged}">
+                                                <TextBox.Style>
+                                                    <Style TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+                                                        <Setter Property="IsEnabled" Value="True" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding DataContext.IsManualAggregationBusy, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                                <Setter Property="IsEnabled" Value="False" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+
+                    <DockPanel Grid.Row="3" Margin="0,16,0,0" LastChildFill="True">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Margin="0,0,10,0"
+                                    Content="取消"
+                                    Command="{Binding CancelManualAggregationCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                            <Button Content="聚合"
+                                    Command="{Binding ApplyManualAggregationCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                        </StackPanel>
+                        <TextBlock Margin="0,0,18,0"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding ManualAggregationStatusMessage}"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+                    </DockPanel>
+                </Grid>
+            </Border>
+        </Border>
+
+        <Border Grid.RowSpan="3"
+                Background="#99000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
                         <DataTrigger Binding="{Binding IsRemovedLibraryPanelOpen}" Value="True">
                             <Setter Property="Visibility" Value="Visible" />
                         </DataTrigger>
@@ -626,7 +828,7 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-	                        <ListBox ItemsSource="{Binding RemovedLibraryItems}">
+                        <ListBox ItemsSource="{Binding RemovedLibraryGroups}">
                             <ListBox.Style>
                                 <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
                                     <Setter Property="Visibility" Value="Visible" />
@@ -639,40 +841,119 @@
                             </ListBox.Style>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="140" />
-                                            <ColumnDefinition Width="110" />
-                                            <ColumnDefinition Width="110" />
-                                            <ColumnDefinition Width="110" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Margin="0,0,18,0">
-                                            <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
-                                            <WrapPanel Margin="0,6,0,0">
-                                                <TextBlock Margin="0,0,12,0" Text="{Binding MediaKindText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                <TextBlock Margin="0,0,12,0" Text="{Binding SourceStatusText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                <TextBlock Text="{Binding StateSummary}" Style="{StaticResource BodyMutedTextStyle}" />
-                                            </WrapPanel>
-                                        </StackPanel>
-                                        <Button Grid.Column="2"
-                                                Content="恢复"
-                                                Command="{Binding DataContext.RestoreRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource PrimaryButtonStyle}" />
-                                        <Button Grid.Column="3"
-                                                Margin="10,0,0,0"
-                                                Content="详情"
-                                                Command="{Binding DataContext.OpenRemovedLibraryDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                        <Button Grid.Column="4"
-                                                Margin="10,0,0,0"
-                                                Content="删除记录"
-                                                Command="{Binding DataContext.DeleteRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                    </Grid>
+                                    <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                                        <Expander.Header>
+                                            <Border Padding="14"
+                                                    BorderBrush="{DynamicResource BrushBorder}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="12">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsTvGroup}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="112" />
+                                                        <ColumnDefinition Width="124" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Margin="0,0,16,0">
+                                                        <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
+                                                        <TextBlock Margin="0,5,0,0"
+                                                                   Text="{Binding HeaderSubtitle}"
+                                                                   TextWrapping="Wrap"
+                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1"
+                                                            Margin="0,0,8,0"
+                                                            Content="恢复全部"
+                                                            Command="{Binding DataContext.RestoreRemovedLibraryGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsTvGroup}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                    <Button Grid.Column="2"
+                                                            Content="删除全部记录"
+                                                            Command="{Binding DataContext.DeleteRemovedLibraryGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsTvGroup}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </Expander.Header>
+
+                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="20,0,0,8"
+                                                            Background="{DynamicResource BrushSurfaceAlt}"
+                                                            BorderBrush="{DynamicResource BrushBorder}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="12">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="4" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="100" />
+                                                                <ColumnDefinition Width="100" />
+                                                                <ColumnDefinition Width="110" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Background="{DynamicResource BrushAccent}" CornerRadius="12,0,0,12" />
+                                                            <StackPanel Grid.Column="1" Margin="12,10,18,10">
+                                                                <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
+                                                                <WrapPanel Margin="0,6,0,0">
+                                                                    <TextBlock Margin="0,0,12,0" Text="{Binding MediaKindText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    <TextBlock Margin="0,0,12,0" Text="{Binding SourceStatusText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    <TextBlock Text="{Binding StateSummary}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                                </WrapPanel>
+                                                            </StackPanel>
+                                                            <Button Grid.Column="2"
+                                                                    Margin="0,10,8,10"
+                                                                    Content="恢复"
+                                                                    Command="{Binding DataContext.RestoreRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource PrimaryButtonStyle}" />
+                                                            <Button Grid.Column="3"
+                                                                    Margin="0,10,8,10"
+                                                                    Content="详情"
+                                                                    Command="{Binding DataContext.OpenRemovedLibraryDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                                            <Button Grid.Column="4"
+                                                                    Margin="0,10,12,10"
+                                                                    Content="删除记录"
+                                                                    Command="{Binding DataContext.DeleteRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Expander>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

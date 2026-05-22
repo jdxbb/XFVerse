@@ -8,6 +8,10 @@ public sealed class DiscoveryMovieStatus
 
     public int? MovieId { get; set; }
 
+    public int ActiveSourceCount { get; set; }
+
+    public bool HasLocalMovie => MovieId is > 0;
+
     public bool IsInLibrary { get; set; }
 
     public bool IsVisibleInLibrary { get; set; }

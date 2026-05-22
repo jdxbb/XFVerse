@@ -44,6 +44,8 @@ public sealed class LibraryMovieListItem
 
     public string OriginalTitle { get; set; } = string.Empty;
 
+    public string SeriesTitle { get; set; } = string.Empty;
+
     public int? ReleaseYear { get; set; }
 
     public string PosterRemoteUrl { get; set; } = string.Empty;

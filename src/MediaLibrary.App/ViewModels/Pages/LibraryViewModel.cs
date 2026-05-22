@@ -62,6 +62,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly IUserCollectionService _userCollectionService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
+    private readonly IManualUnknownSeasonAggregationService _manualUnknownSeasonAggregationService;
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly List<LibraryMovieListItem> _allMovies = [];
     private readonly HashSet<string> _selectedItemKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -84,8 +85,14 @@ public sealed class LibraryViewModel : PageViewModelBase
     private bool _isBatchOperationRunning;
     private bool _isRemovedLibraryPanelOpen;
     private bool _isRemovedLibraryLoading;
+    private bool _isManualAggregationDialogOpen;
+    private bool _isManualAggregationBusy;
     private string _statusMessage = "媒体库会展示已识别的真实影片数据。";
     private string _batchResultSummary = string.Empty;
+    private string _manualAggregationSeriesTitle = string.Empty;
+    private string _manualAggregationSeasonTitle = string.Empty;
+    private string _manualAggregationSeasonNumberText = "1";
+    private string _manualAggregationStatusMessage = "请选择多个未识别播放源后聚合为新的未识别季。";
     private string _removedLibraryStatusMessage = "已移出媒体库项目会保留状态和播放源。";
 
     public LibraryViewModel(
@@ -96,6 +103,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         IMovieIdentificationService movieIdentificationService,
         IUserCollectionService userCollectionService,
         ITvSeasonCollectionService tvSeasonCollectionService,
+        IManualUnknownSeasonAggregationService manualUnknownSeasonAggregationService,
         IConfirmationDialogService confirmationDialogService)
         : base("媒体库", "浏览真实影片数据，支持搜索、排序、筛选和批量操作。")
     {
@@ -106,6 +114,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         _movieIdentificationService = movieIdentificationService;
         _userCollectionService = userCollectionService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
+        _manualUnknownSeasonAggregationService = manualUnknownSeasonAggregationService;
         _confirmationDialogService = confirmationDialogService;
         _dataRefreshService.DataChanged += OnDataChanged;
 
@@ -138,10 +147,15 @@ public sealed class LibraryViewModel : PageViewModelBase
         CancelBatchOperationCommand = new RelayCommand(CancelBatchOperation, () => CanCancelBatchOperation);
         BatchRemoveFromLibraryCommand = new AsyncRelayCommand(BatchRemoveFromLibraryAsync, () => CanBatchRemoveFromLibrary);
         BatchDeleteMovieRecordsCommand = new AsyncRelayCommand(BatchDeleteMovieRecordsAsync, () => CanBatchDeleteMovieRecords);
+        OpenManualAggregationCommand = new AsyncRelayCommand(OpenManualAggregationAsync, () => CanBatchManualAggregate);
+        ApplyManualAggregationCommand = new AsyncRelayCommand(ApplyManualAggregationAsync, () => CanApplyManualAggregation);
+        CancelManualAggregationCommand = new RelayCommand(CancelManualAggregation, () => IsManualAggregationDialogOpen && !IsManualAggregationBusy);
         OpenRemovedLibraryCommand = new AsyncRelayCommand(OpenRemovedLibraryAsync, () => !IsRemovedLibraryLoading);
         CloseRemovedLibraryCommand = new RelayCommand(CloseRemovedLibrary);
         RestoreRemovedLibraryItemCommand = new AsyncRelayCommand(RestoreRemovedLibraryItemAsync, _ => !IsRemovedLibraryLoading);
         DeleteRemovedLibraryItemCommand = new AsyncRelayCommand(DeleteRemovedLibraryItemAsync, _ => !IsRemovedLibraryLoading);
+        RestoreRemovedLibraryGroupCommand = new AsyncRelayCommand(RestoreRemovedLibraryGroupAsync, parameter => !IsRemovedLibraryLoading && parameter is RemovedLibraryGroupViewModel { IsTvGroup: true });
+        DeleteRemovedLibraryGroupCommand = new AsyncRelayCommand(DeleteRemovedLibraryGroupAsync, parameter => !IsRemovedLibraryLoading && parameter is RemovedLibraryGroupViewModel { IsTvGroup: true });
         OpenRemovedLibraryDetailCommand = new RelayCommand(OpenMovie);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
         ApplySearchCommand = new RelayCommand(ApplyFilters);
@@ -152,6 +166,10 @@ public sealed class LibraryViewModel : PageViewModelBase
     public ObservableCollection<LibraryMovieItemViewModel> Movies { get; } = [];
 
     public ObservableCollection<LibraryMovieItemViewModel> RemovedLibraryItems { get; } = [];
+
+    public ObservableCollection<RemovedLibraryGroupViewModel> RemovedLibraryGroups { get; } = [];
+
+    public ObservableCollection<ManualUnknownSeasonAggregationSourceRowViewModel> ManualAggregationSources { get; } = [];
 
     public ObservableCollection<TagFilterOption> TypeTagOptions { get; } = [];
 
@@ -217,6 +235,12 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public AsyncRelayCommand BatchDeleteMovieRecordsCommand { get; }
 
+    public AsyncRelayCommand OpenManualAggregationCommand { get; }
+
+    public AsyncRelayCommand ApplyManualAggregationCommand { get; }
+
+    public RelayCommand CancelManualAggregationCommand { get; }
+
     public AsyncRelayCommand OpenRemovedLibraryCommand { get; }
 
     public RelayCommand CloseRemovedLibraryCommand { get; }
@@ -224,6 +248,10 @@ public sealed class LibraryViewModel : PageViewModelBase
     public AsyncRelayCommand RestoreRemovedLibraryItemCommand { get; }
 
     public AsyncRelayCommand DeleteRemovedLibraryItemCommand { get; }
+
+    public AsyncRelayCommand RestoreRemovedLibraryGroupCommand { get; }
+
+    public AsyncRelayCommand DeleteRemovedLibraryGroupCommand { get; }
 
     public RelayCommand OpenRemovedLibraryDetailCommand { get; }
 
@@ -478,6 +506,112 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public bool CanBatchDeleteMovieRecords => IsBatchSelectionMode && HasSelection && !IsBatchOperationRunning;
 
+    public bool CanBatchManualAggregate => IsBatchSelectionMode
+                                           && HasSelection
+                                           && !IsBatchOperationRunning
+                                           && !IsManualAggregationBusy
+                                           && GetSelectedVisibleItems().Count > 0
+                                           && GetSelectedVisibleItems().All(CanUseForManualUnknownSeasonAggregation);
+
+    public bool IsManualAggregationDialogOpen
+    {
+        get => _isManualAggregationDialogOpen;
+        private set
+        {
+            if (SetProperty(ref _isManualAggregationDialogOpen, value))
+            {
+                OnPropertyChanged(nameof(CanApplyManualAggregation));
+                ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+                CancelManualAggregationCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsManualAggregationBusy
+    {
+        get => _isManualAggregationBusy;
+        private set
+        {
+            if (SetProperty(ref _isManualAggregationBusy, value))
+            {
+                OnPropertyChanged(nameof(CanBatchManualAggregate));
+                OnPropertyChanged(nameof(CanApplyManualAggregation));
+                OpenManualAggregationCommand.RaiseCanExecuteChanged();
+                ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+                CancelManualAggregationCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string ManualAggregationSeriesTitle
+    {
+        get => _manualAggregationSeriesTitle;
+        set
+        {
+            if (SetProperty(ref _manualAggregationSeriesTitle, value))
+            {
+                OnPropertyChanged(nameof(CanApplyManualAggregation));
+                ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string ManualAggregationSeasonTitle
+    {
+        get => _manualAggregationSeasonTitle;
+        set
+        {
+            if (SetProperty(ref _manualAggregationSeasonTitle, value))
+            {
+                OnPropertyChanged(nameof(CanApplyManualAggregation));
+                OnPropertyChanged(nameof(ManualAggregationSeasonDisplayText));
+                ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string ManualAggregationSeasonNumberText
+    {
+        get => _manualAggregationSeasonNumberText;
+        set
+        {
+            if (SetProperty(ref _manualAggregationSeasonNumberText, value))
+            {
+                OnPropertyChanged(nameof(CanApplyManualAggregation));
+                OnPropertyChanged(nameof(ManualAggregationSeasonDisplayText));
+                ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string ManualAggregationSeasonDisplayText
+    {
+        get
+        {
+            var seasonNumber = ManualAggregationSeasonNumber;
+            var seasonText = seasonNumber.HasValue ? $"S{seasonNumber.Value:00}" : "S?";
+            return string.IsNullOrWhiteSpace(ManualAggregationSeasonTitle)
+                ? seasonText
+                : $"{seasonText} {ManualAggregationSeasonTitle.Trim()}";
+        }
+    }
+
+    private int? ManualAggregationSeasonNumber => int.TryParse(ManualAggregationSeasonNumberText, out var value) && value > 0
+        ? value
+        : null;
+
+    public string ManualAggregationStatusMessage
+    {
+        get => _manualAggregationStatusMessage;
+        private set => SetProperty(ref _manualAggregationStatusMessage, value);
+    }
+
+    public bool HasManualAggregationSources => ManualAggregationSources.Count > 0;
+
+    public bool CanApplyManualAggregation => IsManualAggregationDialogOpen
+                                             && !IsManualAggregationBusy
+                                             && ManualAggregationSources.Count > 0;
+
     public bool CanCancelBatchOperation => IsBatchOperationRunning
                                            && _batchIdentifyCancellationTokenSource is not null
                                            && !_batchIdentifyCancellationTokenSource.IsCancellationRequested;
@@ -498,6 +632,8 @@ public sealed class LibraryViewModel : PageViewModelBase
                 OpenRemovedLibraryCommand.RaiseCanExecuteChanged();
                 RestoreRemovedLibraryItemCommand.RaiseCanExecuteChanged();
                 DeleteRemovedLibraryItemCommand.RaiseCanExecuteChanged();
+                RestoreRemovedLibraryGroupCommand.RaiseCanExecuteChanged();
+                DeleteRemovedLibraryGroupCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -508,7 +644,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         private set => SetProperty(ref _removedLibraryStatusMessage, value);
     }
 
-    public bool HasRemovedLibraryItems => RemovedLibraryItems.Count > 0;
+    public bool HasRemovedLibraryItems => RemovedLibraryGroups.Count > 0;
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
@@ -558,6 +694,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                 RemovedLibraryItems.Add(new LibraryMovieItemViewModel(item, BuildSelectionKey(item), false, false));
             }
 
+            RefreshRemovedLibraryGroups();
             OnPropertyChanged(nameof(HasRemovedLibraryItems));
             RemovedLibraryStatusMessage = items.Count == 0
                 ? "当前没有已移出媒体库项目。"
@@ -566,6 +703,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         catch (Exception exception)
         {
             RemovedLibraryItems.Clear();
+            RemovedLibraryGroups.Clear();
             OnPropertyChanged(nameof(HasRemovedLibraryItems));
             RemovedLibraryStatusMessage = $"加载已移出媒体库失败：{exception.Message}";
         }
@@ -578,6 +716,15 @@ public sealed class LibraryViewModel : PageViewModelBase
     private void CloseRemovedLibrary()
     {
         IsRemovedLibraryPanelOpen = false;
+    }
+
+    private void RefreshRemovedLibraryGroups()
+    {
+        RemovedLibraryGroups.Clear();
+        foreach (var group in RemovedLibraryGroupViewModel.FromItems(RemovedLibraryItems))
+        {
+            RemovedLibraryGroups.Add(group);
+        }
     }
 
     private async Task RestoreRemovedLibraryItemAsync(object? parameter)
@@ -612,6 +759,53 @@ public sealed class LibraryViewModel : PageViewModelBase
             }
 
             RemovedLibraryStatusMessage = $"已恢复到媒体库：{item.Title}";
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await LoadRemovedLibraryItemsAsync();
+            await ActivateAsync();
+        }
+        catch (Exception exception)
+        {
+            RemovedLibraryStatusMessage = $"恢复到媒体库失败：{exception.Message}";
+        }
+    }
+
+    private async Task RestoreRemovedLibraryGroupAsync(object? parameter)
+    {
+        if (parameter is not RemovedLibraryGroupViewModel { IsTvGroup: true } group)
+        {
+            return;
+        }
+
+        var items = group.Items.ToArray();
+        if (items.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var item in items)
+            {
+                if (IsGroupedPlaceholder(item.Movie))
+                {
+                    await _movieManagementService.RestoreGroupedPlaceholderRangeToLibraryAsync(item.Movie.GroupedRangeMediaFileIds);
+                }
+                else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
+                {
+                    await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(item.SeasonId);
+                }
+                else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
+                {
+                    await _movieManagementService.RestoreToLibraryAsync(item.MovieId);
+                }
+                else if (item.IsMovie)
+                {
+                    await _userCollectionService.RestoreToLibraryAsync(BuildRecommendationItem(item.Movie), changeSource: "RemovedLibrary");
+                }
+            }
+
+            RemovedLibraryStatusMessage = $"已恢复到媒体库：{group.Title}（{items.Length} 项）";
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await LoadRemovedLibraryItemsAsync();
@@ -665,6 +859,65 @@ public sealed class LibraryViewModel : PageViewModelBase
             }
 
             RemovedLibraryStatusMessage = $"已删除记录：{item.Title}";
+            _dataRefreshService.NotifyLibraryChanged();
+            _dataRefreshService.NotifyPlaybackChanged();
+            _dataRefreshService.NotifyMetadataChanged();
+            _dataRefreshService.NotifyCollectionChanged();
+            await LoadRemovedLibraryItemsAsync();
+            await ActivateAsync();
+        }
+        catch (Exception exception)
+        {
+            RemovedLibraryStatusMessage = $"删除记录失败：{exception.Message}";
+        }
+    }
+
+    private async Task DeleteRemovedLibraryGroupAsync(object? parameter)
+    {
+        if (parameter is not RemovedLibraryGroupViewModel { IsTvGroup: true } group)
+        {
+            return;
+        }
+
+        var items = group.Items.ToArray();
+        if (items.Length == 0)
+        {
+            return;
+        }
+
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "确认删除记录？",
+            $"将删除该剧下已移出媒体库的 {items.Length} 个 Season 记录。删除记录不会删除本地文件或 WebDAV 文件。",
+            "删除记录",
+            "取消");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var item in items)
+            {
+                if (IsGroupedPlaceholder(item.Movie))
+                {
+                    await _movieManagementService.DeleteGroupedPlaceholderRangeRecordAsync(item.Movie.GroupedRangeMediaFileIds);
+                }
+                else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
+                {
+                    await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.SeasonId);
+                }
+                else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
+                {
+                    await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
+                }
+                else if (item.IsMovie)
+                {
+                    await _userCollectionService.DeleteCollectionRecordAsync(BuildRecommendationItem(item.Movie));
+                }
+            }
+
+            RemovedLibraryStatusMessage = $"已删除记录：{group.Title}（{items.Length} 项）";
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyPlaybackChanged();
             _dataRefreshService.NotifyMetadataChanged();
@@ -1394,6 +1647,154 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
+    private async Task OpenManualAggregationAsync()
+    {
+        var selectedItems = GetSelectedVisibleItems();
+        if (selectedItems.Count == 0)
+        {
+            BatchResultSummary = "没有可聚合的已选项目。";
+            return;
+        }
+
+        if (selectedItems.Any(item => !CanUseForManualUnknownSeasonAggregation(item)))
+        {
+            BatchResultSummary = "人工聚合为季只支持未识别且有播放源的项目；混入已识别或无播放源项目时不可用。";
+            RefreshBatchCommandState();
+            return;
+        }
+
+        IsManualAggregationBusy = true;
+        ManualAggregationStatusMessage = "正在展开已选未识别播放源...";
+        WriteLibraryBatchEvent($"event=manual-unknown-season-aggregation-open count={selectedItems.Count}");
+
+        try
+        {
+            var selections = selectedItems
+                .Select(BuildManualAggregationSelection)
+                .ToArray();
+            var result = await _manualUnknownSeasonAggregationService.PrepareAsync(selections);
+            ManualAggregationStatusMessage = string.IsNullOrWhiteSpace(result.Message)
+                ? "已展开已选播放源。"
+                : result.Message;
+
+            if (!result.IsValid)
+            {
+                BatchResultSummary = ManualAggregationStatusMessage;
+                WriteLibraryBatchEvent(
+                    $"event=manual-unknown-season-aggregation-open-skipped reason=\"{AiPerfDiagnostics.SanitizeMessage(ManualAggregationStatusMessage)}\"");
+                return;
+            }
+
+            ManualAggregationSeriesTitle = result.SuggestedSeriesTitle;
+            ManualAggregationSeasonTitle = result.SuggestedSeasonTitle;
+            ManualAggregationSeasonNumberText = "1";
+            ManualAggregationSources.Clear();
+            foreach (var source in result.Sources.OrderBy(item => item.SortIndex).ThenBy(item => item.MediaFileId))
+            {
+                ManualAggregationSources.Add(new ManualUnknownSeasonAggregationSourceRowViewModel(source));
+            }
+
+            RefreshManualAggregationState();
+            IsManualAggregationDialogOpen = true;
+            BatchResultSummary = $"已展开 {ManualAggregationSources.Count} 个未识别播放源，请确认集号后聚合。";
+        }
+        catch (Exception exception)
+        {
+            var message = DescribeException(exception);
+            ManualAggregationStatusMessage = $"打开人工聚合失败：{message}";
+            BatchResultSummary = ManualAggregationStatusMessage;
+            WriteLibraryBatchEvent(
+                $"event=manual-unknown-season-aggregation-open-failed reason=\"{AiPerfDiagnostics.SanitizeMessage(message)}\"");
+        }
+        finally
+        {
+            IsManualAggregationBusy = false;
+        }
+    }
+
+    private async Task ApplyManualAggregationAsync()
+    {
+        if (!IsManualAggregationDialogOpen || IsManualAggregationBusy)
+        {
+            return;
+        }
+
+        var validationMessage = ValidateManualAggregationInput();
+        if (!string.IsNullOrWhiteSpace(validationMessage))
+        {
+            ManualAggregationStatusMessage = validationMessage;
+            return;
+        }
+
+        var request = new ManualUnknownSeasonAggregationApplyRequest
+        {
+            SeriesTitle = ManualAggregationSeriesTitle.Trim(),
+            SeasonTitle = ManualAggregationSeasonTitle.Trim(),
+            SeasonNumber = ManualAggregationSeasonNumber.GetValueOrDefault(),
+            Sources = ManualAggregationSources
+                .Select(row => new ManualUnknownSeasonAggregationSourceAssignment
+                {
+                    MediaFileId = row.MediaFileId,
+                    EpisodeNumber = row.ParsedEpisodeNumber.GetValueOrDefault()
+                })
+                .ToArray()
+        };
+
+        IsManualAggregationBusy = true;
+        IsBatchOperationRunning = true;
+        ManualAggregationStatusMessage = "正在聚合为未识别季...";
+        WriteLibraryBatchEvent(
+            $"event=manual-season-aggregate-apply-started sourceCount={request.Sources.Count} seasonNumber={request.SeasonNumber}");
+
+        try
+        {
+            var result = await _manualUnknownSeasonAggregationService.ApplyAsync(request);
+            var message = $"人工聚合完成：移动 {result.SourceCount} 个播放源，创建 {result.CreatedEpisodeCount} 集，重复集号追加 {result.AdditionalSourceCount} 个播放源。";
+            ManualAggregationStatusMessage = message;
+            BatchResultSummary = message;
+            IsManualAggregationDialogOpen = false;
+            ManualAggregationSources.Clear();
+            ManualAggregationSeasonNumberText = "1";
+            RefreshManualAggregationState();
+            ClearSelection();
+            IsBatchSelectionMode = false;
+            NotifyAfterManualAggregation();
+            await ActivateAsync();
+            WriteLibraryBatchEvent(
+                $"event=manual-season-aggregate-apply-succeeded seasonId={result.SeasonId} sourceCount={result.SourceCount} createdEpisodeCount={result.CreatedEpisodeCount} additionalSourceCount={result.AdditionalSourceCount} seasonNumber={request.SeasonNumber}");
+        }
+        catch (Exception exception)
+        {
+            var message = DescribeException(exception);
+            ManualAggregationStatusMessage = message.Contains("已存在同名剧集", StringComparison.Ordinal)
+                ? message
+                : $"聚合失败，事务已回滚：{message}";
+            BatchResultSummary = ManualAggregationStatusMessage;
+            WriteLibraryBatchEvent(
+                $"event=manual-season-aggregate-apply-failed seasonNumber={request.SeasonNumber} failureReason=\"{AiPerfDiagnostics.SanitizeMessage(message)}\"");
+        }
+        finally
+        {
+            IsBatchOperationRunning = false;
+            IsManualAggregationBusy = false;
+        }
+    }
+
+    private void CancelManualAggregation()
+    {
+        if (IsManualAggregationBusy)
+        {
+            return;
+        }
+
+        IsManualAggregationDialogOpen = false;
+        ManualAggregationSources.Clear();
+        ManualAggregationSeasonNumberText = "1";
+        RefreshManualAggregationState();
+        ManualAggregationStatusMessage = "已取消人工聚合。";
+        BatchResultSummary = "已取消人工聚合。";
+    }
+
     private async Task BatchAutoIdentifyAsync()
     {
         var selectedItems = GetSelectedVisibleItems();
@@ -1538,6 +1939,94 @@ public sealed class LibraryViewModel : PageViewModelBase
             .ToList();
     }
 
+    private static ManualUnknownSeasonAggregationSelection BuildManualAggregationSelection(LibraryMovieItemViewModel item)
+    {
+        return new ManualUnknownSeasonAggregationSelection
+        {
+            SelectionKey = item.SelectionKey,
+            MovieId = item.Movie.MovieId,
+            SeasonId = item.Movie.SeasonId,
+            OrphanMediaFileId = item.Movie.OrphanMediaFileId,
+            GroupedRangeMediaFileIds = item.Movie.GroupedRangeMediaFileIds
+        };
+    }
+
+    private static bool CanUseForManualUnknownSeasonAggregation(LibraryMovieItemViewModel item)
+    {
+        if (!item.HasActiveSource)
+        {
+            return false;
+        }
+
+        var movie = item.Movie;
+        if (movie.IsOther && movie.OrphanMediaFileId > 0)
+        {
+            return true;
+        }
+
+        if (IsGroupedPlaceholder(movie))
+        {
+            return true;
+        }
+
+        if ((movie.IsSeason || movie.IsOther)
+            && movie.SeasonId > 0
+            && movie.TmdbId is null
+            && movie.IdentificationStatus == IdentificationStatus.Failed)
+        {
+            return true;
+        }
+
+        return (movie.IsMovie || movie.IsOther)
+               && movie.MovieId > 0
+               && movie.TmdbId is null
+               && movie.IdentificationStatus == IdentificationStatus.Failed;
+    }
+
+    private string? ValidateManualAggregationInput()
+    {
+        if (string.IsNullOrWhiteSpace(ManualAggregationSeriesTitle))
+        {
+            return "请输入剧名。";
+        }
+
+        if (string.IsNullOrWhiteSpace(ManualAggregationSeasonTitle))
+        {
+            return "请输入季名称。";
+        }
+
+        if (ManualAggregationSeasonNumber is null)
+        {
+            WriteLibraryBatchEvent("event=manual-season-aggregate-season-number-invalid");
+            return "季号必须是正整数。";
+        }
+
+        if (ManualAggregationSources.Count == 0)
+        {
+            return "没有可聚合的播放源。";
+        }
+
+        var invalidRows = ManualAggregationSources
+            .Where(row => row.ParsedEpisodeNumber is null)
+            .Take(3)
+            .Select(row => row.FileName)
+            .ToArray();
+        if (invalidRows.Length == 0)
+        {
+            return null;
+        }
+
+        return $"集号必须是正整数，请检查：{string.Join("；", invalidRows)}";
+    }
+
+    private void RefreshManualAggregationState()
+    {
+        OnPropertyChanged(nameof(HasManualAggregationSources));
+        OnPropertyChanged(nameof(CanApplyManualAggregation));
+        ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+        CancelManualAggregationCommand.RaiseCanExecuteChanged();
+    }
+
     private void SetSelectionToFailures(IEnumerable<BatchItemError> errors)
     {
         _selectedItemKeys.Clear();
@@ -1591,6 +2080,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(CanBatchAutoIdentify));
         OnPropertyChanged(nameof(CanBatchRemoveFromLibrary));
         OnPropertyChanged(nameof(CanBatchDeleteMovieRecords));
+        OnPropertyChanged(nameof(CanBatchManualAggregate));
         OnPropertyChanged(nameof(CanCancelBatchOperation));
         OnPropertyChanged(nameof(BatchSelectionButtonText));
         if (_allMovies.Count > 0)
@@ -1607,6 +2097,9 @@ public sealed class LibraryViewModel : PageViewModelBase
         CancelBatchOperationCommand.RaiseCanExecuteChanged();
         BatchRemoveFromLibraryCommand.RaiseCanExecuteChanged();
         BatchDeleteMovieRecordsCommand.RaiseCanExecuteChanged();
+        OpenManualAggregationCommand.RaiseCanExecuteChanged();
+        ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+        CancelManualAggregationCommand.RaiseCanExecuteChanged();
     }
 
     private void NotifyAfterBatchStatusChange()
@@ -1630,6 +2123,14 @@ public sealed class LibraryViewModel : PageViewModelBase
         _dataRefreshService.NotifyMetadataChanged();
         _dataRefreshService.NotifyCollectionChanged();
         _dataRefreshService.NotifyRecommendationChanged();
+    }
+
+    private void NotifyAfterManualAggregation()
+    {
+        _dataRefreshService.NotifyLibraryChanged();
+        _dataRefreshService.NotifyPlaybackChanged();
+        _dataRefreshService.NotifyMetadataChanged();
+        _dataRefreshService.NotifyCollectionChanged();
     }
 
     private void NotifyAfterBatchIdentification()
@@ -1754,6 +2255,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             EmotionTagsText = movie.EmotionTagsText,
             SceneTagsText = movie.SceneTagsText,
             IsInLibrary = movie.IsInLibrary,
+            IsVisibleInLibrary = movie.IsVisibleInLibrary,
+            LibraryVisibilityState = movie.LibraryVisibilityState,
             IsWatched = movie.IsWatched,
             IsWantToWatch = movie.IsWantToWatch,
             IsNotInterested = movie.IsNotInterested,

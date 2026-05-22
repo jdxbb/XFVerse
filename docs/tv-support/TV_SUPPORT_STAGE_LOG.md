@@ -2419,3 +2419,159 @@ Known Issues:
 - Blocker: none expected in the implemented single-source path.
 - Deferred: batch correction, manual grouping, grouped Season correction, and historical cleanup remain later Phase 4.13 work.
 - Noise: the picker dialog uses hashed context hints rather than readable paths, so users distinguish same-name unknown Seasons by title, range, source count, source kind, and context hash.
+
+## Phase 4.13b-fix Movie no-source semantics correction impact
+
+Completed:
+
+- TV correction paths keep preserving real files, probe fields, subtitle bindings, and TV / Movie user states.
+- When a TV correction path moves a source away from a Movie, recognized Movies are preserved as no-source Movies instead of being deleted as if they were failed placeholders.
+- Failed Movie placeholders with no remaining source still use the existing safe cleanup semantics.
+
+Not done:
+
+- No TV no-source detail redesign, batch correction, manual grouping, grouped Season correction, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: none after build validation.
+- Deferred: broader TV no-source semantics remain outside this Movie-focused fix.
+- Noise: this stage only records the correction impact on Movie cleanup from TV correction paths.
+
+## Phase 4.13b follow-up - no-source Episode correction tab and removed-library grouping
+
+Completed:
+
+- Confirmed Episode detail has no add-to-library command. TV add-to-library remains on Season detail through the existing season collection flow.
+- Episode detail now exposes the correction tab and top-level correction button only when the Episode has at least one playback source.
+- If an Episode loses all sources while the correction tab is selected, the page returns to the playback-source tab and hides correction UI.
+- The media-library removed-items dialog now groups removed TV Seasons under expandable Series rows, with distinct Series header and Season row styling. Movie entries remain independently actionable.
+- Removed TV Series groups are collapsed by default and expose group-level restore / delete-record buttons that batch the same existing per-Season operations across the Seasons contained in that group.
+
+Not done:
+
+- No TV add-to-library flow was added to Episode detail.
+- No database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` should remain 0 warnings and 0 errors after this follow-up.
+- Current migrations diff should remain empty.
+
+Known Issues:
+
+- Blocker: none expected.
+- Deferred: broader TV no-source detail semantics and batch correction remain later work.
+- Noise: removed-library grouping uses the current read model title/context rather than full paths, so it does not expose local or WebDAV locations.
+
+## Phase 4.13c - Manual aggregation to unknown Season
+
+Completed:
+
+- Media-library batch mode now exposes `人工聚合为季` for selected unidentified items with active sources only.
+- The button is disabled when the selection includes recognized Movie / Series / Season content, no-source content, or unsupported rows.
+- The prepare step expands selected orphan sources, failed Movie placeholders, grouped unidentified ranges, and failed / no-TMDB unknown Seasons into deduplicated `MediaFile` rows.
+- The dialog asks for Series title and Season title, shows safe file names plus source-kind / hashed-context summaries, and provides an editable positive episode-number field for every source.
+- Episode numbers are prefilled from the TV episode file-name parser when a single regular episode can be inferred; otherwise rows are filled by current sorted order.
+- Applying aggregation creates one no-TMDB `TvSeries`, one failed / no-TMDB `TvSeason`, and only the selected episode numbers. Missing intermediate numbers are not created.
+- Duplicate episode numbers reuse the same `TvEpisode`; the first source for that episode becomes default, and later duplicate-number sources are appended without overwriting default.
+- Moved sources keep the same `MediaFile` records, probe fields, subtitle bindings, and real local / WebDAV files. `MovieId` is cleared and `EpisodeId` points to the new unknown Episode.
+- Old Movie / Episode default-source values are recalculated with the existing local-first fallback if the moved source was the old default.
+- Empty failed Movie placeholders are cleaned up only through the existing safe placeholder semantics.
+- Added sanitized diagnostics for prepare / apply start / success / failure, including source counts, created episode counts, additional-source counts, ids, and sanitized failure reason.
+
+Not done:
+
+- No `聚合后识别`, AI top1, batch AI correction, grouped unknown Season to recognized Season correction, historical wrong-binding cleanup, ignore / blacklist, scan-rule change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: `聚合后识别`, batch AI correction, grouped unknown Season to recognized Season correction, and historical cleanup remain later Phase 4.13 work.
+- Noise: the dialog uses hashed context summaries instead of readable directories, so it avoids exposing full local paths or WebDAV URLs while still helping distinguish sources.
+
+## Phase 4.13c-fix - Manual aggregation duplicate Series guard and Season number input
+
+Completed:
+
+- Manual aggregation remains a create-new-container workflow only. It now rejects apply when the entered Series title matches any existing `TvSeries`, whether recognized or no-TMDB / unknown.
+- Duplicate Series detection runs before the transaction, before Series / Season / Episode creation, and before moving any `MediaFile`.
+- Duplicate matching uses a conservative normalized title key: trim, Unicode compatibility normalization for common full-width / half-width differences, repeated whitespace collapse, outer wrapping-symbol trim, and case-insensitive equality. It does not use `contains` matching.
+- The manual aggregation dialog now includes a Season number field, defaulting to `1`.
+- Season number must be a positive integer. Empty, `0`, negative, decimal, and non-numeric values are rejected before apply.
+- New unknown Seasons use the user-provided `SeasonNumber`; the Season title remains independently editable and the dialog shows the combined `Sxx + title` preview.
+- Existing aggregation semantics are unchanged: duplicate episode numbers become multiple sources on one Episode, and missing intermediate Episodes are not created.
+- Added sanitized diagnostics for duplicate-Series blocking, invalid Season number, apply started, apply succeeded, and apply failed. Logs use normalized title hashes, ids, counts, Season number, and sanitized failure reasons.
+
+Not done:
+
+- No join-existing Series / Season behavior was added to manual aggregation.
+- No same-name automatic merge, unknown-to-recognized migration, Season-level correction, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: joining existing unknown / recognized Seasons and migrating unknown Seasons into recognized Series remain explicit correction workflows for later Phase 4.13 work.
+- Noise: normalized title equality is intentionally conservative; titles that are semantically related but not normalized-equal are not blocked.
+
+## Phase 4.13d - Unknown Season correction to recognized Season
+
+Completed:
+
+- Unidentified / no-TMDB Season detail now exposes a `修正为已识别季` entry only when the Season still has active playback sources.
+- The correction panel lets the user search TMDB TV Series candidates, choose one candidate, enter a positive target Season number, and confirm the whole-Season correction.
+- Apply fetches target Series and Season metadata, then moves every active source from the unknown Season by preserving the source Episode number.
+- Target Episodes are reused when the same Episode number already exists; otherwise only that Episode number is created. Missing intermediate Episodes are not created.
+- Moved sources keep their existing `MediaFile` rows, real local / WebDAV files, probe fields, subtitle bindings, and user states. `MovieId` is cleared and `EpisodeId` points to the target recognized Episode.
+- Each moved source becomes the target Episode default source. If multiple moved sources land on the same Episode, the last processed moved source is the default.
+- When the source unknown Season is emptied, its collection visibility is marked hidden so the old empty container does not keep appearing in Other.
+- Apply uses a database transaction and logs sanitized preview / apply start / success / failure events with ids and counts only.
+
+Not done:
+
+- No automatic top1 application, batch AI correction, `聚合后识别`, historical wrong-binding cleanup, SP / OVA / OAD / special mapping, scan-rule change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors during implementation.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: partial Season correction, special / OVA / OAD mapping, grouped Season correction variants, and historical cleanup remain later work.
+- Noise: target Season selection is numeric and TMDB-based; ambiguous real-world folk-season splits still require the user to choose the right Season number manually.
+
+### Phase 4.13d follow-up - Recognized Season picker dialog
+
+Completed:
+
+- The unknown Season correction target selection now uses a modal recognized-Season picker instead of an inline TV candidate list plus free Season-number field.
+- The correction panel now exposes only a single `选择已识别季...` button for target selection; the external Series-name input was removed.
+- The dialog now loads local recognized `TvSeries` / `TvSeason` rows instead of relying on the unknown Season title to search TMDB, so generic unknown names or numbered ranges do not produce an empty picker when recognized Seasons already exist locally.
+- The correction flow now opens as a dedicated modal layer with its own scrollable content area and fixed confirmation / cancel footer, so returning from the recognized-Season picker no longer depends on the Season detail page's non-scrolling header area.
+- Series overview now suppresses no-source failed unknown Seasons under no-TMDB Series, so an unknown Season emptied by correction does not remain visible as an empty shell.
+- Season detail now suppresses no-source failed unknown Episodes under no-TMDB Seasons, so a single unidentified Episode emptied by correction does not remain visible as an empty row.
+- Series overview, library Season / unknown-Series projection, and TV collection aggregation now also exclude those no-source failed unknown Episode shells from watched progress totals, so hiding an empty unknown Episode updates the displayed denominator instead of only removing the row.
+- Series rows are expandable and collapsed by default. Expanding a Series shows Seasons sorted by Season number with distinct Season-row styling.
+- Selecting a Season fills the correction target and Season number, then returns to the correction panel for confirmation.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.

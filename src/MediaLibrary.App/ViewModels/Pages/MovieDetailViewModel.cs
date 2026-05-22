@@ -81,6 +81,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private IdentificationStatus _identificationStatus;
     private bool _hasMovie;
     private bool _isLibraryMovie;
+    private bool _isNoSourceDetail;
     private bool _canPlay;
     private bool _isOpeningPlayer;
     private bool _isTogglingWatched;
@@ -392,7 +393,6 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(HasSearchCandidates));
                 OnPropertyChanged(nameof(CanUseIdentificationCorrection));
                 OnPropertyChanged(nameof(ShowLibrarySections));
-                OnPropertyChanged(nameof(ShowExternalInfoSection));
                 OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
                 OnPropertyChanged(nameof(ShowNotInterestedAction));
@@ -416,7 +416,6 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(CanUseIdentificationCorrection));
                 OnPropertyChanged(nameof(ShowLibrarySections));
-                OnPropertyChanged(nameof(ShowExternalInfoSection));
                 OnPropertyChanged(nameof(ShowCollectionActions));
                 OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
@@ -449,6 +448,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public bool CanResetSourcesToUnidentified => HasMovie
                                                  && IsLibraryMovie
                                                  && _identificationStatus != IdentificationStatus.Failed;
+
+    public bool IsNoSourceDetail
+    {
+        get => _isNoSourceDetail;
+        private set => SetProperty(ref _isNoSourceDetail, value);
+    }
 
     public bool IsFavorite
     {
@@ -505,11 +510,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public bool HasUnknownSeasonTargets => UnknownSeasonSeriesGroups.Count > 0;
 
-    public bool CanUseIdentificationCorrection => HasMovie && IsLibraryMovie;
+    public bool CanUseIdentificationCorrection => HasMovie && IsLibraryMovie && Sources.Count > 0;
 
-    public bool ShowLibrarySections => HasMovie && IsLibraryMovie;
-
-    public bool ShowExternalInfoSection => HasMovie && !IsLibraryMovie;
+    public bool ShowLibrarySections => HasMovie;
 
     public bool ShowCollectionActions => IsLibraryMovie;
 
@@ -519,7 +522,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public bool ShowWatchedAction => HasMovie && (IsLibraryMovie || _externalRecommendation is not null);
 
-    public bool ShowAddToLibraryAction => HasMovie && !IsVisibleInLibrary;
+    public bool ShowAddToLibraryAction => HasMovie
+                                          && !IsVisibleInLibrary
+                                          && (!IsLibraryMovie || CurrentLibraryVisibilityState == LibraryVisibilityState.Hidden);
 
     public bool CanAddToLibrary => ShowAddToLibraryAction && !_isAddingToLibrary;
 
@@ -548,6 +553,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             if (SetProperty(ref _libraryVisibilityState, value))
             {
                 OnPropertyChanged(nameof(AddToLibraryButtonText));
+                OnPropertyChanged(nameof(ShowAddToLibraryAction));
+                RefreshAddToLibraryCommandState();
             }
         }
     }
@@ -562,7 +569,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public bool CanToggleNotInterested => ShowNotInterestedAction && !_isTogglingNotInterested;
 
     public bool ShowRatingsAndTagsTab => ShowLibrarySections
-                                         && _identificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed;
+                                         && (_externalRecommendation is not null
+                                             || _identificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed);
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
@@ -609,7 +617,6 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             RefreshNotInterestedCommandState();
             RefreshWatchedCommandState();
             RefreshAddToLibraryCommandState();
-            AvailabilityText = "已入库 / 可播放";
             TitleText = detail.Title;
             OriginalTitle = string.IsNullOrWhiteSpace(detail.OriginalTitle) ? "-" : detail.OriginalTitle;
             ReleaseYearText = detail.ReleaseYear?.ToString() ?? "-";
@@ -650,8 +657,22 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             }
             RefreshResetSourceRecognitionCommandState();
 
-            CanPlay = Sources.Count > 0;
+            var hasSources = Sources.Count > 0;
+            var isUnidentifiedPlaceholder = detail.IdentificationStatus == IdentificationStatus.Failed
+                                            && !detail.TmdbId.HasValue;
+            IsNoSourceDetail = !hasSources && !isUnidentifiedPlaceholder;
+            OnPropertyChanged(nameof(CanUseIdentificationCorrection));
+            AvailabilityText = isUnidentifiedPlaceholder
+                ? "未识别 / 待修正"
+                : hasSources
+                    ? "有播放源 / 已入库"
+                    : "暂无播放源 / 已入库";
+            CanPlay = hasSources;
             PlayButtonText = CanPlay ? "播放默认源" : "暂无可播放源";
+            if (!hasSources)
+            {
+                SelectedDetailTabIndex = 0;
+            }
 
             if (isNewMovie)
             {
@@ -697,10 +718,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
             var defaultSource = detail.Sources.FirstOrDefault(source => source.IsDefault);
             DefaultSourceDisplay = defaultSource is null
-                ? "尚未设置默认播放源"
+                ? (IsNoSourceDetail ? "当前电影没有可用播放源" : "尚未设置默认播放源")
                 : $"{defaultSource.SourceTypeText} · {defaultSource.FileName} ({defaultSource.Extension})";
 
-            StatusMessage = detail.IdentificationStatus switch
+            StatusMessage = IsNoSourceDetail
+                ? "当前电影没有可用播放源，可通过扫描、修正或添加播放源补充。"
+                : detail.IdentificationStatus switch
             {
                 IdentificationStatus.NeedsReview => "该影片识别置信度较低，建议在识别修正中人工确认。",
                 IdentificationStatus.Failed => "该影片尚未识别成功，可使用人工修正或 AI 辅助识别。",
@@ -928,8 +951,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _externalRecommendation = recommendation;
         HasMovie = true;
         IsLibraryMovie = false;
-        IsVisibleInLibrary = false;
-        CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
+        IsNoSourceDetail = true;
+        IsVisibleInLibrary = recommendation.IsVisibleInLibrary;
+        CurrentLibraryVisibilityState = recommendation.LibraryVisibilityState;
+        SelectedDetailTabIndex = 0;
+        _correctionMediaFileId = null;
+        _correctionSourceFileName = string.Empty;
+        ClearCorrectionPreview();
+        OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         _identificationStatus = IdentificationStatus.Pending;
         OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
         IsFavorite = false;
@@ -937,8 +966,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         IsWantToWatch = recommendation.IsWantToWatch;
         IsNotInterested = recommendation.IsNotInterested;
         CanPlay = false;
-        AvailabilityText = "未入库 / 无法播放";
-        PlayButtonText = "该影片未入库，无法播放";
+        AvailabilityText = IsVisibleInLibrary
+            ? "暂无播放源 / 已入库"
+            : "暂无播放源 / 未加入媒体库";
+        PlayButtonText = "暂无可播放源";
         TitleText = recommendation.Title;
         OriginalTitle = string.IsNullOrWhiteSpace(recommendation.OriginalTitle) ? "-" : recommendation.OriginalTitle;
         ReleaseYearText = recommendation.ReleaseYear?.ToString() ?? "-";
@@ -959,10 +990,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ConfidenceText = "-";
         TmdbIdText = recommendation.TmdbId?.ToString() ?? "-";
         ImdbIdText = string.IsNullOrWhiteSpace(recommendation.ImdbId) ? "-" : recommendation.ImdbId;
-        DefaultSourceDisplay = "影片未入库，暂无播放源。";
+        DefaultSourceDisplay = "当前电影没有可用播放源";
         StatusMessage = shouldAutoClassify
-            ? "当前页面展示的是未入库影片详情，AI 正在分析影片。"
-            : "当前页面展示的是未入库影片详情，仅展示评分、标签与基础信息，无法播放。";
+            ? "当前电影没有可用播放源，AI 正在分析影片标签。"
+            : IsVisibleInLibrary
+                ? "当前电影没有可用播放源。"
+                : "当前电影没有可用播放源，可加入媒体库后保留库内记录。";
         ManualSearchQuery = recommendation.Title;
         ManualSearchYear = recommendation.ReleaseYear?.ToString() ?? string.Empty;
 
@@ -986,6 +1019,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         Sources.Clear();
+        OnPropertyChanged(nameof(CanUseIdentificationCorrection));
         SearchCandidates.Clear();
         OnPropertyChanged(nameof(HasSearchCandidates));
         await RefreshExternalWantToWatchStateAsync(cancellationToken);
@@ -1003,7 +1037,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         CancellationToken cancellationToken)
     {
         ShowExternalAiAnalyzingState(recommendation);
-        StatusMessage = "当前页面展示的是未入库影片详情，正在生成 AI 标签。";
+        StatusMessage = "正在为无播放源候选生成 AI 标签。";
         try
         {
             var tags = await _aiClassificationService.ClassifyExternalMovieAsync(recommendation, cancellationToken);
@@ -1012,7 +1046,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             recommendation.SceneTagsText = string.IsNullOrWhiteSpace(tags.SceneTagsText) ? recommendation.SceneTagsText : tags.SceneTagsText;
             CacheExternalTags(recommendation);
             ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
-            StatusMessage = "当前页面展示的是未入库影片详情，AI 标签已自动生成。";
+            StatusMessage = "无播放源候选 AI 标签已自动生成。";
         }
         catch (OperationCanceledException)
         {
@@ -1021,7 +1055,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         catch (Exception exception)
         {
             ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
-            StatusMessage = $"未入库影片 AI 标签生成失败：{DescribeException(exception)}";
+            StatusMessage = $"无播放源候选 AI 标签生成失败：{DescribeException(exception)}";
         }
     }
 
@@ -1029,7 +1063,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         if (!IsLibraryMovie)
         {
-            StatusMessage = "该影片未入库，无法播放。";
+            StatusMessage = "当前电影没有可用播放源，无法播放。";
             return;
         }
 
@@ -1041,7 +1075,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         if (!CanPlay)
         {
-            StatusMessage = "当前影片没有可播放源。";
+            StatusMessage = "当前电影没有可用播放源，无法播放。";
             return;
         }
 
@@ -1228,6 +1262,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                                      && (IsWatched || IsWantToWatch || IsNotInterested)
                 ? LibraryVisibilityState.Auto
                 : LibraryVisibilityState.Visible;
+            _externalRecommendation.IsVisibleInLibrary = IsVisibleInLibrary;
+            _externalRecommendation.LibraryVisibilityState = CurrentLibraryVisibilityState;
+            AvailabilityText = "暂无播放源 / 已入库";
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
             StatusMessage = "已加入媒体库。";
@@ -1296,7 +1333,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         if (_externalRecommendation is null)
         {
-            StatusMessage = "只有未入库影片可以在此切换库外观看状态。";
+            StatusMessage = "只有外部候选可以在此切换库外观看状态。";
             return;
         }
 
@@ -1337,7 +1374,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         if (_externalRecommendation is null || IsLibraryMovie)
         {
-            StatusMessage = "只有未入库影片可以在此切换想看状态。";
+            StatusMessage = "只有外部候选可以在此切换想看状态。";
             return;
         }
 
@@ -1408,7 +1445,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             {
                 if (_externalRecommendation is null)
                 {
-                    StatusMessage = "只有未入库影片可以在此切换不想看状态。";
+                    StatusMessage = "只有外部候选可以在此切换不想看状态。";
                     return;
                 }
 
@@ -2213,6 +2250,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _externalRecommendation = null;
         HasMovie = false;
         IsLibraryMovie = false;
+        IsNoSourceDetail = false;
         _tmdbId = null;
         CanPlay = false;
         IsFavorite = false;
@@ -2252,6 +2290,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ManualSearchYear = string.Empty;
         Ratings.Clear();
         Sources.Clear();
+        OnPropertyChanged(nameof(CanUseIdentificationCorrection));
         SearchCandidates.Clear();
         TvSearchCandidates.Clear();
         ClearUnknownSeasonTargets();

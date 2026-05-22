@@ -87,7 +87,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         || x.IsFavorite
                         || x.UserRating.HasValue
                         || x.WatchHistories.Any()
-                        || collectionMovieIds.Contains(x.Id))
+                        || collectionMovieIds.Contains(x.Id)
+                        || (x.TmdbId.HasValue && x.IdentificationStatus != IdentificationStatus.Failed))
             .Select(
                 x => new
                 {
@@ -163,13 +164,18 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var isWantToWatch = wantToWatchIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear);
                     var isNotInterested = notInterestedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear);
                     var hasActiveSource = x.SourceCount > 0;
+                    var hasLocalRecognizedMovie = x.TmdbId.HasValue
+                                                  && x.IdentificationStatus != IdentificationStatus.Failed;
                     var hasUserState = x.IsFavorite
                                        || isWatched
                                        || x.UserRating.HasValue
                                        || x.HasWatchHistory
                                        || isWantToWatch
                                        || isNotInterested;
-                    var isVisibleInLibrary = ResolveIsVisibleInLibrary(hasActiveSource, visibilityState, hasUserState);
+                    var isVisibleInLibrary = ResolveIsVisibleInLibrary(
+                        hasActiveSource,
+                        visibilityState,
+                        hasUserState || hasLocalRecognizedMovie);
 
                     return new LibraryMovieListItem
                     {
@@ -516,6 +522,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 })
             .ToListAsync(cancellationToken);
         var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
+        var sourceEpisodeIds = sourceRows.Select(x => x.EpisodeId).ToHashSet();
         var episodesBySeason = episodeRows
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.ToList());
@@ -533,12 +540,13 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 season =>
                 {
                     stateBySeason.TryGetValue(season.SeasonId, out var state);
-                    var episodes = episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
+                    var episodes = FilterCountableSeasonEpisodes(
+                        season,
+                        episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
+                        sourceEpisodeIds);
                     var sources = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
                     var watchedEpisodeCount = episodes.Count(x => x.IsWatched);
-                    var totalEpisodeCount = season.TotalEpisodeCount.GetValueOrDefault() > 0
-                        ? season.TotalEpisodeCount!.Value
-                        : episodes.Count;
+                    var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(season, episodes.Count);
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
                     return new LibraryMovieListItem
                     {
@@ -548,6 +556,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         SeasonNumber = season.SeasonNumber,
                         TmdbId = season.TmdbSeriesId,
                         Title = BuildSeasonTitle(season.SeriesName, season.Name, season.SeasonNumber),
+                        SeriesTitle = season.SeriesName,
                         OriginalTitle = season.OriginalSeriesName,
                         ReleaseYear = season.AirYear,
                         PosterRemoteUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl),
@@ -576,6 +585,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
                     };
                 })
+            .Where(ShouldShowTvSeasonLibraryItem)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
     }
@@ -587,7 +597,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
         var rows = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
             .Where(
-                x => !x.IsInLibrary
+                x => (!x.IsInLibrary || !x.MovieId.HasValue)
                      && (x.IsWatched
                          || x.IsWantToWatch
                          || x.IsNotInterested
@@ -828,6 +838,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 {
                     SeasonId = x.Id,
                     SeriesId = x.TvSeriesId,
+                    TmdbSeriesId = x.Series!.TmdbSeriesId,
                     SeasonNumber = x.SeasonNumber,
                     Name = x.Name,
                     PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
@@ -852,6 +863,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     })
                 .ToListAsync(cancellationToken);
         var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
+        var sourceEpisodeIds = sourceRows.Select(x => x.EpisodeId).ToHashSet();
         var stateRows = await LoadTvCollectionStateRowsAsync(dbContext, seasonIds, cancellationToken);
 
         var seasonsBySeries = seasonRows
@@ -892,7 +904,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     foreach (var season in seasons)
                     {
                         stateBySeason.TryGetValue(season.SeasonId, out var state);
-                        var watchedInSeason = (episodesBySeason.GetValueOrDefault(season.SeasonId) ?? []).Count(x => x.IsWatched);
+                        var episodes = FilterCountableSeasonEpisodes(
+                            season,
+                            episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
+                            sourceEpisodeIds);
+                        var watchedInSeason = episodes.Count(x => x.IsWatched);
                         var seasonHasCurrentState = state?.HasUserState == true || watchedInSeason > 0;
                         var seasonHasActiveSource = (sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? []).Count > 0;
                         hasState |= seasonHasCurrentState;
@@ -914,14 +930,24 @@ public sealed class LibraryQueryService : ILibraryQueryService
                                              && (hasRecognizedSeason || isUnknownSeriesProjection);
                     var inLibraryEpisodeCount = visibleSources.Select(x => x.EpisodeId).Distinct().Count();
                     var watchedEpisodeCount = seasons
-                        .SelectMany(season => episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
+                        .SelectMany(season => FilterCountableSeasonEpisodes(
+                            season,
+                            episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
+                            sourceEpisodeIds))
                         .Count(x => x.IsWatched);
                     var hasWatchedEpisodeState = watchedEpisodeCount > 0;
                     var totalEpisodeCount = seasons.Sum(
-                        season => season.TotalEpisodeCount.GetValueOrDefault() > 0
-                            ? season.TotalEpisodeCount!.Value
-                            : episodesBySeason.GetValueOrDefault(season.SeasonId)?.Count ?? 0);
-                    var knownEpisodeCount = seasons.Sum(season => episodesBySeason.GetValueOrDefault(season.SeasonId)?.Count ?? 0);
+                        season => ResolveSeasonProgressTotalEpisodeCount(
+                            season,
+                            FilterCountableSeasonEpisodes(
+                                season,
+                                episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
+                                sourceEpisodeIds).Count));
+                    var knownEpisodeCount = seasons.Sum(
+                        season => FilterCountableSeasonEpisodes(
+                            season,
+                            episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
+                            sourceEpisodeIds).Count);
                     var latestSeasonPoster = seasons
                         .OrderByDescending(x => x.SeasonNumber)
                         .Select(x => x.PosterRemoteUrl)
@@ -954,7 +980,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasUserState = hasState || hasWatchedEpisodeState,
                         IsInLibrary = hasActiveSource,
                         IsWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount),
-                        SeasonCount = seasons.Count,
+                        SeasonCount = isUnknownSeriesProjection ? visibleSeasonCount : seasons.Count,
                         InLibraryEpisodeCount = inLibraryEpisodeCount,
                         WatchedEpisodeCount = watchedEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
@@ -1013,6 +1039,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 })
             .ToListAsync(cancellationToken);
         var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
+        var sourceEpisodeIds = sourceRows.Select(x => x.EpisodeId).ToHashSet();
         var stateRows = await LoadTvCollectionStateRowsAsync(dbContext, seasonIds, cancellationToken);
         var stateBySeason = stateRows
             .GroupBy(x => x.SeasonId)
@@ -1032,13 +1059,14 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .Select(
                 season =>
                 {
-                    var episodes = episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
+                    var episodes = FilterCountableSeasonEpisodes(
+                        season,
+                        episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
+                        sourceEpisodeIds);
                     var sources = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
                     stateBySeason.TryGetValue(season.SeasonId, out var state);
                     var inLibraryEpisodeCount = sources.Select(x => x.EpisodeId).Distinct().Count();
-                    var totalEpisodeCount = season.TotalEpisodeCount.GetValueOrDefault() > 0
-                        ? season.TotalEpisodeCount!.Value
-                        : episodes.Count;
+                    var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(season, episodes.Count);
                     var watchedEpisodeCount = episodes.Count(x => x.IsWatched);
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
                     var isUnwatched = watchedEpisodeCount == 0;
@@ -1054,6 +1082,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         SeasonNumber = season.SeasonNumber,
                         TmdbId = season.TmdbSeriesId,
                         Title = BuildSeasonTitle(season.SeriesName, season.Name, season.SeasonNumber),
+                        SeriesTitle = season.SeriesName,
                         OriginalTitle = season.OriginalSeriesName,
                         ReleaseYear = season.AirYear,
                         PosterRemoteUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl),
@@ -1083,6 +1112,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     };
                 })
             .Where(x => x.IsVisibleInLibrary)
+            .Where(ShouldShowTvSeasonLibraryItem)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
     }
@@ -1185,6 +1215,43 @@ public sealed class LibraryQueryService : ILibraryQueryService
         }
 
         return knownEpisodeCount >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount;
+    }
+
+    private static IReadOnlyList<TvEpisodeLibraryRow> FilterCountableSeasonEpisodes(
+        TvSeasonLibraryRow season,
+        IReadOnlyCollection<TvEpisodeLibraryRow> episodes,
+        ISet<int> sourceEpisodeIds)
+    {
+        if (!IsNoTmdbFailedUnknownSeason(season))
+        {
+            return episodes.ToList();
+        }
+
+        return episodes.Where(x => sourceEpisodeIds.Contains(x.EpisodeId)).ToList();
+    }
+
+    private static int ResolveSeasonProgressTotalEpisodeCount(TvSeasonLibraryRow season, int countableEpisodeCount)
+    {
+        if (IsNoTmdbFailedUnknownSeason(season))
+        {
+            return countableEpisodeCount;
+        }
+
+        return season.TotalEpisodeCount.GetValueOrDefault() > 0
+            ? season.TotalEpisodeCount!.Value
+            : countableEpisodeCount;
+    }
+
+    private static bool ShouldShowTvSeasonLibraryItem(LibraryMovieListItem item)
+    {
+        return item.TmdbId.HasValue
+               || item.IdentificationStatus != IdentificationStatus.Failed
+               || item.InLibraryEpisodeCount > 0;
+    }
+
+    private static bool IsNoTmdbFailedUnknownSeason(TvSeasonLibraryRow season)
+    {
+        return season.TmdbSeriesId is null && season.IdentificationStatus == IdentificationStatus.Failed;
     }
 
     private static bool ResolveIsVisibleInLibrary(

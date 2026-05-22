@@ -131,11 +131,18 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
             source.IsDefault = source.MediaFileId == effectiveDefaultMediaFileId;
         }
         var hasActiveSource = sources.Count > 0;
+        var hasLocalRecognizedMovie = movie.TmdbId.HasValue
+                                      && movie.IdentificationStatus != IdentificationStatus.Failed;
         var libraryVisibilityState = collectionState?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
         var isVisibleInLibrary = ResolveIsVisibleInLibrary(
             hasActiveSource,
             libraryVisibilityState,
-            movie.IsFavorite || movie.IsWatched || movie.UserRating.HasValue || isNotInterested || collectionState?.HasUserState == true);
+            hasLocalRecognizedMovie
+            || movie.IsFavorite
+            || movie.IsWatched
+            || movie.UserRating.HasValue
+            || isNotInterested
+            || collectionState?.HasUserState == true);
 
         sources = sources
             .OrderBy(source => source.MediaFileId == effectiveDefaultMediaFileId ? 0 : 1)
@@ -257,7 +264,7 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
     {
         if (sources.Count == 0)
         {
-            return storedDefaultMediaFileId;
+            return null;
         }
 
         var storedDefault = storedDefaultMediaFileId.HasValue

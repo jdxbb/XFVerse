@@ -46,6 +46,10 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public int? MovieId { get; private set; }
 
+    public bool HasLocalMovie => MovieId is > 0;
+
+    public int ActiveSourceCount { get; private set; }
+
     public string Title { get; private set; }
 
     public string OriginalTitle { get; private set; }
@@ -164,7 +168,11 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public string OverviewText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
 
-    public string AvailabilityText => IsInLibrary ? "有播放源" : "无播放源";
+    public string AvailabilityText => IsInLibrary
+        ? "有播放源"
+        : HasLocalMovie || IsVisibleInLibrary
+            ? "暂无播放源"
+            : "未加入媒体库";
 
     public string WatchStateText => IsWatched ? "已看" : "未看";
 
@@ -172,13 +180,15 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public string WantToWatchButtonText => IsWatched ? "已看" : IsWantToWatch ? "想看" : "+ 想看";
 
-    public bool CanAddToLibrary => !IsVisibleInLibrary;
+    public bool CanAddToLibrary => LibraryVisibilityState == LibraryVisibilityState.Hidden
+                                   || (!HasLocalMovie && !IsVisibleInLibrary);
 
     public string AddToLibraryButtonText => LibraryVisibilityState == LibraryVisibilityState.Hidden ? "恢复到媒体库" : "加入媒体库";
 
     public void ApplyStatus(DiscoveryMovieStatus status)
     {
         MovieId = status.MovieId;
+        ActiveSourceCount = status.ActiveSourceCount;
         IsInLibrary = status.IsInLibrary;
         IsVisibleInLibrary = status.IsVisibleInLibrary;
         LibraryVisibilityState = status.LibraryVisibilityState;
@@ -187,7 +197,7 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         IsFavorite = status.IsFavorite;
         IsNotInterested = status.IsNotInterested;
 
-        if (status.IsInLibrary)
+        if (status.HasLocalMovie)
         {
             Title = string.IsNullOrWhiteSpace(status.Title) ? Title : status.Title;
             OriginalTitle = string.IsNullOrWhiteSpace(status.OriginalTitle) ? OriginalTitle : status.OriginalTitle;
@@ -242,6 +252,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(EmotionTagsText));
             OnPropertyChanged(nameof(SceneTagsText));
             OnPropertyChanged(nameof(IsInLibrary));
+            OnPropertyChanged(nameof(HasLocalMovie));
+            OnPropertyChanged(nameof(ActiveSourceCount));
             OnPropertyChanged(nameof(MovieId));
             OnPropertyChanged(nameof(AvailabilityText));
             OnPropertyChanged(nameof(CanAddToLibrary));
@@ -252,6 +264,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         {
             RefreshRating();
             OnPropertyChanged(nameof(IsInLibrary));
+            OnPropertyChanged(nameof(HasLocalMovie));
+            OnPropertyChanged(nameof(ActiveSourceCount));
             OnPropertyChanged(nameof(MovieId));
             OnPropertyChanged(nameof(AvailabilityText));
             OnPropertyChanged(nameof(CanAddToLibrary));

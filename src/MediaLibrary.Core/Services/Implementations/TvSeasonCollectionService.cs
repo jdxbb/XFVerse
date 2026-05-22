@@ -62,7 +62,9 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                         season?.SeriesName ?? item.SeriesTitle,
                         season?.SeasonName ?? item.SeasonTitle,
                         season?.SeasonNumber ?? item.SeasonNumber);
-                    var totalEpisodeCount = ResolveTotalEpisodeCount(season?.TotalEpisodeCount, season?.EpisodeCount ?? 0);
+                    var totalEpisodeCount = season is null
+                        ? ResolveTotalEpisodeCount(null, 0)
+                        : ResolveTotalEpisodeCount(season);
                     var watchedEpisodeCount = season?.WatchedEpisodeCount ?? 0;
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, season?.EpisodeCount ?? 0, totalEpisodeCount);
                     var isUnwatched = watchedEpisodeCount == 0;
@@ -143,11 +145,12 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             .Include(x => x.MediaFiles)
             .Where(x => x.TvSeasonId == tvSeasonId)
             .ToListAsync(cancellationToken);
-        var totalEpisodeCount = ResolveTotalEpisodeCount(season, episodes);
-        var oldAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
-        var oldAggregateUnwatched = IsAggregateUnwatched(episodes);
+        var aggregateEpisodes = FilterCountableSeasonEpisodes(season, episodes);
+        var totalEpisodeCount = ResolveTotalEpisodeCount(season, aggregateEpisodes);
+        var oldAggregateWatched = IsAggregateWatched(aggregateEpisodes.Count(x => x.IsWatched), aggregateEpisodes.Count, totalEpisodeCount);
+        var oldAggregateUnwatched = IsAggregateUnwatched(aggregateEpisodes);
 
-        foreach (var episode in episodes)
+        foreach (var episode in aggregateEpisodes)
         {
             ApplyEpisodeWatchedState(episode, isWatched, now);
         }
@@ -171,8 +174,8 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             item.UpdatedAt = now;
         }
 
-        var newAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
-        var newAggregateUnwatched = IsAggregateUnwatched(episodes);
+        var newAggregateWatched = IsAggregateWatched(aggregateEpisodes.Count(x => x.IsWatched), aggregateEpisodes.Count, totalEpisodeCount);
+        var newAggregateUnwatched = IsAggregateUnwatched(aggregateEpisodes);
         season.UpdatedAt = now;
         RecordStateChange(
             dbContext,
@@ -227,14 +230,15 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         var episode = episodes.FirstOrDefault(x => x.Id == tvEpisodeId)
             ?? throw new InvalidOperationException("电视剧集不存在。");
         var now = DateTime.UtcNow;
-        var totalEpisodeCount = ResolveTotalEpisodeCount(season, episodes);
-        var oldAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
-        var oldAggregateUnwatched = IsAggregateUnwatched(episodes);
+        var aggregateEpisodes = FilterCountableSeasonEpisodes(season, episodes);
+        var totalEpisodeCount = ResolveTotalEpisodeCount(season, aggregateEpisodes);
+        var oldAggregateWatched = IsAggregateWatched(aggregateEpisodes.Count(x => x.IsWatched), aggregateEpisodes.Count, totalEpisodeCount);
+        var oldAggregateUnwatched = IsAggregateUnwatched(aggregateEpisodes);
 
         ApplyEpisodeWatchedState(episode, isWatched, now);
 
-        var newAggregateWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
-        var newAggregateUnwatched = IsAggregateUnwatched(episodes);
+        var newAggregateWatched = IsAggregateWatched(aggregateEpisodes.Count(x => x.IsWatched), aggregateEpisodes.Count, totalEpisodeCount);
+        var newAggregateUnwatched = IsAggregateUnwatched(aggregateEpisodes);
         var item = await FindCollectionItemAsync(dbContext, season, cancellationToken);
         var oldFavorite = item?.IsFavorite ?? false;
         var oldWantToWatch = item?.IsWantToWatch ?? false;
@@ -650,12 +654,13 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         var now = DateTime.UtcNow;
         var episodes = await dbContext.TvEpisodes
             .AsNoTracking()
+            .Include(x => x.MediaFiles)
             .Where(x => x.TvSeasonId == tvSeasonId)
-            .Select(x => new { x.IsWatched })
             .ToListAsync(cancellationToken);
-        var totalEpisodeCount = ResolveTotalEpisodeCount(season.TmdbEpisodeCount, episodes.Count);
-        var isSeasonWatched = IsAggregateWatched(episodes.Count(x => x.IsWatched), episodes.Count, totalEpisodeCount);
-        var isSeasonUnwatched = episodes.All(x => !x.IsWatched);
+        var aggregateEpisodes = FilterCountableSeasonEpisodes(season, episodes);
+        var totalEpisodeCount = ResolveTotalEpisodeCount(season, aggregateEpisodes);
+        var isSeasonWatched = IsAggregateWatched(aggregateEpisodes.Count(x => x.IsWatched), aggregateEpisodes.Count, totalEpisodeCount);
+        var isSeasonUnwatched = aggregateEpisodes.All(x => !x.IsWatched);
 
         if (stateType == StateFavorite && newValue && !isSeasonWatched)
         {
@@ -878,7 +883,22 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
 
     private static int ResolveTotalEpisodeCount(TvSeason season, IReadOnlyCollection<TvEpisode> episodes)
     {
+        if (IsNoTmdbFailedUnknownSeason(season))
+        {
+            return Math.Max(0, episodes.Count);
+        }
+
         return ResolveTotalEpisodeCount(season.TmdbEpisodeCount, episodes.Count);
+    }
+
+    private static int ResolveTotalEpisodeCount(SeasonCollectionRow season)
+    {
+        if (IsNoTmdbFailedUnknownSeason(season))
+        {
+            return Math.Max(0, season.EpisodeCount);
+        }
+
+        return ResolveTotalEpisodeCount(season.TotalEpisodeCount, season.EpisodeCount);
     }
 
     private static int ResolveTotalEpisodeCount(int? tmdbEpisodeCount, int knownEpisodeCount)
@@ -901,6 +921,30 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
     private static bool IsAggregateUnwatched(IEnumerable<TvEpisode> episodes)
     {
         return episodes.All(x => !x.IsWatched);
+    }
+
+    private static IReadOnlyList<TvEpisode> FilterCountableSeasonEpisodes(
+        TvSeason season,
+        IReadOnlyCollection<TvEpisode> episodes)
+    {
+        if (!IsNoTmdbFailedUnknownSeason(season))
+        {
+            return episodes.ToList();
+        }
+
+        return episodes
+            .Where(episode => episode.MediaFiles.Any(file => !file.IsDeleted && file.MediaType == MediaType.Video))
+            .ToList();
+    }
+
+    private static bool IsNoTmdbFailedUnknownSeason(TvSeason season)
+    {
+        return season.Series?.TmdbSeriesId is null && season.IdentificationStatus == IdentificationStatus.Failed;
+    }
+
+    private static bool IsNoTmdbFailedUnknownSeason(SeasonCollectionRow season)
+    {
+        return season.TmdbSeriesId is null && season.IdentificationStatus == IdentificationStatus.Failed;
     }
 
     private static void ApplyEpisodeWatchedState(TvEpisode episode, bool isWatched, DateTime now)
@@ -952,6 +996,8 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                 {
                     SeasonId = x.Id,
                     SeriesId = x.TvSeriesId,
+                    TmdbSeriesId = x.Series!.TmdbSeriesId,
+                    IdentificationStatus = x.IdentificationStatus,
                     SeriesName = x.Series!.Name,
                     OriginalSeriesName = x.Series.OriginalName ?? string.Empty,
                     SeasonName = x.Name,
@@ -961,9 +1007,18 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                     SeasonOverview = x.Overview ?? string.Empty,
                     GenresText = x.Series.GenresText ?? string.Empty,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
-                    TotalEpisodeCount = x.TmdbEpisodeCount,
-                    EpisodeCount = x.Episodes.Count,
-                    WatchedEpisodeCount = x.Episodes.Count(episode => episode.IsWatched),
+                    TotalEpisodeCount = x.Series.TmdbSeriesId == null && x.IdentificationStatus == IdentificationStatus.Failed
+                        ? null
+                        : x.TmdbEpisodeCount,
+                    EpisodeCount = x.Series.TmdbSeriesId == null && x.IdentificationStatus == IdentificationStatus.Failed
+                        ? x.Episodes.Count(
+                            episode => episode.MediaFiles.Any(media => !media.IsDeleted && media.MediaType == MediaType.Video))
+                        : x.Episodes.Count,
+                    WatchedEpisodeCount = x.Series.TmdbSeriesId == null && x.IdentificationStatus == IdentificationStatus.Failed
+                        ? x.Episodes.Count(
+                            episode => episode.IsWatched
+                                       && episode.MediaFiles.Any(media => !media.IsDeleted && media.MediaType == MediaType.Video))
+                        : x.Episodes.Count(episode => episode.IsWatched),
                     InLibraryEpisodeCount = x.Episodes.Count(
                         episode => episode.MediaFiles.Any(media => !media.IsDeleted && media.MediaType == MediaType.Video)),
                     HasLocalSource = x.Episodes.Any(
@@ -1043,6 +1098,10 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         public int SeasonId { get; set; }
 
         public int SeriesId { get; set; }
+
+        public int? TmdbSeriesId { get; set; }
+
+        public IdentificationStatus IdentificationStatus { get; set; }
 
         public string SeriesName { get; set; } = string.Empty;
 

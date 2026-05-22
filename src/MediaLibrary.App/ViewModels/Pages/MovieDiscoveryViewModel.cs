@@ -249,14 +249,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         GoNextSearchPageCommand = new AsyncRelayCommand(GoNextSearchPageAsync, () => CanGoNextActiveSearchPage);
         ClearSearchFiltersCommand = new RelayCommand(ClearSearchFilters);
         ShowLayoutSwitchPlaceholderCommand = new RelayCommand(() => SearchStatusMessage = "切布局将在后续视觉阶段接入。");
-        OpenSearchMovieCommand = new RelayCommand(OpenSearchMovie);
+        OpenSearchMovieCommand = new AsyncRelayCommand(OpenSearchMovieAsync);
         ToggleSearchWantToWatchCommand = new AsyncRelayCommand(ToggleSearchWantToWatchAsync);
         AddSearchMovieToLibraryCommand = new AsyncRelayCommand(AddSearchMovieToLibraryAsync);
         SelectRankingTypeCommand = new RelayCommand(SelectRankingType);
         SelectTrendingTimeCommand = new RelayCommand(SelectTrendingTime, _ => IsActiveTrendingRanking);
         GoPreviousRankingPageCommand = new AsyncRelayCommand(GoPreviousRankingPageAsync, () => CanGoPreviousActiveRankingPage);
         GoNextRankingPageCommand = new AsyncRelayCommand(GoNextRankingPageAsync, () => CanGoNextActiveRankingPage);
-        OpenRankingMovieCommand = new RelayCommand(OpenRankingMovie);
+        OpenRankingMovieCommand = new AsyncRelayCommand(OpenRankingMovieAsync);
         ToggleRankingWantToWatchCommand = new AsyncRelayCommand(ToggleRankingWantToWatchAsync);
         AddRankingMovieToLibraryCommand = new AsyncRelayCommand(AddRankingMovieToLibraryAsync);
         OpenTvSeriesCommand = new RelayCommand(OpenTvSeries, _ => !IsTvSeriesNavigating);
@@ -315,7 +315,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public RelayCommand ShowLayoutSwitchPlaceholderCommand { get; }
 
-    public RelayCommand OpenSearchMovieCommand { get; }
+    public AsyncRelayCommand OpenSearchMovieCommand { get; }
 
     public AsyncRelayCommand ToggleSearchWantToWatchCommand { get; }
 
@@ -329,7 +329,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public AsyncRelayCommand GoNextRankingPageCommand { get; }
 
-    public RelayCommand OpenRankingMovieCommand { get; }
+    public AsyncRelayCommand OpenRankingMovieCommand { get; }
 
     public AsyncRelayCommand ToggleRankingWantToWatchCommand { get; }
 
@@ -2053,14 +2053,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _ = ResetAndLoadTvSearchDisplayPageAsync(1);
     }
 
-    private void OpenSearchMovie(object? parameter)
+    private async Task OpenSearchMovieAsync(object? parameter)
     {
         if (parameter is not DiscoveryMovieCardViewModel item)
         {
             return;
         }
 
-        OpenDiscoveryMovie(item, message => SearchStatusMessage = message);
+        await OpenDiscoveryMovieAsync(item, message => SearchStatusMessage = message);
     }
 
     private async Task ToggleSearchWantToWatchAsync(object? parameter)
@@ -2089,14 +2089,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             () => RebuildSearchDisplay());
     }
 
-    private void OpenRankingMovie(object? parameter)
+    private async Task OpenRankingMovieAsync(object? parameter)
     {
         if (parameter is not DiscoveryMovieCardViewModel item)
         {
             return;
         }
 
-        OpenDiscoveryMovie(item, message => RankingStatusMessage = message);
+        await OpenDiscoveryMovieAsync(item, message => RankingStatusMessage = message);
     }
 
     private void OpenTvSeries(object? parameter)
@@ -2236,11 +2236,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
     }
 
-    private void OpenDiscoveryMovie(
+    private async Task OpenDiscoveryMovieAsync(
         DiscoveryMovieCardViewModel item,
         Action<string> setStatusMessage)
     {
-        if (item.IsInLibrary && item.MovieId is > 0)
+        await RefreshDiscoveryMovieStatusBeforeOpenAsync(item, setStatusMessage);
+
+        if (item.MovieId is > 0)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, item.MovieId.Value);
             return;
@@ -2253,6 +2255,29 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
 
         _navigationStateService.RequestExternalMovieDetail(DiscoveryExternalMovieAdapter.ToRecommendation(item));
+    }
+
+    private async Task RefreshDiscoveryMovieStatusBeforeOpenAsync(
+        DiscoveryMovieCardViewModel item,
+        Action<string> setStatusMessage)
+    {
+        if (item.TmdbId <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var statuses = await _statusResolver.ResolveAsync([item.TmdbId], CancellationToken.None);
+            if (statuses.TryGetValue(item.TmdbId, out var status))
+            {
+                item.ApplyStatus(status);
+            }
+        }
+        catch (Exception exception)
+        {
+            setStatusMessage($"刷新影片库内状态失败，已使用当前卡片状态打开：{DescribeException(exception)}");
+        }
     }
 
     private async Task OpenTvSeriesAsync(DiscoveryTvSeriesCardViewModel item)

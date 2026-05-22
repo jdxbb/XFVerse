@@ -1235,3 +1235,40 @@ Phase 4.13a starts the active correction work with a narrow single-source founda
 - The path preserves the physical source file, probe fields, subtitle bindings, and existing user states. Cross-type user state migration is still not performed.
 - Picker diagnostics and UI context hints remain sanitized; full local paths and full WebDAV URLs are not displayed.
 - This phase does not add manual Season aggregation, batch AI correction, grouped unknown Season to recognized Season correction, recognized Season target selection, historical data cleanup, schema changes, migrations, or scan-safety changes.
+
+## Phase 4.13c Manual Unknown Season Aggregation Boundary
+
+- Media-library batch mode supports manual aggregation into a new no-TMDB unknown Season.
+- The batch button is enabled only when every selected visible row is unidentified and has at least one active source. Supported inputs are orphan sources, failed Movie placeholders, grouped unidentified ranges, and failed / no-TMDB unknown Seasons.
+- Recognized Movie / Series / Season rows, no-source Movie / Episode rows, and unsupported rows disable the aggregation button.
+- The aggregation dialog expands selected rows into deduplicated source rows. It shows safe file names, source kind, hashed context hints, current binding text, and an editable positive episode-number input per source.
+- Episode-number prefill uses the TV episode file-name parser for single regular episodes and falls back to the current source order when parsing fails.
+- Duplicate episode numbers are allowed and mean multiple playback sources for the same Episode.
+- Applying creates one unknown Series, one failed / no-TMDB Season, and only the Episodes represented by the selected source rows. Missing intermediate numbers are never created.
+- The first source for each Episode becomes default; additional duplicate-number sources are appended without overriding that default.
+- Source movement preserves `MediaFile`, physical local / WebDAV files, probe fields, subtitle bindings, and user states. Cross-type user state migration is not performed.
+- Failed Movie placeholders emptied by source movement keep using the existing safe placeholder cleanup semantics.
+- This phase does not add `聚合后识别`, AI top1, batch AI correction, grouped unknown Season to recognized Season correction, historical data cleanup, schema changes, migrations, or scan-safety changes.
+
+## Phase 4.13c-fix Manual Aggregation Duplicate Guard
+
+- Manual aggregation is strictly a create-new unknown Series / Season workflow.
+- If the entered Series title normalized-equals any existing `TvSeries` name, apply is blocked and the user is directed to correction instead.
+- Existing recognized Series and existing no-TMDB / unknown Series both count as duplicates for manual aggregation.
+- The duplicate guard runs before writing any new Series / Season / Episode and before moving selected sources.
+- The normalized Series title key trims, applies Unicode compatibility normalization, collapses repeated whitespace, removes common outer wrapping symbols, and compares case-insensitively. It does not use substring matching.
+- The dialog now asks for a positive Season number. The new unknown `TvSeason.SeasonNumber` uses that value.
+- Future scans or searches may still create recognized Series with the same real-world title as an existing unknown Series. This phase does not add automatic same-name merge or migration; that remains Season-level correction work.
+
+## Phase 4.13d Unknown Season to Recognized Season Boundary
+
+- Unknown Season detail now owns the Season-level correction workflow for moving an entire no-TMDB / failed Season into a recognized TMDB Series / Season.
+- The entry is only shown for unknown Seasons with active sources. Recognized Seasons and no-source Seasons do not show this correction action.
+- The user searches TV Series candidates, selects a target Series, enters a positive target Season number, and confirms the correction.
+- Follow-up UI uses a modal recognized-Season picker: the correction panel has only one target-selection button, loading local recognized Seasons directly; the dialog groups Seasons under collapsed Series rows, and selecting a Season fills the target Season number.
+- Apply preserves the current unknown Episode numbers and moves sources to matching target Episode numbers.
+- Target Episodes are reused when present. Missing target Episodes are created only for moved sources. Empty intermediate Episodes are never created.
+- Target Series / Season metadata is refreshed from TMDB, but the workflow does not call full Season hydration because full hydration would create no-source Episodes.
+- Moved sources become target Episode default sources. Probe fields, subtitle bindings, physical files, and user states are preserved.
+- The emptied unknown Season is hidden through collection visibility so the old Other container does not remain as an empty shell.
+- Batch AI correction, automatic top1 application, `聚合后识别`, SP / OVA / OAD mapping, historical cleanup, schema changes, migrations, and scan-safety changes remain out of scope.

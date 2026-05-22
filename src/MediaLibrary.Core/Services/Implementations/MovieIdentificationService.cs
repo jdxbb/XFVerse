@@ -1526,9 +1526,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
                 if (canPreserveSourceState || collectionItem.TmdbId == targetMovie.TmdbId)
                 {
                     collectionItem.MovieId = targetMovie.Id;
-                    collectionItem.IsInLibrary = targetMovie.MediaFiles.Any(x => x.MediaType == MediaType.Video)
-                                                 || currentMediaFiles.Any(x => x.MediaType == MediaType.Video);
                     ApplyIdentificationSnapshot(collectionItem, targetMovie);
+                    collectionItem.IsInLibrary = targetMovie.MediaFiles.Any(x => x.MediaType == MediaType.Video && !x.IsDeleted)
+                                                 || currentMediaFiles.Any(x => x.MediaType == MediaType.Video && !x.IsDeleted);
                     collectionItem.UpdatedAt = DateTime.UtcNow;
                     continue;
                 }
@@ -1628,8 +1628,23 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             cancellationToken,
             includeOmdbRating);
 
+        if (targetMovie.Id == 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            ScanIdentificationDiagnostics.Write(
+                $"event=correction-movie-target-materialized mediaFileId={mediaFile.Id} targetMovieId={targetMovie.Id}");
+        }
+
         if (currentMovie is not null && currentMovie.Id != targetMovie.Id)
         {
+            if (currentMovie.DefaultMediaFileId == mediaFile.Id)
+            {
+                currentMovie.DefaultMediaFileId = SelectPreferredDefaultMediaFileId(currentMovie.MediaFiles, mediaFile.Id);
+                currentMovie.UpdatedAt = DateTime.UtcNow;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=correction-movie-old-default-recalculated oldMovieId={currentMovie.Id} movedMediaFileId={mediaFile.Id} fallbackMediaFileId={ScanIdentificationDiagnostics.FormatNullable(currentMovie.DefaultMediaFileId)}");
+            }
+
             var transferWholeCurrentMovie = currentMovie.MediaFiles
                 .Where(x => x.MediaType == MediaType.Video && !x.IsDeleted)
                 .All(x => x.Id == mediaFile.Id);
@@ -1661,8 +1676,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
                     if (canPreserveSourceState || collectionItem.TmdbId == targetMovie.TmdbId)
                     {
                         collectionItem.MovieId = targetMovie.Id;
-                        collectionItem.IsInLibrary = targetMovie.MediaFiles.Any(x => x.MediaType == MediaType.Video) || mediaFile.MediaType == MediaType.Video;
                         ApplyIdentificationSnapshot(collectionItem, targetMovie);
+                        collectionItem.IsInLibrary = targetMovie.MediaFiles.Any(x => x.MediaType == MediaType.Video && !x.IsDeleted)
+                                                     || mediaFile.MediaType == MediaType.Video;
                         collectionItem.UpdatedAt = now;
                         continue;
                     }
@@ -2238,7 +2254,11 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             return;
         }
 
-        if (movie.MediaFiles.Count == 0
+        var isFailedPlaceholder = !movie.TmdbId.HasValue
+                                  && movie.IdentificationStatus == IdentificationStatus.Failed;
+
+        if (isFailedPlaceholder
+            && movie.MediaFiles.Count == 0
             && movie.WatchHistories.Count == 0
             && !movie.IsFavorite
             && !movie.IsWatched)

@@ -298,7 +298,9 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         }
     }
 
-    public bool IsCorrectionPanelVisible => _correctionMediaFileId.HasValue;
+    public bool IsCorrectionPanelVisible => _correctionMediaFileId.HasValue && HasSources;
+
+    public bool CanUseIdentificationCorrection => HasEpisode && HasSources;
 
     public bool IsCorrectionTargetMovie => SelectedCorrectionTarget == CorrectionTargetMovieText;
 
@@ -350,6 +352,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(HasNoEpisode));
                 OnPropertyChanged(nameof(CanResetSourcesToUnidentified));
+                OnPropertyChanged(nameof(CanUseIdentificationCorrection));
                 CorrectionPlaceholderCommand.RaiseCanExecuteChanged();
                 SetDefaultSourceCommand.RaiseCanExecuteChanged();
                 ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
@@ -382,6 +385,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             if (SetProperty(ref _hasSources, value))
             {
                 OnPropertyChanged(nameof(HasNoSources));
+                OnPropertyChanged(nameof(CanUseIdentificationCorrection));
+                OnPropertyChanged(nameof(IsCorrectionPanelVisible));
                 CorrectionPlaceholderCommand.RaiseCanExecuteChanged();
                 SetDefaultSourceCommand.RaiseCanExecuteChanged();
                 ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
@@ -500,6 +505,11 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             foreach (var source in model.Sources)
             {
                 Sources.Add(source);
+            }
+
+            if (!model.HasSources && SelectedDetailTabIndex == 1)
+            {
+                SelectedDetailTabIndex = 0;
             }
 
             if (isNewEpisode)

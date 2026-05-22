@@ -47,6 +47,8 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public string OriginalTitle => Movie.OriginalTitle;
 
+    public string SeriesTitle => Movie.SeriesTitle;
+
     public int? ReleaseYear => Movie.ReleaseYear;
 
     public string PosterRemoteUrl => Movie.PosterRemoteUrl;

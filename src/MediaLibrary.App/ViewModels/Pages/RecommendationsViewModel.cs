@@ -1146,7 +1146,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             return;
         }
 
-        if (item.IsInLibrary && item.MovieId > 0)
+        if (item.MovieId > 0)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, item.MovieId);
             return;

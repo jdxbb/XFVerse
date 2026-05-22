@@ -2156,8 +2156,16 @@ public sealed class RecommendationService : IRecommendationService
             IsWatched = source.IsWatched,
             IsWantToWatch = source.IsWantToWatch,
             IsNotInterested = source.IsNotInterested,
-            ScopeText = source.IsInLibrary ? "已有播放源推荐" : "外部状态候选",
-            AvailabilityText = source.IsInLibrary ? "有播放源" : "外部候选",
+            ScopeText = source.IsInLibrary
+                ? "已有播放源推荐"
+                : source.MovieId.HasValue
+                    ? "库内暂无播放源"
+                    : "外部状态候选",
+            AvailabilityText = source.IsInLibrary
+                ? "有播放源"
+                : source.MovieId.HasValue
+                    ? "暂无播放源"
+                    : "外部候选",
             WatchStateText = source.IsWatched ? "已看" : "未看",
             Reason = source.IsInLibrary
                 ? source.IsFavorite
@@ -2165,7 +2173,9 @@ public sealed class RecommendationService : IRecommendationService
                     : source.IsWatched
                         ? "已标记为已看，可作为复看或延伸选择。"
                         : "基于当前片库类型、评分和观看状态推荐。"
-                : source.IsWantToWatch
+                : source.MovieId.HasValue
+                    ? "该影片已有库内记录，但当前没有可用播放源。"
+                    : source.IsWantToWatch
                     ? "你已加入想看，当前筛选条件下可作为外部候选。"
                     : "来自外部用户状态，当前筛选条件下可作为推荐候选。"
         };
@@ -2417,6 +2427,12 @@ public sealed class RecommendationService : IRecommendationService
 
             item.IsWantToWatch = state.IsWantToWatch && !state.IsWatched;
             item.IsNotInterested = state.IsNotInterested;
+            if (state.IsInLibrary)
+            {
+                item.IsVisibleInLibrary = true;
+                item.LibraryVisibilityState = LibraryVisibilityState.Visible;
+            }
+
             item.IsWatched = item.IsInLibrary
                 ? item.IsWatched || state.IsWatched
                 : state.IsWatched;

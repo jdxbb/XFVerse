@@ -94,7 +94,7 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
         catch (Exception exception)
         {
             ScanIdentificationDiagnostics.Write(
-                $"event=correction-apply-failed mediaFileId={mediaFileId} targetKind=movie error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
+                $"event=correction-apply-failed mediaFileId={mediaFileId} targetKind=movie error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 260)}");
             throw;
         }
     }
@@ -197,7 +197,7 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
         catch (Exception exception)
         {
             ScanIdentificationDiagnostics.Write(
-                $"event=correction-apply-failed mediaFileId={mediaFileId} targetKind=tv-episode seriesTmdbId={seriesTmdbId} season={seasonNumber} episode={episodeNumber} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
+                $"event=correction-apply-failed mediaFileId={mediaFileId} targetKind=tv-episode seriesTmdbId={seriesTmdbId} season={seasonNumber} episode={episodeNumber} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 260)}");
             throw;
         }
     }
@@ -375,7 +375,7 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
         catch (Exception exception)
         {
             ScanIdentificationDiagnostics.Write(
-                $"event=correction-target-unknown-season-failed mediaFileId={mediaFileId} targetSeasonId={targetSeasonId} inputEpisodeNumber={episodeNumber} reason={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
+                $"event=correction-target-unknown-season-failed mediaFileId={mediaFileId} targetSeasonId={targetSeasonId} inputEpisodeNumber={episodeNumber} reason={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 260)}");
             throw;
         }
     }
@@ -614,7 +614,11 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
             return;
         }
 
-        if (movie.MediaFiles.Count == 0
+        var isFailedPlaceholder = !movie.TmdbId.HasValue
+                                  && movie.IdentificationStatus == IdentificationStatus.Failed;
+
+        if (isFailedPlaceholder
+            && movie.MediaFiles.Count == 0
             && movie.WatchHistories.Count == 0
             && !movie.IsFavorite
             && !movie.IsWatched)
@@ -760,5 +764,20 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
     private static string TrimMessage(string message)
     {
         return string.IsNullOrWhiteSpace(message) ? "未知错误" : message.Trim();
+    }
+
+    private static string DescribeException(Exception exception)
+    {
+        var messages = new List<string>();
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            var message = TrimMessage(current.Message);
+            if (messages.Count == 0 || !string.Equals(messages[^1], message, StringComparison.Ordinal))
+            {
+                messages.Add(message);
+            }
+        }
+
+        return string.Join(" | ", messages);
     }
 }

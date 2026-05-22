@@ -1,5 +1,24 @@
 # 影片发现 Known Issues
 
+## Phase 4.13b-fix No-source Movie Semantics
+
+- External no-source Movie candidates reuse the previous not-in-library detail add-to-library write semantics; media-library projection now shows visible no-source external rows, and no-source Movie detail hides correction because there is no source to correct.
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- No-source TV / Season / Episode semantics are not broadly redesigned in this Movie-focused fix.
+- Batch correction, manual grouping, grouped Season correction, and historical wrong-binding cleanup remain later Phase 4.13 work.
+
+Noise:
+
+- Recognized Movies with local metadata but zero active sources are now visible as `暂无播放源` unless explicitly hidden.
+- External TMDB candidates also open the unified no-source Movie detail state. `Not in library` is only a label / action state, not a separate details page.
+- Failed Movie placeholders and orphan carriers remain unidentified items and are intentionally not treated as no-source recognized Movies.
+
 ## Phase 4.12h Movie Boundary
 
 Blocker:

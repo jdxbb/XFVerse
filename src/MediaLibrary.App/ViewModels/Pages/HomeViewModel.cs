@@ -320,7 +320,7 @@ public sealed class HomeViewModel : PageViewModelBase
                 OpenCollectionMovie(collectionMovie);
                 break;
             case AiRecommendationItem recommendation:
-                if (recommendation.IsInLibrary && recommendation.MovieId > 0)
+                if (recommendation.MovieId > 0)
                 {
                     _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, recommendation.MovieId);
                 }
@@ -440,7 +440,7 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private void OpenCollectionMovie(CollectionMovieItem movie)
     {
-        if (movie.IsInLibrary && movie.MovieId.HasValue)
+        if (movie.MovieId.HasValue)
         {
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId.Value);
             return;
