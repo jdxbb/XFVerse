@@ -424,7 +424,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
                     {
                         MediaFileId = item.File.Id,
                         SeriesTitleHint = titleHint,
-                        SeasonNumberHint = Math.Max(1, item.Parse.SeasonNumber),
+                        SeasonNumberHint = Math.Max(0, item.Parse.SeasonNumber),
                         EpisodeNumberHint = item.Parse.EpisodeNumber,
                         Confidence = directoryContext.IsStrong ? "high" : "medium",
                         Source = "local",
@@ -1049,6 +1049,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         builder.AppendLine("Input is sanitized. Review only the listed uncertain ranges, not a full media tree.");
         builder.AppendLine("These ranges are already uncertain. Your task is not to decide whether the app can auto-write metadata; your task is to provide the best title hints for a local TMDB TV search.");
         builder.AppendLine("Return strict JSON: {\"ranges\":[{\"inputRangeId\":\"r001\",\"originalLanguageTitle\":\"original-language title or null\",\"englishTitleHint\":\"English/international title or null\",\"localizedTitleHint\":\"Chinese/localized title or null\",\"searchTitle\":\"best TMDB search title, usually identical to originalLanguageTitle\",\"refinedSeriesTitle\":\"legacy fallback title or null\",\"seriesYearHint\":2023,\"seasonYearHint\":2024,\"seasonNumberHint\":1,\"confidence\":\"high|medium|low\",\"needsReview\":false,\"evidence\":[\"original-title-from-filename\"]}]}");
+        builder.AppendLine("seasonNumberHint may be 0 only when the range is safely a TMDB Season 0 specials season; otherwise use an ordinary season number or null.");
         builder.AppendLine("originalLanguageTitle is the primary output and must follow TMDB original_name semantics: the series' official original name, not a translated, localized, international, romanized, or marketing alias.");
         builder.AppendLine("The official original name may itself be English even when the series is Korean, Japanese, Chinese, Spanish, French, German, or another non-English-region work; in that case originalLanguageTitle should be that official English original name.");
         builder.AppendLine("Use file and folder names to identify the work, but never use the language or script of a file/folder name to decide the TMDB original_name language or spelling.");
@@ -1440,6 +1441,7 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         var builder = new StringBuilder();
         builder.AppendLine("Input is sanitized. Do not infer exact private paths.");
         builder.AppendLine("Return strict JSON: {\"tvRanges\":[{\"seriesFolder\":\"/path\",\"seriesTitleHint\":\"title\",\"confidence\":\"high|medium|low\",\"evidence\":[\"season-folders\"],\"seasonFolders\":[{\"path\":\"/path\",\"seasonNumberHint\":1}]}]}");
+        builder.AppendLine("seasonNumberHint may be 0 only for a folder that safely represents TMDB Season 0 specials; otherwise use an ordinary season number or null.");
         builder.AppendLine("Only identify directory ranges that look like TV series. Do not classify movies. Do not return episodeFiles. Do not map files to episode numbers.");
         builder.AppendLine("seriesTitleHint should follow TMDB original_name semantics when a title is returned. Do not use translated, localized, international, or romanized aliases unless that alias is the official original name.");
         builder.AppendLine("Use file and folder names to identify the work, but do not infer original_name language or spelling from the language or script used by those files/folders.");

@@ -839,6 +839,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     SeasonId = x.Id,
                     SeriesId = x.TvSeriesId,
                     TmdbSeriesId = x.Series!.TmdbSeriesId,
+                    TmdbSeasonId = x.TmdbSeasonId,
                     SeasonNumber = x.SeasonNumber,
                     Name = x.Name,
                     PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
@@ -900,6 +901,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .ToList();
                     var visibleSeasonCount = 0;
                     var visibleSeasonIds = new HashSet<int>();
+                    var displaySeasonIds = new HashSet<int>();
                     var hasState = false;
                     foreach (var season in seasons)
                     {
@@ -910,11 +912,25 @@ public sealed class LibraryQueryService : ILibraryQueryService
                             sourceEpisodeIds);
                         var watchedInSeason = episodes.Count(x => x.IsWatched);
                         var seasonHasCurrentState = state?.HasUserState == true || watchedInSeason > 0;
-                        var seasonHasActiveSource = (sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? []).Count > 0;
+                        var seasonSourceRows = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
+                        var seasonHasActiveSource = seasonSourceRows.Count > 0;
+                        var seasonInLibraryEpisodeCount = seasonSourceRows.Select(x => x.EpisodeId).Distinct().Count();
+                        var visibilityState = state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
                         hasState |= seasonHasCurrentState;
-                        if (ResolveIsVisibleInLibrary(
+                        var shouldShowSeason = ShouldShowSeasonInSeriesOverviewProjection(
+                            series.TmdbSeriesId,
+                            season,
+                            seasonInLibraryEpisodeCount,
+                            visibilityState);
+                        if (shouldShowSeason)
+                        {
+                            displaySeasonIds.Add(season.SeasonId);
+                        }
+
+                        if (shouldShowSeason
+                            && ResolveIsVisibleInLibrary(
                                 seasonHasActiveSource,
-                                state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto,
+                                visibilityState,
                                 seasonHasCurrentState))
                         {
                             visibleSeasonCount++;
@@ -922,6 +938,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         }
                     }
 
+                    var displaySeasons = seasons
+                        .Where(season => displaySeasonIds.Contains(season.SeasonId))
+                        .ToList();
                     var visibleSources = sources
                         .Where(x => visibleSeasonIds.Contains(x.SeasonId))
                         .ToList();
@@ -929,26 +948,26 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var isVisibleInLibrary = visibleSeasonCount > 0
                                              && (hasRecognizedSeason || isUnknownSeriesProjection);
                     var inLibraryEpisodeCount = visibleSources.Select(x => x.EpisodeId).Distinct().Count();
-                    var watchedEpisodeCount = seasons
+                    var watchedEpisodeCount = displaySeasons
                         .SelectMany(season => FilterCountableSeasonEpisodes(
                             season,
                             episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
                             sourceEpisodeIds))
                         .Count(x => x.IsWatched);
                     var hasWatchedEpisodeState = watchedEpisodeCount > 0;
-                    var totalEpisodeCount = seasons.Sum(
+                    var totalEpisodeCount = displaySeasons.Sum(
                         season => ResolveSeasonProgressTotalEpisodeCount(
                             season,
                             FilterCountableSeasonEpisodes(
                                 season,
                                 episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
                                 sourceEpisodeIds).Count));
-                    var knownEpisodeCount = seasons.Sum(
+                    var knownEpisodeCount = displaySeasons.Sum(
                         season => FilterCountableSeasonEpisodes(
                             season,
                             episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
                             sourceEpisodeIds).Count);
-                    var latestSeasonPoster = seasons
+                    var latestSeasonPoster = displaySeasons
                         .OrderByDescending(x => x.SeasonNumber)
                         .Select(x => x.PosterRemoteUrl)
                         .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
@@ -980,7 +999,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasUserState = hasState || hasWatchedEpisodeState,
                         IsInLibrary = hasActiveSource,
                         IsWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount),
-                        SeasonCount = isUnknownSeriesProjection ? visibleSeasonCount : seasons.Count,
+                        SeasonCount = displaySeasons.Count,
                         InLibraryEpisodeCount = inLibraryEpisodeCount,
                         WatchedEpisodeCount = watchedEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
@@ -1249,6 +1268,29 @@ public sealed class LibraryQueryService : ILibraryQueryService
                || item.InLibraryEpisodeCount > 0;
     }
 
+    private static bool ShouldShowSeasonInSeriesOverviewProjection(
+        int? tmdbSeriesId,
+        TvSeasonLibraryRow season,
+        int inLibraryEpisodeCount,
+        LibraryVisibilityState libraryVisibilityState)
+    {
+        if (tmdbSeriesId.HasValue
+            && !season.TmdbSeasonId.HasValue
+            && inLibraryEpisodeCount <= 0
+            && libraryVisibilityState != LibraryVisibilityState.Visible)
+        {
+            return false;
+        }
+
+        if (IsNoTmdbFailedUnknownSeason(season)
+            && inLibraryEpisodeCount <= 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     private static bool IsNoTmdbFailedUnknownSeason(TvSeasonLibraryRow season)
     {
         return season.TmdbSeriesId is null && season.IdentificationStatus == IdentificationStatus.Failed;
@@ -1412,6 +1454,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public int SeriesId { get; set; }
 
         public int? TmdbSeriesId { get; set; }
+
+        public int? TmdbSeasonId { get; set; }
 
         public int SeasonNumber { get; set; }
 

@@ -2521,7 +2521,7 @@ Completed:
 - Duplicate Series detection runs before the transaction, before Series / Season / Episode creation, and before moving any `MediaFile`.
 - Duplicate matching uses a conservative normalized title key: trim, Unicode compatibility normalization for common full-width / half-width differences, repeated whitespace collapse, outer wrapping-symbol trim, and case-insensitive equality. It does not use `contains` matching.
 - The manual aggregation dialog now includes a Season number field, defaulting to `1`.
-- Season number must be a positive integer. Empty, `0`, negative, decimal, and non-numeric values are rejected before apply.
+- Season number must be `0` or a positive integer. Empty, negative, decimal, and non-numeric values are rejected before apply.
 - New unknown Seasons use the user-provided `SeasonNumber`; the Season title remains independently editable and the dialog shows the combined `Sxx + title` preview.
 - Existing aggregation semantics are unchanged: duplicate episode numbers become multiple sources on one Episode, and missing intermediate Episodes are not created.
 - Added sanitized diagnostics for duplicate-Series blocking, invalid Season number, apply started, apply succeeded, and apply failed. Logs use normalized title hashes, ids, counts, Season number, and sanitized failure reasons.
@@ -3093,4 +3093,85 @@ Not done:
 Verification:
 
 - Build verification is recorded in the final report for this follow-up.
+- Current migrations diff remained empty.
+
+### Phase 4.13f - Manual aggregation then identify
+
+Completed:
+
+- The manual unknown Season aggregation dialog now has two actions: `聚合` keeps the existing create-only no-TMDB unknown Season behavior, and `聚合后识别` runs aggregation first, then attempts Season AI correction.
+- `聚合后识别` reuses the existing manual aggregation service for the first transaction. The aggregate transaction still enforces unidentified-source-only input, duplicate Series title blocking, non-negative Season number, positive Episode numbers, duplicate Episode number as multi-source, and no empty Episode creation.
+- After aggregation succeeds, the new unknown Season is passed as a single Season unit to the existing batch / Season AI correction service. This reuses the existing Season AI prompt, TMDB search, Season target resolver, Season correction service, Season 0 safety gate, and episode-number-preserving mapping behavior.
+- AI correction runs in a separate transaction. If AI returns empty / skip / unsafe target, returns a non-Season target, cannot resolve a safe target, or apply fails, the already-created unknown Season is preserved and the user is told to correct it manually later.
+- The dialog shows busy/status text for the aggregation step and the AI identification step, then writes a combined summary to the library batch result area.
+- New sanitized diagnostics include `manual-aggregate-identify-started`, `manual-aggregate-identify-aggregate-succeeded`, `manual-aggregate-identify-season-ai-started`, `manual-aggregate-identify-season-ai-result`, `manual-aggregate-identify-season-correction-succeeded`, `manual-aggregate-identify-skipped`, `manual-aggregate-identify-failed`, and `manual-aggregate-identify-summary`.
+
+Not done:
+
+- No new AI prompt / schema, batch AI rule, scan rule, TMDB / OMDb resolver, SP / OVA / OAD mapping UI, migration, database update, commit, or push was added.
+
+Verification:
+
+- Build verification is recorded in the final report for this phase.
+- Current migrations diff remained empty.
+
+### Phase 4.13f Follow-up - Season 0 inputs and scan safety
+
+Completed:
+
+- Manual Season number inputs now accept `0` as a valid target Season for specials while still rejecting negative, empty, decimal, and non-numeric values.
+- Manual unknown Season aggregation can create an unknown Season with `SeasonNumber=0`; Episode numbers remain positive integers and empty Episode creation is still disabled.
+- Season-level correction accepts manually entered target Season 0 and preserves the existing per-source target Episode mapping behavior.
+- TMDB recognized Season pickers now include Season 0 / Specials when available instead of filtering it out.
+- TV filename parsing and scan AI hints can carry explicit Season 0 / S00 instead of normalizing it to S01.
+- TV scan auto-apply now has a Season 0 safety gate: Season 0 must load from TMDB, and all scanned target Episode numbers must exist in that TMDB Season 0 before automatic binding. Otherwise the candidate is preserved as unidentified.
+- Movie scan confidence now uses the same neutral missing-year score (`0.70`) as batch AI Movie target resolution; the stricter scan auto-match threshold remains unchanged.
+
+Not done:
+
+- No Season 0 special mapping UI, SP / OVA / OAD complex mapping, ordinary Season fallback change, migration, database update, commit, or push was added.
+- Batch AI's unique strong match / single exact-year override was not copied into ordinary movie scanning; scan auto-identification stays more conservative.
+
+Verification:
+
+- Build verification is recorded in the final report for this follow-up.
+- Current migrations diff remained empty.
+
+### Phase 4.13f Follow-up - Series season count projection
+
+Completed:
+
+- Media library Series cards now use the same display-season rule as Series overview when calculating `SeasonCount`.
+- TMDB Series seasons that were locally created without a TMDB Season binding and currently have no active source are not counted on the media library card unless the Season is explicitly visible.
+- no-TMDB failed unknown Seasons without active source are not counted on the media library card.
+- Aggregate watched / total episode counts on Series cards now use the same displayed Season set, avoiding progress totals inflated by hidden empty shell Seasons.
+
+Not done:
+
+- No data cleanup, historical shell deletion, migration, database update, commit, or push was added.
+
+Verification:
+
+- Build verification is recorded in the final report for this follow-up.
+- Current migrations diff remained empty.
+
+### Phase 4.13 Closure Regression
+
+Completed:
+
+- Audited the current Phase 4.13 implementation from the actual worktree instead of assuming prompt state: single-source correction, attach-to-unknown-season correction, manual unknown Season aggregation, aggregate-then-identify, Season-level correction, batch AI correction, AI model routing, adaptive AI concurrency, TMDB / OMDb throttling, Season 0 handling, and no-source / empty-shell projection behavior.
+- Verified the active diff remains scoped to Phase 4.13 correction / AI / projection work plus related documentation.
+- Confirmed no migration changes are present.
+- Confirmed the current build passes with 0 warnings and 0 errors.
+- No new Phase 4.13 blocker, data-safety issue, default-source regression, duplicate projection regression, or Movie / Episode dual-binding issue was identified during this closure pass.
+
+Known Issues:
+
+- Blocker: none found in this closure pass.
+- Deferred: long-running absolute episode mapping, cross-season range splitting, and richer SP / OVA / OAD / theatrical special mapping still need later dedicated design.
+- Noise: Windows line-ending warnings appear in `git diff --stat`; no functional code issue was found.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed.
 - Current migrations diff remained empty.

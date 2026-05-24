@@ -26,7 +26,7 @@
 - 统计缓存已按时间范围和日历月份拆分；旧的 `statistics/global` 缓存行可能仍留在表中，但当前 range-aware service 不再使用。
 - 手动刷新画像在同一 fingerprint + 同一 prompt/schema version 下不会重复请求 AI；如果未来需要“强制重新生成”，应作为高级功能单独设计。
 - 画像生成已拆为 5 个卡片级并发请求；DeepSeek 官方并发限制为动态策略，当前服务层使用 max concurrency 5，后续如遇 429 需要降低并发或增加重试。
-- DeepSeek endpoint 下画像使用 `deepseek-v4-pro` + thinking high；推荐使用 `deepseek-v4-flash`；分类仍使用全局模型配置。非 DeepSeek endpoint 不强制覆盖模型。
+- DeepSeek endpoint 下画像默认使用 `deepseek-v4-pro` + thinking high；如果设置页将画像模型改为 `deepseek-v4-flash`，运行时会自动关闭 thinking 并继续请求。推荐使用 `deepseek-v4-flash`；非 DeepSeek endpoint 不强制覆盖模型。
 - 叙事标签只存在于画像结果中，不写入 `Movie`，也不新增 DB 字段。
 - 画像人格类型限定为最终版 23 个；非法类型会回退为“类型探索家”，必要时追加一次 AI 请求生成匹配描述。
 - 旧画像缓存可能仍显示已废弃人格（如“多元杂食者”或“童心奇想家”）；页面应保持可显示并提示手动刷新画像，不会自动改写缓存或调用 AI。

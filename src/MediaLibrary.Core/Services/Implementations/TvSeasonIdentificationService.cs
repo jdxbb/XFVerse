@@ -464,6 +464,22 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 result.Summary.AddWarning("TV.Detail", TrimMessage(exception.Message));
             }
 
+            if (candidate.SeasonNumber == 0)
+            {
+                var seasonZeroSkipReason = GetSeasonZeroAutoApplySkippedReason(candidate, seasonDetails);
+                if (!string.IsNullOrWhiteSpace(seasonZeroSkipReason))
+                {
+                    ScanIdentificationDiagnostics.Write(
+                        $"event=tv-season-zero-auto-apply-skipped tmdbId={bestCandidate.Item.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Item.Name)} season=0 files={candidate.Files.Count} skippedReason={ScanIdentificationDiagnostics.FormatValue(seasonZeroSkipReason)}");
+                    await UpsertUnidentifiedSeasonAsync(candidate, cancellationToken);
+                    result.Summary.PlaceholderCount++;
+                    continue;
+                }
+
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tv-season-zero-auto-apply-validated tmdbId={bestCandidate.Item.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(bestCandidate.Item.Name)} season=0 files={candidate.Files.Count} tmdbEpisodeCount={ScanIdentificationDiagnostics.FormatNullable(seasonDetails?.EpisodeCount)}");
+            }
+
             var partOffsetResult = HasPartOffsetCandidates(candidate)
                 ? await ApplySafeSiblingPartOffsetsAsync(
                     candidate,
@@ -974,7 +990,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     var effectiveSeasonNumber = parseResult.IsSeasonContextOnly && folderSeasonNumber.HasValue
                         ? folderSeasonNumber.Value
                         : parseResult.SeasonNumber;
-                    if (hint?.SeasonNumberHint is > 0 && parseResult.IsSeasonContextOnly)
+                    if (hint?.SeasonNumberHint is >= 0 && parseResult.IsSeasonContextOnly)
                     {
                         effectiveSeasonNumber = hint.SeasonNumberHint.Value;
                     }
@@ -1087,7 +1103,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         }
 
         var candidates = new List<TvSeasonCandidate>();
-        foreach (var seasonGroup in validEpisodeFiles.GroupBy(x => Math.Max(1, x.SeasonNumber)))
+        foreach (var seasonGroup in validEpisodeFiles.GroupBy(x => NormalizeCandidateSeasonNumber(x.SeasonNumber)))
         {
             var seasonFiles = seasonGroup
                 .GroupBy(x => x.ParseResult.EpisodeNumber)
@@ -1116,7 +1132,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     WeakTvReasons = directoryContext.WeakReasons.ToList(),
                     Files = seasonFiles,
                     UnsupportedFiles = unsupportedFiles
-                        .Where(x => Math.Max(1, x.SeasonNumber) == seasonNumber || !x.ParseResult.IsEpisodeLike)
+                        .Where(x => NormalizeCandidateSeasonNumber(x.SeasonNumber) == seasonNumber || !x.ParseResult.IsEpisodeLike)
                         .ToList()
                 });
         }
@@ -1430,7 +1446,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 file => file.ParseResult.IsEpisodeLike
                         && !file.ParseResult.IsMultiEpisode
                         && file.ParseResult.EpisodeNumber > 0
-                        && Math.Max(1, file.SeasonNumber) == candidate.SeasonNumber)
+                        && NormalizeCandidateSeasonNumber(file.SeasonNumber) == candidate.SeasonNumber)
             .Select(x => x.ParseResult.EpisodeNumber)
             .Distinct()
             .ToList();
@@ -2090,7 +2106,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         int? folderSeasonNumber,
         IReadOnlyList<TvSeasonCandidateFile> parsedFiles)
     {
-        if (folderSeasonNumber is > 0)
+        if (folderSeasonNumber is >= 0)
         {
             return folderSeasonNumber.Value;
         }
@@ -2101,6 +2117,38 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             .Distinct()
             .ToArray();
         return partSeasonNumbers.Length == 1 ? partSeasonNumbers[0] : 1;
+    }
+
+    private static int NormalizeCandidateSeasonNumber(int seasonNumber)
+    {
+        return Math.Max(0, seasonNumber);
+    }
+
+    private static string? GetSeasonZeroAutoApplySkippedReason(
+        TvSeasonCandidate candidate,
+        TmdbTvSeasonDetailResult? seasonDetails)
+    {
+        if (seasonDetails is null)
+        {
+            return "season-zero-tmdb-season-unavailable";
+        }
+
+        var tmdbEpisodeNumbers = GetTmdbSeasonEpisodeNumbers(seasonDetails);
+        if (tmdbEpisodeNumbers.Count == 0)
+        {
+            return "season-zero-tmdb-episode-unavailable";
+        }
+
+        var missingEpisodeNumbers = candidate.Files
+            .Select(x => x.ParseResult.EpisodeNumber)
+            .Where(x => x > 0)
+            .Distinct()
+            .Where(x => !tmdbEpisodeNumbers.Contains(x))
+            .Take(5)
+            .ToArray();
+        return missingEpisodeNumbers.Length > 0
+            ? "season-zero-tmdb-episode-unavailable"
+            : null;
     }
 
     private static TvSearchQuerySet BuildSearchQueries(

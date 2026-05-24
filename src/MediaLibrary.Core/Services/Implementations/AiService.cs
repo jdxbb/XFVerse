@@ -69,8 +69,12 @@ public sealed class AiService : IAiService
             }
         };
 
-        var thinkingEnabled = isDeepSeek && options?.ThinkingEnabled == true;
-        LogRouting(options, modelResolution, isDeepSeek, thinkingEnabled);
+        var thinkingRequested = isDeepSeek && options?.ThinkingEnabled == true;
+        var thinkingEnabled = thinkingRequested && SupportsDeepSeekThinking(model);
+        var thinkingSkipReason = thinkingRequested && !thinkingEnabled
+            ? "model-does-not-support-thinking"
+            : string.Empty;
+        LogRouting(options, modelResolution, isDeepSeek, thinkingRequested, thinkingEnabled, thinkingSkipReason);
         if (thinkingEnabled)
         {
             payload["thinking"] = new { type = "enabled" };
@@ -161,11 +165,18 @@ public sealed class AiService : IAiService
         return IsDeepSeekLegacyModel(model) ? "deepseek-v4-flash" : model;
     }
 
+    private static bool SupportsDeepSeekThinking(string model)
+    {
+        return string.Equals(model?.Trim(), "deepseek-v4-pro", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static void LogRouting(
         AiRequestOptions? options,
         ModelResolution modelResolution,
         bool isDeepSeek,
-        bool thinkingEnabled)
+        bool thinkingRequested,
+        bool thinkingEnabled,
+        string thinkingSkipReason)
     {
         var provider = isDeepSeek ? "deepseek" : "custom";
         var purpose = FirstNonEmpty(options?.RequestKind, "default");
@@ -173,7 +184,7 @@ public sealed class AiService : IAiService
             ? FirstNonEmpty(options?.ReasoningEffort, "default")
             : "off";
         AiPerfDiagnostics.WriteEvent(
-            $"event=ai-model-routing provider={FormatLogValue(provider)} purpose={FormatLogValue(purpose)} requestedModel={FormatLogValue(modelResolution.RequestedModel)} resolvedModel={FormatLogValue(modelResolution.ResolvedModel)} thinkingEnabled={thinkingEnabled.ToString().ToLowerInvariant()} reasoningMode={FormatLogValue(reasoningMode)} overrideReason={FormatLogValue(modelResolution.OverrideReason)}");
+            $"event=ai-model-routing provider={FormatLogValue(provider)} purpose={FormatLogValue(purpose)} requestedModel={FormatLogValue(modelResolution.RequestedModel)} resolvedModel={FormatLogValue(modelResolution.ResolvedModel)} thinkingRequested={thinkingRequested.ToString().ToLowerInvariant()} thinkingEnabled={thinkingEnabled.ToString().ToLowerInvariant()} reasoningMode={FormatLogValue(reasoningMode)} thinkingSkipReason={FormatLogValue(thinkingSkipReason)} overrideReason={FormatLogValue(modelResolution.OverrideReason)}");
     }
 
     private static string FirstNonEmpty(params string?[] values)

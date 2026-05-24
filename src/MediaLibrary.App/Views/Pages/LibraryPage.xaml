@@ -764,6 +764,10 @@
                                     Content="取消"
                                     Command="{Binding CancelManualAggregationCommand}"
                                     Style="{StaticResource SecondaryButtonStyle}" />
+                            <Button Margin="0,0,10,0"
+                                    Content="聚合后识别"
+                                    Command="{Binding ApplyManualAggregationAndIdentifyCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
                             <Button Content="聚合"
                                     Command="{Binding ApplyManualAggregationCommand}"
                                     Style="{StaticResource PrimaryButtonStyle}" />

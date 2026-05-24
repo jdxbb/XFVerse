@@ -806,3 +806,11 @@
 - Strong year conflicts still skip with `movie-year-conflict`.
 - Diagnostics now include `singleExactYearResult` and resolution `movie-single-exact-year-result-applied` when this pass is used.
 - This does not change TV target logic, detail-page correction, recommendation boundaries, Watch Insights, scan rules, migrations, database update, commit, or push.
+
+# AI Settings Watch Profile Compatibility Follow-up
+
+- Removed the obsolete single global model-name input from the Settings API page; model and timeout editing now happens only through the per-purpose rows.
+- The stored global/default model remains runtime-compatible for old settings payloads, but it is no longer user-facing in the Settings UI.
+- Watch Profile high thinking is now enabled only when the resolved DeepSeek model supports it (`deepseek-v4-pro`). If the Watch Profile row is changed to `deepseek-v4-flash`, the request keeps using Flash and automatically sends thinking off.
+- AI routing diagnostics now include `thinkingRequested`, `thinkingEnabled`, and `thinkingSkipReason` so Flash profile requests can be distinguished from Pro high-thinking profile requests.
+- This does not change Movie / TV safety gates, prompts, recommendation inputs, Watch Insights profile semantics, schema, migrations, database update, commit, or push.

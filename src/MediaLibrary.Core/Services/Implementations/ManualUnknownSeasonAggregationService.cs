@@ -116,11 +116,11 @@ public sealed class ManualUnknownSeasonAggregationService : IManualUnknownSeason
             throw new InvalidOperationException("集号必须是正整数。");
         }
 
-        if (seasonNumber <= 0)
+        if (seasonNumber < 0)
         {
             ScanIdentificationDiagnostics.Write(
                 $"event=manual-season-aggregate-season-number-invalid seasonNumber={seasonNumber} sourceCount={sourceAssignments.Length}");
-            throw new InvalidOperationException("季号必须是正整数。");
+            throw new InvalidOperationException("季号必须是 0 或正整数。");
         }
 
         var normalizedSeriesTitle = NormalizeSeriesTitleForDuplicate(seriesTitle);

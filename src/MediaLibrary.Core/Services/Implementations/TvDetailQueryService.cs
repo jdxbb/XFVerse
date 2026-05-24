@@ -553,7 +553,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             .AsNoTracking()
             .Where(x => x.Series != null
                         && x.Series.TmdbSeriesId.HasValue
-                        && x.SeasonNumber > 0
+                        && x.SeasonNumber >= 0
                         && x.IdentificationStatus != IdentificationStatus.Failed)
             .OrderBy(x => x.Series!.Name)
             .ThenBy(x => x.SeasonNumber)

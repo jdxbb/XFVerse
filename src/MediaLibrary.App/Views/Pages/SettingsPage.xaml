@@ -293,14 +293,11 @@
                                     <TextBlock Margin="0,10,0,0" Text="API Key" Style="{StaticResource BodyTextStyle}" />
                                     <TextBox Style="{StaticResource FormTextBoxStyle}"
                                              Text="{Binding AiApiKey, UpdateSourceTrigger=PropertyChanged}" />
-                                    <TextBlock Margin="0,10,0,0" Text="模型名称" Style="{StaticResource BodyTextStyle}" />
-                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                             Text="{Binding AiModel, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBlock Margin="0,16,0,0"
                                                Text="分项模型与超时"
                                                Style="{StaticResource BodyTextStyle}" />
                                     <TextBlock Margin="0,4,0,0"
-                                               Text="可按调用场景覆盖模型和超时时间；旧的单一模型名会作为默认模型兼容读取。"
+                                               Text="可按调用场景覆盖模型和超时时间；旧配置中的单一模型名仍会兼容读取。"
                                                TextWrapping="Wrap"
                                                Style="{StaticResource BodyMutedTextStyle}" />
                                     <Grid Margin="0,10,0,0">

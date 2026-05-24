@@ -1257,7 +1257,7 @@ Phase 4.13a starts the active correction work with a narrow single-source founda
 - Existing recognized Series and existing no-TMDB / unknown Series both count as duplicates for manual aggregation.
 - The duplicate guard runs before writing any new Series / Season / Episode and before moving selected sources.
 - The normalized Series title key trims, applies Unicode compatibility normalization, collapses repeated whitespace, removes common outer wrapping symbols, and compares case-insensitively. It does not use substring matching.
-- The dialog now asks for a positive Season number. The new unknown `TvSeason.SeasonNumber` uses that value.
+- The dialog now asks for a non-negative Season number. `0` is allowed for specials, and the new unknown `TvSeason.SeasonNumber` uses that value.
 - Future scans or searches may still create recognized Series with the same real-world title as an existing unknown Series. This phase does not add automatic same-name merge or migration; that remains Season-level correction work.
 
 ## Phase 4.13d Unknown Season to Recognized Season Boundary

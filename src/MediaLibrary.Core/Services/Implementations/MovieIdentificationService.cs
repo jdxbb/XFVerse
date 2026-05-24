@@ -16,6 +16,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 {
     private const double MinimumAutoMatchConfidence = 0.55d;
     private const double MatchedConfidence = 0.80d;
+    private const double NeutralYearScore = 0.70d;
     private const int MovieTitleMaxLength = 300;
     private const string UnidentifiedTvSeriesCandidateTitle = "未识别剧集候选";
     private const string UnidentifiedTvSeasonCandidateTitle = "未识别电视剧季";
@@ -2027,7 +2028,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         var originalTitleSimilarity = MovieFileNameParser.CalculateTitleSimilarity(expectedTitle, candidate.OriginalTitle);
         var bestTitleScore = Math.Max(titleSimilarity, originalTitleSimilarity);
 
-        var yearScore = 0d;
+        var yearScore = NeutralYearScore;
         if (expectedYear.HasValue && candidate.ReleaseYear.HasValue)
         {
             yearScore = expectedYear.Value == candidate.ReleaseYear.Value
@@ -2035,10 +2036,6 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
                 : Math.Abs(expectedYear.Value - candidate.ReleaseYear.Value) == 1
                     ? 0.5d
                     : 0d;
-        }
-        else if (!expectedYear.HasValue)
-        {
-            yearScore = 0.4d;
         }
 
         return Math.Clamp((bestTitleScore * 0.8d) + (yearScore * 0.2d), 0d, 1d);

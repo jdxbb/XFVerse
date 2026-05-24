@@ -52,7 +52,7 @@ public sealed class RecognizedTvSeasonCorrectionSeriesGroup
         IEnumerable<RecognizedTvSeasonCorrectionTargetItem> targets)
     {
         return targets
-            .Where(x => x.TmdbSeriesId > 0 && x.SeasonNumber > 0)
+            .Where(x => x.TmdbSeriesId > 0 && x.SeasonNumber >= 0)
             .GroupBy(x => string.IsNullOrWhiteSpace(x.SeriesTitle) ? "-" : x.SeriesTitle.Trim(), StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(x => x.Key, StringComparer.CurrentCultureIgnoreCase)
             .Select(x => new RecognizedTvSeasonCorrectionSeriesGroup(x.Key, x))
@@ -93,7 +93,7 @@ public sealed class RecognizedTvSeasonCorrectionSeasonItem
         SeasonId = target.SeasonId;
         SeasonNumber = target.SeasonNumber;
         SeasonTitle = string.IsNullOrWhiteSpace(target.SeasonTitle)
-            ? $"Season {target.SeasonNumber}"
+            ? target.SeasonNumber == 0 ? "Specials" : $"Season {target.SeasonNumber}"
             : target.SeasonTitle.Trim();
         EpisodeCount = target.EpisodeCount;
         AirDate = target.AirDate;

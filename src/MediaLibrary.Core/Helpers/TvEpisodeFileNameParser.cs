@@ -100,7 +100,7 @@ public static partial class TvEpisodeFileNameParser
             var match = regex.Match(value);
             if (match.Success && TryReadSeasonToken(match.Groups["season"].Value, out var seasonNumber))
             {
-                return Math.Max(1, seasonNumber);
+                return NormalizeSeasonNumber(seasonNumber);
             }
         }
 
@@ -270,7 +270,7 @@ public static partial class TvEpisodeFileNameParser
                 IsSeasonContextOnly = false,
                 IsMultiEpisode = false,
                 MultiEpisodeFalsePositiveAvoided = multiEpisodeFalsePositiveAvoided,
-                SeasonNumber = Math.Max(1, explicitSeasonNumber ?? seasonNumberHint ?? 1),
+                SeasonNumber = NormalizeSeasonNumber(explicitSeasonNumber ?? seasonNumberHint ?? 1),
                 EpisodeNumber = 0,
                 SeriesNameCandidate = CleanSeriesNameCandidate(pattern.PrefixKey),
                 EpisodeTitleCandidate = string.Empty,
@@ -292,7 +292,7 @@ public static partial class TvEpisodeFileNameParser
             IsSeasonContextOnly = !explicitSeasonNumber.HasValue,
             IsMultiEpisode = false,
             MultiEpisodeFalsePositiveAvoided = multiEpisodeFalsePositiveAvoided,
-            SeasonNumber = Math.Max(1, explicitSeasonNumber ?? seasonNumberHint ?? 1),
+            SeasonNumber = NormalizeSeasonNumber(explicitSeasonNumber ?? seasonNumberHint ?? 1),
             EpisodeNumber = pattern.Number,
             SeriesNameCandidate = CleanSeriesNameCandidate(pattern.PrefixKey),
             EpisodeTitleCandidate = string.Empty,
@@ -474,7 +474,7 @@ public static partial class TvEpisodeFileNameParser
             if (match.Groups["season"].Success
                 && TryReadSeasonToken(match.Groups["season"].Value, out var parsedSeasonNumber))
             {
-                seasonNumber = Math.Max(1, parsedSeasonNumber);
+                seasonNumber = NormalizeSeasonNumber(parsedSeasonNumber);
             }
 
             var keySeason = seasonNumber.HasValue
@@ -571,7 +571,7 @@ public static partial class TvEpisodeFileNameParser
             "leading-number-title",
             prefixKey,
             episodeNumber,
-            Math.Max(1, seasonNumber));
+            NormalizeSeasonNumber(seasonNumber));
         return true;
     }
 
@@ -688,7 +688,7 @@ public static partial class TvEpisodeFileNameParser
                 continue;
             }
 
-            return new EpisodeMatch(match, Math.Max(1, seasonNumber), episodeNumber, "MultiEpisode", endEpisodeNumber);
+            return new EpisodeMatch(match, NormalizeSeasonNumber(seasonNumber), episodeNumber, "MultiEpisode", endEpisodeNumber);
         }
 
         return null;
@@ -739,7 +739,7 @@ public static partial class TvEpisodeFileNameParser
                 continue;
             }
 
-            return new EpisodeMatch(match, Math.Max(1, seasonNumber), episodeNumber, entry.Kind, null);
+            return new EpisodeMatch(match, NormalizeSeasonNumber(seasonNumber), episodeNumber, entry.Kind, null);
         }
 
         return null;
@@ -804,7 +804,7 @@ public static partial class TvEpisodeFileNameParser
             MultiEpisodeFalsePositiveAvoided = multiEpisodeFalsePositiveAvoided,
             MultiEpisodeEndNumber = isMultiEpisode ? episodeMatch.MultiEpisodeEndNumber : null,
             MultiEpisodePattern = isMultiEpisode ? episodeMatch.Kind : string.Empty,
-            SeasonNumber = Math.Max(1, episodeMatch.SeasonNumber),
+            SeasonNumber = NormalizeSeasonNumber(episodeMatch.SeasonNumber),
             EpisodeNumber = Math.Max(0, episodeMatch.EpisodeNumber),
             SeriesNameCandidate = seriesCandidate,
             EpisodeTitleCandidate = episodeTitleCandidate,
@@ -824,13 +824,18 @@ public static partial class TvEpisodeFileNameParser
 
     private static bool TryReadSeasonToken(string value, out int number)
     {
-        if (TryReadInt(value, out number))
+        if (int.TryParse(value, out number) && number >= 0)
         {
             return true;
         }
 
         number = ParseChineseNumber(value);
-        return number > 0;
+        return number >= 0;
+    }
+
+    private static int NormalizeSeasonNumber(int seasonNumber)
+    {
+        return Math.Max(0, seasonNumber);
     }
 
     private static int ParseChineseNumber(string value)
@@ -1051,7 +1056,7 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"\b[Ss](?<season>\d{1,2})\b", RegexOptions.CultureInvariant)]
     private static partial Regex SeasonTokenRegex();
 
-    [GeneratedRegex(@"\u7b2c\s*(?<season>[0-9一二三四五六七八九十两]{1,4})\s*\u5b63(?:\s*\u5168\s*\d{1,3}\s*\u96c6)?", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\u7b2c\s*(?<season>[0-9零一二三四五六七八九十两]{1,4})\s*\u5b63(?:\s*\u5168\s*\d{1,3}\s*\u96c6)?", RegexOptions.CultureInvariant)]
     private static partial Regex ChineseSeasonTokenRegex();
 
     [GeneratedRegex(@"\u5168\s*(?<count>[0-9\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]{1,4})\s*[\u96c6\u8bdd\u5b63]", RegexOptions.CultureInvariant)]

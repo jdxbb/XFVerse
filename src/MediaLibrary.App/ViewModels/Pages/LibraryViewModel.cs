@@ -152,6 +152,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         BatchDeleteMovieRecordsCommand = new AsyncRelayCommand(BatchDeleteMovieRecordsAsync, () => CanBatchDeleteMovieRecords);
         OpenManualAggregationCommand = new AsyncRelayCommand(OpenManualAggregationAsync, () => CanBatchManualAggregate);
         ApplyManualAggregationCommand = new AsyncRelayCommand(ApplyManualAggregationAsync, () => CanApplyManualAggregation);
+        ApplyManualAggregationAndIdentifyCommand = new AsyncRelayCommand(ApplyManualAggregationAndIdentifyAsync, () => CanApplyManualAggregation);
         CancelManualAggregationCommand = new RelayCommand(CancelManualAggregation, () => IsManualAggregationDialogOpen && !IsManualAggregationBusy);
         OpenRemovedLibraryCommand = new AsyncRelayCommand(OpenRemovedLibraryAsync, () => !IsRemovedLibraryLoading);
         CloseRemovedLibraryCommand = new RelayCommand(CloseRemovedLibrary);
@@ -241,6 +242,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     public AsyncRelayCommand OpenManualAggregationCommand { get; }
 
     public AsyncRelayCommand ApplyManualAggregationCommand { get; }
+
+    public AsyncRelayCommand ApplyManualAggregationAndIdentifyCommand { get; }
 
     public RelayCommand CancelManualAggregationCommand { get; }
 
@@ -525,6 +528,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(CanApplyManualAggregation));
                 ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+                ApplyManualAggregationAndIdentifyCommand.RaiseCanExecuteChanged();
                 CancelManualAggregationCommand.RaiseCanExecuteChanged();
             }
         }
@@ -541,6 +545,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(CanApplyManualAggregation));
                 OpenManualAggregationCommand.RaiseCanExecuteChanged();
                 ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+                ApplyManualAggregationAndIdentifyCommand.RaiseCanExecuteChanged();
                 CancelManualAggregationCommand.RaiseCanExecuteChanged();
             }
         }
@@ -555,6 +560,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(CanApplyManualAggregation));
                 ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+                ApplyManualAggregationAndIdentifyCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -569,6 +575,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(CanApplyManualAggregation));
                 OnPropertyChanged(nameof(ManualAggregationSeasonDisplayText));
                 ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+                ApplyManualAggregationAndIdentifyCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -583,6 +590,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(CanApplyManualAggregation));
                 OnPropertyChanged(nameof(ManualAggregationSeasonDisplayText));
                 ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+                ApplyManualAggregationAndIdentifyCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -599,7 +607,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
-    private int? ManualAggregationSeasonNumber => int.TryParse(ManualAggregationSeasonNumberText, out var value) && value > 0
+    private int? ManualAggregationSeasonNumber => int.TryParse(ManualAggregationSeasonNumberText, out var value) && value >= 0
         ? value
         : null;
 
@@ -1383,7 +1391,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private static int GetBatchSelectionSeasonNumber(LibraryMovieListItem item)
     {
-        return IsSeasonLikeBatchItem(item) && item.SeasonNumber > 0
+        return IsSeasonLikeBatchItem(item) && item.SeasonNumber >= 0
             ? item.SeasonNumber
             : int.MaxValue;
     }
@@ -1838,19 +1846,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
-        var request = new ManualUnknownSeasonAggregationApplyRequest
-        {
-            SeriesTitle = ManualAggregationSeriesTitle.Trim(),
-            SeasonTitle = ManualAggregationSeasonTitle.Trim(),
-            SeasonNumber = ManualAggregationSeasonNumber.GetValueOrDefault(),
-            Sources = ManualAggregationSources
-                .Select(row => new ManualUnknownSeasonAggregationSourceAssignment
-                {
-                    MediaFileId = row.MediaFileId,
-                    EpisodeNumber = row.ParsedEpisodeNumber.GetValueOrDefault()
-                })
-                .ToArray()
-        };
+        var request = BuildManualAggregationApplyRequest();
 
         IsManualAggregationBusy = true;
         IsBatchOperationRunning = true;
@@ -1890,6 +1886,150 @@ public sealed class LibraryViewModel : PageViewModelBase
             IsBatchOperationRunning = false;
             IsManualAggregationBusy = false;
         }
+    }
+
+    private async Task ApplyManualAggregationAndIdentifyAsync()
+    {
+        if (!IsManualAggregationDialogOpen || IsManualAggregationBusy)
+        {
+            return;
+        }
+
+        var validationMessage = ValidateManualAggregationInput();
+        if (!string.IsNullOrWhiteSpace(validationMessage))
+        {
+            ManualAggregationStatusMessage = validationMessage;
+            return;
+        }
+
+        var request = BuildManualAggregationApplyRequest();
+        IsManualAggregationBusy = true;
+        IsBatchOperationRunning = true;
+        ManualAggregationStatusMessage = "正在聚合为未识别季...";
+        ScanIdentificationDiagnostics.Write(
+            $"event=manual-aggregate-identify-started sourceCount={request.Sources.Count} seasonNumber={request.SeasonNumber}");
+
+        ManualUnknownSeasonAggregationApplyResult? aggregateResult = null;
+        try
+        {
+            aggregateResult = await _manualUnknownSeasonAggregationService.ApplyAsync(request);
+            ScanIdentificationDiagnostics.Write(
+                $"event=manual-aggregate-identify-aggregate-succeeded unknownSeasonId={aggregateResult.SeasonId} unknownSeriesId={aggregateResult.SeriesId} sourceCount={aggregateResult.SourceCount} createdEpisodeCount={aggregateResult.CreatedEpisodeCount} additionalSourceCount={aggregateResult.AdditionalSourceCount}");
+        }
+        catch (Exception exception)
+        {
+            var message = DescribeException(exception);
+            ManualAggregationStatusMessage = message.Contains("已存在同名剧集", StringComparison.Ordinal)
+                ? message
+                : $"聚合失败，事务已回滚：{message}";
+            BatchResultSummary = ManualAggregationStatusMessage;
+            ScanIdentificationDiagnostics.Write(
+                $"event=manual-aggregate-identify-failed stage=\"aggregate\" sourceCount={request.Sources.Count} seasonNumber={request.SeasonNumber} failureReason={ScanIdentificationDiagnostics.FormatValue(message, 260)}");
+            IsBatchOperationRunning = false;
+            IsManualAggregationBusy = false;
+            return;
+        }
+
+        var aggregateSummary = $"聚合完成：移动 {aggregateResult.SourceCount} 个播放源，创建 {aggregateResult.CreatedEpisodeCount} 集，重复集号追加 {aggregateResult.AdditionalSourceCount} 个播放源。";
+        ManualAggregationStatusMessage = "聚合完成，正在 AI 识别新聚合季...";
+        ScanIdentificationDiagnostics.Write(
+            $"event=manual-aggregate-identify-season-ai-started unknownSeasonId={aggregateResult.SeasonId} sourceCount={aggregateResult.SourceCount}");
+
+        var identifySummary = "已完成聚合，但 AI 未能安全识别，可后续手动修正。";
+        var identifySucceeded = false;
+        try
+        {
+            var selection = new BatchAiCorrectionSelectionItem
+            {
+                SelectionKey = $"season:{aggregateResult.SeasonId}",
+                Title = string.IsNullOrWhiteSpace(ManualAggregationSeasonTitle)
+                    ? ManualAggregationSeriesTitle.Trim()
+                    : $"{ManualAggregationSeriesTitle.Trim()} {ManualAggregationSeasonTitle.Trim()}",
+                SeriesTitle = ManualAggregationSeriesTitle.Trim(),
+                ItemKind = LibraryMediaItemKind.Season,
+                SeasonId = aggregateResult.SeasonId,
+                IsInLibrary = true,
+                HasActiveSource = aggregateResult.SourceCount > 0
+            };
+            var progress = new Progress<BatchAiCorrectionProgress>(progressValue =>
+            {
+                ManualAggregationStatusMessage =
+                    $"正在 AI 识别聚合季 {Math.Min(progressValue.ProcessedCount, progressValue.TotalCount)} / {progressValue.TotalCount}：成功 {progressValue.SuccessCount}，跳过 {progressValue.SkippedCount}，失败 {progressValue.FailedCount}。";
+            });
+
+            var aiResult = await _batchAiCorrectionService.CorrectAsync([selection], progress);
+            var unitResult = aiResult.UnitResults.FirstOrDefault(x => x.SeasonId == aggregateResult.SeasonId)
+                             ?? aiResult.UnitResults.FirstOrDefault();
+            ScanIdentificationDiagnostics.Write(
+                $"event=manual-aggregate-identify-season-ai-result unknownSeasonId={aggregateResult.SeasonId} success={aiResult.SuccessCount} skipped={aiResult.SkippedCount} failed={aiResult.FailedCount} cancelled={aiResult.CancelledCount} unitStatus={ScanIdentificationDiagnostics.FormatValue(unitResult?.Status)} targetKind={ScanIdentificationDiagnostics.FormatValue(unitResult?.TargetKind)} message={ScanIdentificationDiagnostics.FormatValue(unitResult?.Message, 220)}");
+
+            if (aiResult.SuccessCount > 0)
+            {
+                identifySucceeded = true;
+                identifySummary = $"AI 识别成功，已将新聚合季修正到已识别季。{NormalizeAutoIdentifyMessage(unitResult?.Message ?? string.Empty, string.Empty)}";
+                ScanIdentificationDiagnostics.Write(
+                    $"event=manual-aggregate-identify-season-correction-succeeded unknownSeasonId={aggregateResult.SeasonId} sourceCount={aggregateResult.SourceCount} targetKind={ScanIdentificationDiagnostics.FormatValue(unitResult?.TargetKind)} message={ScanIdentificationDiagnostics.FormatValue(unitResult?.Message, 220)}");
+            }
+            else
+            {
+                var reason = NormalizeAutoIdentifyMessage(unitResult?.Message ?? string.Empty, "AI 未返回安全目标季。");
+                identifySummary = $"已完成聚合，但 AI 未能安全识别，可后续手动修正。原因：{reason}";
+                ScanIdentificationDiagnostics.Write(
+                    $"event=manual-aggregate-identify-skipped unknownSeasonId={aggregateResult.SeasonId} skippedReason={ScanIdentificationDiagnostics.FormatValue(reason, 220)}");
+            }
+        }
+        catch (Exception exception)
+        {
+            var message = DescribeException(exception);
+            identifySummary = $"已完成聚合，但 AI 识别失败，可后续手动修正。原因：{message}";
+            ScanIdentificationDiagnostics.Write(
+                $"event=manual-aggregate-identify-failed stage=\"identify\" unknownSeasonId={aggregateResult.SeasonId} failureReason={ScanIdentificationDiagnostics.FormatValue(message, 260)}");
+        }
+        finally
+        {
+            var finalMessage = $"{aggregateSummary} {identifySummary}";
+            ManualAggregationStatusMessage = finalMessage;
+            BatchResultSummary = finalMessage;
+            IsManualAggregationDialogOpen = false;
+            ManualAggregationSources.Clear();
+            ManualAggregationSeasonNumberText = "1";
+            RefreshManualAggregationState();
+            ClearSelection();
+            IsBatchSelectionMode = false;
+            NotifyAfterManualAggregation();
+            ScanIdentificationDiagnostics.Write(
+                $"event=manual-aggregate-identify-summary unknownSeasonId={aggregateResult.SeasonId} aggregateSucceeded=true identifySucceeded={identifySucceeded.ToString().ToLowerInvariant()} sourceCount={aggregateResult.SourceCount} createdEpisodeCount={aggregateResult.CreatedEpisodeCount} additionalSourceCount={aggregateResult.AdditionalSourceCount}");
+            IsBatchOperationRunning = false;
+            IsManualAggregationBusy = false;
+            try
+            {
+                await ActivateAsync();
+            }
+            catch (Exception exception)
+            {
+                var refreshMessage = DescribeException(exception);
+                BatchResultSummary = $"{finalMessage} 刷新媒体库失败：{refreshMessage}";
+                ScanIdentificationDiagnostics.Write(
+                    $"event=manual-aggregate-identify-refresh-failed unknownSeasonId={aggregateResult.SeasonId} failureReason={ScanIdentificationDiagnostics.FormatValue(refreshMessage, 260)}");
+            }
+        }
+    }
+
+    private ManualUnknownSeasonAggregationApplyRequest BuildManualAggregationApplyRequest()
+    {
+        return new ManualUnknownSeasonAggregationApplyRequest
+        {
+            SeriesTitle = ManualAggregationSeriesTitle.Trim(),
+            SeasonTitle = ManualAggregationSeasonTitle.Trim(),
+            SeasonNumber = ManualAggregationSeasonNumber.GetValueOrDefault(),
+            Sources = ManualAggregationSources
+                .Select(row => new ManualUnknownSeasonAggregationSourceAssignment
+                {
+                    MediaFileId = row.MediaFileId,
+                    EpisodeNumber = row.ParsedEpisodeNumber.GetValueOrDefault()
+                })
+                .ToArray()
+        };
     }
 
     private void CancelManualAggregation()
@@ -2200,7 +2340,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (ManualAggregationSeasonNumber is null)
         {
             WriteLibraryBatchEvent("event=manual-season-aggregate-season-number-invalid");
-            return "季号必须是正整数。";
+            return "季号必须是 0 或正整数。";
         }
 
         if (ManualAggregationSources.Count == 0)
@@ -2226,6 +2366,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasManualAggregationSources));
         OnPropertyChanged(nameof(CanApplyManualAggregation));
         ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+        ApplyManualAggregationAndIdentifyCommand.RaiseCanExecuteChanged();
         CancelManualAggregationCommand.RaiseCanExecuteChanged();
     }
 
@@ -2301,6 +2442,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         BatchDeleteMovieRecordsCommand.RaiseCanExecuteChanged();
         OpenManualAggregationCommand.RaiseCanExecuteChanged();
         ApplyManualAggregationCommand.RaiseCanExecuteChanged();
+        ApplyManualAggregationAndIdentifyCommand.RaiseCanExecuteChanged();
         CancelManualAggregationCommand.RaiseCanExecuteChanged();
     }
 

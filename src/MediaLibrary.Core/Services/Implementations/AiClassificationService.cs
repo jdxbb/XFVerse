@@ -692,7 +692,7 @@ public sealed class AiClassificationService : IAiClassificationService
                     allowStrongContextFallbacks: true);
                 if (parsedEpisode.IsEpisodeLike && !parsedEpisode.IsMultiEpisode)
                 {
-                    parsedSeasonNumber = parsedEpisode.SeasonNumber > 0 ? parsedEpisode.SeasonNumber : null;
+                    parsedSeasonNumber = parsedEpisode.SeasonNumber >= 0 ? parsedEpisode.SeasonNumber : null;
                     parsedEpisodeNumber = parsedEpisode.EpisodeNumber > 0 ? parsedEpisode.EpisodeNumber : null;
                 }
             }

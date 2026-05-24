@@ -83,7 +83,7 @@ public sealed class RescanReattachService : IRescanReattachService
                 sourceKind,
                 mediaFile,
                 "episode",
-                parseResult.SeasonNumber > 0 ? parseResult.SeasonNumber : null,
+                parseResult.SeasonNumber >= 0 ? parseResult.SeasonNumber : null,
                 parseResult.EpisodeNumber > 0 ? parseResult.EpisodeNumber : null,
                 episodeSkipReason,
                 fallbackToPlaceholderGrouping: true);
@@ -156,7 +156,7 @@ public sealed class RescanReattachService : IRescanReattachService
         string sourceKind,
         CancellationToken cancellationToken)
     {
-        var seasonNumber = Math.Max(1, parseResult.SeasonNumber);
+        var seasonNumber = Math.Max(0, parseResult.SeasonNumber);
         var episodeNumber = parseResult.EpisodeNumber;
         var candidateSeasons = await dbContext.TvSeasons
             .Include(x => x.Series)

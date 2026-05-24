@@ -115,7 +115,7 @@ public sealed class UnknownTvSeasonAppendService : IUnknownTvSeasonAppendService
                     sourceKind,
                     mediaFile,
                     context,
-                    parseResult.SeasonNumber > 0 ? parseResult.SeasonNumber : null,
+                    parseResult.SeasonNumber >= 0 ? parseResult.SeasonNumber : null,
                     parseResult.EpisodeNumber > 0 ? parseResult.EpisodeNumber : null,
                     skippedReason,
                     0,

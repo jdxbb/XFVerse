@@ -573,7 +573,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             }
             else if (string.IsNullOrWhiteSpace(SeasonCorrectionSeasonNumber))
             {
-                SeasonCorrectionSeasonNumber = model.SeasonNumber > 0 ? model.SeasonNumber.ToString() : "1";
+                SeasonCorrectionSeasonNumber = model.SeasonNumber >= 0 ? model.SeasonNumber.ToString() : "1";
             }
 
             var shouldEnsureEpisodeMetadata = ShouldEnsureEpisodeMetadata(model);
@@ -863,7 +863,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
             SeasonCorrectionSearchQuery = suggestion.Query;
             var hasAiSeasonNumber = suggestion.SeasonNumber.HasValue
-                                    && suggestion.SeasonNumber.Value > 0;
+                                    && suggestion.SeasonNumber.Value >= 0;
             SeasonCorrectionSeasonNumber = hasAiSeasonNumber
                 ? suggestion.SeasonNumber!.Value.ToString()
                 : string.Empty;
@@ -1150,7 +1150,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             {
                 if (!TryGetSeasonCorrectionSeasonNumber(out var seasonNumber))
                 {
-                    SeasonCorrectionStatusMessage = "Season number must be a positive integer.";
+                    SeasonCorrectionStatusMessage = "季号必须是 0 或正整数。";
                     return;
                 }
 
@@ -1196,7 +1196,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
         if (!TryGetSeasonCorrectionSeasonNumber(out var seasonNumber))
         {
-            SeasonCorrectionStatusMessage = "季号必须是正整数。";
+            SeasonCorrectionStatusMessage = "季号必须是 0 或正整数。";
             return;
         }
 
@@ -1495,7 +1495,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
         if (!TryGetSeasonCorrectionSeasonNumber(out var seasonNumber))
         {
-            SeasonCorrectionConfirmationText = "季号必须是正整数。";
+            SeasonCorrectionConfirmationText = "季号必须是 0 或正整数。";
             return;
         }
 
@@ -1547,7 +1547,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private bool TryGetSeasonCorrectionSeasonNumber(out int seasonNumber)
     {
         return int.TryParse(SeasonCorrectionSeasonNumber?.Trim(), out seasonNumber)
-               && seasonNumber > 0;
+               && seasonNumber >= 0;
     }
 
     private bool HasValidSeasonCorrectionMappings()
@@ -1620,8 +1620,15 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             return false;
         }
 
+        if (value.Contains("特别", StringComparison.CurrentCultureIgnoreCase)
+            || value.Contains("Special", StringComparison.CurrentCultureIgnoreCase))
+        {
+            seasonNumber = 0;
+            return true;
+        }
+
         var digits = new string(value.Where(char.IsDigit).ToArray());
-        return int.TryParse(digits, out seasonNumber) && seasonNumber > 0;
+        return int.TryParse(digits, out seasonNumber) && seasonNumber >= 0;
     }
 
     private void Clear(string statusMessage)
