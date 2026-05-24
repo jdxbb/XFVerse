@@ -394,6 +394,10 @@
                                          Maximum="100"
                                          IsIndeterminate="{Binding IsProgressIndeterminate}" />
                             <TextBlock Margin="0,12,0,0"
+                                       Text="{Binding CurrentStageText}"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource BodyTextStyle}" />
+                            <TextBlock Margin="0,6,0,0"
                                        Text="{Binding CurrentFileText}"
                                        TextWrapping="Wrap"
                                        Style="{StaticResource BodyMutedTextStyle}" />
@@ -521,6 +525,25 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
+                                            <StackPanel Margin="0,8,0,0">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasReasonSummary}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+                                                <TextBlock Text="{Binding ReasonSummaryText}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Margin="0,4,0,0"
+                                                           Text="{Binding TopReasonSummaryText}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>

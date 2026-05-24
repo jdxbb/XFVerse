@@ -385,9 +385,9 @@ public sealed class MovieManagementService : IMovieManagementService
             await RemoveFromLibraryAsync(movieId, cancellationToken);
         }
 
-        var orphanMediaFiles = await MarkUnassociatedMediaFilesDeletedAsync(mediaFileIds, cancellationToken);
+        var orphanHideResult = await HideUnassociatedMediaFilesAsMoviePlaceholdersAsync(mediaFileIds, cancellationToken);
         AiPerfDiagnostics.WriteEvent(
-            $"event=library-grouped-placeholder-remove-from-library mediaFiles={mediaFileIds.Count} movies={movieIds.Count} orphanMediaFiles={orphanMediaFiles}");
+            $"event=library-grouped-placeholder-remove-from-library mediaFiles={mediaFileIds.Count} movies={movieIds.Count} orphanMediaFiles={orphanHideResult.HiddenMediaFileCount} createdHiddenPlaceholders={orphanHideResult.CreatedPlaceholderCount} hideOnly=true");
     }
 
     public async Task RestoreGroupedPlaceholderRangeToLibraryAsync(
@@ -807,7 +807,7 @@ public sealed class MovieManagementService : IMovieManagementService
             .ToListAsync(cancellationToken);
     }
 
-    private static async Task<int> MarkUnassociatedMediaFilesDeletedAsync(
+    private static async Task<OrphanHideOnlyResult> HideUnassociatedMediaFilesAsMoviePlaceholdersAsync(
         IReadOnlyCollection<int> mediaFileIds,
         CancellationToken cancellationToken)
     {
@@ -817,10 +817,11 @@ public sealed class MovieManagementService : IMovieManagementService
             .ToArray();
         if (ids.Length == 0)
         {
-            return 0;
+            return OrphanHideOnlyResult.Empty;
         }
 
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var now = DateTime.UtcNow;
         var mediaFiles = await dbContext.MediaFiles
             .Where(
@@ -829,19 +830,51 @@ public sealed class MovieManagementService : IMovieManagementService
                      && !x.IsDeleted
                      && !x.MovieId.HasValue
                      && !x.EpisodeId.HasValue)
+            .OrderBy(x => x.Id)
             .ToListAsync(cancellationToken);
+
+        if (mediaFiles.Count == 0)
+        {
+            return OrphanHideOnlyResult.Empty;
+        }
+
+        var placeholders = new List<Movie>(mediaFiles.Count);
         foreach (var mediaFile in mediaFiles)
         {
-            mediaFile.IsDeleted = true;
-            mediaFile.UpdatedAt = now;
+            var parsedName = MovieFileNameParser.Parse(mediaFile.FileName);
+            var placeholderMovie = new Movie
+            {
+                Title = BuildUnidentifiedMovieTitle(mediaFile.FileName),
+                ReleaseYear = parsedName.ReleaseYear,
+                IdentificationStatus = IdentificationStatus.Failed,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            placeholders.Add(placeholderMovie);
+            dbContext.Movies.Add(placeholderMovie);
         }
 
-        if (mediaFiles.Count > 0)
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        for (var index = 0; index < mediaFiles.Count; index++)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            var mediaFile = mediaFiles[index];
+            var placeholderMovie = placeholders[index];
+            mediaFile.MovieId = placeholderMovie.Id;
+            mediaFile.UpdatedAt = now;
+            placeholderMovie.DefaultMediaFileId = mediaFile.Id;
+            placeholderMovie.UpdatedAt = now;
+            PreserveRemovedLibraryState(dbContext, placeholderMovie, Array.Empty<UserMovieCollectionItem>(), false, now);
         }
 
-        return mediaFiles.Count;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        AiPerfDiagnostics.WriteEvent(
+            $"event=orphan-remove-hide-only hiddenOrphanCount={mediaFiles.Count} createdPlaceholderCount={placeholders.Count} mediaFileIsDeleted=false");
+        AiPerfDiagnostics.WriteEvent(
+            $"event=orphan-remove-created-hidden-placeholder hiddenOrphanCount={mediaFiles.Count} createdPlaceholderCount={placeholders.Count}");
+        return new OrphanHideOnlyResult(mediaFiles.Count, placeholders.Count);
     }
 
     private static async Task<int> DeleteUnassociatedMediaFileRecordsAsync(
@@ -927,5 +960,10 @@ public sealed class MovieManagementService : IMovieManagementService
         return hasActiveSource || hasCurrentState
             ? LibraryVisibilityState.Auto
             : LibraryVisibilityState.Visible;
+    }
+
+    private sealed record OrphanHideOnlyResult(int HiddenMediaFileCount, int CreatedPlaceholderCount)
+    {
+        public static OrphanHideOnlyResult Empty { get; } = new(0, 0);
     }
 }

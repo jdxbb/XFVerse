@@ -1272,3 +1272,28 @@ Phase 4.13a starts the active correction work with a narrow single-source founda
 - Moved sources become target Episode default sources. Probe fields, subtitle bindings, physical files, and user states are preserved.
 - The emptied unknown Season is hidden through collection visibility so the old Other container does not remain as an empty shell.
 - Batch AI correction, automatic top1 application, `聚合后识别`, SP / OVA / OAD mapping, historical cleanup, schema changes, migrations, and scan-safety changes remain out of scope.
+
+## Phase 4.14b Scan / Rescan Safety Goal
+
+- Unchanged active video files that remain unbound to Movie / Episode are requeued into the full TV / Movie identification path during local and WebDAV rescans.
+- Existing Episode bindings are treated as stable for ordinary scan / automatic TV identification paths. Automatic attach is idempotent for the same Episode and skipped when the target Episode differs.
+- Other / orphan / unassociated grouped source "remove from library" is hide-only. The source is attached to a failed Movie placeholder visibility carrier and hidden through `UserMovieCollectionItem.LibraryVisibilityState=Hidden`; `MediaFile.IsDeleted` is not used for this hide action.
+- Hidden failed Movie placeholders are excluded from automatic scan retry, reattach, unknown Season append, and orphan grouping candidates until the user restores them to the library.
+- Delete-record semantics remain separate from remove-from-library semantics and may still delete software records or mark source rows deleted according to the existing delete-record flow.
+
+## Phase 4.14b Deferred
+
+- Scan summary UI, history / calendar positioning, probe / subtitle boundary redesign, Movie reattach expansion, TV Discovery closure, online subtitle search, media-library performance work, final UI redesign, migrations, and database update remain out of scope.
+
+## Phase 4.14c Scan Progress / Reason Summary Goal
+
+- The scan task page shows the current scan stage and a safe current file name while local or WebDAV scanning is running.
+- Current-stage progress uses sanitized stage names and file names only. It does not display full local paths, full WebDAV URLs, usernames, passwords, tokens, or API keys.
+- Scan task logs now persist a task-level `ReasonSummaryJson` field on `ScanTaskLogs` through migration `20260524213322_AddScanTaskReasonSummary`.
+- The reason summary stores aggregate counts only, grouped as success / skipped / cancelled / warning / error. It does not store per-file reason rows or full file paths.
+- Recent scan record cards show a lightweight reason summary and the top few non-success reasons below the existing scan counts.
+- Reason summary is explanatory only and does not change Movie / TV identification rules, matching thresholds, placeholder behavior, or recommendation inputs.
+
+## Phase 4.14c Deferred
+
+- Per-file reason history, click-to-item positioning from scan reasons, complex scan log UI, scan rule expansion, media-library performance work, TV Discovery closure, online subtitle search, final UI redesign, and TV Watch Insights / recommendation integration remain out of scope.

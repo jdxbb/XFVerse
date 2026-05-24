@@ -814,3 +814,19 @@
 - Watch Profile high thinking is now enabled only when the resolved DeepSeek model supports it (`deepseek-v4-pro`). If the Watch Profile row is changed to `deepseek-v4-flash`, the request keeps using Flash and automatically sends thinking off.
 - AI routing diagnostics now include `thinkingRequested`, `thinkingEnabled`, and `thinkingSkipReason` so Flash profile requests can be distinguished from Pro high-thinking profile requests.
 - This does not change Movie / TV safety gates, prompts, recommendation inputs, Watch Insights profile semantics, schema, migrations, database update, commit, or push.
+
+# Phase 4.14b Scan / Rescan Safety Cross-impact
+
+- Other / orphan / unassociated grouped source "remove from library" is now represented by a failed Movie placeholder visibility carrier plus `UserMovieCollectionItem.LibraryVisibilityState=Hidden`, instead of marking the unbound `MediaFile` as deleted.
+- The source row stays present and `MediaFile.IsDeleted` stays false for remove-from-library, so probe fields, subtitle bindings, physical local files, and WebDAV files are not cleared by the hide action.
+- Hidden failed Movie placeholders are excluded from automatic scan retry, rescan reattach, unknown Season append, and orphan grouping candidates. They are shown only through the removed-from-library surface until the user restores them.
+- Delete-record behavior remains separate from remove-from-library behavior and was not converted to hide-only.
+- Movie Discovery, no-source Movie detail semantics, recommendation inputs, Watch Insights, AI recommendation, schema, migrations, database update, commit, and push were not changed.
+
+# Phase 4.14c Scan Reason Summary Cross-impact
+
+- Movie scan outcomes now contribute aggregate task-level reason counts, including Movie identified, Movie fallback preserved as placeholder / needs review, hidden failed placeholder skipped, and placeholder / orphan grouping counts.
+- These counts are persisted only in `ScanTaskLogs.ReasonSummaryJson` for scan-record explanation. They are not per-file history, are not used as matching rules, and do not affect Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, or AI recommendations.
+- Scan history cards no longer show full WebDAV target URLs or usernames; they use scan-path display names and reason totals instead.
+- This phase adds migration `20260524213322_AddScanTaskReasonSummary` but does not execute database update, commit, or push.
+- Follow-up: Movie success in the reason summary now counts only source rows that end bound to matched / manually confirmed Movie records. Failed Movie placeholders stay in the needs-review bucket and do not inflate Movie success counts.

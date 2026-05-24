@@ -2388,6 +2388,43 @@ Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
 
+### Phase 4.14c - Scan progress details and task-level reason summary
+
+Completed:
+
+- Local and WebDAV scan entry points now accept an optional scan progress reporter. The scan task page uses it to show the current stage and a safe current file name while scanning is running.
+- Reported stages include prepare, file enumeration, file comparison, missing-file marking, TV directory pre-analysis, TV identification, AI-on-uncertain handling, Movie identification, rescan reattach, unknown append, placeholder / orphan grouping, subtitle binding rebuild, and completion.
+- Progress current-file text uses file names only, not full local paths or full WebDAV URLs. Scan history cards now hide WebDAV usernames and show scan-path display names instead of full WebDAV target URLs.
+- `ScanTaskLogs` now has task-level `ReasonSummaryJson` through migration `20260524213322_AddScanTaskReasonSummary`. The JSON stores aggregate reason counts only and has no per-file path, URL, username, password, token, or API-key values.
+- Reason categories are success, skipped, cancelled, warning, and error. Current aggregate keys cover Movie / TV identified counts, reattach success, unknown append success, placeholder / orphan grouping, ignored files, unchanged stable binding skips, unchanged unbound requeue, existing Episode binding preserved, hidden placeholder skips, TV-risk Movie fallback blocks, AI uncertainty, partial AI failure, subtitle binding warning, and task-level errors.
+- Recent scan record cards now show a compact reason total line plus the top few non-success reasons under the existing scan / new / updated / ignored / error counts.
+- Cancellation now marks the active path log as `Cancelled` instead of leaving it `Running`; cancellation is recorded separately and is not counted as an error.
+
+Not done:
+
+- No per-file reason history table, click-to-item positioning, complex scan log UI, scan rule expansion, default hard-guess expansion, media-library performance work, TV Discovery closure, online subtitle search, final UI redesign, database update, commit, or push was added.
+- Reason summary is explanatory only; Movie / TV matching thresholds, placeholder handling, 4.14b rescan safety guards, Watch Insights, AI recommendations, Watch Profile, persona inputs, and recommendation fingerprints were not changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff contains only the new `ScanTaskLogs.ReasonSummaryJson` column and the updated EF model snapshot.
+
+### Phase 4.14c Follow-up - Current file precision
+
+- Scan progress no longer uses scan-path display names as the current-file text when a stage has no concrete file.
+- WebDAV enumeration now reports each discovered file's safe name, so the running scan page can show a concrete current file during remote listing instead of only the outer scan folder.
+- Local enumeration keeps safe file-name reporting and also clears the current-file text during stage-only transitions.
+- Full local paths, full WebDAV URLs, usernames, passwords, tokens, API keys, per-file reason history, scan rules, schema, migrations, database update, commit, and push were not changed.
+
+### Phase 4.14c Follow-up - Source-level success summary
+
+- Task-level reason summary success counts now use source-level final state instead of TV / Movie candidate-batch counts.
+- `TV source 已绑定` counts active video sources from the current scan input that end with an Episode binding.
+- `Movie source 已识别` counts active video sources from the current scan input that end with a matched or manually confirmed Movie binding.
+- Failed Movie placeholders remain in the skipped / needs-review bucket and are not counted as Movie success.
+- This changes only persisted reason summary counts for future scan logs. It does not change scan matching rules, binding rules, schema, migration, database update, commit, or push.
+
 ### Phase 4.13e follow-up - Batch global order stability
 
 Completed:
@@ -3174,4 +3211,26 @@ Known Issues:
 Verification:
 
 - `dotnet build MediaLibrary.sln` passed.
+- Current migrations diff remained empty.
+
+### Phase 4.14b - Scan / rescan safety hardening
+
+Completed:
+
+- Local and WebDAV rescan now requeue unchanged active video files that still have no Movie or Episode binding into the full TV / Movie identification input. This covers interrupted scans that left active unbound `MediaFile` rows behind instead of limiting them to reattach / append / grouping closeout paths.
+- Automatic TV scan candidate construction now excludes sources that already have an Episode binding, and the automatic TV attach helper preserves an existing different Episode binding with `existing-episode-binding-preserved` diagnostics. User-initiated correction paths continue to own deliberate source moves.
+- Other / orphan remove-from-library is now hide-only for unbound video sources. The remove path creates failed Movie placeholder carriers, binds the existing `MediaFile` to those placeholders, writes Movie `LibraryVisibilityState.Hidden`, and leaves `MediaFile.IsDeleted=false`.
+- Delete-record behavior remains separate: unassociated delete-record still removes the source row or marks it deleted only when history retention requires it, and it still removes related subtitle bindings as before.
+- Hidden failed Movie placeholders are excluded from automatic Movie retry, RescanReattach, UnknownTvSeasonAppend, and orphan / grouped placeholder aggregation. They stay hidden until the user restores them from the removed-library surface.
+- Added sanitized scan diagnostics for unchanged unbound requeue counts, existing Episode binding preservation, hidden placeholder scan-candidate skips, and orphan hide-only placeholder creation. No full local paths, WebDAV URLs, account names, tokens, passwords, or API keys are logged.
+
+Not done:
+
+- No scan summary UI, history positioning, probe / subtitle redesign, Movie reattach feature, TV Discovery closeout, media-library performance work, final UI redesign, schema migration, database update, commit, or push was added.
+- No default scan recognition rule was broadened; the change only requeues already active unbound sources through the existing TV / Movie identification chain.
+- TV remains outside Watch Insights, AI recommendations, Watch Profile, persona inputs, and recommendation fingerprints.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.

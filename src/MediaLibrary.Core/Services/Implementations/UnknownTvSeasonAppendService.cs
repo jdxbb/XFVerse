@@ -68,10 +68,14 @@ public sealed class UnknownTvSeasonAppendService : IUnknownTvSeasonAppendService
             .Where(x => ids.Contains(x.Id))
             .OrderBy(x => x.Id)
             .ToListAsync(cancellationToken);
+        var hiddenMovieIds = await ScanCandidateVisibilityGuard.LoadHiddenMovieIdsAsync(
+            dbContext,
+            mediaFiles.Select(x => x.MovieId),
+            cancellationToken);
 
         foreach (var mediaFile in mediaFiles)
         {
-            if (!IsEligibleAppendCandidate(mediaFile, out var skippedReason))
+            if (!IsEligibleAppendCandidate(mediaFile, hiddenMovieIds, out var skippedReason))
             {
                 WriteSkipped(sourceKind, mediaFile, UnknownTvGroupingContext.Empty, null, null, skippedReason, 0, 0);
                 result.SkippedCount++;
@@ -334,7 +338,10 @@ public sealed class UnknownTvSeasonAppendService : IUnknownTvSeasonAppendService
         return "no-compatible-unknown-season";
     }
 
-    private static bool IsEligibleAppendCandidate(MediaFile mediaFile, out string skippedReason)
+    private static bool IsEligibleAppendCandidate(
+        MediaFile mediaFile,
+        IReadOnlySet<int> hiddenMovieIds,
+        out string skippedReason)
     {
         if (mediaFile.MediaType != MediaType.Video)
         {
@@ -351,6 +358,12 @@ public sealed class UnknownTvSeasonAppendService : IUnknownTvSeasonAppendService
         if (mediaFile.EpisodeId.HasValue)
         {
             skippedReason = "already-bound-episode";
+            return false;
+        }
+
+        if (ScanCandidateVisibilityGuard.IsHiddenFailedMoviePlaceholder(mediaFile, hiddenMovieIds))
+        {
+            skippedReason = ScanCandidateVisibilityGuard.HiddenFailedPlaceholderSkipReason;
             return false;
         }
 

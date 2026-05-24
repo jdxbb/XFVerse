@@ -96,6 +96,17 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
                 continue;
             }
 
+            var hiddenMovieIds = await ScanCandidateVisibilityGuard.LoadHiddenMovieIdsAsync(
+                dbContext,
+                [mediaFile.MovieId],
+                cancellationToken);
+            if (ScanCandidateVisibilityGuard.IsHiddenFailedMoviePlaceholder(mediaFile, hiddenMovieIds))
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-skip mediaFileId={mediaFileId} movieId={mediaFile.MovieId!.Value} reason={ScanCandidateVisibilityGuard.HiddenFailedPlaceholderSkipReason}");
+                continue;
+            }
+
             if (mediaFile.MovieId.HasValue
                 && mediaFile.Movie is not null
                 && mediaFile.Movie.TmdbId.HasValue
@@ -242,7 +253,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         return result;
     }
 
-    public async Task AggregateUnidentifiedMediaFilesAsync(
+    public async Task<MoviePlaceholderGroupingRunResult> AggregateUnidentifiedMediaFilesAsync(
         IReadOnlyCollection<int> scanPathIds,
         CancellationToken cancellationToken = default,
         string sourceKind = "unknown")
@@ -255,10 +266,26 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         {
             ScanIdentificationDiagnostics.Write(
                 "event=orphan-grouping-summary orphanGroupingAttempted=false orphanGroupingMediaFileCount=0 orphanGroupingCreatedSeasonCount=0 orphanGroupingSkippedReason=no-scan-paths");
-            return;
+            return MoviePlaceholderGroupingRunResult.Empty;
         }
 
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var hiddenPlaceholderSkippedCount = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Include(x => x.Movie)
+            .Where(
+                x => x.ScanPathId.HasValue
+                     && ids.Contains(x.ScanPathId.Value)
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted
+                     && !x.EpisodeId.HasValue
+                     && x.MovieId.HasValue
+                     && x.Movie != null
+                     && x.Movie.IdentificationStatus == IdentificationStatus.Failed
+                     && dbContext.UserMovieCollectionItems.Any(
+                         item => item.MovieId == x.MovieId
+                                 && item.LibraryVisibilityState == LibraryVisibilityState.Hidden))
+            .CountAsync(cancellationToken);
         var candidates = await dbContext.MediaFiles
             .AsNoTracking()
             .Include(x => x.Movie)
@@ -268,7 +295,12 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
                      && x.MediaType == MediaType.Video
                      && !x.IsDeleted
                      && !x.EpisodeId.HasValue
-                     && (!x.MovieId.HasValue || (x.Movie != null && x.Movie.IdentificationStatus == IdentificationStatus.Failed)))
+                     && (!x.MovieId.HasValue
+                         || (x.Movie != null
+                             && x.Movie.IdentificationStatus == IdentificationStatus.Failed
+                             && !dbContext.UserMovieCollectionItems.Any(
+                                 item => item.MovieId == x.MovieId
+                                         && item.LibraryVisibilityState == LibraryVisibilityState.Hidden))))
             .Select(
                 x => new MoviePlaceholderGroupingInput(
                     x.Id,
@@ -280,10 +312,18 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             .ToListAsync(cancellationToken);
 
         ScanIdentificationDiagnostics.Write(
-            $"event=orphan-grouping-start orphanGroupingAttempted=true scanPaths={ids.Length} orphanGroupingMediaFileCount={candidates.Count}");
+            $"event=orphan-grouping-start orphanGroupingAttempted=true scanPaths={ids.Length} orphanGroupingMediaFileCount={candidates.Count} hiddenPlaceholderSkippedCount={hiddenPlaceholderSkippedCount} hiddenPlaceholderSkipReason={ScanCandidateVisibilityGuard.HiddenFailedPlaceholderSkipReason}");
         var summary = await PersistMoviePlaceholderGroupingAsync(candidates, sourceKind, cancellationToken);
         ScanIdentificationDiagnostics.Write(
             $"event=orphan-grouping-summary orphanGroupingAttempted=true orphanGroupingMediaFileCount={summary.CandidateFiles} orphanGroupingCreatedSeasonCount={summary.PersistedRanges} orphanGroupingGroupedMediaFileCount={summary.PersistedFiles} orphanGroupingSkippedReason={ScanIdentificationDiagnostics.FormatValue(summary.SkippedReasons)}");
+        return new MoviePlaceholderGroupingRunResult
+        {
+            CandidateFiles = summary.CandidateFiles,
+            PersistedRanges = summary.PersistedRanges,
+            PersistedFiles = summary.PersistedFiles,
+            HiddenPlaceholderSkippedCount = hiddenPlaceholderSkippedCount,
+            SkippedReasons = summary.SkippedReasons
+        };
     }
 
     private static void AddMoviePlaceholderGroupingCandidate(

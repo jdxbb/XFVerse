@@ -833,7 +833,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
-        var touchedFiles = await dbContext.MediaFiles
+        var touchedRows = await dbContext.MediaFiles
             .AsNoTracking()
             .Where(
                 x => mediaFileIds.Contains(x.Id)
@@ -851,12 +851,16 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     FilePath = x.FilePath
                 })
             .ToListAsync(cancellationToken);
+        var touchedFiles = touchedRows
+            .Where(x => !x.EpisodeId.HasValue)
+            .ToList();
+        var touchedExistingEpisodeBindingCount = touchedRows.Count - touchedFiles.Count;
 
         ScanIdentificationDiagnostics.Write(
-            $"event=tv-build-touched requested={mediaFileIds.Count} touched={touchedFiles.Count}");
+            $"event=tv-build-touched requested={mediaFileIds.Count} touched={touchedFiles.Count} existingEpisodeBindingSkippedCount={touchedExistingEpisodeBindingCount} existingEpisodeBindingSkipReason=existing-episode-binding-preserved");
         if (touchedFiles.Count == 0)
         {
-            ScanIdentificationDiagnostics.Write("event=tv-build-complete candidateCount=0 reason=no-unbound-video-files");
+            ScanIdentificationDiagnostics.Write("event=tv-build-complete candidateCount=0 reason=no-unbound-video-files existingEpisodeBindingSkipReason=existing-episode-binding-preserved");
             return [];
         }
 
@@ -868,7 +872,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             .Distinct()
             .ToArray();
 
-        var sourceFiles = await dbContext.MediaFiles
+        var sourceRows = await dbContext.MediaFiles
             .AsNoTracking()
             .Where(
                 x => sourceConnectionIds.Contains(x.SourceConnectionId)
@@ -886,9 +890,13 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                     FilePath = x.FilePath
                 })
             .ToListAsync(cancellationToken);
+        var sourceFiles = sourceRows
+            .Where(x => !x.EpisodeId.HasValue)
+            .ToList();
+        var sourceExistingEpisodeBindingCount = sourceRows.Count - sourceFiles.Count;
 
         ScanIdentificationDiagnostics.Write(
-            $"event=tv-build-source-context touchedDirectories={touchedDirectoryKeys.Count} sourceFiles={sourceFiles.Count}");
+            $"event=tv-build-source-context touchedDirectories={touchedDirectoryKeys.Count} sourceFiles={sourceFiles.Count} existingEpisodeBindingSkippedCount={sourceExistingEpisodeBindingCount} existingEpisodeBindingSkipReason=existing-episode-binding-preserved");
         var candidates = new List<TvSeasonCandidate>();
         foreach (var directoryGroup in sourceFiles
                      .GroupBy(x => new
@@ -1954,6 +1962,18 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                 cancellationToken);
         if (mediaFile is null || mediaFile.MovieId.HasValue)
         {
+            return;
+        }
+
+        if (mediaFile.EpisodeId.HasValue)
+        {
+            if (mediaFile.EpisodeId.Value == episodeId)
+            {
+                return;
+            }
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-attach-skipped mediaFileId={mediaFileId} existingEpisodeId={mediaFile.EpisodeId.Value} targetEpisodeId={episodeId} skippedReason=existing-episode-binding-preserved");
             return;
         }
 

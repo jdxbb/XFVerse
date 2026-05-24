@@ -13,7 +13,7 @@ public interface IMovieIdentificationService
         ScanTmdbSearchCache? tmdbSearchCache,
         CancellationToken cancellationToken = default);
 
-    Task AggregateUnidentifiedMediaFilesAsync(
+    Task<MoviePlaceholderGroupingRunResult> AggregateUnidentifiedMediaFilesAsync(
         IReadOnlyCollection<int> scanPathIds,
         CancellationToken cancellationToken = default,
         string sourceKind = "unknown");

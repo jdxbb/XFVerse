@@ -51,6 +51,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private int _updatedFileCount;
     private int _ignoredFileCount;
     private int _errorCount;
+    private string _currentStageText = "当前阶段：等待";
     private string _currentFileText = "尚未开始扫描。";
     private string _elapsedText = "--";
 
@@ -359,6 +360,12 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     {
         get => _currentFileText;
         private set => SetProperty(ref _currentFileText, value);
+    }
+
+    public string CurrentStageText
+    {
+        get => _currentStageText;
+        private set => SetProperty(ref _currentStageText, value);
     }
 
     public int ScannedCount
@@ -810,7 +817,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             return;
         }
 
-        await RunLocalScanCoreAsync(() => _localMediaScanService.RunScanAsync(_scanCts!.Token));
+        await RunLocalScanCoreAsync(progress => _localMediaScanService.RunScanAsync(_scanCts!.Token, progress));
     }
 
     private async Task RunLocalScanPathAsync(object? parameter)
@@ -820,10 +827,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             return;
         }
 
-        await RunLocalScanCoreAsync(() => _localMediaScanService.RunScanPathAsync(scanPath.Id, _scanCts!.Token));
+        await RunLocalScanCoreAsync(progress => _localMediaScanService.RunScanPathAsync(scanPath.Id, _scanCts!.Token, progress));
     }
 
-    private async Task RunLocalScanCoreAsync(Func<Task<ScanExecutionResult>> scanAction)
+    private async Task RunLocalScanCoreAsync(Func<IProgress<ScanProgressUpdate>, Task<ScanExecutionResult>> scanAction)
     {
         var stopwatch = Stopwatch.StartNew();
         _scanCts?.Dispose();
@@ -832,25 +839,30 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         ResetProgress();
         IsRunning = true;
         StatusMessage = "正在扫描本地目录，请稍候。";
-        CurrentFileText = "本地扫描进行中，当前文件明细不显示。";
+        CurrentStageText = "当前阶段：准备扫描";
+        CurrentFileText = "当前文件：--";
+        var progress = new Progress<ScanProgressUpdate>(ApplyScanProgress);
 
         try
         {
-            var result = await scanAction();
+            var result = await scanAction(progress);
             ApplyScanResult(result, stopwatch.Elapsed);
             StatusMessage = result.StatusMessage;
-            CurrentFileText = "本地扫描完成。";
+            CurrentStageText = "当前阶段：完成";
+            CurrentFileText = "当前文件：--";
             _dataRefreshService.NotifyScanChanged();
         }
         catch (OperationCanceledException)
         {
             StatusMessage = "本地扫描已取消。";
-            CurrentFileText = "本地扫描已取消。";
+            CurrentStageText = "当前阶段：已取消";
+            CurrentFileText = "当前文件：--";
         }
         catch (Exception exception)
         {
             StatusMessage = $"本地扫描失败：{exception.GetType().Name}";
-            CurrentFileText = "本地扫描失败。";
+            CurrentStageText = "当前阶段：失败";
+            CurrentFileText = "当前文件：--";
         }
         finally
         {
@@ -877,25 +889,30 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         ResetProgress();
         IsRunning = true;
         StatusMessage = "正在扫描已启用的 WebDAV 路径，请稍候。";
-        CurrentFileText = "扫描进行中，当前文件明细暂不可用。";
+        CurrentStageText = "当前阶段：准备扫描";
+        CurrentFileText = "当前文件：--";
+        var progress = new Progress<ScanProgressUpdate>(ApplyScanProgress);
 
         try
         {
-            var result = await _mediaScanService.RunScanAsync(_scanCts.Token);
+            var result = await _mediaScanService.RunScanAsync(_scanCts.Token, progress);
             ApplyScanResult(result, stopwatch.Elapsed);
             StatusMessage = result.StatusMessage;
-            CurrentFileText = "扫描完成。";
+            CurrentStageText = "当前阶段：完成";
+            CurrentFileText = "当前文件：--";
             _dataRefreshService.NotifyScanChanged();
         }
         catch (OperationCanceledException)
         {
             StatusMessage = "扫描已取消。";
-            CurrentFileText = "扫描已取消。";
+            CurrentStageText = "当前阶段：已取消";
+            CurrentFileText = "当前文件：--";
         }
         catch (Exception exception)
         {
-            StatusMessage = $"扫描失败：{exception.Message}";
-            CurrentFileText = "扫描失败。";
+            StatusMessage = $"扫描失败：{exception.GetType().Name}";
+            CurrentStageText = "当前阶段：失败";
+            CurrentFileText = "当前文件：--";
         }
         finally
         {
@@ -916,6 +933,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         }
 
         StatusMessage = "正在取消扫描。";
+        CurrentStageText = "当前阶段：取消中";
         _scanCts?.Cancel();
     }
 
@@ -926,7 +944,24 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         UpdatedFileCount = 0;
         IgnoredFileCount = 0;
         ErrorCount = 0;
+        CurrentStageText = "当前阶段：等待";
+        CurrentFileText = "当前文件：--";
         ElapsedText = "--";
+    }
+
+    private void ApplyScanProgress(ScanProgressUpdate update)
+    {
+        CurrentStageText = string.IsNullOrWhiteSpace(update.StageText)
+            ? "当前阶段：处理中"
+            : $"当前阶段：{update.StageText}";
+        CurrentFileText = string.IsNullOrWhiteSpace(update.CurrentItemName)
+            ? "当前文件：--"
+            : $"当前文件：{update.CurrentItemName}";
+        ScannedCount = update.ScannedCount;
+        NewFileCount = update.NewFileCount;
+        UpdatedFileCount = update.UpdatedFileCount;
+        IgnoredFileCount = update.IgnoredFileCount;
+        ErrorCount = update.ErrorCount;
     }
 
     private void ApplyScanResult(ScanExecutionResult result, TimeSpan elapsed)
@@ -1049,8 +1084,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 ? isLocal ? "本地目录" : "扫描路径"
                 : item.ScanPathDisplayName;
             ScanPath = item.ScanPath;
-            TargetText = isLocal ? $"本地目录：{ScanPathDisplayName}" : BuildTargetText(baseUrl, item.ScanPath);
-            UsernameText = isLocal ? "Local" : string.IsNullOrWhiteSpace(username) ? "未填写用户名" : username;
+            TargetText = isLocal ? $"本地目录：{ScanPathDisplayName}" : $"WebDAV 路径：{ScanPathDisplayName}";
+            UsernameText = isLocal ? "Local" : "已隐藏";
             StatusText = FormatStatus(item.Status);
             StartedAt = item.StartedAt;
             EndedAt = item.EndedAt;
@@ -1063,6 +1098,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             IgnoredFileCount = item.IgnoredFileCount;
             ErrorCount = item.ErrorCount;
             ErrorMessage = item.ErrorMessage;
+            ReasonSummaryText = item.ReasonSummaryText;
+            TopReasonSummaryText = item.TopReasonSummaryText;
         }
 
         public int Id { get; }
@@ -1107,34 +1144,12 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
         public bool HasErrorMessage => !string.IsNullOrWhiteSpace(ErrorMessage);
 
-        private static string BuildTargetText(string baseUrl, string scanPath)
-        {
-            var normalizedBase = SanitizeBaseUrl(baseUrl);
-            var normalizedPath = string.IsNullOrWhiteSpace(scanPath) ? "/" : scanPath.Trim();
-            return $"{normalizedBase.TrimEnd('/')}{normalizedPath}";
-        }
+        public string ReasonSummaryText { get; }
 
-        private static string SanitizeBaseUrl(string baseUrl)
-        {
-            if (string.IsNullOrWhiteSpace(baseUrl))
-            {
-                return "WebDAV";
-            }
+        public string TopReasonSummaryText { get; }
 
-            if (!Uri.TryCreate(baseUrl.Trim(), UriKind.Absolute, out var uri))
-            {
-                return baseUrl.Trim();
-            }
-
-            var builder = new UriBuilder(uri)
-            {
-                UserName = string.Empty,
-                Password = string.Empty,
-                Query = string.Empty,
-                Fragment = string.Empty
-            };
-            return builder.Uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
-        }
+        public bool HasReasonSummary => !string.IsNullOrWhiteSpace(ReasonSummaryText)
+                                        || !string.IsNullOrWhiteSpace(TopReasonSummaryText);
 
         private static string FormatStatus(ScanTaskStatus status)
         {
@@ -1145,6 +1160,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 ScanTaskStatus.Success => "已完成",
                 ScanTaskStatus.Failed => "失败",
                 ScanTaskStatus.PartialSuccess => "部分完成",
+                ScanTaskStatus.Cancelled => "已取消",
                 _ => status.ToString()
             };
         }

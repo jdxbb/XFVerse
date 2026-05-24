@@ -31,4 +31,10 @@ public sealed class ScanTaskLogItem
     public int ErrorCount { get; set; }
 
     public string ErrorMessage { get; set; } = string.Empty;
+
+    public string ReasonSummaryJson { get; set; } = string.Empty;
+
+    public string ReasonSummaryText { get; set; } = string.Empty;
+
+    public string TopReasonSummaryText { get; set; } = string.Empty;
 }

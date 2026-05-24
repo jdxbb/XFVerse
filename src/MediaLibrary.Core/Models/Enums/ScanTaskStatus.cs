@@ -6,5 +6,6 @@ public enum ScanTaskStatus
     Running = 2,
     Success = 3,
     Failed = 4,
-    PartialSuccess = 5
+    PartialSuccess = 5,
+    Cancelled = 6
 }

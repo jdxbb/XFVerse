@@ -15,6 +15,9 @@ public sealed class ScanTaskLogConfiguration : IEntityTypeConfiguration<ScanTask
         builder.Property(x => x.ErrorMessage)
             .HasMaxLength(4000);
 
+        builder.Property(x => x.ReasonSummaryJson)
+            .HasMaxLength(12000);
+
         builder.HasIndex(x => x.CreatedAt);
     }
 }

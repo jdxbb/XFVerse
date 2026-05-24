@@ -36,10 +36,14 @@ public sealed class RescanReattachService : IRescanReattachService
             .Where(x => ids.Contains(x.Id))
             .OrderBy(x => x.Id)
             .ToListAsync(cancellationToken);
+        var hiddenMovieIds = await ScanCandidateVisibilityGuard.LoadHiddenMovieIdsAsync(
+            dbContext,
+            mediaFiles.Select(x => x.MovieId),
+            cancellationToken);
 
         foreach (var mediaFile in mediaFiles)
         {
-            if (!IsEligibleUnboundVideo(mediaFile, out var skipReason))
+            if (!IsEligibleUnboundVideo(mediaFile, hiddenMovieIds, out var skipReason))
             {
                 WriteSkipped(sourceKind, mediaFile, "none", null, null, skipReason, fallbackToPlaceholderGrouping: false);
                 continue;
@@ -93,7 +97,10 @@ public sealed class RescanReattachService : IRescanReattachService
         return result;
     }
 
-    private static bool IsEligibleUnboundVideo(MediaFile mediaFile, out string skipReason)
+    private static bool IsEligibleUnboundVideo(
+        MediaFile mediaFile,
+        IReadOnlySet<int> hiddenMovieIds,
+        out string skipReason)
     {
         if (mediaFile.MediaType != MediaType.Video)
         {
@@ -110,6 +117,12 @@ public sealed class RescanReattachService : IRescanReattachService
         if (mediaFile.EpisodeId.HasValue)
         {
             skipReason = "already-bound-episode";
+            return false;
+        }
+
+        if (ScanCandidateVisibilityGuard.IsHiddenFailedMoviePlaceholder(mediaFile, hiddenMovieIds))
+        {
+            skipReason = ScanCandidateVisibilityGuard.HiddenFailedPlaceholderSkipReason;
             return false;
         }
 

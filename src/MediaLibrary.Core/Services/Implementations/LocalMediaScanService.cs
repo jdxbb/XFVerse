@@ -84,7 +84,10 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                     UpdatedFileCount = x.UpdatedFileCount,
                     IgnoredFileCount = x.IgnoredFileCount,
                     ErrorCount = x.ErrorCount,
-                    ErrorMessage = x.ErrorMessage ?? string.Empty
+                    ErrorMessage = x.ErrorMessage ?? string.Empty,
+                    ReasonSummaryJson = x.ReasonSummaryJson ?? string.Empty,
+                    ReasonSummaryText = ScanReasonSummaryFormatter.FormatTotals(x.ReasonSummaryJson),
+                    TopReasonSummaryText = ScanReasonSummaryFormatter.FormatTopReasons(x.ReasonSummaryJson, 3)
                 })
             .ToListAsync(cancellationToken);
 
@@ -99,7 +102,9 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         };
     }
 
-    public async Task<ScanExecutionResult> RunScanAsync(CancellationToken cancellationToken = default)
+    public async Task<ScanExecutionResult> RunScanAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<ScanProgressUpdate>? progress = null)
     {
         var connection = await _settingsService.GetLocalConnectionAsync(cancellationToken);
         if (connection is null)
@@ -132,12 +137,13 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             };
         }
 
-        return await RunScanCoreAsync(connection.Id, enabledScanPaths, cancellationToken);
+        return await RunScanCoreAsync(connection.Id, enabledScanPaths, cancellationToken, progress);
     }
 
     public async Task<ScanExecutionResult> RunScanPathAsync(
         int scanPathId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<ScanProgressUpdate>? progress = null)
     {
         var connection = await _settingsService.GetLocalConnectionAsync(cancellationToken);
         if (connection is null)
@@ -167,14 +173,17 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             };
         }
 
-        return await RunScanCoreAsync(connection.Id, [scanPath], cancellationToken);
+        return await RunScanCoreAsync(connection.Id, [scanPath], cancellationToken, progress);
     }
 
     private async Task<ScanExecutionResult> RunScanCoreAsync(
         int sourceConnectionId,
         IReadOnlyList<ScanPath> scanPaths,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<ScanProgressUpdate>? progress)
     {
+        var progressReporter = new ScanProgressReporter(progress);
+        progressReporter.Report("prepare", "准备扫描", force: true);
         var seenFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var postProcessVideoMediaFileIds = new HashSet<int>();
         var reattachCandidateMediaFileIds = new HashSet<int>();
@@ -183,6 +192,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         var videoStats = new ScanVideoClassificationStats();
         var completedLogIds = new List<int>();
         var scanStartedAtUtc = DateTime.UtcNow;
+        var reasonSummary = new ScanReasonSummaryBuilder();
         var totalResult = new ScanExecutionResult
         {
             ProcessedPathCount = scanPaths.Count
@@ -199,6 +209,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 localDefaultCandidateMediaFileIds,
                 subtitleBindingVideoMediaFileIds,
                 videoStats,
+                progressReporter,
                 cancellationToken);
 
             totalResult.TotalScannedCount += pathResult.TotalScannedCount;
@@ -214,6 +225,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
             if (pathResult.CanMarkMissing)
             {
+                progressReporter.Report("mark-missing", "标记缺失文件", force: true);
                 var deletedSubtitleAffectedVideoIds = await MarkMissingFilesDeletedAsync(
                     sourceConnectionId,
                     scanPath,
@@ -229,27 +241,35 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         var postStage = new PostScanStageResult();
         try
         {
-            var retryMovieMediaFileIds = await CollectFailedMoviePlaceholderRetryCandidatesAsync(
+            progressReporter.Report("movie-retry", "Movie 重试候选", force: true);
+            var retryMovieResult = await CollectFailedMoviePlaceholderRetryCandidatesAsync(
                 sourceConnectionId,
                 scanPaths.Select(x => x.Id).ToArray(),
                 seenFilePaths,
                 scanStartedAtUtc,
                 "local",
                 cancellationToken);
-            foreach (var mediaFileId in retryMovieMediaFileIds)
+            foreach (var mediaFileId in retryMovieResult.QueuedMediaFileIds)
             {
                 postProcessVideoMediaFileIds.Add(mediaFileId);
             }
 
+            ScanIdentificationDiagnostics.Write(
+                $"event=unchanged-unbound-requeued-for-identification source=local count={videoStats.UnchangedUnboundRequeuedForIdentificationCount}");
             var tmdbSearchCache = new ScanTmdbSearchCache();
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-identification-stage-start source=local videoIds={postProcessVideoMediaFileIds.Count}");
+            progressReporter.Report("tv-directory-analysis", "TV 目录预分析", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
             var tvDirectoryAnalysis = await _tvScanDirectoryAnalysisService.AnalyzeAsync(
                 postProcessVideoMediaFileIds.ToArray(),
                 cancellationToken);
             var aiCandidateRangesWithFiles = tvDirectoryAnalysis.AiCandidateRanges.Count(x => x.MediaFileIds.Count > 0);
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-ai-candidate-ranges source=local count={tvDirectoryAnalysis.AiCandidateRanges.Count} uniqueAiCandidateDirs={tvDirectoryAnalysis.AiCandidateRanges.Count} mergedRangeCount={tvDirectoryAnalysis.AiCandidateRangeMergedCount} deduplicatedEntryCount={tvDirectoryAnalysis.AiCandidateRangeDeduplicatedEntryCount} rangesWithFiles={aiCandidateRangesWithFiles} rangesWithoutFiles={Math.Max(0, tvDirectoryAnalysis.AiCandidateRanges.Count - aiCandidateRangesWithFiles)} fullAiRangeAnalysis=disabled reason=deferred-to-ai-on-uncertain");
+            var existingEpisodeBindingPreservedCount = await CountExistingEpisodeBindingsAsync(
+                postProcessVideoMediaFileIds,
+                cancellationToken);
+            progressReporter.Report("tv-identification", "TV 识别", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
             var tvIdentificationResult = await _tvSeasonIdentificationService.IdentifyMediaFilesAsync(
                 postProcessVideoMediaFileIds.ToArray(),
                 tvDirectoryAnalysis,
@@ -264,6 +284,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             var tvErrorCount = tvIdentificationResult.Summary.ErrorCount;
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-tv-first-pass-complete source=local tvIdentifyFirstPassRequested={postProcessVideoMediaFileIds.Count} handled={tvHandledMediaFileIds.Count} attempted={tvIdentificationResult.Summary.AttemptedCount} bound={tvIdentificationResult.Summary.BoundCount} placeholders={tvIdentificationResult.Summary.PlaceholderCount} warnings={tvIdentificationResult.Summary.WarningCount} errors={tvIdentificationResult.Summary.ErrorCount}");
+            progressReporter.Report("ai-on-uncertain", "AI 不确定项处理", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
             var aiOnUncertainApplyResult = await _tvScanDirectoryAnalysisService.ApplyAiOnUncertainAsync(
                 postProcessVideoMediaFileIds.ToArray(),
                 tvDirectoryAnalysis,
@@ -313,6 +334,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 .ToArray();
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-movie-stage-start source=local requested={movieMediaFileIds.Length} movieFallbackBlockedByTvRisk={tvDirectoryAnalysis.MovieFallbackBlockedMediaFileIds.Count}");
+            progressReporter.Report("movie-identification", "Movie 识别", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
             var identificationResult = await _movieIdentificationService.IdentifyMediaFilesAsync(
                 movieMediaFileIds,
                 tmdbSearchCache,
@@ -323,6 +345,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             RescanReattachResult reattachResult;
             try
             {
+                progressReporter.Report("rescan-reattach", "重扫恢复", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
                 reattachResult = await _rescanReattachService.TryReattachAsync(
                     postProcessVideoMediaFileIds.Concat(reattachCandidateMediaFileIds).ToArray(),
                     "local",
@@ -332,15 +355,18 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             {
                 reattachResult = new RescanReattachResult();
                 postStage.AddWarning("Rescan.Reattach", reattachException.GetType().Name);
+                reasonSummary.AddWarning("rescan-reattach-warning", "重扫恢复部分失败", 1);
                 ScanIdentificationDiagnostics.Write(
                     $"event=rescan-reattach-error sourceKind=local error={ScanIdentificationDiagnostics.FormatValue(reattachException.GetType().Name)} fallbackToPlaceholderGrouping=true");
             }
 
             ScanIdentificationDiagnostics.Write(
-                $"event=scan-video-classification source=local newVideoCount={videoStats.NewVideoCount} deletedReappearedVideoCount={videoStats.DeletedReappearedVideoCount} changedVideoCount={videoStats.ChangedVideoCount} unchangedUnboundVideoCount={videoStats.UnchangedUnboundVideoCount} postProcessVideoCount={postProcessVideoMediaFileIds.Count} reattachCandidateCount={reattachResult.CandidateCount} reattachSucceededCount={reattachResult.SucceededCount} reattachSkippedCount={reattachResult.SkippedCount} placeholderFallbackCount={reattachResult.PlaceholderFallbackCount}");
+                $"event=scan-video-classification source=local newVideoCount={videoStats.NewVideoCount} deletedReappearedVideoCount={videoStats.DeletedReappearedVideoCount} changedVideoCount={videoStats.ChangedVideoCount} unchangedUnboundVideoCount={videoStats.UnchangedUnboundVideoCount} unchangedUnboundRequeuedForIdentificationCount={videoStats.UnchangedUnboundRequeuedForIdentificationCount} postProcessVideoCount={postProcessVideoMediaFileIds.Count} reattachCandidateCount={reattachResult.CandidateCount} reattachSucceededCount={reattachResult.SucceededCount} reattachSkippedCount={reattachResult.SkippedCount} placeholderFallbackCount={reattachResult.PlaceholderFallbackCount}");
+            UnknownTvSeasonAppendResult unknownAppendResult = new();
             try
             {
-                var unknownAppendResult = await _unknownTvSeasonAppendService.TryAppendScanPathsAsync(
+                progressReporter.Report("unknown-append", "unknown append", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
+                unknownAppendResult = await _unknownTvSeasonAppendService.TryAppendScanPathsAsync(
                     scanPaths.Select(x => x.Id).ToArray(),
                     "local",
                     cancellationToken);
@@ -350,33 +376,58 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             catch (Exception appendException)
             {
                 postStage.AddWarning("UnknownTv.Append", FormatExceptionType(appendException));
+                reasonSummary.AddWarning("unknown-append-warning", "unknown append 部分失败", 1);
                 ScanIdentificationDiagnostics.Write(
                     $"event=unknown-season-append-error sourceKind=local error={ScanIdentificationDiagnostics.FormatValue(FormatExceptionType(appendException))} fallbackToPlaceholderGrouping=true");
             }
 
-            await _movieIdentificationService.AggregateUnidentifiedMediaFilesAsync(
+            progressReporter.Report("orphan-grouping", "placeholder / orphan 聚合", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
+            var orphanGroupingResult = await _movieIdentificationService.AggregateUnidentifiedMediaFilesAsync(
                 scanPaths.Select(x => x.Id).ToArray(),
                 cancellationToken,
                 "local");
             ScanIdentificationDiagnostics.Write(
                 $"event=tmdb-search-cache-summary source=local tmdbTvSearchCacheHit={tmdbSearchCache.TvSearchCacheHits} tmdbTvSearchCacheMiss={tmdbSearchCache.TvSearchCacheMisses} tmdbMovieSearchCacheHit={tmdbSearchCache.MovieSearchCacheHits} tmdbMovieSearchCacheMiss={tmdbSearchCache.MovieSearchCacheMisses} tmdbTvSearchCacheEntries={tmdbSearchCache.TvSearchCacheEntries} tmdbMovieSearchCacheEntries={tmdbSearchCache.MovieSearchCacheEntries} duplicateSearchAvoided={tmdbSearchCache.DuplicateSearchAvoided}");
+            var sourceOutcomes = await CountSourceLevelOutcomesAsync(
+                postProcessVideoMediaFileIds,
+                cancellationToken);
+            AddReasonSummary(
+                reasonSummary,
+                totalResult,
+                videoStats,
+                retryMovieResult,
+                tvDirectoryAnalysis,
+                aiOnUncertainApplyResult,
+                sourceOutcomes,
+                tvPlaceholderCount,
+                identificationResult,
+                reattachResult,
+                unknownAppendResult,
+                orphanGroupingResult,
+                existingEpisodeBindingPreservedCount,
+                postStage);
         }
         catch (Exception exception)
         {
             postStage.AddError("Identify.Stage", FormatExceptionType(exception));
+            AddReasonSummary(reasonSummary, totalResult, videoStats, postStage);
+            reasonSummary.AddError("identify-stage-error", "识别阶段异常", 1);
         }
 
         try
         {
+            progressReporter.Report("local-default-source", "本地默认播放源", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
             await PromoteLocalDefaultSourcesAsync(localDefaultCandidateMediaFileIds, cancellationToken);
         }
         catch (Exception exception)
         {
             postStage.AddWarning("Local.DefaultSource", FormatExceptionType(exception));
+            reasonSummary.AddWarning("local-default-source-warning", "本地默认播放源部分失败", 1);
         }
 
         try
         {
+            progressReporter.Report("subtitle-binding", "字幕绑定重建", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
             await _subtitleBindingService.RebuildBindingsAsync(
                 sourceConnectionId,
                 subtitleBindingVideoMediaFileIds.ToArray(),
@@ -385,6 +436,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         catch (Exception exception)
         {
             postStage.AddWarning("Subtitle.Binding", FormatExceptionType(exception));
+            reasonSummary.AddWarning("subtitle-binding-warning", "字幕绑定重建部分失败", 1);
         }
 
         if (completedLogIds.Count > 0 && postStage.HasIssues)
@@ -396,7 +448,12 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         if (completedLogIds.Count > 0)
         {
             var completedAt = DateTime.UtcNow;
-            await FinalizeCompletedLogsAsync(completedLogIds, completedAt, cancellationToken);
+            if (string.IsNullOrWhiteSpace(reasonSummary.ToJson()))
+            {
+                AddReasonSummary(reasonSummary, totalResult, videoStats, postStage);
+            }
+
+            await FinalizeCompletedLogsAsync(completedLogIds, completedAt, reasonSummary.ToJson(), cancellationToken);
             await UpdateConnectionLastScanAtAsync(sourceConnectionId, completedAt, cancellationToken);
         }
 
@@ -407,6 +464,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         totalResult.StatusMessage = BuildStatusMessage(totalResult, postStage);
         ScanIdentificationDiagnostics.Write(
             $"event=scan-run-complete source=local scanned={totalResult.TotalScannedCount} new={totalResult.NewFileCount} updated={totalResult.UpdatedFileCount} ignored={totalResult.IgnoredFileCount} errors={totalResult.ErrorCount} warnings={postStage.WarningCount} scanErrorCount={totalResult.ErrorCount} scanWarningCount={postStage.WarningCount} rawWarningCount={postStage.RawWarningCount} tvParseRawWarningCount={postStage.RawWarningCount} warningDedupedCount={Math.Max(0, postStage.RawWarningCount - postStage.WarningCount)} tvParseDeduplicatedWarningCount={postStage.WarningCount} warningsIncludedInErrorCount=false finalScanStatus={(totalResult.ErrorCount > 0 ? "partial-success" : "success-with-warnings-or-success")} backgroundAiClassification=queued");
+        progressReporter.Report("complete", "完成", scannedCount: totalResult.TotalScannedCount, newFileCount: totalResult.NewFileCount, updatedFileCount: totalResult.UpdatedFileCount, ignoredFileCount: totalResult.IgnoredFileCount, errorCount: totalResult.ErrorCount, force: true);
         return totalResult;
     }
 
@@ -419,6 +477,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         HashSet<int> localDefaultCandidateMediaFileIds,
         HashSet<int> subtitleBindingVideoMediaFileIds,
         ScanVideoClassificationStats videoStats,
+        ScanProgressReporter progressReporter,
         CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -445,10 +504,18 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         var localEntries = new List<LocalFileEntry>();
         try
         {
-            CollectLocalFiles(scanPath, localEntries, result, cancellationToken);
+            progressReporter.Report("enumerating-files", "枚举文件", force: true);
+            CollectLocalFiles(scanPath, localEntries, result, progressReporter, cancellationToken);
         }
         catch (OperationCanceledException)
         {
+            await CompletePathLogAsync(
+                log,
+                result,
+                ScanTaskStatus.Cancelled,
+                string.Empty,
+                dbContext,
+                CancellationToken.None);
             throw;
         }
         catch
@@ -480,6 +547,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
         try
         {
+            progressReporter.Report("comparing-files", "比对文件变化", force: true);
             var existingFiles = await LoadExistingFilesForPathAsync(
                 dbContext,
                 sourceConnectionId,
@@ -491,6 +559,15 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
 
             foreach (var entry in localEntries.OrderBy(x => x.FilePath, StringComparer.OrdinalIgnoreCase))
             {
+                progressReporter.Report(
+                    "comparing-files",
+                    "比对文件变化",
+                    entry.FileName,
+                    result.TotalScannedCount,
+                    result.NewFileCount,
+                    result.UpdatedFileCount,
+                    result.IgnoredFileCount,
+                    result.ErrorCount);
                 if (!seenFilePaths.Add(entry.FilePath))
                 {
                     result.RecordIgnored("duplicate-path", entry.FileName);
@@ -525,7 +602,16 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                             if (IsActiveUnboundVideo(mediaFile))
                             {
                                 reattachCandidateMediaFileIds.Add(mediaFile.Id);
+                                if (postProcessVideoMediaFileIds.Add(mediaFile.Id))
+                                {
+                                    videoStats.UnchangedUnboundRequeuedForIdentificationCount++;
+                                }
+
                                 videoStats.UnchangedUnboundVideoCount++;
+                            }
+                            else if (!mediaFile.IsDeleted)
+                            {
+                                videoStats.UnchangedBoundVideoCount++;
                             }
                         }
 
@@ -611,6 +697,13 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         }
         catch (OperationCanceledException)
         {
+            await CompletePathLogAsync(
+                log,
+                result,
+                ScanTaskStatus.Cancelled,
+                string.Empty,
+                dbContext,
+                CancellationToken.None);
             throw;
         }
         catch
@@ -632,6 +725,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         ScanPath scanPath,
         List<LocalFileEntry> entries,
         PathScanExecutionResult result,
+        ScanProgressReporter progressReporter,
         CancellationToken cancellationToken)
     {
         var root = new DirectoryInfo(scanPath.Path);
@@ -664,6 +758,15 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             foreach (var file in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                progressReporter.Report(
+                    "enumerating-files",
+                    "枚举文件",
+                    file.Name,
+                    result.TotalScannedCount,
+                    result.NewFileCount,
+                    result.UpdatedFileCount,
+                    result.IgnoredFileCount,
+                    result.ErrorCount);
                 try
                 {
                     if (MediaFileRules.IsIgnoredSystemFile(file.Name))
@@ -790,7 +893,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                && !mediaFile.EpisodeId.HasValue;
     }
 
-    private static async Task<IReadOnlyCollection<int>> CollectFailedMoviePlaceholderRetryCandidatesAsync(
+    private static async Task<FailedMoviePlaceholderRetryResult> CollectFailedMoviePlaceholderRetryCandidatesAsync(
         int sourceConnectionId,
         IReadOnlyCollection<int> scanPathIds,
         HashSet<string> seenFilePaths,
@@ -802,7 +905,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         {
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-movie-retry-candidates source={sourceKind} previousTmdbSearchErrorScanPaths=0 candidateCount=0 queuedCount=0 skippedCount=0 reason=no-scan-scope");
-            return [];
+            return FailedMoviePlaceholderRetryResult.Empty;
         }
 
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -835,7 +938,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         {
             ScanIdentificationDiagnostics.Write(
                 $"event=scan-movie-retry-candidates source={sourceKind} previousTmdbSearchErrorScanPaths=0 candidateCount=0 queuedCount=0 skippedCount=0 reason=no-previous-tmdb-search-error");
-            return [];
+            return FailedMoviePlaceholderRetryResult.Empty;
         }
 
         var retryPathIds = retryWindows.Select(x => x.ScanPathId).Distinct().ToArray();
@@ -859,11 +962,15 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                     MediaFileId = x.Id,
                     ScanPathId = x.ScanPathId!.Value,
                     FilePath = x.FilePath,
-                    MovieUpdatedAt = x.Movie!.UpdatedAt
+                    MovieUpdatedAt = x.Movie!.UpdatedAt,
+                    IsHiddenFromLibrary = dbContext.UserMovieCollectionItems.Any(
+                        item => item.MovieId == x.MovieId
+                                && item.LibraryVisibilityState == LibraryVisibilityState.Hidden)
                 })
             .ToListAsync(cancellationToken);
 
         var queuedIds = candidates
+            .Where(x => !x.IsHiddenFromLibrary)
             .Where(x => seenFilePaths.Contains(x.FilePath))
             .Where(
                 x => retryWindowsByPath.TryGetValue(x.ScanPathId, out var retryWindow)
@@ -874,9 +981,12 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             .ToArray();
 
         ScanIdentificationDiagnostics.Write(
-            $"event=scan-movie-retry-candidates source={sourceKind} previousTmdbSearchErrorScanPaths={retryWindows.Count} candidateCount={candidates.Count} queuedCount={queuedIds.Length} skippedCount={Math.Max(0, candidates.Count - queuedIds.Length)} reason=previous-tmdb-search-error");
+            $"event=scan-movie-retry-candidates source={sourceKind} previousTmdbSearchErrorScanPaths={retryWindows.Count} candidateCount={candidates.Count} queuedCount={queuedIds.Length} skippedCount={Math.Max(0, candidates.Count - queuedIds.Length)} hiddenPlaceholderSkippedCount={candidates.Count(x => x.IsHiddenFromLibrary)} hiddenPlaceholderSkipReason={ScanCandidateVisibilityGuard.HiddenFailedPlaceholderSkipReason} reason=previous-tmdb-search-error");
 
-        return queuedIds;
+        return new FailedMoviePlaceholderRetryResult(
+            queuedIds,
+            candidates.Count,
+            candidates.Count(x => x.IsHiddenFromLibrary));
     }
 
     private static async Task<IReadOnlyCollection<int>> MarkMissingFilesDeletedAsync(
@@ -1014,6 +1124,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         log.IgnoredFileCount = result.IgnoredFileCount;
         log.ErrorCount = result.ErrorCount;
         log.ErrorMessage = string.IsNullOrWhiteSpace(errorMessage) ? null : errorMessage;
+        log.ReasonSummaryJson = BuildPathReasonSummaryJson(result, status);
         log.EndedAt = DateTime.UtcNow;
         log.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1051,6 +1162,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
     private static async Task FinalizeCompletedLogsAsync(
         IReadOnlyCollection<int> logIds,
         DateTime completedAt,
+        string reasonSummaryJson,
         CancellationToken cancellationToken)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -1061,6 +1173,9 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         foreach (var log in logs)
         {
             log.EndedAt = completedAt;
+            log.ReasonSummaryJson = string.IsNullOrWhiteSpace(reasonSummaryJson)
+                ? log.ReasonSummaryJson
+                : reasonSummaryJson;
             log.UpdatedAt = completedAt;
         }
 
@@ -1157,6 +1272,55 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         }
     }
 
+    private static async Task<int> CountExistingEpisodeBindingsAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = mediaFileIds.Where(x => x > 0).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return 0;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        return await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.Id) && x.EpisodeId.HasValue && !x.IsDeleted)
+            .CountAsync(cancellationToken);
+    }
+
+    private static async Task<ScanSourceLevelOutcomes> CountSourceLevelOutcomesAsync(
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = mediaFileIds.Where(x => x > 0).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return ScanSourceLevelOutcomes.Empty;
+        }
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var rows = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Include(x => x.Movie)
+            .Where(x => ids.Contains(x.Id)
+                        && x.MediaType == MediaType.Video
+                        && !x.IsDeleted)
+            .Select(
+                x => new
+                {
+                    x.EpisodeId,
+                    x.MovieId,
+                    MovieStatus = x.Movie != null ? x.Movie.IdentificationStatus : (IdentificationStatus?)null
+                })
+            .ToListAsync(cancellationToken);
+
+        return new ScanSourceLevelOutcomes(
+            rows.Count(x => x.EpisodeId.HasValue),
+            rows.Count(x => x.MovieId.HasValue
+                            && x.MovieStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed));
+    }
+
     private static bool IsExistingLocalFile(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
@@ -1172,6 +1336,69 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         {
             return false;
         }
+    }
+
+    private static string BuildPathReasonSummaryJson(PathScanExecutionResult result, ScanTaskStatus status)
+    {
+        var summary = new ScanReasonSummaryBuilder();
+        summary.AddSkipped("ignored-file", "文件已忽略", result.IgnoredFileCount);
+        if (status == ScanTaskStatus.Cancelled)
+        {
+            summary.AddCancelled("scan-cancelled", "用户取消", 1);
+        }
+        else if (status == ScanTaskStatus.Failed)
+        {
+            summary.AddError("scan-path-failed", "扫描路径失败", Math.Max(1, result.ErrorCount));
+        }
+        else
+        {
+            summary.AddError("scan-path-error", "扫描路径错误", result.ErrorCount);
+        }
+
+        return summary.ToJson();
+    }
+
+    private static void AddReasonSummary(
+        ScanReasonSummaryBuilder summary,
+        ScanExecutionResult totalResult,
+        ScanVideoClassificationStats videoStats,
+        PostScanStageResult postStage)
+    {
+        summary.AddSkipped("ignored-file", "文件已忽略", totalResult.IgnoredFileCount);
+        summary.AddSkipped("unchanged-stable-binding", "未变化且已绑定跳过", videoStats.UnchangedBoundVideoCount);
+        summary.AddWarning("post-stage-warning", "识别/元数据警告", postStage.WarningCount);
+        summary.AddError("task-error", "任务异常", totalResult.ErrorCount);
+    }
+
+    private static void AddReasonSummary(
+        ScanReasonSummaryBuilder summary,
+        ScanExecutionResult totalResult,
+        ScanVideoClassificationStats videoStats,
+        FailedMoviePlaceholderRetryResult retryMovieResult,
+        TvScanDirectoryAnalysisResult tvDirectoryAnalysis,
+        TvScanAiOnUncertainApplyResult aiOnUncertainApplyResult,
+        ScanSourceLevelOutcomes sourceOutcomes,
+        int tvPlaceholderCount,
+        IdentificationRunResult movieIdentificationResult,
+        RescanReattachResult reattachResult,
+        UnknownTvSeasonAppendResult unknownAppendResult,
+        MoviePlaceholderGroupingRunResult orphanGroupingResult,
+        int existingEpisodeBindingPreservedCount,
+        PostScanStageResult postStage)
+    {
+        AddReasonSummary(summary, totalResult, videoStats, postStage);
+        summary.AddSuccess("tv-source-bound", "TV source 已绑定", sourceOutcomes.EpisodeSourceCount);
+        summary.AddSuccess("movie-source-identified", "Movie source 已识别", sourceOutcomes.MatchedMovieSourceCount);
+        summary.AddSuccess("rescan-reattach-succeeded", "重扫恢复成功", reattachResult.SucceededCount);
+        summary.AddSuccess("unknown-append-succeeded", "追加到未识别季", unknownAppendResult.SucceededCount);
+        summary.AddSuccess("placeholder-orphan-grouped", "placeholder/orphan 聚合", orphanGroupingResult.PersistedFiles);
+        summary.AddSkipped("unchanged-unbound-requeued", "未变化未绑定重新识别", videoStats.UnchangedUnboundRequeuedForIdentificationCount);
+        summary.AddSkipped("existing-episode-binding-preserved", "已有 Episode 绑定保持", existingEpisodeBindingPreservedCount);
+        summary.AddSkipped("hidden-placeholder-skipped", "Hidden 项跳过", retryMovieResult.HiddenPlaceholderSkippedCount + orphanGroupingResult.HiddenPlaceholderSkippedCount);
+        summary.AddSkipped("movie-fallback-blocked-by-tv-risk", "Movie fallback 被 TV 风险阻止", tvDirectoryAnalysis.MovieFallbackBlockedMediaFileIds.Count);
+        summary.AddSkipped("ai-uncertain", "AI 不确定", aiOnUncertainApplyResult.IgnoredHints);
+        summary.AddSkipped("confidence-or-review-placeholder", "未识别/待修正", tvPlaceholderCount + movieIdentificationResult.PlaceholderCount);
+        summary.AddWarning("ai-request-failed", "AI 请求失败但扫描继续", aiOnUncertainApplyResult.FailedBatchCount);
     }
 
     private static string BuildStatusMessage(ScanExecutionResult totalResult, PostScanStageResult postStage)
@@ -1290,6 +1517,10 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         public int ChangedVideoCount { get; set; }
 
         public int UnchangedUnboundVideoCount { get; set; }
+
+        public int UnchangedUnboundRequeuedForIdentificationCount { get; set; }
+
+        public int UnchangedBoundVideoCount { get; set; }
     }
 
     private sealed class RetryScanLogWindow
@@ -1312,6 +1543,21 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         public string FilePath { get; set; } = string.Empty;
 
         public DateTime MovieUpdatedAt { get; set; }
+
+        public bool IsHiddenFromLibrary { get; set; }
+    }
+
+    private sealed record FailedMoviePlaceholderRetryResult(
+        IReadOnlyCollection<int> QueuedMediaFileIds,
+        int CandidateCount,
+        int HiddenPlaceholderSkippedCount)
+    {
+        public static FailedMoviePlaceholderRetryResult Empty { get; } = new([], 0, 0);
+    }
+
+    private sealed record ScanSourceLevelOutcomes(int EpisodeSourceCount, int MatchedMovieSourceCount)
+    {
+        public static ScanSourceLevelOutcomes Empty { get; } = new(0, 0);
     }
 
     private sealed class PostScanStageResult

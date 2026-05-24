@@ -410,3 +410,39 @@ Noise:
 
 - The target Season number is user-entered. Folk-season naming that differs from TMDB numbering still depends on the user choosing the correct TMDB Season.
 - If TMDB lacks metadata for a moved Episode number, the local Episode is still created with minimal metadata so the source is not discarded.
+
+## Phase 4.14b Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Historical rows that were previously marked `MediaFile.IsDeleted=true` by older remove-from-library behavior are not auto-restored, because those rows cannot be safely distinguished from missing files, removed scan paths, or delete-record retention.
+- Hidden failed Movie placeholders are intentionally excluded from automatic scan recovery. Users must restore them before they can reappear in the media library or participate in later manual correction workflows.
+- `MediaFile` still has no dedicated visibility column. If future phases need hide-only state for raw source rows without a Movie / Season carrier, that requires a separately approved migration.
+- Scan summary UI, history positioning, probe / subtitle boundary cleanup, online subtitle search, TV Discovery closeout, and media-library performance work remain later phases.
+
+Noise:
+
+- Unchanged unbound files now re-enter the full TV / Movie identification input, so scan logs may show larger requested identification counts without implying broader matching rules.
+- Existing Episode bindings skipped by automatic TV scan can leave wrongly bound sources in place until the user uses an explicit correction or split workflow.
+
+## Phase 4.14c Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Reason summaries are task-level aggregates only. Per-file reason history, reason click-through, and history / calendar positioning remain future work.
+- The reason summary intentionally stores counts and stable reason keys, not detailed diagnostic payloads. Detailed low-level scan diagnostics remain log-only.
+- Historical scan logs created before migration `20260524213322_AddScanTaskReasonSummary` have no reason summary until they are naturally superseded by new scan logs.
+- No data backfill is included because this phase does not execute database update or rebuild old scan records.
+
+Noise:
+
+- Recent scan cards may show the same task-level reason summary on multiple path logs when one scan run processes multiple enabled paths.
+- Scan progress file text is throttled and safe-name-only, so very fast scans may skip over intermediate file names by design.
