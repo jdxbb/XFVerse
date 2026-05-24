@@ -47,6 +47,8 @@ public sealed class TvSeriesSeasonListItem
 
     public int SeasonNumber { get; set; }
 
+    public int? TmdbSeasonId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public string PosterRemoteUrl { get; set; } = string.Empty;

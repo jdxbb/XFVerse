@@ -32,6 +32,8 @@ public sealed class RemovedLibraryGroupViewModel : ObservableObject
 
     public bool IsTvGroup { get; }
 
+    public bool IsMovieGroup => !IsTvGroup;
+
     public ObservableCollection<LibraryMovieItemViewModel> Items { get; } = [];
 
     public bool IsExpanded

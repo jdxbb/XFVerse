@@ -296,6 +296,53 @@
                                     <TextBlock Margin="0,10,0,0" Text="模型名称" Style="{StaticResource BodyTextStyle}" />
                                     <TextBox Style="{StaticResource FormTextBoxStyle}"
                                              Text="{Binding AiModel, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,16,0,0"
+                                               Text="分项模型与超时"
+                                               Style="{StaticResource BodyTextStyle}" />
+                                    <TextBlock Margin="0,4,0,0"
+                                               Text="可按调用场景覆盖模型和超时时间；旧的单一模型名会作为默认模型兼容读取。"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="96" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="模型" Style="{StaticResource BodyMutedTextStyle}" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="超时(秒)" Style="{StaticResource BodyMutedTextStyle}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,10,0" Text="详情页修正" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,6,8,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiDetailCorrectionModel, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Row="1" Grid.Column="2" Margin="0,6,0,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiDetailCorrectionTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,10,0" Text="批量 AI 识别" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBox Grid.Row="2" Grid.Column="1" Margin="0,6,8,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiBatchCorrectionModel, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Row="2" Grid.Column="2" Margin="0,6,0,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiBatchCorrectionTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,8,10,0" Text="扫描 TV 不确定范围" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBox Grid.Row="3" Grid.Column="1" Margin="0,6,8,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiScanTvUncertainRangeModel, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Row="3" Grid.Column="2" Margin="0,6,0,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiScanTvUncertainRangeTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,8,10,0" Text="扫描 TV 全量范围" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBox Grid.Row="4" Grid.Column="1" Margin="0,6,8,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiScanTvFullRangeModel, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Row="4" Grid.Column="2" Margin="0,6,0,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiScanTvFullRangeTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Margin="0,8,10,0" Text="扫描电影标签" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBox Grid.Row="5" Grid.Column="1" Margin="0,6,8,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiScanMovieTaggingModel, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Row="5" Grid.Column="2" Margin="0,6,0,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiScanMovieTaggingTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Margin="0,8,10,0" Text="AI 推荐" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBox Grid.Row="6" Grid.Column="1" Margin="0,6,8,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiRecommendationModel, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Row="6" Grid.Column="2" Margin="0,6,0,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiRecommendationTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="7" Grid.Column="0" Margin="0,8,10,0" Text="观影画像" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBox Grid.Row="7" Grid.Column="1" Margin="0,6,8,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiWatchProfileModel, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Row="7" Grid.Column="2" Margin="0,6,0,0" Style="{StaticResource FormTextBoxStyle}" Text="{Binding AiWatchProfileTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                    </Grid>
                                     <Button Margin="0,18,0,0"
                                             Width="150"
                                             HorizontalAlignment="Left"

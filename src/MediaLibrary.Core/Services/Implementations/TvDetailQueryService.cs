@@ -57,6 +57,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                 {
                     x.Id,
                     x.SeasonNumber,
+                    x.TmdbSeasonId,
                     x.Name,
                     x.PosterRemoteUrl,
                     x.PosterLocalPath,
@@ -151,6 +152,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     {
                         SeasonId = season.Id,
                         SeasonNumber = season.SeasonNumber,
+                        TmdbSeasonId = season.TmdbSeasonId,
                         Name = season.Name,
                         PosterRemoteUrl = season.PosterRemoteUrl ?? string.Empty,
                         PosterLocalPath = season.PosterLocalPath ?? string.Empty,
@@ -640,6 +642,14 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
 
     private static bool ShouldShowSeasonInSeriesOverview(int? tmdbSeriesId, TvSeriesSeasonListItem season)
     {
+        if (tmdbSeriesId.HasValue
+            && !season.TmdbSeasonId.HasValue
+            && season.InLibraryEpisodeCount <= 0
+            && season.LibraryVisibilityState != LibraryVisibilityState.Visible)
+        {
+            return false;
+        }
+
         if (IsNoTmdbFailedUnknownSeason(tmdbSeriesId, season.IdentificationStatus)
             && season.InLibraryEpisodeCount <= 0)
         {

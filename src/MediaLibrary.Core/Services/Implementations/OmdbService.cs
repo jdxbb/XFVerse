@@ -20,8 +20,11 @@ public sealed class OmdbService : IOmdbService
     private static readonly TimeSpan RatingPersistentCacheTtl = TimeSpan.FromDays(14);
     private static readonly ConcurrentDictionary<string, CacheEntry<MovieRatingItem>> RatingCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CacheEntry<OmdbSeasonRatingAuditResult>> SeasonRatingAuditCache = new(StringComparer.Ordinal);
-    private static readonly SemaphoreSlim OmdbHttpLimiter = new(HttpConcurrencyLimit, HttpConcurrencyLimit);
-    private static int OmdbHttpInFlight;
+    private static readonly ExternalApiAdaptiveThrottle OmdbHttpThrottle = new(
+        OmdbProvider,
+        "omdb-http",
+        [2, 1],
+        maxRequestsPerSecond: 2);
 
     private readonly HttpClient _httpClient = new()
     {
@@ -115,6 +118,7 @@ public sealed class OmdbService : IOmdbService
         {
             using var response = await SendGetAsync(
                 $"?i={Uri.EscapeDataString(trimmedImdbId)}&Season={seasonNumber}&apikey={Uri.EscapeDataString(settings.OmdbApiKey)}",
+                "omdb-season-audit",
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -220,7 +224,7 @@ public sealed class OmdbService : IOmdbService
                 requestUri += $"&type={Uri.EscapeDataString(type)}";
             }
 
-            using var response = await SendGetAsync(requestUri, cancellationToken);
+            using var response = await SendGetAsync(requestUri, diagnosticsName, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -282,20 +286,15 @@ public sealed class OmdbService : IOmdbService
         }
     }
 
-    private async Task<HttpResponseMessage> SendGetAsync(string requestUri, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendGetAsync(
+        string requestUri,
+        string purpose,
+        CancellationToken cancellationToken)
     {
-        await OmdbHttpLimiter.WaitAsync(cancellationToken);
-        var currentInFlight = Interlocked.Increment(ref OmdbHttpInFlight);
-        AiPerfDiagnostics.RecordConcurrencySample("omdb-http", currentInFlight);
-        try
-        {
-            return await _httpClient.GetAsync(requestUri, cancellationToken);
-        }
-        finally
-        {
-            Interlocked.Decrement(ref OmdbHttpInFlight);
-            OmdbHttpLimiter.Release();
-        }
+        return await OmdbHttpThrottle.SendAsync(
+            purpose,
+            token => _httpClient.GetAsync(requestUri, token),
+            cancellationToken);
     }
 
     private static string BuildOmdbRatingCacheKey(string imdbId, string apiKey, string cacheScope)

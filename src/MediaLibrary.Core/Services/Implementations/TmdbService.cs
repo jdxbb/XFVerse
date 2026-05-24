@@ -23,7 +23,7 @@ public sealed class TmdbService : ITmdbService
     private const string TmdbDetailCacheType = "Detail";
     private const string TmdbExternalIdsCacheType = "ExternalIds";
     private const int DiscoveryPageSize = 20;
-    internal const int HttpConcurrencyLimit = 3;
+    internal const int HttpConcurrencyLimit = 8;
     private const int SearchCacheLimit = 300;
     private const int DetailCacheLimit = 600;
     private const int ExternalIdsCacheLimit = 600;
@@ -40,8 +40,11 @@ public sealed class TmdbService : ITmdbService
     private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeriesDetailResult>> TvSeriesDetailCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeasonDetailResult>> TvSeasonDetailCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeriesExternalIdsResult>> TvSeriesExternalIdsCache = new(StringComparer.Ordinal);
-    private static readonly SemaphoreSlim TmdbHttpLimiter = new(HttpConcurrencyLimit, HttpConcurrencyLimit);
-    private static int TmdbHttpInFlight;
+    private static readonly ExternalApiAdaptiveThrottle TmdbHttpThrottle = new(
+        TmdbProvider,
+        "tmdb-http",
+        [8, 4, 2, 1],
+        maxRequestsPerSecond: 12);
 
     private readonly HttpClient _httpClient = new(
         new SocketsHttpHandler
@@ -113,7 +116,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var response = await SendGetAsync(queryString, options, cancellationToken);
+            using var response = await SendGetAsync(queryString, options, "tmdb-movie-search", cancellationToken);
             EnsureSuccessStatusCode(response);
 
             await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -219,7 +222,7 @@ public sealed class TmdbService : ITmdbService
                 JsonDocument detailsDocument;
                 try
                 {
-                    using var detailsResponse = await SendGetAsync($"movie/{tmdbId}?language={TmdbLanguage}", options, cancellationToken);
+                    using var detailsResponse = await SendGetAsync($"movie/{tmdbId}?language={TmdbLanguage}", options, "tmdb-detail", cancellationToken);
                     EnsureSuccessStatusCode(detailsResponse);
 
                     await using var detailsStream = await detailsResponse.Content.ReadAsStreamAsync(cancellationToken);
@@ -277,7 +280,7 @@ public sealed class TmdbService : ITmdbService
                     var externalError = false;
                     try
                     {
-                        using var externalIdsResponse = await SendGetAsync($"movie/{tmdbId}/external_ids", options, cancellationToken);
+                        using var externalIdsResponse = await SendGetAsync($"movie/{tmdbId}/external_ids", options, "tmdb-movie-external-ids", cancellationToken);
                         externalError = !externalIdsResponse.IsSuccessStatusCode;
                         externalIdsFailed = externalError;
                         if (externalIdsResponse.IsSuccessStatusCode)
@@ -366,7 +369,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var response = await SendGetAsync(queryString, options, cancellationToken);
+            using var response = await SendGetAsync(queryString, options, "tmdb-movie-discovery-search", cancellationToken);
             EnsureSuccessStatusCode(response);
 
             await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -409,6 +412,7 @@ public sealed class TmdbService : ITmdbService
             using var response = await SendGetAsync(
                 $"search/person?language={TmdbLanguage}&include_adult=false&page={safePage}&query={Uri.EscapeDataString(query.Trim())}",
                 options,
+                "tmdb-person-search",
                 cancellationToken);
             EnsureSuccessStatusCode(response);
 
@@ -450,7 +454,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var creditsResponse = await SendGetAsync($"person/{personId}/movie_credits?language={TmdbLanguage}", options, cancellationToken);
+            using var creditsResponse = await SendGetAsync($"person/{personId}/movie_credits?language={TmdbLanguage}", options, "tmdb-person-movie-credits", cancellationToken);
             EnsureSuccessStatusCode(creditsResponse);
 
             await using var creditsStream = await creditsResponse.Content.ReadAsStreamAsync(cancellationToken);
@@ -633,6 +637,7 @@ public sealed class TmdbService : ITmdbService
             using var response = await SendGetAsync(
                 $"tv/{seriesId}?language={Uri.EscapeDataString(safeLanguage)}",
                 options,
+                "tmdb-tv-series-detail",
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -683,6 +688,8 @@ public sealed class TmdbService : ITmdbService
     {
         if (seriesId <= 0 || seasonNumber < 0)
         {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-season-detail-skipped seriesId={seriesId} seasonNumber={seasonNumber} skippedReason=\"invalid-arguments\"");
             return null;
         }
 
@@ -690,13 +697,18 @@ public sealed class TmdbService : ITmdbService
         var options = await GetRequestOptionsAsync(cancellationToken);
         if (!options.HasCredential)
         {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-season-detail-skipped seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} skippedReason=\"missing-tmdb-credential\"");
             return null;
         }
 
         var cacheKey = BuildTmdbTvSeasonDetailCacheKey(seriesId, seasonNumber, safeLanguage, options);
+        var cacheKeyHash = HashCachePart(cacheKey);
         if (TryGetCacheValue(TvSeasonDetailCache, cacheKey, out var cachedDetails))
         {
             AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail-cache-hit", TimeSpan.Zero, false);
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-season-detail-cache-hit seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} cacheKeyHash={ScanIdentificationDiagnostics.FormatValue(cacheKeyHash)} episodeCount={cachedDetails.Episodes.Count}");
             return CloneTvSeasonDetail(cachedDetails);
         }
 
@@ -710,28 +722,45 @@ public sealed class TmdbService : ITmdbService
             AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail-persistent-cache-hit", TimeSpan.Zero, false);
             var cloned = CloneTvSeasonDetail(persistentDetails.Value);
             SetCacheValue(TvSeasonDetailCache, cacheKey, CloneTvSeasonDetail(cloned), DetailCacheTtl, DetailCacheLimit);
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-season-detail-persistent-cache-hit seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} cacheKeyHash={ScanIdentificationDiagnostics.FormatValue(cacheKeyHash)} episodeCount={cloned.Episodes.Count}");
             return cloned;
         }
 
+        ScanIdentificationDiagnostics.Write(
+            $"event=tmdb-tv-season-detail-cache-miss seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} cacheKeyHash={ScanIdentificationDiagnostics.FormatValue(cacheKeyHash)}");
         var requestStopwatch = Stopwatch.StartNew();
         var isError = false;
         try
         {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-season-detail-request-started seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} cacheKeyHash={ScanIdentificationDiagnostics.FormatValue(cacheKeyHash)}");
             using var response = await SendGetAsync(
                 $"tv/{seriesId}/season/{seasonNumber}?language={Uri.EscapeDataString(safeLanguage)}",
                 options,
+                "tmdb-tv-season-detail",
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
                 isError = true;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tmdb-tv-season-detail-request-failed seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} statusCode={(int)response.StatusCode} reason={ScanIdentificationDiagnostics.FormatValue(response.ReasonPhrase)} skippedReason=\"http-non-success\"");
                 return null;
             }
 
             await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
             var result = BuildTvSeasonDetail(seriesId, document.RootElement);
-            if (result is not null && !cancellationToken.IsCancellationRequested)
+            if (result is null)
+            {
+                isError = true;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tmdb-tv-season-detail-request-failed seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} skippedReason=\"empty-or-invalid-season-detail\"");
+                return null;
+            }
+
+            if (!cancellationToken.IsCancellationRequested)
             {
                 var cacheValue = CloneTvSeasonDetail(result);
                 SetCacheValue(TvSeasonDetailCache, cacheKey, cacheValue, DetailCacheTtl, DetailCacheLimit);
@@ -744,15 +773,19 @@ public sealed class TmdbService : ITmdbService
                     cancellationToken);
             }
 
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-season-detail-request-succeeded seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} tmdbSeasonId={result.TmdbId} episodeCount={result.Episodes.Count} elapsedMs={requestStopwatch.ElapsedMilliseconds}");
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             isError = true;
+            ScanIdentificationDiagnostics.Write(
+                $"event=tmdb-tv-season-detail-request-failed seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} exceptionType={ScanIdentificationDiagnostics.FormatValue(exception.GetType().Name)} innerExceptionType={ScanIdentificationDiagnostics.FormatValue(exception.InnerException?.GetType().Name)} error={ScanIdentificationDiagnostics.FormatValue(exception.Message, 220)} skippedReason=\"exception\"");
             return null;
         }
         finally
@@ -801,7 +834,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var response = await SendGetAsync($"tv/{seriesId}/external_ids", options, cancellationToken);
+            using var response = await SendGetAsync($"tv/{seriesId}/external_ids", options, "tmdb-tv-external-ids", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 isError = true;
@@ -926,7 +959,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var response = await SendGetAsync(queryString, options, cancellationToken);
+            using var response = await SendGetAsync(queryString, options, diagnosticsName, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 isError = true;
@@ -983,7 +1016,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var response = await SendGetAsync(queryString, options, cancellationToken);
+            using var response = await SendGetAsync(queryString, options, diagnosticsName, cancellationToken);
             EnsureSuccessStatusCode(response);
 
             await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -1014,47 +1047,43 @@ public sealed class TmdbService : ITmdbService
     private async Task<HttpResponseMessage> SendGetAsync(
         string requestUri,
         TmdbRequestOptions options,
+        string purpose,
         CancellationToken cancellationToken)
     {
-        Exception? lastNetworkException = null;
-
-        foreach (var baseUri in BuildApiBaseUris(options.ApiBaseUrl))
-        {
-            var effectiveRequestUri = options.UseBearerToken
-                ? requestUri
-                : AppendQueryParameter(requestUri, "api_key", options.ApiKey);
-
-            var absoluteUri = new Uri(baseUri, effectiveRequestUri);
-            using var request = new HttpRequestMessage(HttpMethod.Get, absoluteUri);
-            if (options.UseBearerToken)
+        return await TmdbHttpThrottle.SendAsync(
+            purpose,
+            async token =>
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ReadAccessToken);
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            }
+                Exception? lastNetworkException = null;
 
-            try
-            {
-                await TmdbHttpLimiter.WaitAsync(cancellationToken);
-                var currentInFlight = Interlocked.Increment(ref TmdbHttpInFlight);
-                AiPerfDiagnostics.RecordConcurrencySample("tmdb-http", currentInFlight);
-                try
+                foreach (var baseUri in BuildApiBaseUris(options.ApiBaseUrl))
                 {
-                    return await _httpClient.SendAsync(request, cancellationToken);
-                }
-                finally
-                {
-                    Interlocked.Decrement(ref TmdbHttpInFlight);
-                    TmdbHttpLimiter.Release();
-                }
-            }
-            catch (Exception exception) when (!cancellationToken.IsCancellationRequested
-                                               && IsFallbackEligibleNetworkFailure(exception))
-            {
-                lastNetworkException = exception;
-            }
-        }
+                    var effectiveRequestUri = options.UseBearerToken
+                        ? requestUri
+                        : AppendQueryParameter(requestUri, "api_key", options.ApiKey);
 
-        throw new HttpRequestException("TMDB 请求失败，主地址和后备地址都不可用。", lastNetworkException);
+                    var absoluteUri = new Uri(baseUri, effectiveRequestUri);
+                    using var request = new HttpRequestMessage(HttpMethod.Get, absoluteUri);
+                    if (options.UseBearerToken)
+                    {
+                        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ReadAccessToken);
+                        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    }
+
+                    try
+                    {
+                        return await _httpClient.SendAsync(request, token);
+                    }
+                    catch (Exception exception) when (!token.IsCancellationRequested
+                                                       && IsFallbackEligibleNetworkFailure(exception))
+                    {
+                        lastNetworkException = exception;
+                    }
+                }
+
+                throw new HttpRequestException("TMDB 请求失败，主地址和后备地址都不可用。", lastNetworkException);
+            },
+            cancellationToken);
     }
 
     private static void EnsureSuccessStatusCode(HttpResponseMessage response)

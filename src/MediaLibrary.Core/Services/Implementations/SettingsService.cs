@@ -24,21 +24,7 @@ public sealed class SettingsService : ISettingsService
 
         return entity is null
             ? new ApplicationSettingModel()
-            : new ApplicationSettingModel
-            {
-                Id = entity.Id,
-                TmdbReadAccessToken = entity.TmdbReadAccessToken,
-                TmdbApiKey = entity.TmdbApiKey,
-                OmdbApiKey = entity.OmdbApiKey,
-                ThemeMode = string.IsNullOrWhiteSpace(entity.ThemeMode) ? "Light" : entity.ThemeMode,
-                AiBaseUrl = entity.AiBaseUrl,
-                AiApiKey = entity.AiApiKey,
-                AiModel = entity.AiModel,
-                RecentAiRecommendationsJson = entity.RecentAiRecommendationsJson,
-                CurrentAiRecommendationsJson = entity.CurrentAiRecommendationsJson,
-                AiRecommendationLibraryFingerprint = entity.AiRecommendationLibraryFingerprint,
-                TmdbBaseUrl = string.IsNullOrWhiteSpace(entity.TmdbBaseUrl) ? "https://api.tmdb.org/3/" : entity.TmdbBaseUrl
-            };
+            : MapApplicationSetting(entity);
     }
 
     public async Task<ApplicationSettingModel> SaveApplicationSettingAsync(
@@ -85,7 +71,13 @@ public sealed class SettingsService : ISettingsService
         entity.ThemeMode = string.IsNullOrWhiteSpace(settings.ThemeMode) ? "Light" : settings.ThemeMode.Trim();
         entity.AiBaseUrl = settings.AiBaseUrl.Trim();
         entity.AiApiKey = settings.AiApiKey.Trim();
-        entity.AiModel = settings.AiModel.Trim();
+        settings.AiRouting ??= AiModelRoutingSettings.FromStoredValue(settings.AiModel);
+        if (!string.IsNullOrWhiteSpace(settings.AiModel))
+        {
+            settings.AiRouting.DefaultModel = settings.AiModel.Trim();
+        }
+
+        entity.AiModel = settings.AiRouting.ToStoredValue();
         entity.RecentAiRecommendationsJson = settings.RecentAiRecommendationsJson;
         entity.CurrentAiRecommendationsJson = settings.CurrentAiRecommendationsJson;
         entity.AiRecommendationLibraryFingerprint = settings.AiRecommendationLibraryFingerprint;
@@ -94,21 +86,7 @@ public sealed class SettingsService : ISettingsService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new ApplicationSettingModel
-        {
-            Id = entity.Id,
-            TmdbReadAccessToken = entity.TmdbReadAccessToken,
-            TmdbApiKey = entity.TmdbApiKey,
-            OmdbApiKey = entity.OmdbApiKey,
-            ThemeMode = entity.ThemeMode,
-            AiBaseUrl = entity.AiBaseUrl,
-            AiApiKey = entity.AiApiKey,
-            AiModel = entity.AiModel,
-            RecentAiRecommendationsJson = entity.RecentAiRecommendationsJson,
-            CurrentAiRecommendationsJson = entity.CurrentAiRecommendationsJson,
-            AiRecommendationLibraryFingerprint = entity.AiRecommendationLibraryFingerprint,
-            TmdbBaseUrl = string.IsNullOrWhiteSpace(entity.TmdbBaseUrl) ? "https://api.tmdb.org/3/" : entity.TmdbBaseUrl
-        };
+        return MapApplicationSetting(entity);
     }
 
     public async Task<WebDavConnectionModel> GetPrimaryConnectionAsync(CancellationToken cancellationToken = default)
@@ -531,6 +509,27 @@ public sealed class SettingsService : ISettingsService
             IsEnabled = connection.IsEnabled,
             LastConnectedAt = connection.LastConnectedAt,
             LastScanAt = connection.LastScanAt
+        };
+    }
+
+    private static ApplicationSettingModel MapApplicationSetting(ApplicationSetting entity)
+    {
+        var aiRouting = AiModelRoutingSettings.FromStoredValue(entity.AiModel);
+        return new ApplicationSettingModel
+        {
+            Id = entity.Id,
+            TmdbReadAccessToken = entity.TmdbReadAccessToken,
+            TmdbApiKey = entity.TmdbApiKey,
+            OmdbApiKey = entity.OmdbApiKey,
+            ThemeMode = string.IsNullOrWhiteSpace(entity.ThemeMode) ? "Light" : entity.ThemeMode,
+            AiBaseUrl = entity.AiBaseUrl,
+            AiApiKey = entity.AiApiKey,
+            AiModel = aiRouting.DefaultModel,
+            AiRouting = aiRouting,
+            RecentAiRecommendationsJson = entity.RecentAiRecommendationsJson,
+            CurrentAiRecommendationsJson = entity.CurrentAiRecommendationsJson,
+            AiRecommendationLibraryFingerprint = entity.AiRecommendationLibraryFingerprint,
+            TmdbBaseUrl = string.IsNullOrWhiteSpace(entity.TmdbBaseUrl) ? "https://api.tmdb.org/3/" : entity.TmdbBaseUrl
         };
     }
 

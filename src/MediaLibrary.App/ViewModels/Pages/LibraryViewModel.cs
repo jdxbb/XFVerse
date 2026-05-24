@@ -60,6 +60,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IMovieManagementService _movieManagementService;
     private readonly IMovieIdentificationService _movieIdentificationService;
+    private readonly IBatchAiCorrectionService _batchAiCorrectionService;
     private readonly IUserCollectionService _userCollectionService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IManualUnknownSeasonAggregationService _manualUnknownSeasonAggregationService;
@@ -101,6 +102,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         IDataRefreshService dataRefreshService,
         IMovieManagementService movieManagementService,
         IMovieIdentificationService movieIdentificationService,
+        IBatchAiCorrectionService batchAiCorrectionService,
         IUserCollectionService userCollectionService,
         ITvSeasonCollectionService tvSeasonCollectionService,
         IManualUnknownSeasonAggregationService manualUnknownSeasonAggregationService,
@@ -112,6 +114,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         _dataRefreshService = dataRefreshService;
         _movieManagementService = movieManagementService;
         _movieIdentificationService = movieIdentificationService;
+        _batchAiCorrectionService = batchAiCorrectionService;
         _userCollectionService = userCollectionService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _manualUnknownSeasonAggregationService = manualUnknownSeasonAggregationService;
@@ -143,7 +146,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         ClearBatchSelectionCommand = new RelayCommand(ClearBatchSelection, () => CanClearBatchSelection);
         BatchMarkWatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(true), () => CanBatchMarkWatched);
         BatchMarkUnwatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(false), () => CanBatchMarkUnwatched);
-        BatchAutoIdentifyCommand = new AsyncRelayCommand(BatchAutoIdentifyAsync, () => CanBatchAutoIdentify);
+        BatchAutoIdentifyCommand = new AsyncRelayCommand(BatchAutoIdentifyCrossTypeAsync, () => CanBatchAutoIdentify);
         CancelBatchOperationCommand = new RelayCommand(CancelBatchOperation, () => CanCancelBatchOperation);
         BatchRemoveFromLibraryCommand = new AsyncRelayCommand(BatchRemoveFromLibraryAsync, () => CanBatchRemoveFromLibrary);
         BatchDeleteMovieRecordsCommand = new AsyncRelayCommand(BatchDeleteMovieRecordsAsync, () => CanBatchDeleteMovieRecords);
@@ -836,27 +839,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         try
         {
-            if (IsGroupedPlaceholder(item.Movie))
-            {
-                await _movieManagementService.DeleteGroupedPlaceholderRangeRecordAsync(item.Movie.GroupedRangeMediaFileIds);
-            }
-            else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
-            {
-                await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.SeasonId);
-            }
-            else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
-            {
-                await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
-            }
-            else if (item.IsMovie)
-            {
-                await _userCollectionService.DeleteCollectionRecordAsync(BuildRecommendationItem(item.Movie));
-            }
-            else
-            {
-                RemovedLibraryStatusMessage = "电视剧总览没有独立删除记录，请处理具体 Season。";
-                return;
-            }
+            await DeleteLibraryItemRecordAsync(item);
 
             RemovedLibraryStatusMessage = $"已删除记录：{item.Title}";
             _dataRefreshService.NotifyLibraryChanged();
@@ -899,22 +882,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             foreach (var item in items)
             {
-                if (IsGroupedPlaceholder(item.Movie))
-                {
-                    await _movieManagementService.DeleteGroupedPlaceholderRangeRecordAsync(item.Movie.GroupedRangeMediaFileIds);
-                }
-                else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
-                {
-                    await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.SeasonId);
-                }
-                else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
-                {
-                    await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
-                }
-                else if (item.IsMovie)
-                {
-                    await _userCollectionService.DeleteCollectionRecordAsync(BuildRecommendationItem(item.Movie));
-                }
+                await DeleteLibraryItemRecordAsync(item);
             }
 
             RemovedLibraryStatusMessage = $"已删除记录：{group.Title}（{items.Length} 项）";
@@ -1274,6 +1242,11 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private IEnumerable<LibraryMovieListItem> ApplySorting(IEnumerable<LibraryMovieListItem> query)
     {
+        if (IsBatchSelectionMode)
+        {
+            return ApplyBatchSelectionSorting(query);
+        }
+
         var descending = string.Equals(SelectedSortDirection, "降序", StringComparison.Ordinal);
 
         return SelectedSortOption switch
@@ -1292,6 +1265,135 @@ public sealed class LibraryViewModel : PageViewModelBase
                 : query.OrderBy(item => item.UpdatedAt).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
         };
     }
+
+    private IEnumerable<LibraryMovieListItem> ApplyBatchSelectionSorting(IEnumerable<LibraryMovieListItem> query)
+    {
+        var items = query.ToList();
+        var seriesGroups = items
+            .Where(IsSeasonLikeBatchItem)
+            .GroupBy(GetBatchSelectionSeriesGroupKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => new BatchSelectionSeriesSortKey(
+                    group.Max(item => item.UpdatedAt),
+                    group.Select(GetBatchSelectionSeriesKey).FirstOrDefault(title => !string.IsNullOrWhiteSpace(title)) ?? string.Empty,
+                    group.Where(item => item.ReleaseYear is > 0).Select(item => item.ReleaseYear!.Value).DefaultIfEmpty(0).Min()),
+                StringComparer.OrdinalIgnoreCase);
+        var descending = string.Equals(SelectedSortDirection, "降序", StringComparison.Ordinal);
+
+        IOrderedEnumerable<LibraryMovieListItem> ordered = SelectedSortOption switch
+        {
+            "标题" => descending
+                ? items.OrderByDescending(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase)
+                : items.OrderBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase),
+            "年份" => descending
+                ? items.OrderByDescending(item => GetBatchSelectionGroupReleaseYear(item, seriesGroups))
+                    .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase)
+                : items.OrderBy(item => GetBatchSelectionGroupReleaseYear(item, seriesGroups))
+                    .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase),
+            "评分" => descending
+                ? items.OrderByDescending(item => item.PrimaryRatingValue ?? -1d)
+                    .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase)
+                : items.OrderBy(item => item.PrimaryRatingValue ?? -1d)
+                    .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase),
+            _ => descending
+                ? items.OrderByDescending(item => GetBatchSelectionGroupUpdatedAt(item, seriesGroups))
+                    .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase)
+                : items.OrderBy(item => GetBatchSelectionGroupUpdatedAt(item, seriesGroups))
+                    .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase)
+        };
+
+        return ordered
+            .ThenBy(item => GetBatchSelectionGroupKey(item))
+            .ThenBy(item => GetBatchSelectionSeasonNumber(item))
+            .ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ThenByDescending(item => item.UpdatedAt);
+    }
+
+    private static string GetBatchSelectionSeriesKey(LibraryMovieListItem item)
+    {
+        if (IsSeasonLikeBatchItem(item))
+        {
+            return string.IsNullOrWhiteSpace(item.SeriesTitle)
+                ? item.Title
+                : item.SeriesTitle;
+        }
+
+        return item.Title;
+    }
+
+    private static string GetBatchSelectionSeriesGroupKey(LibraryMovieListItem item)
+    {
+        if (item.SeriesId > 0)
+        {
+            return $"series:{item.SeriesId}";
+        }
+
+        return $"title:{GetBatchSelectionSeriesKey(item)}";
+    }
+
+    private static string GetBatchSelectionGroupKey(LibraryMovieListItem item)
+    {
+        return IsSeasonLikeBatchItem(item)
+            ? GetBatchSelectionSeriesGroupKey(item)
+            : BuildSelectionKey(item);
+    }
+
+    private static DateTime GetBatchSelectionGroupUpdatedAt(
+        LibraryMovieListItem item,
+        IReadOnlyDictionary<string, BatchSelectionSeriesSortKey> seriesGroups)
+    {
+        if (!IsSeasonLikeBatchItem(item))
+        {
+            return item.UpdatedAt;
+        }
+
+        return seriesGroups.TryGetValue(GetBatchSelectionSeriesGroupKey(item), out var sortKey)
+            ? sortKey.UpdatedAt
+            : item.UpdatedAt;
+    }
+
+    private static string GetBatchSelectionGroupTitle(
+        LibraryMovieListItem item,
+        IReadOnlyDictionary<string, BatchSelectionSeriesSortKey> seriesGroups)
+    {
+        if (!IsSeasonLikeBatchItem(item))
+        {
+            return item.Title;
+        }
+
+        return seriesGroups.TryGetValue(GetBatchSelectionSeriesGroupKey(item), out var sortKey)
+            ? sortKey.Title
+            : GetBatchSelectionSeriesKey(item);
+    }
+
+    private static int GetBatchSelectionGroupReleaseYear(
+        LibraryMovieListItem item,
+        IReadOnlyDictionary<string, BatchSelectionSeriesSortKey> seriesGroups)
+    {
+        if (!IsSeasonLikeBatchItem(item))
+        {
+            return item.ReleaseYear ?? 0;
+        }
+
+        return seriesGroups.TryGetValue(GetBatchSelectionSeriesGroupKey(item), out var sortKey)
+            ? sortKey.ReleaseYear
+            : item.ReleaseYear ?? 0;
+    }
+
+    private static int GetBatchSelectionSeasonNumber(LibraryMovieListItem item)
+    {
+        return IsSeasonLikeBatchItem(item) && item.SeasonNumber > 0
+            ? item.SeasonNumber
+            : int.MaxValue;
+    }
+
+    private static bool IsSeasonLikeBatchItem(LibraryMovieListItem item)
+    {
+        return item.SeasonId > 0 && (item.IsSeason || item.IsOther);
+    }
+
+    private sealed record BatchSelectionSeriesSortKey(DateTime UpdatedAt, string Title, int ReleaseYear);
 
     private void ToggleBatchSelectionMode()
     {
@@ -1586,27 +1688,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 try
                 {
-                    if (IsGroupedPlaceholder(item.Movie))
-                    {
-                        await _movieManagementService.DeleteGroupedPlaceholderRangeRecordAsync(item.Movie.GroupedRangeMediaFileIds);
-                    }
-                    else if ((item.Movie.IsSeason || item.Movie.IsOther) && item.Movie.SeasonId > 0)
-                    {
-                        await _tvSeasonCollectionService.DeleteSeasonRecordAsync(item.Movie.SeasonId);
-                    }
-                    else if ((item.Movie.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
-                    {
-                        await _movieManagementService.DeleteMovieRecordAsync(item.MovieId);
-                    }
-                    else if (item.Movie.IsMovie)
-                    {
-                        await _userCollectionService.DeleteCollectionRecordAsync(BuildRecommendationItem(item.Movie));
-                    }
-                    else
-                    {
-                        errors.Add(new BatchItemError(item.SelectionKey, item.Title, "电视剧总览不参与批量操作。"));
-                        continue;
-                    }
+                    await DeleteLibraryItemRecordAsync(item);
 
                     successCount++;
                     WriteLibraryBatchEvent(
@@ -1645,6 +1727,36 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             IsBatchOperationRunning = false;
         }
+    }
+
+    private async Task DeleteLibraryItemRecordAsync(LibraryMovieItemViewModel item)
+    {
+        var movie = item.Movie;
+        if (IsGroupedPlaceholder(movie))
+        {
+            await _movieManagementService.DeleteGroupedPlaceholderRangeRecordAsync(movie.GroupedRangeMediaFileIds);
+            return;
+        }
+
+        if (movie.SeasonId > 0 && (movie.IsSeason || movie.IsOther))
+        {
+            await _tvSeasonCollectionService.DeleteSeasonRecordAsync(movie.SeasonId);
+            return;
+        }
+
+        if (movie.MovieId > 0 && !movie.IsSeries && movie.SeasonId <= 0)
+        {
+            await _movieManagementService.DeleteMovieRecordAsync(movie.MovieId);
+            return;
+        }
+
+        if (movie.IsMovie)
+        {
+            await _userCollectionService.DeleteCollectionRecordAsync(BuildRecommendationItem(movie));
+            return;
+        }
+
+        throw new InvalidOperationException("电视剧总览没有独立删除记录，请处理具体 Season。");
     }
 
     private async Task OpenManualAggregationAsync()
@@ -1793,6 +1905,78 @@ public sealed class LibraryViewModel : PageViewModelBase
         RefreshManualAggregationState();
         ManualAggregationStatusMessage = "已取消人工聚合。";
         BatchResultSummary = "已取消人工聚合。";
+    }
+
+    private async Task BatchAutoIdentifyCrossTypeAsync()
+    {
+        var selectedItems = GetSelectedVisibleItems();
+        if (selectedItems.Count == 0)
+        {
+            ClearSelection();
+            BatchResultSummary = "没有可识别的已选项目。";
+            return;
+        }
+
+        var selections = selectedItems
+            .Select(BuildBatchAiCorrectionSelection)
+            .ToArray();
+        _batchIdentifyCancellationTokenSource = new CancellationTokenSource();
+        IsBatchOperationRunning = true;
+        ClearSelection();
+        IsBatchSelectionMode = false;
+        BatchResultSummary = $"正在准备批量 AI 辅助识别：已选择 {selectedItems.Count} 项，正在切回普通视图。";
+
+        var batchStopwatch = Stopwatch.StartNew();
+        WriteBatch2Event($"event=batch2-ai-identify-batch-start count={selectedItems.Count} mode=cross-type");
+
+        try
+        {
+            var cancellationToken = _batchIdentifyCancellationTokenSource.Token;
+            var initialRefreshStopwatch = Stopwatch.StartNew();
+            WriteBatch2Event("event=batch2-ai-identify-initial-refresh-start reason=exit-batch-selection");
+            await ActivateAsync(cancellationToken);
+            initialRefreshStopwatch.Stop();
+            WriteBatch2Event($"event=batch2-ai-identify-initial-refresh-complete elapsedMs={initialRefreshStopwatch.ElapsedMilliseconds}");
+            BatchResultSummary = $"正在批量 AI 辅助识别 0 / {selectedItems.Count}：正在创建处理单元。";
+
+            var progress = new Progress<BatchAiCorrectionProgress>(UpdateBatchAutoIdentifyProgress);
+            var result = await _batchAiCorrectionService.CorrectAsync(selections, progress, cancellationToken);
+            var retainedItems = BuildRetainedBatchAiItems(result);
+
+            var refreshStopwatch = Stopwatch.StartNew();
+            WriteBatch2Event("event=batch2-ai-identify-refresh-start");
+            await ActivateAsync();
+            refreshStopwatch.Stop();
+            WriteBatch2Event($"event=batch2-ai-identify-refresh-complete elapsedMs={refreshStopwatch.ElapsedMilliseconds}");
+            BatchResultSummary = BuildAutoIdentifyResultSummary(result, retainedItems);
+            if (result.SuccessCount > 0)
+            {
+                NotifyAfterBatchIdentification();
+            }
+
+            batchStopwatch.Stop();
+            WriteBatch2Event(
+                $"event=batch2-ai-identify-batch-complete elapsedMs={batchStopwatch.ElapsedMilliseconds} success={result.SuccessCount} skipped={result.SkippedCount} failed={result.FailedCount} cancelled={result.CancelledCount}");
+        }
+        catch (OperationCanceledException)
+        {
+            BatchResultSummary = "批量 AI 辅助识别已取消。";
+            WriteBatch2Event("event=batch2-ai-identify-batch-cancelled");
+        }
+        catch (Exception exception)
+        {
+            var message = DescribeException(exception);
+            BatchResultSummary = $"批量 AI 辅助识别失败：{message}";
+            WriteBatch2Event(
+                $"event=batch2-ai-identify-batch-failed failureReason=\"{AiPerfDiagnostics.SanitizeMessage(message)}\"");
+        }
+        finally
+        {
+            _batchIdentifyCancellationTokenSource.Dispose();
+            _batchIdentifyCancellationTokenSource = null;
+            IsBatchOperationRunning = false;
+            RefreshBatchCommandState();
+        }
     }
 
     private async Task BatchAutoIdentifyAsync()
@@ -1948,6 +2132,24 @@ public sealed class LibraryViewModel : PageViewModelBase
             SeasonId = item.Movie.SeasonId,
             OrphanMediaFileId = item.Movie.OrphanMediaFileId,
             GroupedRangeMediaFileIds = item.Movie.GroupedRangeMediaFileIds
+        };
+    }
+
+    private static BatchAiCorrectionSelectionItem BuildBatchAiCorrectionSelection(LibraryMovieItemViewModel item)
+    {
+        return new BatchAiCorrectionSelectionItem
+        {
+            SelectionKey = item.SelectionKey,
+            Title = item.Title,
+            SeriesTitle = item.SeriesTitle,
+            ItemKind = item.Movie.ItemKind,
+            MovieId = item.Movie.MovieId,
+            SeriesId = item.Movie.SeriesId,
+            SeasonId = item.Movie.SeasonId,
+            OrphanMediaFileId = item.Movie.OrphanMediaFileId,
+            GroupedRangeMediaFileIds = item.Movie.GroupedRangeMediaFileIds,
+            IsInLibrary = item.IsInLibrary,
+            HasActiveSource = item.HasActiveSource
         };
     }
 
@@ -2328,6 +2530,12 @@ public sealed class LibraryViewModel : PageViewModelBase
         BatchResultSummary = $"正在 AI 辅助识别 {Math.Min(currentIndex, totalCount)} / {totalCount}：成功 {successCount}，无结果 {noResultCount}，失败 {failedCount}，已取消 {cancelledCount}。";
     }
 
+    private void UpdateBatchAutoIdentifyProgress(BatchAiCorrectionProgress progress)
+    {
+        BatchResultSummary =
+            $"正在批量 AI 辅助识别 {Math.Min(progress.ProcessedCount, progress.TotalCount)} / {progress.TotalCount}：成功 {progress.SuccessCount}，跳过 {progress.SkippedCount}，失败 {progress.FailedCount}，已取消 {progress.CancelledCount}。当前：{progress.CurrentTitle}";
+    }
+
     private static string BuildResultSummary(
         string operationName,
         int successCount,
@@ -2393,6 +2601,41 @@ public sealed class LibraryViewModel : PageViewModelBase
         var suffix = errors.Count > 3 ? $"；另有 {errors.Count - 3} 项失败" : string.Empty;
         parts.Add($"失败项：{preview}{suffix}");
         return $"{summary} {string.Join(" ", parts)}";
+    }
+
+    private static IReadOnlyList<BatchItemError> BuildRetainedBatchAiItems(BatchAiCorrectionRunResult result)
+    {
+        return result.UnitResults
+            .Where(item => !string.Equals(item.Status, "success", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(item => item.SelectionKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var first = group.First();
+                var message = group.Count() == 1
+                    ? first.Message
+                    : $"{group.Count()} 个处理单元未成功，首个原因：{first.Message}";
+                return new BatchItemError(first.SelectionKey, first.Title, message);
+            })
+            .ToList();
+    }
+
+    private static string BuildAutoIdentifyResultSummary(
+        BatchAiCorrectionRunResult result,
+        IReadOnlyCollection<BatchItemError> retainedItems)
+    {
+        var summary = $"AI 辅助识别完成：成功 {result.SuccessCount}，跳过 {result.SkippedCount}，失败 {result.FailedCount}，已取消 {result.CancelledCount}。";
+        if (retainedItems.Count == 0)
+        {
+            return summary;
+        }
+
+        var preview = string.Join(
+            "；",
+            retainedItems
+                .Take(3)
+                .Select(item => $"{item.Title}：{item.Message}"));
+        var suffix = retainedItems.Count > 3 ? $"；另有 {retainedItems.Count - 3} 项未成功" : string.Empty;
+        return $"{summary} 未成功项：{preview}{suffix}";
     }
 
     private static string BuildAutoIdentifyResultSummary(

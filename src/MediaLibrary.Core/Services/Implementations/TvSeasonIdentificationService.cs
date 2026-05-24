@@ -551,11 +551,16 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
                                 cancellationToken: cancellationToken)
                             ?? throw new InvalidOperationException("无法读取 TMDB 电视剧详情。");
         var seasonDetails = await _tmdbService.GetTvSeasonDetailsAsync(
-                                seriesTmdbId,
-                                seasonNumber,
-                                cancellationToken: cancellationToken)
-                            ?? throw new InvalidOperationException("无法读取 TMDB 电视剧季详情。");
-        var episodeMetadata = seasonDetails.Episodes.FirstOrDefault(x => x.EpisodeNumber == episodeNumber);
+            seriesTmdbId,
+            seasonNumber,
+            cancellationToken: cancellationToken);
+        if (seasonDetails is null)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=correction-tv-local-season-fallback mediaFileId={mediaFileId} seriesTmdbId={seriesTmdbId} season={seasonNumber} reason=\"target-season-detail-unavailable\"");
+        }
+
+        var episodeMetadata = seasonDetails?.Episodes.FirstOrDefault(x => x.EpisodeNumber == episodeNumber);
 
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);

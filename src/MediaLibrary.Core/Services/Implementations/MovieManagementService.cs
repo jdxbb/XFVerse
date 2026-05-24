@@ -749,7 +749,11 @@ public sealed class MovieManagementService : IMovieManagementService
             return;
         }
 
-        if (movie.MediaFiles.Count == 0
+        var isFailedPlaceholder = !movie.TmdbId.HasValue
+                                  && movie.IdentificationStatus == IdentificationStatus.Failed;
+
+        if (isFailedPlaceholder
+            && movie.MediaFiles.Count == 0
             && movie.WatchHistories.Count == 0
             && !movie.IsFavorite
             && !movie.IsWatched)

@@ -1,9 +1,11 @@
 using System.Text.Json;
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Models.Settings;
 using MediaLibrary.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -54,6 +56,7 @@ public sealed class AiClassificationService : IAiClassificationService
                 示例：{"aiTags":["剧情"],"emotionTags":["温暖"],"sceneTags":["独自观看"]}
                 """,
                 $"片名：{movie.Title}\n年份：{movie.ReleaseYear}\n类型：{movie.GenresText}\n简介：{movie.Overview}",
+                AiRequestOptions.MovieTaggingFlash,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(text))
@@ -75,6 +78,163 @@ public sealed class AiClassificationService : IAiClassificationService
 
         movie.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ClassifyMoviesAsync(
+        IReadOnlyCollection<int> movieIds,
+        string sourceKind,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = movieIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+        if (ids.Length == 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-movie-ai-concurrency-summary sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} movieCount=0 success=0 skipped=0 failed=0 finalConcurrency=0 retryableErrorCount=0 retryScheduledCount=0 retryExhaustedCount=0");
+            return;
+        }
+
+        var executor = new AdaptiveAiBatchExecutor($"scan-movie-ai-tagging:{sourceKind}", ids.Length);
+        using var saveGate = new SemaphoreSlim(1, 1);
+        var countGate = new object();
+        var successCount = 0;
+        var skippedCount = 0;
+        var failedCount = 0;
+        var tasks = ids
+            .Select(
+                async movieId =>
+                {
+                    var outcome = await ClassifyScanMovieAsync(movieId, sourceKind, executor, saveGate, cancellationToken);
+                    lock (countGate)
+                    {
+                        switch (outcome.Status)
+                        {
+                            case "success":
+                                successCount++;
+                                break;
+                            case "skipped":
+                                skippedCount++;
+                                break;
+                            default:
+                                failedCount++;
+                                break;
+                        }
+                    }
+                })
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+        ScanIdentificationDiagnostics.Write(
+            $"event=scan-movie-ai-concurrency-summary sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} movieCount={ids.Length} success={successCount} skipped={skippedCount} failed={failedCount} finalConcurrency={executor.CurrentConcurrency} aiRequestSuccessCount={executor.SuccessCount} retryableErrorCount={executor.RetryableErrorCount} retryScheduledCount={executor.RetryScheduledCount} retryExhaustedCount={executor.RetryExhaustedCount}");
+    }
+
+    private async Task<MovieClassificationOutcome> ClassifyScanMovieAsync(
+        int movieId,
+        string sourceKind,
+        AdaptiveAiBatchExecutor executor,
+        SemaphoreSlim saveGate,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+            var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+            if (movie is null)
+            {
+                return new MovieClassificationOutcome("skipped", "movie-not-found");
+            }
+
+            if (!movie.TmdbId.HasValue
+                || movie.IdentificationStatus is not (IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed))
+            {
+                return new MovieClassificationOutcome("skipped", "movie-not-recognized");
+            }
+
+            var local = BuildLocalTags(movie.GenresText, movie.Overview);
+            movie.AiTagsText = null;
+            movie.EmotionTagsText = null;
+            movie.SceneTagsText = null;
+            var status = "success";
+            var reason = string.Empty;
+            try
+            {
+                var text = await executor.ExecuteAsync(
+                    "scan-movie-tagging",
+                    $"movie:{movieId}",
+                    (_, token) => GenerateScanMovieTagsTextAsync(movie, token),
+                    cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    var parsed = ParseTags(text);
+                    movie.AiTagsText = parsed.aiTags.Count > 0 ? string.Join(",", parsed.aiTags) : local.aiTags;
+                    movie.EmotionTagsText = parsed.emotionTags.Count > 0 ? string.Join(",", parsed.emotionTags) : local.emotionTags;
+                    movie.SceneTagsText = parsed.sceneTags.Count > 0 ? string.Join(",", parsed.sceneTags) : local.sceneTags;
+                }
+                else
+                {
+                    ApplyLocalTags(movie, local);
+                    status = "skipped";
+                    reason = "ai-returned-empty";
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                ApplyLocalTags(movie, local);
+                status = "failed";
+                reason = TrimMessage(exception.Message);
+            }
+
+            movie.UpdatedAt = DateTime.UtcNow;
+            await saveGate.WaitAsync(cancellationToken);
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            finally
+            {
+                saveGate.Release();
+            }
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-movie-ai-classify-item-complete sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} movieId={movieId} status={ScanIdentificationDiagnostics.FormatValue(status)} reason={ScanIdentificationDiagnostics.FormatValue(reason, 180)}");
+            return new MovieClassificationOutcome(status, reason);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var reason = TrimMessage(exception.Message);
+            ScanIdentificationDiagnostics.Write(
+                $"event=scan-movie-ai-classify-item-failed sourceKind={ScanIdentificationDiagnostics.FormatValue(sourceKind)} movieId={movieId} failureReason={ScanIdentificationDiagnostics.FormatValue(reason, 180)}");
+            return new MovieClassificationOutcome("failed", reason);
+        }
+    }
+
+    private Task<string?> GenerateScanMovieTagsTextAsync(Movie movie, CancellationToken cancellationToken)
+    {
+        return _aiService.GenerateTextAsync(
+            $$"""
+            You are a movie library tagging assistant.
+            Choose tags only from the fixed vocabularies below. Do not invent new tags, synonyms, or English tags.
+            Type tag vocabulary: {{string.Join(",", AiTagVocabulary.TypeTags)}}
+            Emotion tag vocabulary: {{string.Join(",", AiTagVocabulary.EmotionTags)}}
+            Viewing scene vocabulary: {{string.Join(",", AiTagVocabulary.SceneTags)}}
+            Return JSON only with fixed keys: aiTags, emotionTags, sceneTags.
+            Each field must be a string array and should contain 1 to 4 Chinese tags from its matching vocabulary.
+            Example: {"aiTags":["tag"],"emotionTags":["tag"],"sceneTags":["tag"]}
+            """,
+            $"title={movie.Title}\nyear={movie.ReleaseYear}\ngenres={movie.GenresText}\noverview={movie.Overview}",
+            AiRequestOptions.MovieTaggingFlash,
+            cancellationToken);
     }
 
     public async Task<AiMovieTags> ClassifyExternalMovieAsync(
@@ -99,6 +259,7 @@ public sealed class AiClassificationService : IAiClassificationService
                 示例：{"aiTags":["剧情"],"emotionTags":["温暖"],"sceneTags":["独自观看"]}
                 """,
                 $"片名：{recommendation.Title}\n原名：{recommendation.OriginalTitle}\n年份：{recommendation.ReleaseYear}\n类型：{recommendation.Tags}\n简介：{recommendation.Overview}",
+                AiRequestOptions.MovieTaggingFlash,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(text))
@@ -174,13 +335,29 @@ public sealed class AiClassificationService : IAiClassificationService
         {
             var text = await _aiService.GenerateTextAsync(
                 """
-                你是影片识别助手。请优先根据原始文件名和原始路径，生成一组适合 TMDB 搜索的标题与年份。
-                不要被当前可能错误的影片标题和年份带偏。
-                只返回 JSON：
-                {"title":"适合 TMDB 搜索的片名","year":2002}
-                如果无法可靠判断年份，请将 year 设为 null。
+                You are a movie identification search assistant.
+                Generate only a TMDB movie search title and optional year.
+                Prioritize sourcePathHint and sourceFileName. Treat currentTitle, currentYear, and overview only as weak hints because they may be wrong.
+                Use sourcePathHint and sourceFileName to identify the work, but never use the language or script of a file name to decide the TMDB original_title language or spelling.
+                English, localized, or romanized file names can still belong to a non-English TMDB original title.
+                If sourceFileName contains a specific work title or numbered part, prefer that specific title over a collection, franchise, pack, or parent-folder title.
+                If sourceFileName or sourcePathHint contains both a localized title and an original title, return the original title.
+                The title must match TMDB original_title semantics: the work's official original title stored by TMDB, not a translated/localized/marketing alias.
+                Romanized/transliterated titles are aliases unless TMDB original_title itself is romanized.
+                Return an English title only when TMDB original_title itself is English. If you only know an English/international/localized alias for a non-English-original movie, return an empty title instead of guessing.
+                Never return TMDB ids. The app will search TMDB locally from the returned title.
+                Return JSON only:
+                {"title":"TMDB original_title-style movie search title","year":2002}
+                Use null for year when it cannot be inferred safely.
                 """,
-                $"原始文件名：{movie.SourceFileName}\n原始路径：{movie.SourceFilePath}\n当前影片标题：{movie.Title}\n当前影片年份：{movie.ReleaseYear}\n简介：{movie.Overview}",
+                string.Join(
+                    '\n',
+                    $"sourceFileName={movie.SourceFileName}",
+                    $"sourcePathHint={AiSourceContextFormatter.BuildPathHint(movie.SourceFilePath)}",
+                    $"currentTitle={movie.Title}",
+                    $"currentYear={movie.ReleaseYear}",
+                    $"overview={movie.Overview}"),
+                AiRequestOptions.CorrectionPro,
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(text))
@@ -212,9 +389,18 @@ public sealed class AiClassificationService : IAiClassificationService
                 FallbackSuggestion = fallbackSuggestion
             };
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+            return new AiSearchSuggestionResult
+            {
+                Status = AiSearchSuggestionStatus.Failed,
+                FallbackSuggestion = fallbackSuggestion,
+                Message = "AI 请求超时，请稍后重试。"
+            };
         }
         catch (Exception exception)
         {
@@ -232,6 +418,7 @@ public sealed class AiClassificationService : IAiClassificationService
         string? sourceFileName,
         int? releaseYear = null,
         string? overview = null,
+        string? sourcePath = null,
         CancellationToken cancellationToken = default)
     {
         var fallbackSuggestion = BuildFallbackSearchSuggestion(
@@ -245,6 +432,7 @@ public sealed class AiClassificationService : IAiClassificationService
             '\n',
             $"targetKind=Movie",
             $"sourceFileName={sourceFileName}",
+            $"sourcePathHint={AiSourceContextFormatter.BuildPathHint(sourcePath)}",
             $"currentTitle={currentTitle}",
             $"releaseYear={releaseYear}",
             $"overview={overview}");
@@ -254,13 +442,24 @@ public sealed class AiClassificationService : IAiClassificationService
             You are a single-source movie correction assistant.
             The user has already selected targetKind=Movie.
             Only generate a TMDB movie search title and optional year.
+            Prioritize sourcePathHint and sourceFileName. Treat currentTitle and overview only as weak hints because they may be wrong.
+            Use sourcePathHint and sourceFileName to identify the work, but never use the language or script of a file name to decide the TMDB original_title language or spelling.
+            English, localized, or romanized file names can still belong to a non-English TMDB original title.
+            If sourceFileName contains a specific work title or numbered part, prefer that specific title over a collection, franchise, pack, or parent-folder title.
+            If sourceFileName or sourcePathHint contains both a localized title and an original title, return the original title.
+            The title must match TMDB original_title semantics: the work's official original title stored by TMDB, not a translated/localized/marketing alias.
+            Romanized/transliterated titles are aliases unless TMDB original_title itself is romanized.
+            Return an English title only when TMDB original_title itself is English. If you only know an English/international/localized alias for a non-English-original movie, return an empty title instead of guessing.
+            Never return TMDB ids. The app will search TMDB locally from the returned title.
+            Special/SP/OVA/OAD/special episode/theatrical wording is not an automatic skip for a Movie target. Return a movie title when it safely maps to a standalone movie; otherwise return an empty title instead of forcing another target kind.
             Do not classify the item as TV, do not suggest TV fields, and do not switch target kind.
             Return JSON only:
-            {"title":"movie search title","year":2002}
+            {"title":"TMDB original_title-style movie search title","year":2002}
             Use null for year when it cannot be inferred safely.
             """,
             context,
             fallbackSuggestion,
+            AiRequestOptions.CorrectionPro,
             cancellationToken);
     }
 
@@ -271,6 +470,7 @@ public sealed class AiClassificationService : IAiClassificationService
         int? seasonNumber = null,
         int? episodeNumber = null,
         string? overview = null,
+        string? sourcePath = null,
         CancellationToken cancellationToken = default)
     {
         var fallbackTitle = FirstNonEmpty(seriesTitle, currentTitle);
@@ -287,6 +487,7 @@ public sealed class AiClassificationService : IAiClassificationService
             '\n',
             $"targetKind=TvEpisode",
             $"sourceFileName={sourceFileName}",
+            $"sourcePathHint={AiSourceContextFormatter.BuildPathHint(sourcePath)}",
             $"currentTitle={currentTitle}",
             $"seriesTitle={seriesTitle}",
             $"seasonNumber={seasonNumber}",
@@ -298,15 +499,87 @@ public sealed class AiClassificationService : IAiClassificationService
             You are a single-source TV episode correction assistant.
             The user has already selected targetKind=TvEpisode.
             Generate a TMDB TV series search title plus the most likely season and episode numbers.
+            Prioritize sourcePathHint and sourceFileName. Treat currentTitle, seriesTitle, seasonNumber, and episodeNumber only as weak hints because they may be wrong.
+            Use sourcePathHint and sourceFileName to identify the work and episode evidence, but never use the language or script of a file name to decide the TMDB original_name language or spelling.
+            English, localized, or romanized file names can still belong to a non-English TMDB original name.
+            Do not let currentTitle or seriesTitle override clearer sourcePathHint/sourceFileName evidence.
+            The title must match TMDB original_name semantics: the series' official original name stored by TMDB, not a translated/localized/marketing alias.
+            If the original language title is Japanese, Korean, Chinese, Spanish, French, German, or another non-English title, return that original spelling/script, not the English/international title.
+            Romanized/transliterated series names are aliases unless TMDB original_name itself is romanized. If a romanized alias confidently identifies the native-script official original_name, return the native-script original_name; otherwise return an empty title.
+            Return an English series title only when TMDB original_name itself is English. If you only know an English/international/localized alias for a non-English-original series, return an empty title instead of guessing.
+            Final-season wording such as 最终季, 完结篇, final season, or the final season is a season-number clue. Use it to return the correct TMDB seasonNumber only when you are confident; otherwise return null instead of guessing.
+            If sourceFileName contains explicit SxxEyy or a clear ordinary episode number, do not treat final/chapter/part wording as OVA, special, or movie by itself. Use the explicit season/episode when safe.
+            Never return TMDB ids. The app will search TMDB locally from the returned title.
             Do not classify the item as a movie.
             Do not switch target kind and do not return movie candidates.
+            Special/SP/OVA/OAD/special episode/theatrical wording is not an automatic skip for a TV Episode target. Return title, seasonNumber, and episodeNumber only when it can safely be represented as a TV episode; otherwise return an empty title or null numbers.
             Return JSON only:
-            {"title":"tv series search title","year":null,"seasonNumber":1,"episodeNumber":2}
+            {"title":"TMDB original_name-style tv series search title","year":null,"seasonNumber":1,"episodeNumber":2}
             Use null for year unless a first-air year is clearly useful for search.
             Use null for seasonNumber or episodeNumber only when it cannot be inferred safely.
             """,
             context,
             fallbackSuggestion,
+            AiRequestOptions.CorrectionPro,
+            cancellationToken);
+    }
+
+    public Task<AiSearchSuggestionResult> SuggestTvSeasonCorrectionSearchQueryAsync(
+        string currentTitle,
+        IReadOnlyCollection<string> sourceFileNames,
+        string? seriesTitle = null,
+        int? seasonNumber = null,
+        string? overview = null,
+        CancellationToken cancellationToken = default)
+    {
+        var sampledFileNames = sourceFileNames
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => Path.GetFileName(x.Trim()))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(9)
+            .ToArray();
+        var fallbackTitle = FirstNonEmpty(seriesTitle, currentTitle);
+        var fallbackSuggestion = BuildFallbackSearchSuggestion(
+            fallbackTitle,
+            sampledFileNames.FirstOrDefault(),
+            releaseYear: null,
+            preferSourceFileName: false,
+            cleanForTv: true,
+            seasonNumber,
+            episodeNumber: null);
+
+        var context = string.Join(
+            '\n',
+            $"targetKind=TvSeason",
+            $"currentTitle={currentTitle}",
+            $"seriesTitle={seriesTitle}",
+            $"seasonNumber={seasonNumber}",
+            $"overview={overview}",
+            $"sampleFileNames={string.Join(" | ", sampledFileNames)}");
+
+        return SuggestCorrectionSearchQueryAsync(
+            """
+            You are a TV season correction assistant.
+            The user has already selected targetKind=TvSeason.
+            Generate a TMDB TV series search title plus the most likely season number.
+            Prioritize sampled source file names. Treat currentTitle, seriesTitle, and seasonNumber only as weak hints because they may be wrong.
+            Use sampled episode numbers and folder-like title clues to identify one target TV season.
+            Do not assume Part 1, Part 2, cour, half-season, final part, or release-part wording means multiple TMDB seasons. Many releases split one TMDB season into parts.
+            The title must match TMDB original_name semantics: the series' official original name stored by TMDB, not a translated/localized/marketing alias.
+            If the original language title is Japanese, Korean, Chinese, Spanish, French, German, or another non-English title, return that original spelling/script, not the English/international title.
+            Romanized/transliterated series names are aliases unless TMDB original_name itself is romanized. If a romanized alias confidently identifies the native-script official original_name, return the native-script original_name; otherwise return an empty title.
+            Return an English series title only when TMDB original_name itself is English. If you only know an English/international/localized alias for a non-English-original series, return an empty title instead of guessing.
+            Never return TMDB ids. The app will search TMDB locally from the returned title.
+            Special/SP/OVA/OAD/special episode/theatrical wording is not an automatic skip for a TV Season target. Return a season only when sampled rows safely represent one TV season; otherwise return an empty title or null seasonNumber.
+            Return JSON only:
+            {"title":"TMDB original_name-style tv series search title","year":null,"seasonNumber":1}
+            Use null for year unless a first-air year is clearly useful for search.
+            Use null for seasonNumber only when it cannot be inferred safely.
+            """,
+            context,
+            fallbackSuggestion,
+            AiRequestOptions.CorrectionPro,
             cancellationToken);
     }
 
@@ -314,6 +587,7 @@ public sealed class AiClassificationService : IAiClassificationService
         string instruction,
         string context,
         AiSearchSuggestion fallbackSuggestion,
+        AiRequestOptions options,
         CancellationToken cancellationToken)
     {
         try
@@ -321,6 +595,7 @@ public sealed class AiClassificationService : IAiClassificationService
             var text = await _aiService.GenerateTextAsync(
                 instruction,
                 context,
+                options,
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(text))
@@ -352,9 +627,18 @@ public sealed class AiClassificationService : IAiClassificationService
                 FallbackSuggestion = fallbackSuggestion
             };
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+            return new AiSearchSuggestionResult
+            {
+                Status = AiSearchSuggestionStatus.Failed,
+                FallbackSuggestion = fallbackSuggestion,
+                Message = "AI 请求超时，请稍后重试。"
+            };
         }
         catch (Exception exception)
         {
@@ -587,6 +871,8 @@ public sealed class AiClassificationService : IAiClassificationService
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
     }
+
+    private sealed record MovieClassificationOutcome(string Status, string Reason);
 
     private sealed class SearchSuggestionMovieContext
     {

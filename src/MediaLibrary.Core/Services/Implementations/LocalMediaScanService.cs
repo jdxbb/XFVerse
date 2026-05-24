@@ -948,25 +948,23 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        foreach (var movieId in movieIds)
-        {
-            var needsClassification = await dbContext.Movies
-                .AsNoTracking()
-                .AnyAsync(
-                    x => x.Id == movieId
-                         && x.TmdbId.HasValue
-                         && (x.IdentificationStatus == IdentificationStatus.Matched
-                             || x.IdentificationStatus == IdentificationStatus.ManualConfirmed)
-                         && (string.IsNullOrWhiteSpace(x.AiTagsText)
-                             || string.IsNullOrWhiteSpace(x.EmotionTagsText)
-                             || string.IsNullOrWhiteSpace(x.SceneTagsText)),
-                    cancellationToken);
+        var needsClassificationMovieIds = await dbContext.Movies
+            .AsNoTracking()
+            .Where(
+                x => movieIds.Contains(x.Id)
+                     && x.TmdbId.HasValue
+                     && (x.IdentificationStatus == IdentificationStatus.Matched
+                         || x.IdentificationStatus == IdentificationStatus.ManualConfirmed)
+                     && (string.IsNullOrWhiteSpace(x.AiTagsText)
+                         || string.IsNullOrWhiteSpace(x.EmotionTagsText)
+                         || string.IsNullOrWhiteSpace(x.SceneTagsText)))
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
 
-            if (needsClassification)
-            {
-                await _aiClassificationService.ClassifyMovieAsync(movieId, cancellationToken);
-            }
-        }
+        await _aiClassificationService.ClassifyMoviesAsync(
+            needsClassificationMovieIds,
+            "local",
+            cancellationToken);
     }
 
     private void QueueMovieClassification(IReadOnlyCollection<int> mediaFileIds)

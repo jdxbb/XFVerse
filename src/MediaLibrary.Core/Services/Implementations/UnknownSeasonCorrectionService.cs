@@ -50,7 +50,7 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
             throw new ArgumentOutOfRangeException(nameof(targetSeriesTmdbId));
         }
 
-        if (targetSeasonNumber <= 0)
+        if (targetSeasonNumber < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(targetSeasonNumber));
         }
@@ -65,10 +65,14 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
                     cancellationToken: cancellationToken)
                 ?? throw new InvalidOperationException("Unable to load target TV series details.");
             var seasonDetails = await _tmdbService.GetTvSeasonDetailsAsync(
-                    targetSeriesTmdbId,
-                    targetSeasonNumber,
-                    cancellationToken: cancellationToken)
-                ?? throw new InvalidOperationException("Unable to load target TV season details.");
+                targetSeriesTmdbId,
+                targetSeasonNumber,
+                cancellationToken: cancellationToken);
+            if (seasonDetails is null)
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=season-correction-local-season-fallback sourceSeasonId={sourceSeasonId} targetSeriesTmdbId={targetSeriesTmdbId} targetSeasonNumber={targetSeasonNumber} reason=\"target-season-detail-unavailable\"");
+            }
 
             await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -114,16 +118,20 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
             var targetSeason = await UpsertTargetSeasonAsync(
                 dbContext,
                 targetSeries,
+                seriesDetails,
+                targetSeasonNumber,
                 seasonDetails,
                 now,
                 cancellationToken);
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            var targetMetadataByEpisodeNumber = seasonDetails.Episodes
-                .Where(x => x.EpisodeNumber > 0)
-                .GroupBy(x => x.EpisodeNumber)
-                .ToDictionary(x => x.Key, x => x.OrderByDescending(y => y.TmdbId).First());
+            var targetMetadataByEpisodeNumber = seasonDetails is null
+                ? new Dictionary<int, TmdbTvEpisodeMetadataItem>()
+                : seasonDetails.Episodes
+                    .Where(x => x.EpisodeNumber > 0)
+                    .GroupBy(x => x.EpisodeNumber)
+                    .ToDictionary(x => x.Key, x => x.OrderByDescending(y => y.TmdbId).First());
             var moveResult = await MoveSourcesToTargetSeasonAsync(
                 dbContext,
                 targetSeason,
@@ -147,7 +155,7 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
             await transaction.CommitAsync(cancellationToken);
 
             ScanIdentificationDiagnostics.Write(
-                $"event=season-correction-apply-succeeded sourceSeasonId={sourceSeasonId} sourceSeasonKind={sourceSeasonKind} targetKind=recognized targetSeriesId={targetSeries.Id} targetSeasonId={targetSeason.Id} movedSourceCount={sourceRows.Count} createdEpisodeCount={moveResult.CreatedEpisodeCount} appendedSourceCount={moveResult.AppendedSourceCount} remappedSourceCount={remappedSourceCount} oldDefaultFallback={moveResult.OldDefaultFallback.ToString().ToLowerInvariant()} sourceContainerHidden={oldContainerHidden.ToString().ToLowerInvariant()} sourceContainerPreserved={(!oldContainerHidden).ToString().ToLowerInvariant()}");
+                $"event=season-correction-apply-succeeded sourceSeasonId={sourceSeasonId} sourceSeasonKind={sourceSeasonKind} targetKind=recognized targetSeriesId={targetSeries.Id} targetSeasonId={targetSeason.Id} targetLocalSeasonFallback={(seasonDetails is null).ToString().ToLowerInvariant()} movedSourceCount={sourceRows.Count} createdEpisodeCount={moveResult.CreatedEpisodeCount} appendedSourceCount={moveResult.AppendedSourceCount} remappedSourceCount={remappedSourceCount} oldDefaultFallback={moveResult.OldDefaultFallback.ToString().ToLowerInvariant()} sourceContainerHidden={oldContainerHidden.ToString().ToLowerInvariant()} sourceContainerPreserved={(!oldContainerHidden).ToString().ToLowerInvariant()}");
 
             return new UnknownSeasonCorrectionApplyResult
             {
@@ -525,7 +533,9 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
     private static async Task<TvSeason> UpsertTargetSeasonAsync(
         AppDbContext dbContext,
         TvSeries series,
-        TmdbTvSeasonDetailResult detail,
+        TmdbTvSeriesDetailResult seriesDetails,
+        int seasonNumber,
+        TmdbTvSeasonDetailResult? detail,
         DateTime now,
         CancellationToken cancellationToken)
     {
@@ -534,7 +544,7 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
         {
             season = await dbContext.TvSeasons
                 .FirstOrDefaultAsync(
-                    x => x.TvSeriesId == series.Id && x.SeasonNumber == detail.SeasonNumber,
+                    x => x.TvSeriesId == series.Id && x.SeasonNumber == seasonNumber,
                     cancellationToken);
         }
 
@@ -543,20 +553,23 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
             season = new TvSeason
             {
                 Series = series,
-                SeasonNumber = detail.SeasonNumber,
+                SeasonNumber = seasonNumber,
                 CreatedAt = now
             };
             dbContext.TvSeasons.Add(season);
         }
 
-        season.TmdbSeasonId = PositiveOrNull(detail.TmdbId);
+        var summary = seriesDetails.Seasons.FirstOrDefault(x => x.SeasonNumber == seasonNumber);
+        season.TmdbSeasonId = PositiveOrNull(detail?.TmdbId) ?? PositiveOrNull(summary?.TmdbId);
         season.Name = TruncateRequired(
-            FirstNonEmpty(detail.Name, detail.SeasonNumber == 0 ? "Specials" : $"Season {detail.SeasonNumber}"),
+            FirstNonEmpty(detail?.Name, summary?.Name, seasonNumber == 0 ? "Specials" : $"Season {seasonNumber}"),
             300);
-        season.Overview = Truncate(detail.Overview, 5000);
-        season.PosterRemoteUrl = EmptyToNull(detail.PosterRemoteUrl);
-        season.AirDate = ParseDate(detail.AirDate);
-        season.TmdbEpisodeCount = detail.EpisodeCount;
+        season.Overview = Truncate(FirstNonEmpty(detail?.Overview, summary?.Overview), 5000);
+        season.PosterRemoteUrl = EmptyToNull(FirstNonEmpty(detail?.PosterRemoteUrl, summary?.PosterRemoteUrl));
+        season.AirDate = ParseDate(FirstNonEmpty(detail?.AirDate, summary?.AirDate));
+        season.TmdbEpisodeCount = detail?.EpisodeCount > 0
+            ? detail.EpisodeCount
+            : summary?.EpisodeCount;
         season.IdentifiedConfidence = 1d;
         season.IdentificationStatus = IdentificationStatus.ManualConfirmed;
         season.UpdatedAt = now;

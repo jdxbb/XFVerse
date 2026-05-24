@@ -653,3 +653,156 @@
 - Unknown TV Season detail can now move an entire failed / no-TMDB Season into a recognized TMDB Series / Season.
 - This path only moves TV Episode sources already inside the unknown Season and does not change Movie discovery ranking, search, recommendations, Watch Insights, Movie metadata matching, Movie source correction, schema, or migrations.
 - The operation preserves physical local / WebDAV files, probe fields, subtitle bindings, and Movie / TV user states; no Movie source is moved unless it was already part of the unknown TV Season.
+
+# Phase 4.13e Batch AI Correction Cross-impact
+
+- Media-library batch AI can now move selected Movie / failed Movie placeholder sources through the same single-source correction service used by Movie detail.
+- AI can choose Movie or TV Episode for single-source units, but no-source Movies are skipped and no metadata-only correction is performed.
+- Movie targets still use TMDB Movie search / apply; TV targets use TV Episode correction and remain outside Watch Insights / AI recommendation inputs.
+- The batch path does not change Movie discovery ranking, search card status, recommendation inputs, Movie fallback thresholds, scan identification rules, schema, or migrations.
+- SP / OVA / OAD / special / theatrical content is not hard-skipped by local token filters; AI can classify it as Movie or supported TV when confident, while unsupported special mapping remains a later manual special-mapping concern.
+
+# Phase 4.13e Follow-up Source-path Weighted AI Context
+
+- Movie detail and batch single-source AI correction now pass a sanitized playback source path hint together with the file name.
+- AI prompts treat the current Movie / TV title and existing Season / Episode metadata as weak hints during correction, while prioritizing source path hints and file names.
+- Season-level batch AI samples up to 18 source rows evenly across the Season, covering low, middle, and high Episode numbers when available.
+- Batch AI correction now allows up to 3 concurrent AI unit requests; database apply remains serialized to avoid concurrent SQLite write conflicts.
+- Batch AI no longer hard-skips locally based on special-content tokens in source file names or folders, avoiding false skips before AI can classify the item.
+- Batch AI disables batch controls, exits selection mode as soon as the operation starts, and refreshes back to the normal media-library projection before AI requests run. This keeps the UI behavior aligned with clicking the batch "Done" action first, after selected rows are snapshotted.
+- Movie and TV correction AI prompts now require TMDB `original_title` / `original_name` semantics: the official original title/name. This can still be English when the official original title/name is English; translated/localized/marketing aliases are not accepted as substitutes.
+- Batch AI result logs now include sanitized returned Movie / TV title fields so title compliance with TMDB original-title/original-name semantics can be audited after a run.
+- Batch AI now shows a preparation/progress message immediately after the action starts, before the first AI unit completes.
+- Batch AI no longer asks for or trusts AI-returned TMDB ids. Movie and TV corrections now use AI-returned original-title/original-name style titles only, then resolve the final TMDB id through local TMDB search.
+- Batch Movie title resolution now ranks TMDB movie candidates by local title/year confidence instead of applying the first result blindly.
+- Batch TV title fallback initially required TMDB `OriginalName` equality, but a later follow-up relaxed this local filter to improve correction hit rate while keeping the prompt-level official-name instruction.
+- Detail-page and batch TV prompts now explicitly reject English/international aliases for non-English-original TV series. Final-season wording can be used as a season-number clue only when the target TMDB season number is known confidently.
+- Batch AI no longer local-skips solely because source context mentions SP / OVA / OAD / special / theatrical wording; AI may classify those as Movie or supported TV when confident, otherwise it returns Skip.
+- Path hints are tail-only and sanitized; full local paths, full WebDAV URLs, query strings, and credentials are not sent to the prompt.
+- Movie discovery ranking, search card status, recommendation inputs, Watch Insights, scan identification rules, schema, and migrations are unchanged.
+
+# Phase 4.13e Follow-up Batch Delete / Removed Library Cleanup
+
+- Batch delete-record now dispatches by persisted `MovieId` / `SeasonId` before display-state labels, so no-source local Movies and no-source Seasons with existing records can be deleted from batch mode.
+- External no-source Movie rows without a local `MovieId` still use the existing collection-record delete path.
+- The removed-library panel no longer renders Movie rows inside expandable groups. Only TV Series groups remain collapsible and keep group-level restore / delete actions.
+- Latest batch AI log review remained read-only for prompt and recognition logic; no Movie discovery prompt, TMDB matching threshold, scan rule, schema, migration, database update, commit, or push was changed.
+
+# Phase 4.13e Follow-up AI Correction Prompt Tightening
+
+- Movie detail and batch single-source Movie correction prompts now emphasize source file / path evidence over current metadata, and prefer the specific work title from the source over collection, franchise, pack, or parent-folder names.
+- Movie AI prompts now explicitly require TMDB `original_title` semantics and tell AI not to return TMDB ids; the app continues to resolve final ids through local TMDB search and validation.
+- Romanized / transliterated Movie titles are treated as aliases unless they are the official TMDB original title.
+- This follow-up does not change Movie discovery ranking, Movie search card status, recommendation inputs, Watch Insights, scan identification rules, TMDB matching thresholds, schema, migrations, database update, commit, or push.
+
+# Phase 4.13e Follow-up Split No-source Shell Consistency
+
+- Splitting a source from a recognized TMDB Movie now preserves the old Movie record when it becomes no-source, matching single-source correction semantics.
+- Empty failed Movie placeholders can still be cleaned up when they have no sources, no history, and no retained user state.
+- This keeps "split from current Movie" and "correction moved the last source away" consistent: recognized metadata and user state are retained; real local / WebDAV files are not deleted.
+- TV Episode split already preserves Episode / Season metadata; this follow-up did not change TV cleanup or progress rules.
+
+# Phase 4.13e Follow-up Movie Scan Prompt Alignment
+
+- Movie scan / identification AI search prompt now uses the same TMDB `original_title` semantics as Movie detail and batch Movie correction prompts.
+- The scan prompt now tells AI not to return TMDB ids, not to substitute translated / localized / marketing aliases, and not to use collection, franchise, pack, or parent-folder titles when a specific work title is present in the source.
+- Movie scan AI input now sends the selected source file name plus a sanitized tail-only source path hint instead of a full local path / WebDAV URL.
+- This follow-up does not change Movie discovery ranking, Movie search card status, recommendations, Watch Insights, TMDB matching thresholds, scan binding safety gates, schema, migrations, database update, commit, or push.
+
+# Phase 4.13e Follow-up Source Language Prompt Tuning
+
+- Movie scan, Movie detail correction, and batch Movie correction prompts now clarify that source file/path text can identify the work, but the language or script used by the file name must not be treated as proof of TMDB `original_title` language.
+- English, localized, or romanized file names are explicitly allowed to point to non-English TMDB original titles; AI should return the actual TMDB `original_title` or skip when it cannot know it.
+- This is prompt-only: no alias conversion, TMDB resolver fallback, ranking threshold, schema, migration, database update, commit, or push was changed.
+
+# AI model routing cleanup
+
+- Legacy DeepSeek model names `deepseek-chat` and `deepseek-reasoner` are no longer added as defaults or selectable options; if an old saved setting still uses either name, runtime routing resolves it to `deepseek-v4-flash`.
+- Movie scan / tagging and AI recommendation requests explicitly stay on `deepseek-v4-flash` for DeepSeek endpoints with deep thinking disabled.
+- Movie detail correction AI and batch AI correction now explicitly use `deepseek-v4-pro` for DeepSeek endpoints without enabling deep thinking / high thinking.
+- Watch Profile keeps `deepseek-v4-pro` plus the existing high-thinking behavior.
+- Central AI routing diagnostics now record sanitized requested / resolved model, provider kind, request purpose, thinking mode, and override reason. No endpoint credential, API key, local path, or WebDAV URL is logged.
+- This routing cleanup does not change prompts, TMDB matching thresholds, scan binding safety gates, correction safety gates, schema, migration, database update, commit, or push.
+
+# Phase 4.13e Follow-up Batch TV Search Hit-rate Relaxation
+
+- Batch AI TV correction still asks AI to return TMDB `original_name` semantics, but no longer rejects a TMDB search result solely because the returned AI series title differs from the top result's `OriginalName`.
+- When TMDB TV search returns results, batch AI now accepts the top search result and logs whether the AI series title matched `OriginalName`.
+- Empty TMDB TV search results still skip the unit. Existing requirements for target kind, Season number, Episode number, no empty Episode creation, and correction safety gates remain unchanged.
+
+# Phase 4.13e Follow-up Detail TV Correction Candidate Grouping
+
+- Movie detail single-source correction to TV Episode now uses the same collapsible TMDB Series / Season candidate list as Episode detail.
+- Applying at the Series row keeps the manually entered Season/Episode numbers; applying at a Season row overwrites only the Season number and keeps the manually entered Episode number.
+- Detail-page TV AI assist now clears missing Season/Episode values and asks the user to enter them manually or select a Season, instead of silently reusing stale defaults.
+- This is a UI/search refinement only. Movie correction apply semantics, no-source Movie semantics, recommendation boundaries, Watch Insights, scan rules, migrations, database update, commit, and push were not changed.
+
+# Phase 4.13e Follow-up Detail TV Correction Confirmation
+
+- Movie detail and Episode detail TV Episode correction now use the same two-step interaction: choose a TMDB Series or Season target first, then click the explicit confirm button to apply.
+- Series-row selection keeps the entered Season/Episode numbers; Season-row selection fills the Season number but still lets the user edit Season/Episode before confirming.
+- Candidate clicks no longer write database changes directly.
+- This does not change Movie correction apply semantics, single-source correction safety rules, no-source Movie semantics, recommendation boundaries, Watch Insights, scan rules, migrations, database update, commit, or push.
+
+# Phase 4.13e Follow-up Detail Correction AI Timeout / No-result Handling
+
+- Detail-page AI correction requests now use a 90-second timeout for Movie, TV Episode, and TV Season correction prompts.
+- Batch AI correction now uses a 75-second timeout.
+- Scan-stage AI concurrency was checked and left unchanged: TV uncertain-range AI runs up to 3 concurrent batch requests; full-range TV AI remains disabled by default and is a single request when enabled.
+- Movie detail and Episode detail AI correction no longer use local fallback TMDB searches when AI fails or returns no usable search title. Users are prompted to enter the search term manually.
+- This does not change Movie correction apply semantics, batch AI rules, recommendation boundaries, Watch Insights, scan rules, migrations, database update, commit, or push.
+
+# Phase 4.13e Fix Batch AI Movie Confidence Scoring
+
+- Batch AI Movie target confidence now treats missing AI year or missing TMDB year as neutral `yearScore=0.70` instead of the previous stronger penalty.
+- The main Movie auto-apply threshold remains `confidence >= 0.80`.
+- Movie target resolution now rejects strong year conflicts (`AI year` and `TMDB year` both present with a gap greater than one year) with `movie-year-conflict`.
+- A conservative unique strong match can pass below the composite threshold only when top title score is at least `0.86`, the title-score margin to the next candidate is at least `0.12`, and there is no strong year conflict.
+- Movie target diagnostics now log title score, year score, confidence, top1/top2 title scores, title-score margin, `uniqueStrongMatch`, and resolution / skipped reason.
+- This does not change TV target logic, detail-page correction, prompts, recommendation boundaries, Watch Insights, scan rules, migrations, database update, commit, or push.
+
+# AI adaptive concurrency for batch AI and scan movie tags
+
+- Added a shared adaptive AI batch executor for high-volume AI request paths.
+- Initial concurrency is 5. Retryable AI request failures downgrade concurrency 5 -> 3 -> 1, and a success streak upgrades it back 1 -> 3 -> 5.
+- Retryable failures include request timeout, HTTP 429, 502, 503, 504, and transient network I/O failures. HTTP `Retry-After` is honored with a capped delay.
+- Batch AI correction now uses adaptive request concurrency for the AI target-classification request only. Local TMDB resolution and database apply still use existing safety gates, and apply remains serialized to avoid duplicate writes.
+- Scan-stage Movie recognition still does not add a new LLM call. Only the existing background Movie AI tagging queue now uses the same adaptive executor.
+- TV scan uncertain-range and full-range AI concurrency are unchanged.
+- New sanitized logs include `ai-adaptive-concurrency-started`, `ai-adaptive-concurrency-changed`, `ai-request-retry-scheduled`, `ai-request-retry-exhausted`, `batch-ai-concurrency-summary`, and `scan-movie-ai-concurrency-summary`.
+- This does not change AI prompts, Movie / TV safety gates, recommendation inputs, Watch Insights, schema, migrations, database update, commit, or push.
+
+# AI settings routing and adaptive threshold follow-up
+
+- Latest batch AI logs show the adaptive executor was active with initial concurrency 5. The checked run completed 8 AI request units successfully with no retry, no downgrade, and final concurrency 5.
+- Adaptive AI concurrency now upgrades after 3 consecutive successful requests instead of 8.
+- Settings now exposes separate model and timeout fields for detail correction, batch AI correction, scan TV uncertain range, scan TV full range, scan Movie tagging, AI recommendation, and Watch Profile.
+- The expanded routing is stored in the existing AI model setting payload for compatibility. Existing plain model-name settings are still accepted and expanded into the current defaults.
+- Runtime routing still keeps detail and batch correction on Pro by default, scan and recommendation on Flash by default, and Watch Profile on Pro with high thinking by default unless the user changes the per-purpose settings.
+- This does not change Movie / TV safety gates, AI prompts, recommendation inputs, Watch Insights semantics, schema, migrations, database update, commit, or push.
+
+# Phase 4.13e Follow-up Special Content AI Target Handling
+
+- Detail Movie correction, detail TV correction, and batch AI correction prompts now treat SP / OVA / OAD / special / theatrical wording as a decision point rather than an automatic skip.
+- Batch AI is asked to return Movie, TV Episode, or TV Season when a special-looking item can be safely represented as one of those supported targets, and to skip only when it cannot be represented safely or lacks required fields.
+- Target-kind constraints remain unchanged: Movie detail Movie correction cannot switch to TV, TV detail correction cannot switch to Movie, and batch Season units still cannot return Movie or single Episode targets.
+- This is prompt-only. No TMDB / OMDb resolver, local confidence threshold, correction apply rule, scan safety gate, schema, migration, database update, commit, or push was changed.
+
+# TMDB / OMDb External API Adaptive Throttling
+
+- TMDB HTTP requests now use a shared bottom-layer adaptive throttle in `TmdbService.SendGetAsync`.
+- TMDB maximum concurrency is now 8, with adaptive levels 8 -> 4 -> 2 -> 1. A retryable failure downgrades one level, then an 8-request stable observation window upgrades one level.
+- TMDB requests are globally rate limited to 12 requests per second at the same bottom-layer send path.
+- OMDb HTTP requests now use the same adaptive throttle in `OmdbService.SendGetAsync`, with levels 2 -> 1 -> 2 and a conservative 2 requests per second limiter.
+- Retryable external API failures include timeout / transient network errors and HTTP 429, 502, 503, and 504. HTTP 400, 401, 403, 404, empty search results, missing metadata, and local safety-gate rejects are not treated as throttle failures.
+- Retry uses finite attempts with exponential backoff, jitter, and `Retry-After` support. One logical request can only downgrade one level, so repeated retries for the same request do not immediately collapse concurrency to the minimum.
+- Business logic, TMDB / OMDb parsing, Movie / TV identification gates, AI prompts, schema, migrations, database update, commit, and push were not changed.
+
+# Phase 4.13e Follow-up Movie Confidence Origin-name Relaxation
+
+- Batch AI Movie target resolution no longer rejects a single exact-year TMDB Movie result solely because the AI returned title and the TMDB original title have low string similarity.
+- The main Movie auto-apply threshold remains `confidence >= 0.80`, and the existing unique strong-title pass remains unchanged.
+- A conservative single-result pass was added: when TMDB returns exactly one Movie result, AI year and TMDB release year are both present and equal, and there is no strong year conflict, the Movie target can apply even if the title-confidence score is below the composite threshold.
+- Strong year conflicts still skip with `movie-year-conflict`.
+- Diagnostics now include `singleExactYearResult` and resolution `movie-single-exact-year-result-applied` when this pass is used.
+- This does not change TV target logic, detail-page correction, recommendation boundaries, Watch Insights, scan rules, migrations, database update, commit, or push.

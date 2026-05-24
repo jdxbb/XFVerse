@@ -397,10 +397,34 @@
                                     Command="{Binding SelectSeasonCorrectionUnknownTargetKindCommand}"
                                     Content="{Binding SeasonCorrectionUnknownTargetButtonText}"
                                     Style="{StaticResource SecondaryButtonStyle}" />
-                            <Button Margin="0,10,0,0"
+                                                        <StackPanel Margin="0,14,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSeasonCorrectionTargetRecognized}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="目标电视剧名" />
+                                <TextBox Margin="0,6,0,0"
+                                         Text="{Binding SeasonCorrectionSearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FormTextBoxStyle}" />
+                                <TextBlock Margin="0,10,0,0" Style="{StaticResource BodyTextStyle}" Text="目标季号" />
+                                <TextBox Margin="0,6,0,0"
+                                         Text="{Binding SeasonCorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FormTextBoxStyle}" />
+                                <Button Margin="0,10,0,0"
+                                        HorizontalAlignment="Left"
+                                        Command="{Binding AiSuggestSeasonCorrectionCommand}"
+                                        Content="AI 辅助季搜索"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                            </StackPanel><Button Margin="0,10,0,0"
                                     HorizontalAlignment="Left"
                                     Command="{Binding SearchSeasonCorrectionCandidatesCommand}"
-                                    Content="选择已识别季..."
+                                    Content="搜索 TMDB 电视剧..."
                                     Style="{StaticResource SecondaryButtonStyle}" />
                             <Button Margin="0,10,0,0"
                                     HorizontalAlignment="Left"
@@ -572,13 +596,25 @@
                                                 BorderBrush="{DynamicResource BrushBorder}"
                                                 BorderThickness="1"
                                                 CornerRadius="12">
-                                            <StackPanel>
-                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding DisplayTitle}" />
-                                                <TextBlock Margin="0,5,0,0"
-                                                           Style="{StaticResource BodyMutedTextStyle}"
-                                                           Text="{Binding HeaderSubtitle}"
-                                                           TextWrapping="Wrap" />
-                                            </StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="132" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Margin="0,0,12,0">
+                                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding DisplayTitle}" />
+                                                    <TextBlock Margin="0,5,0,0"
+                                                               Style="{StaticResource BodyMutedTextStyle}"
+                                                               Text="{Binding HeaderSubtitle}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding DataContext.SelectRecognizedSeasonTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="修正到剧"
+                                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                            </Grid>
                                         </Border>
                                     </Expander.Header>
                                     <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Seasons}">
@@ -609,7 +645,7 @@
                                                                 VerticalAlignment="Center"
                                                                 Command="{Binding DataContext.SelectRecognizedSeasonTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
-                                                                Content="选择"
+                                                                Content="修正到季"
                                                                 Style="{StaticResource PrimaryButtonStyle}" />
                                                     </Grid>
                                                 </Border>

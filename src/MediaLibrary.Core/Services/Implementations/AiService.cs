@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Settings;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -46,7 +47,12 @@ public sealed class AiService : IAiService
 
         var baseUrl = settings.AiBaseUrl.TrimEnd('/');
         var isDeepSeek = IsDeepSeekEndpoint(baseUrl);
-        var model = ResolveModel(settings.AiModel, options, isDeepSeek);
+        var route = settings.AiRouting.ResolveRoute(options?.RequestKind);
+        var configuredModel = string.IsNullOrWhiteSpace(route?.Model)
+            ? settings.AiModel
+            : route!.Model;
+        var modelResolution = ResolveModel(configuredModel, settings.AiModel, options, isDeepSeek, route is not null);
+        var model = modelResolution.ResolvedModel;
         var endpoint = baseUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)
             ? baseUrl + "/chat/completions"
             : baseUrl + "/v1/chat/completions";
@@ -64,6 +70,7 @@ public sealed class AiService : IAiService
         };
 
         var thinkingEnabled = isDeepSeek && options?.ThinkingEnabled == true;
+        LogRouting(options, modelResolution, isDeepSeek, thinkingEnabled);
         if (thinkingEnabled)
         {
             payload["thinking"] = new { type = "enabled" };
@@ -79,9 +86,15 @@ public sealed class AiService : IAiService
 
         request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(options?.Timeout ?? DefaultTimeout);
+        timeoutCts.CancelAfter(ResolveTimeout(route, options));
         using var response = await HttpClient.SendAsync(request, timeoutCts.Token);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new AiRequestException(
+                response.StatusCode,
+                response.ReasonPhrase,
+                ResolveRetryAfter(response));
+        }
 
         await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeoutCts.Token);
@@ -92,30 +105,127 @@ public sealed class AiService : IAiService
             .GetString();
     }
 
-    private static string ResolveModel(string configuredModel, AiRequestOptions? options, bool isDeepSeek)
+    private static ModelResolution ResolveModel(
+        string configuredModel,
+        string defaultModel,
+        AiRequestOptions? options,
+        bool isDeepSeek,
+        bool hasConfiguredRoute)
     {
+        var model = configuredModel.Trim();
+        if (hasConfiguredRoute)
+        {
+            var resolved = isDeepSeek ? NormalizeDeepSeekLegacyModel(model) : model;
+            var reason = isDeepSeek && IsDeepSeekLegacyModel(model)
+                ? "legacy-model-migrated-to-flash"
+                : FirstNonEmpty(options?.OverrideReason, "configured-route-model");
+            return new ModelResolution(defaultModel.Trim(), resolved, reason);
+        }
+
         if (isDeepSeek && !string.IsNullOrWhiteSpace(options?.DeepSeekModelOverride))
         {
-            return options.DeepSeekModelOverride.Trim();
+            return new ModelResolution(
+                model,
+                NormalizeDeepSeekLegacyModel(options.DeepSeekModelOverride.Trim()),
+                FirstNonEmpty(options.OverrideReason, "deepseek-model-override"));
         }
 
-        var model = configuredModel.Trim();
         if (!isDeepSeek)
         {
-            return model;
+            return new ModelResolution(model, model, "configured-model");
         }
 
-        return model switch
+        return IsDeepSeekLegacyModel(model)
+            ? new ModelResolution(model, "deepseek-v4-flash", "legacy-model-migrated-to-flash")
+            : new ModelResolution(model, model, "configured-model");
+    }
+
+    private static TimeSpan ResolveTimeout(AiModelRoutingSettings.AiModelRoute? route, AiRequestOptions? options)
+    {
+        if (route?.TimeoutSeconds is > 0)
         {
-            "deepseek-chat" => "deepseek-v4-flash",
-            "deepseek-reasoner" => "deepseek-v4-flash",
-            _ => model
-        };
+            return TimeSpan.FromSeconds(route.TimeoutSeconds);
+        }
+
+        return options?.Timeout ?? DefaultTimeout;
+    }
+
+    private static bool IsDeepSeekLegacyModel(string model)
+    {
+        return string.Equals(model, "deepseek-chat", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(model, "deepseek-reasoner", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeDeepSeekLegacyModel(string model)
+    {
+        return IsDeepSeekLegacyModel(model) ? "deepseek-v4-flash" : model;
+    }
+
+    private static void LogRouting(
+        AiRequestOptions? options,
+        ModelResolution modelResolution,
+        bool isDeepSeek,
+        bool thinkingEnabled)
+    {
+        var provider = isDeepSeek ? "deepseek" : "custom";
+        var purpose = FirstNonEmpty(options?.RequestKind, "default");
+        var reasoningMode = thinkingEnabled
+            ? FirstNonEmpty(options?.ReasoningEffort, "default")
+            : "off";
+        AiPerfDiagnostics.WriteEvent(
+            $"event=ai-model-routing provider={FormatLogValue(provider)} purpose={FormatLogValue(purpose)} requestedModel={FormatLogValue(modelResolution.RequestedModel)} resolvedModel={FormatLogValue(modelResolution.ResolvedModel)} thinkingEnabled={thinkingEnabled.ToString().ToLowerInvariant()} reasoningMode={FormatLogValue(reasoningMode)} overrideReason={FormatLogValue(modelResolution.OverrideReason)}");
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static string FormatLogValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "\"\"";
+        }
+
+        return "\"" + value.Trim().Replace("\\", "\\\\").Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
     }
 
     private static bool IsDeepSeekEndpoint(string baseUrl)
     {
         return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
-               && uri.Host.Contains("deepseek", StringComparison.OrdinalIgnoreCase);
+            && uri.Host.Contains("deepseek", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static TimeSpan? ResolveRetryAfter(HttpResponseMessage response)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        if (retryAfter is null)
+        {
+            return null;
+        }
+
+        if (retryAfter.Delta.HasValue)
+        {
+            return retryAfter.Delta.Value;
+        }
+
+        if (retryAfter.Date.HasValue)
+        {
+            var delay = retryAfter.Date.Value - DateTimeOffset.UtcNow;
+            return delay > TimeSpan.Zero ? delay : null;
+        }
+
+        return null;
+    }
+
+    private sealed record ModelResolution(string RequestedModel, string ResolvedModel, string OverrideReason);
 }

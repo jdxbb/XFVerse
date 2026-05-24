@@ -256,10 +256,13 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         try
         {
             var response = await _aiService.GenerateTextAsync(
-                "You review uncertain TV scan directory ranges. Return JSON hints only. Never return episodeFiles.",
+                "You review uncertain TV scan directory ranges. Return JSON hints only. Use TMDB original_name semantics for title hints, never aliases or TMDB ids. Never return episodeFiles.",
                 batch.Prompt,
                 new AiRequestOptions
                 {
+                    DeepSeekModelOverride = "deepseek-v4-flash",
+                    RequestKind = "tv-scan-uncertain-range",
+                    OverrideReason = "scan-ai-flash",
                     Temperature = 0.1,
                     Timeout = AiOnUncertainTimeout
                 },
@@ -841,10 +844,13 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         try
         {
             var response = await _aiService.GenerateTextAsync(
-                "You identify likely TV-series path ranges from a sanitized media tree. Return JSON only.",
+                "You identify likely TV-series path ranges from a sanitized media tree. Return JSON only. Use TMDB original_name semantics for title hints and never return TMDB ids.",
                 prompt,
                 new AiRequestOptions
                 {
+                    DeepSeekModelOverride = "deepseek-v4-flash",
+                    RequestKind = "tv-scan-full-range",
+                    OverrideReason = "scan-ai-flash",
                     Temperature = 0.1,
                     Timeout = AiRangeTimeout
                 },
@@ -1043,12 +1049,17 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         builder.AppendLine("Input is sanitized. Review only the listed uncertain ranges, not a full media tree.");
         builder.AppendLine("These ranges are already uncertain. Your task is not to decide whether the app can auto-write metadata; your task is to provide the best title hints for a local TMDB TV search.");
         builder.AppendLine("Return strict JSON: {\"ranges\":[{\"inputRangeId\":\"r001\",\"originalLanguageTitle\":\"original-language title or null\",\"englishTitleHint\":\"English/international title or null\",\"localizedTitleHint\":\"Chinese/localized title or null\",\"searchTitle\":\"best TMDB search title, usually identical to originalLanguageTitle\",\"refinedSeriesTitle\":\"legacy fallback title or null\",\"seriesYearHint\":2023,\"seasonYearHint\":2024,\"seasonNumberHint\":1,\"confidence\":\"high|medium|low\",\"needsReview\":false,\"evidence\":[\"original-title-from-filename\"]}]}");
-        builder.AppendLine("originalLanguageTitle is the primary output and must be the official native/original title, not a translated, localized, international, romanized, or English marketing title.");
-        builder.AppendLine("For Korean series, originalLanguageTitle must be Hangul when known. For Japanese series, use Japanese Kanji/Kana when known. For Chinese series, use Chinese characters when known. For Spanish, French, German, and other Latin-script original languages, use the actual original local-language title, not an English translation.");
-        builder.AppendLine("Never copy englishTitleHint into originalLanguageTitle unless the series original language is English. If the only title you know is English/international but the range appears to be non-English, set originalLanguageTitle to null and put that value only in englishTitleHint.");
+        builder.AppendLine("originalLanguageTitle is the primary output and must follow TMDB original_name semantics: the series' official original name, not a translated, localized, international, romanized, or marketing alias.");
+        builder.AppendLine("The official original name may itself be English even when the series is Korean, Japanese, Chinese, Spanish, French, German, or another non-English-region work; in that case originalLanguageTitle should be that official English original name.");
+        builder.AppendLine("Use file and folder names to identify the work, but never use the language or script of a file/folder name to decide the TMDB original_name language or spelling.");
+        builder.AppendLine("English, localized, or romanized file/folder names can still belong to a non-English TMDB original name.");
+        builder.AppendLine("Never copy englishTitleHint into originalLanguageTitle unless it is the official original name. If the only title you know is an English/international alias but not the official original name, set originalLanguageTitle to null and put that value only in englishTitleHint.");
+        builder.AppendLine("Romanized/transliterated names are aliases unless they are the official TMDB original_name. If a romanized alias confidently identifies a native-script official original_name, use the native-script name; otherwise leave originalLanguageTitle and searchTitle null.");
         builder.AppendLine("searchTitle must prefer originalLanguageTitle. For non-English series, do not set searchTitle to an English/international title when originalLanguageTitle is unknown; leave searchTitle null instead.");
         builder.AppendLine("If you can provide a title hint, return it even when uncertain and express uncertainty with confidence. Do not set needsReview=true only because the input says candidate-conflict, unresolved, dirty-query, or low-confidence.");
+        builder.AppendLine("Do not set needsReview=true only because the official original name is non-English or uses a non-Latin script.");
         builder.AppendLine("Use needsReview=true only when you cannot provide any credible single title, the range does not look like a TV series, or multiple different series are mixed and cannot be reduced to one title.");
+        builder.AppendLine("Do not mark a range as special/OVA only because it contains final/chapter/part wording. Treat those words as possible season-number clues when ordinary episode numbering supports a regular TV season.");
         builder.AppendLine("Only return directory/title/season hints for TV lookup. Do not return episodeFiles. Do not map individual files to season or episode numbers. Do not request TMDB. Do not choose a TMDB candidate. Do not force guesses.");
         builder.AppendLine("Evidence must be short values such as original-title-from-filename, localized-title-from-folder, english-title-from-file, season-folder, numeric-episodes, conflict.");
         builder.AppendLine("Ranges:");
@@ -1430,6 +1441,8 @@ public sealed partial class TvScanDirectoryAnalysisService : ITvScanDirectoryAna
         builder.AppendLine("Input is sanitized. Do not infer exact private paths.");
         builder.AppendLine("Return strict JSON: {\"tvRanges\":[{\"seriesFolder\":\"/path\",\"seriesTitleHint\":\"title\",\"confidence\":\"high|medium|low\",\"evidence\":[\"season-folders\"],\"seasonFolders\":[{\"path\":\"/path\",\"seasonNumberHint\":1}]}]}");
         builder.AppendLine("Only identify directory ranges that look like TV series. Do not classify movies. Do not return episodeFiles. Do not map files to episode numbers.");
+        builder.AppendLine("seriesTitleHint should follow TMDB original_name semantics when a title is returned. Do not use translated, localized, international, or romanized aliases unless that alias is the official original name.");
+        builder.AppendLine("Use file and folder names to identify the work, but do not infer original_name language or spelling from the language or script used by those files/folders.");
         builder.AppendLine("Do not write natural-language reasons. Use short evidence values only: season-folders, episode-like-files, sequential-files, numeric-files, title-folder.");
         builder.AppendLine("Use high or medium only when directory paths clearly form a series/season/episode structure. Use low for weak guesses.");
         builder.AppendLine("Directories:");

@@ -38,6 +38,20 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _aiBaseUrl = string.Empty;
     private string _aiApiKey = string.Empty;
     private string _aiModel = string.Empty;
+    private string _aiDetailCorrectionModel = "deepseek-v4-pro";
+    private string _aiDetailCorrectionTimeoutSeconds = "90";
+    private string _aiBatchCorrectionModel = "deepseek-v4-pro";
+    private string _aiBatchCorrectionTimeoutSeconds = "75";
+    private string _aiScanTvUncertainRangeModel = "deepseek-v4-flash";
+    private string _aiScanTvUncertainRangeTimeoutSeconds = "300";
+    private string _aiScanTvFullRangeModel = "deepseek-v4-flash";
+    private string _aiScanTvFullRangeTimeoutSeconds = "18";
+    private string _aiScanMovieTaggingModel = "deepseek-v4-flash";
+    private string _aiScanMovieTaggingTimeoutSeconds = "45";
+    private string _aiRecommendationModel = "deepseek-v4-flash";
+    private string _aiRecommendationTimeoutSeconds = "90";
+    private string _aiWatchProfileModel = "deepseek-v4-pro";
+    private string _aiWatchProfileTimeoutSeconds = "180";
     private string _selectedThemeMode = "Light";
     private string _connectionStatusMessage = "请先保存 WebDAV 连接配置。";
     private string _scanPathStatusMessage = "当前还没有扫描路径。";
@@ -173,6 +187,34 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public string AiModel { get => _aiModel; set => SetProperty(ref _aiModel, value); }
 
+    public string AiDetailCorrectionModel { get => _aiDetailCorrectionModel; set => SetProperty(ref _aiDetailCorrectionModel, value); }
+
+    public string AiDetailCorrectionTimeoutSeconds { get => _aiDetailCorrectionTimeoutSeconds; set => SetProperty(ref _aiDetailCorrectionTimeoutSeconds, value); }
+
+    public string AiBatchCorrectionModel { get => _aiBatchCorrectionModel; set => SetProperty(ref _aiBatchCorrectionModel, value); }
+
+    public string AiBatchCorrectionTimeoutSeconds { get => _aiBatchCorrectionTimeoutSeconds; set => SetProperty(ref _aiBatchCorrectionTimeoutSeconds, value); }
+
+    public string AiScanTvUncertainRangeModel { get => _aiScanTvUncertainRangeModel; set => SetProperty(ref _aiScanTvUncertainRangeModel, value); }
+
+    public string AiScanTvUncertainRangeTimeoutSeconds { get => _aiScanTvUncertainRangeTimeoutSeconds; set => SetProperty(ref _aiScanTvUncertainRangeTimeoutSeconds, value); }
+
+    public string AiScanTvFullRangeModel { get => _aiScanTvFullRangeModel; set => SetProperty(ref _aiScanTvFullRangeModel, value); }
+
+    public string AiScanTvFullRangeTimeoutSeconds { get => _aiScanTvFullRangeTimeoutSeconds; set => SetProperty(ref _aiScanTvFullRangeTimeoutSeconds, value); }
+
+    public string AiScanMovieTaggingModel { get => _aiScanMovieTaggingModel; set => SetProperty(ref _aiScanMovieTaggingModel, value); }
+
+    public string AiScanMovieTaggingTimeoutSeconds { get => _aiScanMovieTaggingTimeoutSeconds; set => SetProperty(ref _aiScanMovieTaggingTimeoutSeconds, value); }
+
+    public string AiRecommendationModel { get => _aiRecommendationModel; set => SetProperty(ref _aiRecommendationModel, value); }
+
+    public string AiRecommendationTimeoutSeconds { get => _aiRecommendationTimeoutSeconds; set => SetProperty(ref _aiRecommendationTimeoutSeconds, value); }
+
+    public string AiWatchProfileModel { get => _aiWatchProfileModel; set => SetProperty(ref _aiWatchProfileModel, value); }
+
+    public string AiWatchProfileTimeoutSeconds { get => _aiWatchProfileTimeoutSeconds; set => SetProperty(ref _aiWatchProfileTimeoutSeconds, value); }
+
     public string SelectedThemeMode { get => _selectedThemeMode; set => SetProperty(ref _selectedThemeMode, value); }
 
     public string ConnectionStatusMessage { get => _connectionStatusMessage; set => SetProperty(ref _connectionStatusMessage, value); }
@@ -296,12 +338,80 @@ public sealed class SettingsViewModel : PageViewModelBase
         OmdbApiKey = applicationSetting.OmdbApiKey;
         AiBaseUrl = applicationSetting.AiBaseUrl;
         AiApiKey = applicationSetting.AiApiKey;
-        AiModel = applicationSetting.AiModel;
+        ApplyAiRouting(applicationSetting.AiRouting ?? AiModelRoutingSettings.FromStoredValue(applicationSetting.AiModel));
         SelectedThemeMode = string.IsNullOrWhiteSpace(applicationSetting.ThemeMode) ? "Light" : applicationSetting.ThemeMode;
         TmdbStatusMessage = "已加载 TMDB 配置。";
         OmdbStatusMessage = "已加载 OMDb 配置。";
         ApiStatusMessage = "已加载大模型配置。";
         ThemeStatusMessage = $"当前主题：{SelectedThemeMode}";
+    }
+
+    private void ApplyAiRouting(AiModelRoutingSettings routing)
+    {
+        AiModel = routing.DefaultModel;
+        AiDetailCorrectionModel = routing.SingleSourceCorrection.Model;
+        AiDetailCorrectionTimeoutSeconds = routing.SingleSourceCorrection.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        AiBatchCorrectionModel = routing.BatchCorrection.Model;
+        AiBatchCorrectionTimeoutSeconds = routing.BatchCorrection.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        AiScanTvUncertainRangeModel = routing.ScanTvUncertainRange.Model;
+        AiScanTvUncertainRangeTimeoutSeconds = routing.ScanTvUncertainRange.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        AiScanTvFullRangeModel = routing.ScanTvFullRange.Model;
+        AiScanTvFullRangeTimeoutSeconds = routing.ScanTvFullRange.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        AiScanMovieTaggingModel = routing.ScanMovieTagging.Model;
+        AiScanMovieTaggingTimeoutSeconds = routing.ScanMovieTagging.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        AiRecommendationModel = routing.Recommendation.Model;
+        AiRecommendationTimeoutSeconds = routing.Recommendation.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        AiWatchProfileModel = routing.WatchProfile.Model;
+        AiWatchProfileTimeoutSeconds = routing.WatchProfile.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private AiModelRoutingSettings BuildAiRoutingFromInputs()
+    {
+        return new AiModelRoutingSettings
+        {
+            DefaultModel = RequireModel(AiModel, "默认模型"),
+            SingleSourceCorrection = new AiModelRoutingSettings.AiModelRoute(
+                RequireModel(AiDetailCorrectionModel, "详情页 AI 修正模型"),
+                ParsePositiveSeconds(AiDetailCorrectionTimeoutSeconds, "详情页 AI 修正超时")),
+            BatchCorrection = new AiModelRoutingSettings.AiModelRoute(
+                RequireModel(AiBatchCorrectionModel, "批量 AI 识别模型"),
+                ParsePositiveSeconds(AiBatchCorrectionTimeoutSeconds, "批量 AI 识别超时")),
+            ScanTvUncertainRange = new AiModelRoutingSettings.AiModelRoute(
+                RequireModel(AiScanTvUncertainRangeModel, "扫描 TV 不确定范围模型"),
+                ParsePositiveSeconds(AiScanTvUncertainRangeTimeoutSeconds, "扫描 TV 不确定范围超时")),
+            ScanTvFullRange = new AiModelRoutingSettings.AiModelRoute(
+                RequireModel(AiScanTvFullRangeModel, "扫描 TV 全量范围模型"),
+                ParsePositiveSeconds(AiScanTvFullRangeTimeoutSeconds, "扫描 TV 全量范围超时")),
+            ScanMovieTagging = new AiModelRoutingSettings.AiModelRoute(
+                RequireModel(AiScanMovieTaggingModel, "扫描电影标签模型"),
+                ParsePositiveSeconds(AiScanMovieTaggingTimeoutSeconds, "扫描电影标签超时")),
+            Recommendation = new AiModelRoutingSettings.AiModelRoute(
+                RequireModel(AiRecommendationModel, "AI 推荐模型"),
+                ParsePositiveSeconds(AiRecommendationTimeoutSeconds, "AI 推荐超时")),
+            WatchProfile = new AiModelRoutingSettings.AiModelRoute(
+                RequireModel(AiWatchProfileModel, "观影画像模型"),
+                ParsePositiveSeconds(AiWatchProfileTimeoutSeconds, "观影画像超时"))
+        };
+    }
+
+    private static string RequireModel(string value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"{label}不能为空。");
+        }
+
+        return value.Trim();
+    }
+
+    private static int ParsePositiveSeconds(string value, string label)
+    {
+        if (!int.TryParse(value?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) || seconds <= 0)
+        {
+            throw new InvalidOperationException($"{label}必须是正整数秒数。");
+        }
+
+        return seconds;
     }
 
     private async Task SaveConnectionAsync()
@@ -551,6 +661,7 @@ public sealed class SettingsViewModel : PageViewModelBase
                 settings.AiBaseUrl = AiBaseUrl;
                 settings.AiApiKey = AiApiKey;
                 settings.AiModel = AiModel;
+                settings.AiRouting = BuildAiRoutingFromInputs();
             });
         }
         catch (Exception exception)
@@ -581,6 +692,7 @@ public sealed class SettingsViewModel : PageViewModelBase
             AiBaseUrl = settings.AiBaseUrl,
             AiApiKey = settings.AiApiKey,
             AiModel = settings.AiModel,
+            AiRouting = settings.AiRouting.Clone(),
             RecentAiRecommendationsJson = settings.RecentAiRecommendationsJson,
             CurrentAiRecommendationsJson = settings.CurrentAiRecommendationsJson,
             AiRecommendationLibraryFingerprint = settings.AiRecommendationLibraryFingerprint,

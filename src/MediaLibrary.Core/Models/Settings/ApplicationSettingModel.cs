@@ -18,6 +18,8 @@ public sealed class ApplicationSettingModel
 
     public string AiModel { get; set; } = string.Empty;
 
+    public AiModelRoutingSettings AiRouting { get; set; } = AiModelRoutingSettings.CreateDefault();
+
     public string RecentAiRecommendationsJson { get; set; } = string.Empty;
 
     public string CurrentAiRecommendationsJson { get; set; } = string.Empty;

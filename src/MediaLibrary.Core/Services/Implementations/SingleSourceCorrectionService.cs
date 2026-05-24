@@ -131,9 +131,17 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
             ?? throw new InvalidOperationException("待修正的播放源不存在。");
         var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(seriesTmdbId, cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("无法读取 TMDB 电视剧详情。");
-        var seasonDetails = await _tmdbService.GetTvSeasonDetailsAsync(seriesTmdbId, seasonNumber, cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("无法读取 TMDB 电视剧季详情。");
-        var episodeMetadata = seasonDetails.Episodes.FirstOrDefault(x => x.EpisodeNumber == episodeNumber);
+        var seasonDetails = await _tmdbService.GetTvSeasonDetailsAsync(
+            seriesTmdbId,
+            seasonNumber,
+            cancellationToken: cancellationToken);
+        if (seasonDetails is null)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=correction-preview-local-season-fallback mediaFileId={mediaFileId} seriesTmdbId={seriesTmdbId} season={seasonNumber} reason=\"target-season-detail-unavailable\"");
+        }
+
+        var episodeMetadata = seasonDetails?.Episodes.FirstOrDefault(x => x.EpisodeNumber == episodeNumber);
 
         var existingEpisode = await dbContext.TvEpisodes
             .AsNoTracking()
@@ -671,7 +679,7 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
     private static SingleSourceCorrectionPreview BuildTvEpisodePreview(
         MediaFile mediaFile,
         TmdbTvSeriesDetailResult seriesDetails,
-        TmdbTvSeasonDetailResult seasonDetails,
+        TmdbTvSeasonDetailResult? seasonDetails,
         TmdbTvEpisodeMetadataItem? episodeMetadata,
         int seasonNumber,
         int episodeNumber,
@@ -682,8 +690,8 @@ public sealed class SingleSourceCorrectionService : ISingleSourceCorrectionServi
         var episodeTitle = string.IsNullOrWhiteSpace(episodeMetadata?.Name)
             ? $"第 {episodeNumber} 集"
             : episodeMetadata.Name.Trim();
-        var seasonTitle = string.IsNullOrWhiteSpace(seasonDetails.Name)
-            ? $"第 {seasonNumber} 季"
+        var seasonTitle = string.IsNullOrWhiteSpace(seasonDetails?.Name)
+            ? $"Season {seasonNumber}"
             : seasonDetails.Name.Trim();
         var targetTitle = $"{seriesDetails.Name} / {seasonTitle} / E{episodeNumber:00} {episodeTitle}";
         return new SingleSourceCorrectionPreview

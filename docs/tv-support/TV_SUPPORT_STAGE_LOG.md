@@ -2388,6 +2388,19 @@ Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
 
+### Phase 4.13e follow-up - Batch global order stability
+
+Completed:
+
+- Batch selection mode no longer places every Season-like item ahead of Movies.
+- Batch sorting now keeps Movies and TV Series groups in the same global order as the active library sort, while still expanding each TV Series group into adjacent Season rows.
+- Within an expanded Series group, Seasons continue to sort by Season number for predictable batch selection.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
 ## Phase 4.13b - Attach single source to existing unknown Season
 
 Completed:
@@ -2644,4 +2657,440 @@ Completed:
 Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e - Batch AI correction extension
+
+Completed:
+
+- Media-library batch AI now expands selected items into correction units instead of limiting execution to Movie rows.
+- Movie / failed Movie placeholder / orphan / grouped Other selections expand to deduplicated single-source units.
+- Recognized and no-TMDB Seasons are treated as Season units and are corrected through the existing Season-level correction service.
+- Series-level selections and no-source Movies / Seasons are skipped with explicit reasons.
+- AI output is constrained to a strict target kind: Movie, TvEpisode, TvSeason, or Skip.
+- Single-source units can be automatically corrected to Movie or TV Episode when AI returns complete safe fields.
+- Season units can be automatically corrected to recognized TMDB Seasons when AI returns a Series and Season number.
+- Missing Movie / TV search targets, missing Season / Episode numbers, unsupported unit-target combinations, and uncertain AI results are skipped.
+- SP / OVA / OAD / special / theatrical content is skipped for automatic TV correction and left for a later special-episode mapping flow.
+- Each apply path reuses the existing single-source or Season correction services, preserving transaction boundaries, default-source rules, no-empty-Episode behavior, and probe / subtitle safety.
+- Batch progress and summary now report success, skipped, failed, and cancelled counts, while retaining skipped / failed selections for manual follow-up.
+- Logs include sanitized batch start, unit-created, AI-result, applied, skipped, failed, and summary events without full paths, WebDAV URLs, or credentials.
+
+Not done:
+
+- No per-item preview, batch manual confirmation, aggregation-after-identification, historical wrong-binding cleanup, ignore / blacklist, special-episode mapping UI, scan-rule change, database update, migration, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: none after build verification.
+- Deferred: SP / OVA / OAD / special / theatrical content needs a dedicated mapping UI where AI can suggest, but the user chooses the special Season / Episode target before apply.
+- Noise: the dormant legacy movie-only batch method remains in `LibraryViewModel` but the command now routes to the cross-type batch AI path.
+
+### Phase 4.13e follow-up - Batch Season ordering
+
+Completed:
+
+- Batch selection mode now uses a TV-aware list order for Season-like rows.
+- Seasons are grouped by Series title first and then ordered by Season number, so Seasons from the same Series remain adjacent while users perform batch operations.
+- Normal media-library browsing keeps the existing user-selected sort modes.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Batch AI toolbar entry
+
+Completed:
+
+- The batch operation toolbar now exposes the existing cross-type AI correction command.
+- The `AI 辅助识别` button is visible in batch selection mode and uses the existing `BatchAutoIdentifyCommand` / `CanBatchAutoIdentify` enablement.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Batch Season group position alignment
+
+Completed:
+
+- Batch mode Season grouping still keeps Seasons from the same Series adjacent and sorted by Season number.
+- The order of Series groups in batch mode now uses the latest `UpdatedAt` across that Series' expanded Seasons, aligning it with the normal media-library Series card position after correction updates.
+- No-source Seasons selected for batch AI remain skipped because there is no source to move; logs report `no-source-season-not-supported`.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Source-path weighted AI correction context
+
+Completed:
+
+- Batch AI correction now sends sanitized source path hints alongside file names instead of relying mainly on the current Series / Season title.
+- Current title, current Series title, current Season title, and current Season / Episode numbers are explicitly treated as weak hints because correction usually means the current binding may be wrong.
+- Season AI context samples source rows across the whole Season using an even distribution capped at 18 rows, so low, middle, and high Episode numbers are represented when enough sources exist.
+- Each Season sample includes the current Episode number, safe file name, and a tail-only path hint. Full local paths, full WebDAV URLs, query strings, and credentials are not sent.
+- Detail-page AI correction for Movie and Episode sources now receives the selected playback source path hint and uses it with the file name as primary evidence.
+- Batch AI correction now runs up to 3 AI unit requests concurrently instead of processing every selected unit serially.
+- Batch apply calls remain serialized inside the batch service to avoid concurrent SQLite writes while preserving each item's independent transaction and failure isolation.
+- Special-content local hard-skip was removed for batch AI. Higher-level collection folders, Season folders, or file names that mention theatrical / special content no longer block the AI request by themselves; AI can return Movie / supported TV when confident or Skip when unsupported.
+- Batch AI disables batch controls, exits batch selection mode immediately after the user starts the operation, and runs an initial normal-library refresh before AI requests. This matches the user-facing behavior of clicking the batch "Done" action first, while selected rows remain snapshotted for background correction.
+- Detail-page, batch, and scan AI title prompts now define "original-language title" as TMDB `original_title` / `original_name` semantics: the official original title/name. This can still be English when the official original title/name is English; translated/localized/marketing aliases are not accepted as substitutes.
+- Batch AI result logs now include sanitized `aiMovieTitle` / `aiSeriesTitle` fields so future runs can audit whether AI returned TMDB original-title/original-name style lookup names.
+- Batch AI now writes a visible preparation/progress message immediately after the action starts, before the initial normal-library refresh and before the first AI result returns.
+- Batch AI no longer asks for or trusts AI-returned TMDB ids. AI returns only target kind, original-title/original-name style title, and required Season / Episode numbers; the app resolves TMDB ids through local TMDB search and validation.
+- Batch TV title resolution initially required the AI-provided `seriesTitle` to match a TMDB search result's `OriginalName`; a later hit-rate follow-up relaxed this local filter while keeping the prompt-level official-name instruction.
+- Detail-page TV and batch TV prompts now state that non-English-original series must return the TMDB `original_name` spelling/script rather than an English/international alias. Final-season wording is treated as a season-number clue only when the target TMDB season number is known confidently.
+- Batch AI no longer performs a local hard skip solely because a file or folder mentions SP / OVA / OAD / special / theatrical wording. AI may classify those items as Movie or supported TV only when it is confident; otherwise it must return Skip.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Batch delete and removed-library grouping cleanup
+
+Completed:
+
+- Batch delete-record now routes selected library items by persisted IDs before relying on UI media-kind labels.
+- No-source Seasons with an existing `SeasonId` use the same `DeleteSeasonRecordAsync` path as sourced Seasons; no-source Movies with an existing `MovieId` use `DeleteMovieRecordAsync`.
+- External no-source Movie rows without a local `MovieId` keep the collection-record delete path.
+- The removed-library modal keeps TV Series folded by default, but Movies are displayed as direct rows instead of collapsible one-item groups.
+- TV group-level restore and delete buttons remain only on TV Series groups.
+
+Not done:
+
+- No batch AI prompt, TMDB resolver, scanning rule, special-episode mapping, migration, database update, commit, or push was changed in this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - AI correction prompt tightening
+
+Completed:
+
+- Detail-page TV correction, batch AI correction, and scan uncertain-range AI prompts now state that TMDB `original_name` means the official original Series name, not a translated, localized, international, or romanized alias.
+- Romanized / transliterated titles are now treated as aliases unless they are the official TMDB original name. If the AI confidently knows the native-script official name, it should return that native-script name; otherwise it must skip / return no title instead of guessing with an alias.
+- Batch AI now explicitly limits Season units to `TvSeason` or `Skip`, so a selected Season cannot be classified as a Movie or a single Episode by prompt instruction.
+- Batch AI Season prompt now emphasizes sampled source rows over current / old Series and Season titles, and skips mixed source rows that span movies, specials, OAD / OVA, or multiple TMDB seasons.
+- Single-source TV prompts now treat explicit SxxEyy / ordinary episode evidence as stronger than final / chapter / part wording, while still keeping unsupported special mapping out of automatic application.
+- Scan AI prompts now carry the same original-name semantics and still do not request TMDB ids or individual episode-file mappings.
+
+Not done:
+
+- No resolver thresholds, TMDB candidate validation, source movement logic, scan binding rule, special-episode mapping, schema, migration, database update, commit, or push was changed in this prompt-only follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Split no-source shell consistency
+
+Completed:
+
+- Confirmed Episode-source split keeps the source Episode / Season metadata instead of deleting recognized TMDB containers.
+- Movie-source split was aligned with correction semantics: recognized TMDB Movies are preserved as no-source shells when their last playback source is split away.
+- Failed Movie placeholders still use placeholder cleanup rules when empty; real local / WebDAV files are not deleted.
+
+Not done:
+
+- No TV progress rule, Season cleanup rule, prompt text, scan rule, schema, migration, database update, commit, or push was changed in this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Movie scan prompt alignment
+
+Completed:
+
+- Movie scan / identification AI search prompt now matches Movie detail and batch Movie correction prompt semantics for TMDB `original_title`.
+- The scan prompt now rejects translated / localized / marketing aliases as substitutes, rejects collection / franchise / parent-folder titles when a specific source title is present, and no longer asks for or accepts TMDB ids.
+- The source context sent to AI now uses the safe file name plus sanitized tail-only path hint instead of a full source path.
+
+Not done:
+
+- No TV prompt text, batch AI resolver, TMDB matching threshold, source movement logic, scan binding safety gate, schema, migration, database update, commit, or push was changed in this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Batch Season prompt part-split tuning
+
+Completed:
+
+- Batch AI, detail correction AI, and scan uncertain-range prompts now separate two uses of source names:
+  - source file / folder names are evidence for identifying the work and episode / season context;
+  - source file / folder language or script must not be used to decide TMDB `original_title` / `original_name` language or spelling.
+- Prompts now state that English, localized, or romanized file names can still belong to non-English TMDB original titles / names.
+- Batch Season prompt was tuned not to assume Part 1 / Part 2 / cour / half-season / final-part wording means multiple TMDB seasons.
+- Batch Season prompt now asks AI to use sampled episode numbers, source distribution, and common TMDB season structure; if sampled rows form one ordinary continuous range that safely belongs to one TMDB season, it should return that Season even when release text says Part 1 / Part 2.
+- Batch Season prompt still returns Skip when sampled rows clearly mix movies, specials/OAD/OVA, different Series, or episode ranges that cannot be reduced to one TMDB Season.
+
+Not done:
+
+- No alias conversion, TMDB resolver threshold, local TMDB Season fallback, episode-number remapping, source movement logic, schema, migration, database update, commit, or push was changed in this prompt-only follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - TMDB Season detail diagnostics
+
+Completed:
+
+- TMDB TV Season detail loading now writes sanitized diagnostics for cache hit, persistent-cache hit, cache miss, request start, request success, HTTP non-success, empty / invalid payload, missing credential, invalid arguments, and exception cases.
+- Diagnostics include only IDs, Season number, language, cache-key hash, status code, exception type, elapsed time, and counts. They do not log full request URLs, local paths, WebDAV URLs, credentials, tokens, or API keys.
+- Batch AI Season correction now preflights target TMDB Season detail loading after resolving the target Series. If the target Season detail cannot be loaded, the unit is skipped with `tv-season-target-details-unavailable` instead of entering apply and being reported as an apply failure.
+- Successful preflight fills the normal TMDB Season detail cache, so the subsequent Season correction apply path can reuse the same detail without broadening correction semantics.
+
+Not done:
+
+- No alias conversion, local Season fallback, target Episode remapping, TMDB search strategy, source movement rule, schema, migration, database update, commit, or push was changed in this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Local Season fallback for correction
+
+Completed:
+
+- Season-level correction and batch AI Season correction now allow a resolved TMDB Series to receive a local Season number even when TMDB has no matching Season detail.
+- Single-source TV Episode correction now follows the same rule: if the target Series exists but the target Season detail cannot be loaded, the target local Season and requested Episode can still be created.
+- Target Episodes are still created only for moved playback sources. Missing intermediate Episodes are not created, and missing TMDB Episode metadata leaves the local Episode with fallback metadata.
+- Diagnostics now record sanitized local-Season fallback events for correction preview, single-source apply, and Season-level apply.
+
+Not done:
+
+- No Series resolver threshold, AI schema, episode remapping rule, scan safety gate, migration, database update, commit, or push was changed in this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### AI model routing cleanup - correction Pro, scan Flash
+
+Completed:
+
+- Central AI routing now logs sanitized model routing diagnostics for every `IAiService.GenerateTextAsync` request, including provider kind, request purpose, requested model, resolved model, thinking mode, reasoning mode, and override reason.
+- Legacy DeepSeek model names `deepseek-chat` and `deepseek-reasoner` remain runtime-compatible and resolve to `deepseek-v4-flash`; they are not introduced as new defaults or options.
+- TV scan uncertain-range AI and full-range AI explicitly use `deepseek-v4-flash` for DeepSeek endpoints and keep deep thinking disabled.
+- Detail-page TV correction AI and batch AI correction use `deepseek-v4-pro` for DeepSeek endpoints without enabling deep thinking / high thinking.
+- Watch Profile continues to use `deepseek-v4-pro` with high thinking enabled.
+
+Not done:
+
+- No prompt semantics, TMDB resolver, scan safety gate, correction safety gate, schema, migration, database update, commit, or push was changed in this routing cleanup.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Batch TV series title local filter relaxation
+
+Completed:
+
+- Batch AI TV correction still prompts for TMDB `original_name` semantics, but no longer local-skips solely because the AI-returned Series title differs from the TMDB top result's `OriginalName`.
+- `ResolveSeriesTmdbIdAsync` now accepts the top TMDB TV search result when a result exists, and logs `originalNameMatched` for diagnostics.
+- If TMDB TV search returns no result, the unit still skips with `series-title-no-tmdb-result`.
+
+Not done:
+
+- No AI prompt wording, Season / Episode safety gate, apply transaction, no-empty-Episode rule, scan rule, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Batch AI timeout classification
+
+Completed:
+
+- Batch AI now distinguishes user cancellation from request timeout.
+- If the batch cancellation token is cancelled, the unit is reported as `cancelled`.
+- If an AI request times out without user cancellation, the unit is reported as `failed` with `failureReason="AI request timed out."` and `cancellationSource="request-timeout"`.
+
+Not done:
+
+- No batch timeout duration, prompt text, long-running anime single-file mapping rule, TMDB resolver, apply safety gate, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Detail correction TV candidate grouping
+
+Completed:
+
+- Single-source TV Episode correction in Movie detail and Episode detail now shows TMDB TV search results grouped by Series, collapsed by default.
+- Users can apply correction at the Series row, which keeps the manually entered target Season/Episode numbers, or at a Season row, which overwrites only the Season number and keeps the manually entered Episode number.
+- Detail-page TV AI assist now clears missing Season/Episode fields instead of silently keeping stale defaults, and prompts the user to enter the missing values or select a Season from the expanded Series group.
+- Season-level correction keeps the existing target-episode mapping table, but the recognized target picker now searches TMDB by Series title and displays collapsible Series groups with Season rows.
+- Season-level correction to recognized Series supports applying at the Series row with the entered Season number, or at the Season row with the clicked Season number. The existing correction-to-unknown-Season picker remains unchanged.
+- Season-level correction now has AI-assisted Series/Season search using the same Pro no-deep-thinking correction route and a Season-focused prompt. If AI omits Season number, the field is left empty for manual input or Season selection.
+
+Not done:
+
+- No batch AI rule, scan safety gate, correction apply semantics, target-episode mapping semantics, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Detail TV target selection confirmation
+
+Completed:
+
+- Movie detail and Episode detail TV Episode correction now separate target selection from apply.
+- Clicking "correct to Series" or "correct to Season" only selects the TV target and, for Season rows, fills the target Season number.
+- The user can still edit Season/Episode number fields after selecting a Series or Season.
+- Applying the correction now requires the explicit "confirm TV Episode correction" button in the correction form.
+
+Not done:
+
+- No Movie correction apply flow, single-source correction service rule, batch AI rule, scan safety gate, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Detail correction AI timeout / no-result handling
+
+Completed:
+
+- Detail-page AI search suggestion now preserves external cancellation, but treats internal AI timeout / interrupted I/O as a failed AI suggestion with a clear timeout message.
+- Movie detail, Episode detail, and Season detail AI correction no longer run a local fallback TMDB search when AI returns no result or fails.
+- Detail-page correction AI timeout is now 90 seconds for Movie / TV Episode / TV Season correction. Batch AI correction timeout is 75 seconds.
+- Scan-stage AI concurrency was checked and left unchanged: TV uncertain-range AI runs up to 3 concurrent batch requests; full-range TV AI remains disabled by default and is a single request when enabled.
+- Season correction empty-target text is now localized; the former English "No recognized season selected" / "No unknown season selected" messages were replaced with Chinese UI text.
+- Logs now record skipped AI assist attempts with status / message when AI returns no result or times out.
+
+Not done:
+
+- No AI model, prompt semantics, correction apply rule, scan safety gate, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### AI adaptive concurrency for batch AI and scan Movie tags
+
+Completed:
+
+- Added a shared adaptive AI batch executor for high-volume AI request paths.
+- Initial concurrency is 5. Retryable request failures downgrade concurrency 5 -> 3 -> 1, and a success streak upgrades it back 1 -> 3 -> 5.
+- Retryable failures include request timeout, HTTP 429, 502, 503, 504, and transient network I/O failures. HTTP `Retry-After` is honored with a capped delay.
+- Batch AI correction now uses adaptive request concurrency for the AI target-classification request only. Local TMDB resolution and database apply still use existing safety gates, and apply remains serialized to avoid duplicate writes.
+- Scan-stage Movie recognition still does not add a new LLM call. Only the existing background Movie AI tagging queue now uses the same adaptive executor.
+- TV scan uncertain-range and full-range AI concurrency are unchanged.
+- New sanitized logs include `ai-adaptive-concurrency-started`, `ai-adaptive-concurrency-changed`, `ai-request-retry-scheduled`, `ai-request-retry-exhausted`, `batch-ai-concurrency-summary`, and `scan-movie-ai-concurrency-summary`.
+
+Not done:
+
+- No TV scan concurrency rule, TV prompt, Movie recognition prompt, correction safety gate, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### AI settings routing and correction UX follow-up
+
+Completed:
+
+- Checked the latest batch AI run logs. The run used the adaptive executor with initial concurrency 5, processed 8 AI request units successfully, and did not schedule retries or downgrade concurrency.
+- Adaptive AI concurrency now upgrades after 3 consecutive successful requests instead of 8.
+- Movie detail and Episode detail TV correction now update the TV search input to the selected Series title when the user selects a Series or Season target.
+- Season-level correction to a recognized target also updates the Series search input to the selected Series title.
+- Series overview now hides only no-source local-created TMDB-Series Season shells that do not have a TMDB Season binding, unless the Season has been explicitly made visible. Official TMDB Seasons without sources remain visible in the Series overview.
+- Settings now exposes per-purpose AI model and timeout fields for detail correction, batch AI correction, scan TV uncertain range, scan TV full range, scan Movie tagging, recommendation, and Watch Profile. The values are stored in the existing AI model setting payload, so no migration is required.
+- Legacy single-model settings are still read as the default model and expanded into the current per-purpose defaults.
+
+Not done:
+
+- No AI prompt semantics, correction apply rule, scan safety gate, database migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e follow-up - Special content AI target handling
+
+Completed:
+
+- Detail TV Episode correction, detail TV Season correction, and batch AI correction prompts now treat SP / OVA / OAD / special / theatrical wording as a supported-target decision instead of an automatic skip.
+- Batch AI is asked to return Movie, TV Episode, or TV Season when the special-looking item can be safely represented as one of those supported targets, and to return Skip only when it cannot be safely represented or required fields are missing.
+- Detail-page prompts remain target-kind constrained: Movie target stays Movie-only, TV Episode target stays TV Episode-only, and TV Season target stays TV Season-only.
+
+Not done:
+
+- No TMDB / OMDb resolver, local confidence threshold, correction apply rule, scan safety gate, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### TMDB / OMDb external API adaptive throttling
+
+Completed:
+
+- TMDB external HTTP requests now use a shared bottom-layer adaptive throttle in `TmdbService.SendGetAsync`.
+- TMDB max concurrency is now 8 with adaptive levels 8 / 4 / 2 / 1, plus a global 12 requests per second limiter.
+- OMDb external HTTP requests now use the same adaptive throttle in `OmdbService.SendGetAsync`, while keeping max concurrency at 2 with levels 2 / 1 and a conservative 2 requests per second limiter.
+- Retryable failures are limited to transient request failures: timeout, transient network I/O, HTTP 429, 502, 503, and 504.
+- Non-transient HTTP 400 / 401 / 403 / 404, empty TMDB search results, missing target Seasons, missing OMDb ratings, and local safety-gate rejects do not trigger retry or adaptive concurrency downgrade.
+- Retry uses finite attempts, exponential backoff, jitter, and `Retry-After` when present. One logical request can only downgrade one level, so repeated retries for that same request do not immediately collapse to the minimum level.
+- Sanitized logs record provider, purpose, current / old / new concurrency, rate-limit waits, retry delay, retry count, status code, retry-after usage, and observation-window progress.
+
+Not done:
+
+- No Movie / TV identification rule, correction rule, recommendation rule, AI prompt, TMDB / OMDb parsing semantic, schema, migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.13e Follow-up Season 0 Batch AI Auto-apply
+
+Completed:
+
+- Batch AI correction now treats `seasonNumber=0` as a valid TV target for TMDB specials instead of classifying it as a missing Season number.
+- The batch AI prompt now explicitly says Season 0 is valid for TMDB specials when the returned TV Episode or TV Season mapping is otherwise complete and safe.
+- Season-level correction service validation now accepts target Season 0 so the batch Season path can apply a special-season target.
+- Batch AI Season 0 auto-apply is stricter than normal Season fallback: it must load TMDB Season 0 before applying, and single-episode Season 0 targets must exist in that TMDB Season 0 episode list.
+- If Season 0 detail is missing or the target special episode is absent, batch AI skips with `season-zero-tmdb-season-unavailable` or `season-zero-tmdb-episode-unavailable` instead of creating a local Season 0 fallback.
+
+Not done:
+
+- No SP / OVA / OAD / theatrical special mapping UI, scan rule, TMDB resolver, ordinary Season fallback, migration, database update, commit, or push was changed.
+
+Verification:
+
+- Build verification is recorded in the final report for this follow-up.
 - Current migrations diff remained empty.

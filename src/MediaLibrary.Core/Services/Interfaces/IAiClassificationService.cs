@@ -6,6 +6,11 @@ public interface IAiClassificationService
 {
     Task ClassifyMovieAsync(int movieId, CancellationToken cancellationToken = default);
 
+    Task ClassifyMoviesAsync(
+        IReadOnlyCollection<int> movieIds,
+        string sourceKind,
+        CancellationToken cancellationToken = default);
+
     Task<AiMovieTags> ClassifyExternalMovieAsync(
         AiRecommendationItem recommendation,
         CancellationToken cancellationToken = default);
@@ -19,6 +24,7 @@ public interface IAiClassificationService
         string? sourceFileName,
         int? releaseYear = null,
         string? overview = null,
+        string? sourcePath = null,
         CancellationToken cancellationToken = default);
 
     Task<AiSearchSuggestionResult> SuggestTvEpisodeCorrectionSearchQueryAsync(
@@ -27,6 +33,15 @@ public interface IAiClassificationService
         string? seriesTitle = null,
         int? seasonNumber = null,
         int? episodeNumber = null,
+        string? overview = null,
+        string? sourcePath = null,
+        CancellationToken cancellationToken = default);
+
+    Task<AiSearchSuggestionResult> SuggestTvSeasonCorrectionSearchQueryAsync(
+        string currentTitle,
+        IReadOnlyCollection<string> sourceFileNames,
+        string? seriesTitle = null,
+        int? seasonNumber = null,
         string? overview = null,
         CancellationToken cancellationToken = default);
 }
