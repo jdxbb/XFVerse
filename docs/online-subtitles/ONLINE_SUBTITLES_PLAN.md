@@ -65,6 +65,13 @@ Phase 5 adds online subtitle search and download support centered on the existin
 - 5.3 Download / bind / delete binding / auto switch: save downloaded files, create Movie/Episode bindings, temporary unidentified playback subtitles, duplicate checks, add to player list, and select downloaded subtitle.
 - 5.4 Cache management and closeout: expose subtitle cache usage and clear in software cache management, document real API behavior, and run player/settings/cache regression.
 
+## Current Implementation Status
+
+- 5.1 is implemented in the current codebase: dedicated online subtitle binding model/migration, managed subtitle cache service, OpenSubtitles client, static language list, and Settings API card.
+- 5.2 is implemented as search-only UI: the player subtitle menu has the online downloaded subtitles submenu, the search action pauses playback and opens the search dialog, and results can be searched and sorted through OpenSubtitles.
+- 5.2 intentionally keeps existing downloaded online subtitle rows read-only in the player menu. Switching, delete-binding actions, download, cache write, binding writes, and auto-switch remain 5.3.
+- 5.2 does not add any migration.
+
 ## Data Safety, Credentials, And Privacy
 
 - Do not upload full local paths or full WebDAV URLs.

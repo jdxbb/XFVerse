@@ -44,6 +44,7 @@ public partial class PlayerWindow : Window
     private bool _isAudioTrackMenuOpen;
     private bool _closeRequested;
     private bool _closeConfirmed;
+    private OnlineSubtitleSearchWindow? _onlineSubtitleSearchWindow;
     private POINT? _lastVideoClickPoint;
     private long _lastVideoClickTick;
     private long _lastVideoDoubleClickToggleTick;
@@ -608,7 +609,68 @@ public partial class PlayerWindow : Window
         }
 
         menu.Items.Add(externalGroup);
+
+        var onlineGroup = CreateRightOpeningSubtitleGroup("\u5728\u7ebf\u4e0b\u8f7d\u5b57\u5e55");
+        var searchItem = new MenuItem
+        {
+            Header = CreateMenuHeader("\u641c\u7d22\u5728\u7ebf\u5b57\u5e55..."),
+            IsEnabled = viewModel.HasPlayableOnlineSubtitleSearchContext
+        };
+        SuppressRightClick(searchItem);
+        searchItem.Click += (_, _) => OpenOnlineSubtitleSearch(viewModel);
+        onlineGroup.Items.Add(searchItem);
+        onlineGroup.Items.Add(new Separator());
+
+        if (viewModel.OnlineSubtitleMenuItems.Count == 0)
+        {
+            onlineGroup.Items.Add(new MenuItem
+            {
+                Header = "\u6682\u65e0\u5df2\u4e0b\u8f7d\u5b57\u5e55",
+                IsEnabled = false
+            });
+        }
+        else
+        {
+            foreach (var subtitle in viewModel.OnlineSubtitleMenuItems)
+            {
+                var item = new MenuItem
+                {
+                    Header = CreateMenuHeader(subtitle.DisplayName),
+                    ToolTip = subtitle.ToolTip,
+                    IsEnabled = false
+                };
+                SuppressRightClick(item);
+                onlineGroup.Items.Add(item);
+            }
+        }
+
+        menu.Items.Add(onlineGroup);
         return menu;
+    }
+
+    private void OpenOnlineSubtitleSearch(PlayerWindowViewModel viewModel)
+    {
+        if (_onlineSubtitleSearchWindow is { IsVisible: true } existingWindow)
+        {
+            existingWindow.Activate();
+            return;
+        }
+
+        viewModel.PauseForOnlineSubtitleSearch();
+        var dialogViewModel = viewModel.CreateOnlineSubtitleSearchViewModel();
+        var dialog = new OnlineSubtitleSearchWindow(dialogViewModel)
+        {
+            Owner = this
+        };
+        _onlineSubtitleSearchWindow = dialog;
+        dialog.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_onlineSubtitleSearchWindow, dialog))
+            {
+                _onlineSubtitleSearchWindow = null;
+            }
+        };
+        dialog.ShowDialog();
     }
 
     private static MenuItem CreateRightOpeningSubtitleGroup(string header)

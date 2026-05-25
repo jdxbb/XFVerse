@@ -10,11 +10,29 @@ public sealed class PlaybackSessionModel
 
     public string MovieTitle { get; set; } = string.Empty;
 
+    public string MovieOriginalTitle { get; set; } = string.Empty;
+
+    public int? MovieReleaseYear { get; set; }
+
+    public int? MovieTmdbId { get; set; }
+
+    public string MovieImdbId { get; set; } = string.Empty;
+
+    public IdentificationStatus MovieIdentificationStatus { get; set; } = IdentificationStatus.Pending;
+
     public int? EpisodeId { get; set; }
 
     public int? TvSeasonId { get; set; }
 
     public int? TvSeriesId { get; set; }
+
+    public int? SeriesTmdbId { get; set; }
+
+    public string SeriesOriginalName { get; set; } = string.Empty;
+
+    public int? SeriesFirstAirYear { get; set; }
+
+    public IdentificationStatus SeasonIdentificationStatus { get; set; } = IdentificationStatus.Pending;
 
     public int SeasonNumber { get; set; }
 
@@ -25,6 +43,10 @@ public sealed class PlaybackSessionModel
     public string SeasonTitle { get; set; } = string.Empty;
 
     public string EpisodeTitle { get; set; } = string.Empty;
+
+    public int? EpisodeTmdbId { get; set; }
+
+    public DateTime? EpisodeAirDate { get; set; }
 
     public PlaybackEpisodeNavigationItem? PreviousEpisode { get; set; }
 

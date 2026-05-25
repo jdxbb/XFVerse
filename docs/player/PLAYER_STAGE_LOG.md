@@ -775,6 +775,25 @@ Deferred after closeout:
 - Subtitle/audio memory.
 - Active full-file cache creation, automatic cache, offline cache, partial range cache, and download queue features.
 
+## Phase 5.2 Online Subtitle Search Entry
+
+Goal: add the online subtitle player-menu entry and search dialog without changing existing subtitle switching or adding download/binding behavior.
+
+Changed player surface:
+- The subtitle menu now keeps the existing `None`, embedded, and external groups and adds an online downloaded subtitles submenu as a peer group.
+- The online submenu exposes `Search online subtitles...`.
+- Current Movie / Episode online subtitle bindings are shown read-only when available; an empty placeholder is shown otherwise.
+- Opening the search dialog pauses active playback and does not auto-resume after close.
+
+Kept boundaries:
+- Existing embedded subtitle discovery and switching are unchanged.
+- Existing scanned external subtitle binding and switching are unchanged.
+- No online subtitle download, cache write, binding write, delete-binding UI, or downloaded-subtitle auto-switch was added in this stage.
+- No playback core, scan logic, database schema, or migration change was added.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
 ## Maintenance Rules
 
 - Update this file after every stage.

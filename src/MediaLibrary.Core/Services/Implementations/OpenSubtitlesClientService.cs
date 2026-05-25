@@ -144,18 +144,26 @@ public sealed class OpenSubtitlesClientService : IOpenSubtitlesClientService
             };
         }
 
-        string token = options.Token;
+        var token = string.Empty;
         var loginAttempted = false;
         var loginSucceeded = false;
         try
         {
+            var probeQuery = BuildSearchQuery(new OpenSubtitlesSearchRequest
+            {
+                Query = "matrix",
+                Languages = string.IsNullOrWhiteSpace(options.DefaultLanguageCode) ? "zh-cn" : options.DefaultLanguageCode,
+                Type = "movie",
+                Page = 1
+            });
+
             using var searchResponse = await SendAsync(
                 options,
                 HttpMethod.Get,
-                "subtitles?languages=en&query=contract&page=1",
+                $"subtitles?{probeQuery}",
                 token,
                 body: null,
-                "opensubtitles-api-key-probe",
+                "opensubtitles-api-key-search-probe",
                 cancellationToken);
 
             if (!searchResponse.IsSuccessStatusCode)
@@ -167,6 +175,21 @@ public sealed class OpenSubtitlesClientService : IOpenSubtitlesClientService
                     Message = BuildFailureMessage(searchResponse.StatusCode),
                     ErrorKind = MapStatus(searchResponse.StatusCode)
                 };
+            }
+
+            await using (var responseStream = await searchResponse.Content.ReadAsStreamAsync(cancellationToken))
+            {
+                using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+                if (!document.RootElement.TryGetProperty("data", out _))
+                {
+                    return new OpenSubtitlesProbeResult
+                    {
+                        IsApiKeyConfigured = true,
+                        IsApiKeyAccepted = false,
+                        Message = "OpenSubtitles search probe returned an unexpected response.",
+                        ErrorKind = OpenSubtitlesErrorKind.InvalidResponse
+                    };
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(options.Username) && !string.IsNullOrWhiteSpace(options.Password))
@@ -232,7 +255,7 @@ public sealed class OpenSubtitlesClientService : IOpenSubtitlesClientService
             options,
             HttpMethod.Get,
             $"subtitles?{queryString}",
-            options.Token,
+            string.Empty,
             body: null,
             "opensubtitles-search",
             cancellationToken);

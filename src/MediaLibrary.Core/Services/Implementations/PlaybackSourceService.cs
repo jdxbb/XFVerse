@@ -24,7 +24,18 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
         var movie = await dbContext.Movies
             .AsNoTracking()
             .Where(x => x.Id == movieId)
-            .Select(x => new { x.Id, x.Title, x.DefaultMediaFileId })
+            .Select(
+                x => new
+                {
+                    x.Id,
+                    x.Title,
+                    x.OriginalTitle,
+                    x.ReleaseYear,
+                    x.TmdbId,
+                    x.ImdbId,
+                    x.IdentificationStatus,
+                    x.DefaultMediaFileId
+                })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (movie is null)
@@ -76,6 +87,11 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                 ContentType = PlaybackContentType.Movie,
                 MovieId = movie.Id,
                 MovieTitle = movie.Title,
+                MovieOriginalTitle = movie.OriginalTitle ?? string.Empty,
+                MovieReleaseYear = movie.ReleaseYear,
+                MovieTmdbId = movie.TmdbId,
+                MovieImdbId = movie.ImdbId ?? string.Empty,
+                MovieIdentificationStatus = movie.IdentificationStatus,
                 DefaultMediaFileId = movie.DefaultMediaFileId
             };
         }
@@ -269,6 +285,11 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
             ContentType = PlaybackContentType.Movie,
             MovieId = movie.Id,
             MovieTitle = movie.Title,
+            MovieOriginalTitle = movie.OriginalTitle ?? string.Empty,
+            MovieReleaseYear = movie.ReleaseYear,
+            MovieTmdbId = movie.TmdbId,
+            MovieImdbId = movie.ImdbId ?? string.Empty,
+            MovieIdentificationStatus = movie.IdentificationStatus,
             DefaultMediaFileId = effectiveDefaultMediaFileId,
             SelectedMediaFileId = selectedMediaFileId,
             Sources = sources
@@ -290,13 +311,19 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                 {
                     x.Id,
                     x.TvSeasonId,
+                    x.TmdbEpisodeId,
                     x.EpisodeNumber,
                     x.Title,
+                    x.AirDate,
                     x.DefaultMediaFileId,
                     SeasonNumber = x.Season!.SeasonNumber,
                     SeasonTitle = x.Season.Name,
+                    SeasonIdentificationStatus = x.Season.IdentificationStatus,
                     SeriesId = x.Season.Series!.Id,
-                    SeriesTitle = x.Season.Series.Name
+                    SeriesTmdbId = x.Season.Series.TmdbSeriesId,
+                    SeriesTitle = x.Season.Series.Name,
+                    SeriesOriginalName = x.Season.Series.OriginalName,
+                    SeriesFirstAirYear = x.Season.Series.FirstAirYear
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -361,11 +388,17 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
                 EpisodeId = episode.Id,
                 TvSeasonId = episode.TvSeasonId,
                 TvSeriesId = episode.SeriesId,
+                SeriesTmdbId = episode.SeriesTmdbId,
+                SeriesOriginalName = episode.SeriesOriginalName ?? string.Empty,
+                SeriesFirstAirYear = episode.SeriesFirstAirYear,
+                SeasonIdentificationStatus = episode.SeasonIdentificationStatus,
                 SeasonNumber = episode.SeasonNumber,
                 EpisodeNumber = episode.EpisodeNumber,
                 SeriesTitle = episode.SeriesTitle,
                 SeasonTitle = episode.SeasonTitle,
                 EpisodeTitle = episode.Title,
+                EpisodeTmdbId = episode.TmdbEpisodeId,
+                EpisodeAirDate = episode.AirDate,
                 PreviousEpisode = previousEpisode,
                 NextEpisode = nextEpisode
             };
@@ -581,11 +614,17 @@ public sealed class PlaybackSourceService : IPlaybackSourceService
             EpisodeId = episode.Id,
             TvSeasonId = episode.TvSeasonId,
             TvSeriesId = episode.SeriesId,
+            SeriesTmdbId = episode.SeriesTmdbId,
+            SeriesOriginalName = episode.SeriesOriginalName ?? string.Empty,
+            SeriesFirstAirYear = episode.SeriesFirstAirYear,
+            SeasonIdentificationStatus = episode.SeasonIdentificationStatus,
             SeasonNumber = episode.SeasonNumber,
             EpisodeNumber = episode.EpisodeNumber,
             SeriesTitle = episode.SeriesTitle,
             SeasonTitle = episode.SeasonTitle,
             EpisodeTitle = episode.Title,
+            EpisodeTmdbId = episode.TmdbEpisodeId,
+            EpisodeAirDate = episode.AirDate,
             DefaultMediaFileId = effectiveDefaultMediaFileId,
             SelectedMediaFileId = selectedMediaFileId,
             Sources = sources,

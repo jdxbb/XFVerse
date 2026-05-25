@@ -95,3 +95,64 @@ Not done:
 Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors after implementation.
+
+## Phase 5.2 - Player Menu Entry And Search Dialog
+
+Completed:
+
+- Added the player subtitle-menu peer submenu `Online downloaded subtitles` beside the existing `None`, embedded, and external subtitle entries.
+- The online submenu now exposes `Search online subtitles...`.
+- The online submenu reads current Movie / Episode online subtitle bindings through a read-only query path and shows them as non-switching menu rows. If none exist, it shows an empty placeholder.
+- Existing embedded subtitle, external subtitle, and `None` switching behavior remains unchanged.
+- Opening the online subtitle search dialog pauses active playback and does not auto-resume on close.
+- Added a search dialog with the three Phase 5 primary inputs: static OpenSubtitles language dropdown, Movie / TV Episode type dropdown, and editable keyword input.
+- The dialog defaults to Chinese (`zh-cn`), infers Movie vs TV Episode from the current playback session, fills an initial safe keyword, and automatically runs the first search on open.
+- Movie search can carry IMDb ID, TMDB ID, title, original title, year, and file size where available. The current safe file name is kept as local release / filename ranking context.
+- Episode search can carry Series TMDB ID, series title, original name, Season / Episode numbers, episode title, and file size where available. The current safe file name is kept as local release / filename ranking context. Series IMDb ID remains unavailable in the current TV data model.
+- Unidentified Movie/orphan playback falls back to Movie search with the safe file name. Unidentified Episode/Season playback falls back to TV Episode search with the safe file name and any available Season / Episode numbers.
+- Search uses the Phase 5.1 `OpenSubtitlesClientService` and settings-backed API key / optional token configuration.
+- Search results display language, release / file name, download count, rating / votes, hearing-impaired flag, machine / AI translation flags, trusted uploader flag, FPS, upload date, matched feature title/year, and Season / Episode information when returned.
+- Added sorting options for composite ranking, download count, rating, upload date, and match score. Composite ranking remains local so current identity, Season / Episode, language, filename/release, download/rating/upload/trust signals can be prioritized.
+- Search has loading, empty, unconfigured API, auth/rate-limit/server/network-style error messages without exposing credentials.
+- Download quota is not forced in search. The dialog only notes that quota will be reported from download responses when OpenSubtitles provides it.
+
+Not done:
+
+- No subtitle download.
+- No cache write from search results.
+- No Movie / Episode online subtitle binding write.
+- No delete-binding UI.
+- No downloaded subtitle auto-switch.
+- No subtitle cache management UI.
+- No OCR, translation, editor, full-library automatic download, scan-stage integration, `MediaFile` masquerading, or playback-source-level long-term binding.
+- No migration, database update, commit, or push.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Follow-up fix:
+
+- OpenSubtitles API key probe now validates the API key without reusing a previously stored bearer token, so an invalid API key is not masked by a still-valid old login token.
+- Settings connection test now uses the same `/subtitles` search endpoint shape as the search dialog for the API-key acceptance check, instead of relying on public info or quota endpoints.
+- OpenSubtitles search now uses API-key-only authentication and no stored bearer token, matching the Phase 5.2 search-only contract and making invalid API keys fail immediately.
+- Settings clears the stored OpenSubtitles token when endpoint, API key, username, or password changes before saving or testing, and clears it on `401` / `403` probe failures.
+- Search maps provider `403 Forbidden` responses to a bounded user-facing API-key/access error.
+- Settings and search failure messages were tightened so invalid key, forbidden access, login failure, rate limiting, server error, network error, and invalid response are distinguishable to the user.
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors after the fix.
+
+Manual validation scope:
+
+1. Existing `None`, embedded, and external subtitle menu entries still display and switch as before.
+2. The player subtitle menu shows the new online downloaded subtitles submenu.
+3. The online submenu shows the search action and an empty placeholder when no online bindings exist.
+4. Existing online bindings, if present, are listed read-only and do not attempt Phase 5.3 switching.
+5. Opening search during playback pauses the player and does not auto-resume after close.
+6. The dialog defaults to Chinese and auto-selects Movie or TV Episode from the current playback session.
+7. Recognized Movie search auto-fills title/year and carries available IMDb/TMDB metadata.
+8. Recognized Episode search auto-fills Series plus Season/Episode and carries available Series TMDB metadata.
+9. Unidentified Movie/orphan and unidentified Episode/Season searches use safe file names only.
+10. Manual language/type/keyword edits can be searched again without losing the typed keyword.
+11. Loading, empty, unconfigured API, auth/rate-limit/server/network failures show bounded user messages.
+12. Sorting can switch between composite, downloads, rating, upload date, and match score without crashing on missing fields.

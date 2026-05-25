@@ -104,6 +104,9 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private readonly IPlayerPreferencesService _playerPreferencesService;
     private readonly IPlaybackEngineFactory _playbackEngineFactory;
     private readonly IDataRefreshService _dataRefreshService;
+    private readonly IOpenSubtitlesClientService _openSubtitlesClientService;
+    private readonly IOnlineSubtitleBindingQueryService _onlineSubtitleBindingQueryService;
+    private readonly ISettingsService _settingsService;
     private readonly DispatcherTimer _timer;
     private readonly SemaphoreSlim _playbackReloadLock = new(1, 1);
     private readonly SemaphoreSlim _subtitleSwitchLock = new(1, 1);
@@ -225,7 +228,10 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         IVideoCacheService videoCacheService,
         IPlayerPreferencesService playerPreferencesService,
         IPlaybackEngineFactory playbackEngineFactory,
-        IDataRefreshService dataRefreshService)
+        IDataRefreshService dataRefreshService,
+        IOpenSubtitlesClientService openSubtitlesClientService,
+        IOnlineSubtitleBindingQueryService onlineSubtitleBindingQueryService,
+        ISettingsService settingsService)
     {
         _playbackSourceService = playbackSourceService;
         _watchHistoryService = watchHistoryService;
@@ -233,6 +239,9 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         _playerPreferencesService = playerPreferencesService;
         _playbackEngineFactory = playbackEngineFactory;
         _dataRefreshService = dataRefreshService;
+        _openSubtitlesClientService = openSubtitlesClientService;
+        _onlineSubtitleBindingQueryService = onlineSubtitleBindingQueryService;
+        _settingsService = settingsService;
         _videoCacheService.StatusChanged += OnVideoCacheStatusChanged;
 
         TogglePlayPauseCommand = new RelayCommand(TogglePlayPause);
@@ -270,6 +279,8 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<PlaybackSubtitleItem> EmbeddedSubtitles { get; } = [];
 
     public ObservableCollection<PlaybackSubtitleItem> ExternalSubtitles { get; } = [];
+
+    public ObservableCollection<OnlineSubtitleMenuItemViewModel> OnlineSubtitleMenuItems { get; } = [];
 
     public ObservableCollection<PlaybackAudioTrackItem> AudioTracks { get; } = [];
 
@@ -612,6 +623,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        await RefreshOnlineSubtitleMenuItemsAsync(cancellationToken);
         await PlayCurrentSourceAsync(false);
     }
 
@@ -670,6 +682,49 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             MpvPlaybackDiagnostics.Write("subtitle-menu-open-before-ready");
         }
     }
+
+    public void PauseForOnlineSubtitleSearch()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var isCurrentlyPlaying = _playbackEngine?.IsPlaying ?? _isPlaybackRunning;
+        if (!isCurrentlyPlaying)
+        {
+            MpvPlaybackDiagnostics.Write("online-subtitle-search-open paused=false");
+            return;
+        }
+
+        try
+        {
+            _playbackEngine?.Pause();
+        }
+        catch
+        {
+            // The search dialog should still open even if the engine is between lifecycle states.
+        }
+
+        SetPlaybackState(false);
+        ClearSeekRecovery(resetBuffering: true);
+        SetMainPlaybackUiState(MainPlaybackUiState.Paused, "online-subtitle-search-open");
+        MpvPlaybackDiagnostics.Write("online-subtitle-search-open paused=true");
+    }
+
+    public OnlineSubtitleSearchViewModel CreateOnlineSubtitleSearchViewModel()
+    {
+        var context = OnlineSubtitleSearchContext.FromPlayback(
+            _session,
+            SelectedSource,
+            "zh-cn");
+        return new OnlineSubtitleSearchViewModel(
+            _openSubtitlesClientService,
+            _settingsService,
+            context);
+    }
+
+    public bool HasPlayableOnlineSubtitleSearchContext => _session is not null && SelectedSource is not null;
 
     public void SelectAudioTrackFromMenu(PlaybackAudioTrackItem audioTrack)
     {
@@ -1314,6 +1369,55 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         _currentSubtitleSelection = SubtitleSelection.None();
         MpvPlaybackDiagnostics.Write(
             $"subtitle-menu-build-result embeddedCount=0 externalCandidateCount={ExternalSubtitles.Count} mpvExternalCount=0 dedupedCount={source.Subtitles.Count(x => x.Type == PlaybackSubtitleType.ExternalFile) - ExternalSubtitles.Count} selectedKind=none");
+    }
+
+    private async Task RefreshOnlineSubtitleMenuItemsAsync(CancellationToken cancellationToken = default)
+    {
+        OnlineSubtitleMenuItems.Clear();
+        if (_session is null)
+        {
+            return;
+        }
+
+        var movieId = _session.ContentType == PlaybackContentType.Movie && _session.MovieId > 0
+            ? _session.MovieId
+            : (int?)null;
+        var episodeId = _session.ContentType == PlaybackContentType.Episode && _session.EpisodeId.HasValue
+            ? _session.EpisodeId
+            : null;
+
+        if (!movieId.HasValue && !episodeId.HasValue)
+        {
+            return;
+        }
+
+        var bindings = await _onlineSubtitleBindingQueryService.GetActiveBindingsAsync(
+            movieId,
+            episodeId,
+            cancellationToken);
+
+        foreach (var binding in bindings)
+        {
+            OnlineSubtitleMenuItems.Add(new OnlineSubtitleMenuItemViewModel
+            {
+                BindingId = binding.Id,
+                DisplayName = BuildOnlineSubtitleMenuDisplayName(binding),
+                ToolTip = binding.HasCacheFile
+                    ? "\u5df2\u7ed1\u5b9a\u7684\u5728\u7ebf\u5b57\u5e55\uff0c\u5207\u6362\u64ad\u653e\u7559\u5230 Phase 5.3\u3002"
+                    : "\u5df2\u7ed1\u5b9a\uff0c\u4f46\u5f53\u524d\u7f13\u5b58\u6587\u4ef6\u4e0d\u53ef\u7528\u3002"
+            });
+        }
+    }
+
+    private static string BuildOnlineSubtitleMenuDisplayName(OnlineSubtitleBindingListItem binding)
+    {
+        var name = new[] { binding.DisplayName, binding.ReleaseName, binding.FileName }
+            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+            ?? $"\u5728\u7ebf\u5b57\u5e55 {binding.Id}";
+        var language = !string.IsNullOrWhiteSpace(binding.LanguageName)
+            ? binding.LanguageName
+            : binding.LanguageCode;
+        return string.IsNullOrWhiteSpace(language) ? name : $"{language} \u00b7 {name}";
     }
 
     private async Task ApplySubtitleSelectionAsync(PlaybackSubtitleItem? requestedSubtitle, bool isUserInitiated)

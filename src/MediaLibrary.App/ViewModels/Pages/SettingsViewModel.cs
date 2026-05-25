@@ -42,6 +42,10 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _openSubtitlesUsername = string.Empty;
     private string _openSubtitlesPassword = string.Empty;
     private string _openSubtitlesToken = string.Empty;
+    private string _loadedOpenSubtitlesEndpoint = "https://api.opensubtitles.com/api/v1";
+    private string _loadedOpenSubtitlesApiKey = string.Empty;
+    private string _loadedOpenSubtitlesUsername = string.Empty;
+    private string _loadedOpenSubtitlesPassword = string.Empty;
     private bool _isOpenSubtitlesEnabled;
     private OpenSubtitlesLanguageOption? _selectedOpenSubtitlesLanguage;
     private string _aiBaseUrl = string.Empty;
@@ -385,6 +389,10 @@ public sealed class SettingsViewModel : PageViewModelBase
         OpenSubtitlesUsername = applicationSetting.OpenSubtitlesUsername;
         OpenSubtitlesPassword = applicationSetting.OpenSubtitlesPassword;
         _openSubtitlesToken = applicationSetting.OpenSubtitlesToken;
+        _loadedOpenSubtitlesEndpoint = OpenSubtitlesEndpoint;
+        _loadedOpenSubtitlesApiKey = OpenSubtitlesApiKey;
+        _loadedOpenSubtitlesUsername = OpenSubtitlesUsername;
+        _loadedOpenSubtitlesPassword = OpenSubtitlesPassword;
         IsOpenSubtitlesEnabled = applicationSetting.IsOpenSubtitlesEnabled;
         SelectedOpenSubtitlesLanguage = FindOpenSubtitlesLanguage(applicationSetting.OpenSubtitlesDefaultLanguageCode);
         AiBaseUrl = applicationSetting.AiBaseUrl;
@@ -459,6 +467,42 @@ public sealed class SettingsViewModel : PageViewModelBase
         };
     }
 
+    private void ClearOpenSubtitlesTokenIfCredentialsChanged()
+    {
+        if (!HasOpenSubtitlesCredentialInputsChanged())
+        {
+            return;
+        }
+
+        _openSubtitlesToken = string.Empty;
+    }
+
+    private bool HasOpenSubtitlesCredentialInputsChanged()
+    {
+        return !string.Equals(NormalizeOpenSubtitlesText(OpenSubtitlesEndpoint), NormalizeOpenSubtitlesText(_loadedOpenSubtitlesEndpoint), StringComparison.Ordinal)
+               || !string.Equals(NormalizeOpenSubtitlesText(OpenSubtitlesApiKey), NormalizeOpenSubtitlesText(_loadedOpenSubtitlesApiKey), StringComparison.Ordinal)
+               || !string.Equals(NormalizeOpenSubtitlesText(OpenSubtitlesUsername), NormalizeOpenSubtitlesText(_loadedOpenSubtitlesUsername), StringComparison.Ordinal)
+               || !string.Equals(OpenSubtitlesPassword ?? string.Empty, _loadedOpenSubtitlesPassword ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    private void MarkOpenSubtitlesInputsAsPersisted()
+    {
+        _loadedOpenSubtitlesEndpoint = OpenSubtitlesEndpoint;
+        _loadedOpenSubtitlesApiKey = OpenSubtitlesApiKey;
+        _loadedOpenSubtitlesUsername = OpenSubtitlesUsername;
+        _loadedOpenSubtitlesPassword = OpenSubtitlesPassword;
+    }
+
+    private static string NormalizeOpenSubtitlesText(string? value)
+    {
+        return (value ?? string.Empty).Trim();
+    }
+
+    private static bool IsOpenSubtitlesAuthFailure(OpenSubtitlesErrorKind errorKind)
+    {
+        return errorKind is OpenSubtitlesErrorKind.Unauthorized or OpenSubtitlesErrorKind.Forbidden;
+    }
+
     private void ApplyOpenSubtitlesInputs(ApplicationSettingModel settings)
     {
         settings.OpenSubtitlesEndpoint = string.IsNullOrWhiteSpace(OpenSubtitlesEndpoint)
@@ -486,12 +530,17 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         if (!result.IsApiKeyConfigured)
         {
-            return "OpenSubtitles API Key 未配置。";
+            return "OpenSubtitles API Key 未配置：请先填写在线字幕 API Key 后再测试。";
         }
 
         if (!result.IsApiKeyAccepted)
         {
-            return $"OpenSubtitles API Key 探测失败：{result.Message}";
+            return FormatOpenSubtitlesProbeFailure(result);
+        }
+
+        if (result.LoginAttempted && !result.LoginSucceeded)
+        {
+            return $"API Key 可用，但账号/密码登录失败：{FormatOpenSubtitlesProbeFailure(result)} 如不需要登录，可清空账号和密码后使用 API key-only 模式。";
         }
 
         var loginText = result.LoginAttempted
@@ -501,6 +550,23 @@ public sealed class SettingsViewModel : PageViewModelBase
             ? $"额度：remaining={result.RemainingDownloads?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}, allowed={result.AllowedDownloads?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}"
             : "额度：未能提前查询，将在下载返回中提示";
         return $"API Key 可用；{loginText}；{quotaText}。";
+    }
+
+    private static string FormatOpenSubtitlesProbeFailure(OpenSubtitlesProbeResult result)
+    {
+        return result.ErrorKind switch
+        {
+            OpenSubtitlesErrorKind.NotConfigured => "未填写 API Key。",
+            OpenSubtitlesErrorKind.Unauthorized => "OpenSubtitles 鉴权失败：请检查 API Key 是否复制完整、是否仍有效；如果配置了账号密码，也请检查账号密码。",
+            OpenSubtitlesErrorKind.Forbidden => "OpenSubtitles 拒绝访问：当前 API Key 无效、无权限或已被禁用，请重新填写有效 API Key 后再测试。",
+            OpenSubtitlesErrorKind.RateLimited => "OpenSubtitles 测试请求被限流或额度受限，请稍后再试。",
+            OpenSubtitlesErrorKind.ServerError => "OpenSubtitles 服务暂时不可用，请稍后再试。",
+            OpenSubtitlesErrorKind.Network => "无法连接 OpenSubtitles：请检查网络、代理或防火墙设置。",
+            OpenSubtitlesErrorKind.InvalidResponse => "OpenSubtitles 返回格式异常：测试请求没有得到有效的字幕搜索响应。",
+            _ => string.IsNullOrWhiteSpace(result.Message)
+                ? "OpenSubtitles 测试失败，原因未知。"
+                : $"OpenSubtitles 测试失败：{result.Message}"
+        };
     }
 
     private static string RequireModel(string value, string label)
@@ -650,11 +716,13 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         try
         {
+            ClearOpenSubtitlesTokenIfCredentialsChanged();
             var saved = await SaveApplicationSettingsAsync(settings =>
             {
                 ApplyOpenSubtitlesInputs(settings);
             });
             _applicationSettingId = saved.Id;
+            MarkOpenSubtitlesInputsAsPersisted();
             OpenSubtitlesStatusMessage = "OpenSubtitles 配置已保存。";
         }
         catch (Exception exception)
@@ -674,6 +742,7 @@ public sealed class SettingsViewModel : PageViewModelBase
         try
         {
             OpenSubtitlesStatusMessage = "正在探测 OpenSubtitles API 能力...";
+            ClearOpenSubtitlesTokenIfCredentialsChanged();
             var result = await _openSubtitlesClientService.ProbeAsync(BuildOpenSubtitlesOptionsFromInputs());
             if (!string.IsNullOrWhiteSpace(result.Token))
             {
@@ -682,14 +751,16 @@ public sealed class SettingsViewModel : PageViewModelBase
                 {
                     ApplyOpenSubtitlesInputs(settings);
                 });
+                MarkOpenSubtitlesInputsAsPersisted();
             }
-            else if (result.ErrorKind == OpenSubtitlesErrorKind.Unauthorized && !string.IsNullOrWhiteSpace(_openSubtitlesToken))
+            else if (IsOpenSubtitlesAuthFailure(result.ErrorKind) && !string.IsNullOrWhiteSpace(_openSubtitlesToken))
             {
                 _openSubtitlesToken = string.Empty;
                 await SaveApplicationSettingsAsync(settings =>
                 {
                     ApplyOpenSubtitlesInputs(settings);
                 });
+                MarkOpenSubtitlesInputsAsPersisted();
             }
 
             OpenSubtitlesStatusMessage = FormatOpenSubtitlesProbeResult(result);
