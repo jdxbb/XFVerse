@@ -1,5 +1,50 @@
 # TV Support Stage Log
 
+## Phase 4.16 - TV Discovery Closure Regression
+
+Completed:
+
+- Rechecked the Phase 4.16a audit conclusion against the current worktree: TV Discovery is integrated into the existing `MovieDiscoveryPage`, not a separate TV page.
+- Confirmed the search and ranking tabs expose Movie / TV media switches while the AI recommendation tab remains Movie-only.
+- Confirmed TV search has keyword search, request cancellation, loading / empty / error status text, pagination, client-side filters, and TV Series cards with name, original name, first-air year, poster, overview, genres, TMDB Series rating, Season count, playback-source state, and Season state summary.
+- Confirmed TV ranking supports popular, top-rated, and trending lists; trending supports day / week switching; ranking pagination keeps the same first-page top-card and later-page list behavior as Movie ranking.
+- Confirmed TV search / ranking card clicks use summary-first metadata hydration before navigating to `SeriesOverviewPage`.
+- Confirmed metadata-only TV navigation creates or updates `TvSeries` and TMDB Season summary rows only on the first navigation step; it does not create `MediaFile`, fabricate playback sources, or route TV through Movie detail.
+- Confirmed `SeriesOverviewPage` can continue full Episode metadata hydration in the background, and `TvSeasonDetailPage` can hydrate the current Season on demand.
+- Confirmed source-less Episodes remain non-playable: the play button is disabled / unavailable, while Episode detail and user-state actions remain available.
+- Confirmed TV Discovery does not feed TV data into Movie AI recommendations, Watch Insights, Watch Profile, persona inputs, or recommendation fingerprints.
+- Confirmed Movie search, Movie ranking, Movie AI recommendation, and no-source Movie detail semantics remain separated from the TV Discovery branches.
+
+Fixed in closure:
+
+- Removed hard-coded workstation paths from temporary AI pool / AI performance diagnostics. These logs now resolve to the workspace `logs` directory when running from a checkout, or the app base `logs` directory when no solution root is available.
+
+Not done:
+
+- No 4.16b feature development was opened.
+- No TV AI recommendation, TV Watch Insights, TV recommendation fingerprint, final UI redesign, scan rule change, media-library category change, no-source detail semantic change, online subtitle search, migration, database update, commit, or push was performed.
+- A dedicated hidden-state badge on TV Discovery cards remains UI polish; current restore behavior is functional and records hidden state through the existing restore action.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Manual acceptance matrix:
+
+1. Movie search remains the default search mode and keeps existing Movie / person behavior.
+2. TV keyword search loads TMDB Series results with loading, empty, and error status paths.
+3. TV search filters reset / refresh the TV result pool without affecting Movie search results.
+4. TV search pagination can move forward and back without stale TV detail enrichment overwriting newer visible results.
+5. TV search cards show poster, title, original title, year, overview, genres, TMDB rating, Season count, playback-source state, and Season state summary.
+6. TV ranking popular, top-rated, and trending lists load Series-level TMDB results.
+7. TV trending can switch between day and week while preserving the Movie ranking path.
+8. TV ranking pagination shows the first result as the top card and later results in the list layout.
+9. Clicking a TV search or ranking card opens `SeriesOverviewPage` through summary-first metadata hydration.
+10. Metadata-only TV detail does not create `MediaFile` rows or playback sources.
+11. Source-less Episodes show no playable source and keep the play action disabled.
+12. TV remains excluded from Movie AI recommendation, Watch Insights, Watch Profile, persona input, and recommendation fingerprints.
+
 ## Phase 4.12-post-fix-follow-up - Restrict Recognized Reattach To Same Directory
 
 Completed:

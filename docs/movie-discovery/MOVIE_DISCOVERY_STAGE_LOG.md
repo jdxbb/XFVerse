@@ -1,5 +1,19 @@
 # 影片发现阶段日志
 
+## Phase 4.16 TV Discovery 收口回归
+
+- Phase 4.16a 审计结论已收口：当前 TV Discovery / TV 搜索 / TV 榜单基础能力已可用，没有必须新增功能的 Blocker。
+- `MovieDiscoveryPage` 继续承载影片发现入口，不新增独立 TV Discovery 页。
+- 影片搜索 Tab 和榜单 Tab 保留 Movie / TV 媒介切换；Movie 搜索、人物搜索、Movie 榜单和 Movie 无播放源详情语义不变。
+- AI 推荐 Tab 仍只服务 Movie，不提供 TV 推荐入口。
+- TV 搜索 / 榜单点击会先写入 metadata-only `TvSeries` / TMDB Season summary，然后进入 `SeriesOverviewPage`。
+- metadata-only TV 不创建 `MediaFile`，不创建播放源，不进入 Movie detail。
+- 无播放源 Episode 播放按钮保持禁用 / 不可用，Episode 详情和用户状态仍可使用。
+- TV 仍不进入 Movie AI 推荐、Watch Insights、Watch Profile、persona input 或 recommendation fingerprint。
+- 隐藏项独立徽标未在本阶段新增；现有恢复入口可用，独立徽标记录为 Deferred / UI polish。
+- 修复了 AI pool / AI perf 临时诊断中的硬编码本机日志路径，改为解析到工作区或应用目录下的 `logs`。
+- 未新增 DB 字段，未新增 migration，未执行 database update。
+
 ## FD-2.1 影片搜索基础版
 
 - 接入影片搜索 Tab：TMDB 影片搜索、人物搜索、筛选区、结果卡片、空状态和加载状态。

@@ -26,7 +26,7 @@ public sealed class RecommendationService : IRecommendationService
     private const int CandidatePoolLowWatermark = 9;
     private const int NotInterestedFilterHitLogLimit = 20;
     private static readonly TimeSpan CandidatePoolRefillFailureCooldown = TimeSpan.FromMinutes(2);
-    private const string AiPoolDiagnosticLogPath = @"C:\Users\32184\Desktop\影音管理系统1.0\logs\ai-pool-debug.log";
+    private static readonly string AiPoolDiagnosticLogPath = DiagnosticLogPathResolver.Resolve("ai-pool-debug.log");
     private const int RecommendationCacheDocumentVersion = 4;
     private const string RecommendationPromptVersion = "wi-r-profile-reason-v4";
     private const string RecommendationReasonPromptVersion = "wi-r-reason-v4";

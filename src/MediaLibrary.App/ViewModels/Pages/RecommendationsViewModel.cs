@@ -22,7 +22,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private const string CandidatePoolRefillWaitingMessage = "正在补充推荐候选，请稍候";
     private const string CandidatePoolRefillFailedMessage = "候选补充失败，请稍后重试";
     private const string CandidatePoolRefillNoCandidatesMessage = "本次没有补充到新的候选影片，请稍后再试";
-    private const string AiPoolDiagnosticLogPath = @"C:\Users\32184\Desktop\影音管理系统1.0\logs\ai-pool-debug.log";
+    private static readonly string AiPoolDiagnosticLogPath = DiagnosticLogPathResolver.Resolve("ai-pool-debug.log");
     private static readonly object AiPoolDiagnosticFileLock = new();
     private const string RefreshBatchText = "换一批";
     private const string RetryRecommendationText = "重试";

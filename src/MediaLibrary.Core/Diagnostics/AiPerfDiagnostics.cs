@@ -5,7 +5,7 @@ namespace MediaLibrary.Core.Diagnostics;
 
 public static class AiPerfDiagnostics
 {
-    private const string LogPath = "C:\\Users\\32184\\Desktop\\\u5f71\u97f3\u7ba1\u7406\u7cfb\u7edf1.0\\logs\\ai-perf-debug.log";
+    private static readonly string LogPath = DiagnosticLogPathResolver.Resolve("ai-perf-debug.log");
     private static readonly object FileLock = new();
     private static readonly AsyncLocal<AiPerfScope?> CurrentScope = new();
 

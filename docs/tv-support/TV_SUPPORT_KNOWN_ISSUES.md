@@ -1,5 +1,23 @@
 # TV Support Known Issues
 
+## Phase 4.16 Closure Regression Known Issues
+
+Blocker:
+
+- None after closure audit and build validation.
+
+Deferred:
+
+- A dedicated hidden-state badge on TV Discovery cards remains UI polish. Current restore behavior is functional through the existing add / restore action and is not a 4.16 blocker.
+- Automatic cleanup and stale-data policy for metadata-only TV Series / Seasons / Episodes created by Discovery browsing remains deferred.
+- TV AI recommendation, TV Watch Insights, TV recommendation fingerprints, and TV-specific recommendation UX remain later product decisions and should not be folded into Phase 4.
+
+Noise:
+
+- TV search / ranking Season counts are supplemented with per-visible-card TMDB Series detail requests. These requests are asynchronous, use existing TMDB cache / throttle behavior, and do not block the first result render.
+- In-flight Season-count detail requests may finish after a page or filter switch, but request-version checks prevent stale results from overwriting the current visible TV result set.
+- Metadata-only TV detail can expose Episode rows without playback sources by design; those Episodes remain non-playable until a real active `MediaFile` is attached.
+
 ## Phase 4.13c Manual Aggregation Known Issues
 
 Blocker:

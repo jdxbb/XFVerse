@@ -1,5 +1,26 @@
 # TV Support Plan
 
+## Phase 4.16 Closure Scope
+
+Phase 4.16 closes TV Discovery search and ranking after the Phase 4.16a audit found no required feature Blocker.
+
+The current product shape is:
+
+- TV Discovery is integrated into the existing `MovieDiscoveryPage` under the normal `影片发现` surface.
+- The search and ranking tabs provide Movie / TV media switches.
+- The AI recommendation tab remains Movie-only and must not expose a TV recommendation mode in Phase 4.
+- TV search supports keyword search, request cancellation, pagination, loading / empty / error states, basic TV filters, and Series-level result cards.
+- TV rankings support popular, top-rated, and trending Series lists; trending supports day and week windows.
+- TV search / ranking result clicks navigate to `SeriesOverviewPage` through summary-first TV metadata hydration.
+- The first navigation step writes metadata-only `TvSeries` and TMDB Season summary rows as needed. It must not create `MediaFile` rows, fabricate playback sources, or route TV through Movie detail.
+- Full Episode metadata may complete later through `SeriesOverviewPage` background hydration or `TvSeasonDetailPage` on-demand hydration.
+- Source-less Episodes remain non-playable; their play action is disabled / unavailable, while details and user-state actions remain available.
+- TV remains excluded from Movie AI recommendations, Watch Insights, Watch Profile, persona inputs, and recommendation fingerprints.
+
+Phase 4.16 closure work is limited to regression validation, documentation updates, build / migration checks, and fixes for clear blockers, regressions, build failures, migration drift, or sensitive-log risks.
+
+Out of scope remains TV AI recommendation, TV Watch Insights, TV recommendation fingerprints, final UI redesign, scan rule changes, media-library category semantic changes, no-source detail semantic changes, online subtitle search, database update, commit, and push.
+
 ## Phase 4.12-post-fix Scope
 
 Phase 4.12-post-fix is an automatic-scan legacy fix before Phase 4.13. It keeps the existing schema and derives non-persistent unknown TV grouping keys from active source context only.
