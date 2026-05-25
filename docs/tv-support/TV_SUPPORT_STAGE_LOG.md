@@ -2425,6 +2425,29 @@ Verification:
 - Failed Movie placeholders remain in the skipped / needs-review bucket and are not counted as Movie success.
 - This changes only persisted reason summary counts for future scan logs. It does not change scan matching rules, binding rules, schema, migration, database update, commit, or push.
 
+### Phase 4.14d - Watch history location and media metadata boundary polish
+
+Completed:
+
+- Watch Insights calendar date navigation now lands on the Watch History page with the target date filter applied, raises a target-date location event, scrolls the matching day group into view, and applies a short visual highlight.
+- If the target date has no history rows, Watch History keeps the date filter and shows a clear empty status instead of silently falling back to the full list.
+- Watch History item opening now handles missing detail targets, Episode rows without a Season id, and deleted / unavailable `MediaFile` rows with a user-facing status and sanitized diagnostics instead of failing silently.
+- Episode history rows still open Season detail. The target Episode row is marked, highlighted, and scrolled into view when it is present; missing target Episodes show a bounded status message.
+- Manual / direct probe now skips deleted `MediaFile` rows with a sanitized `probe-skipped-deleted-mediafile` diagnostic. Scan-time probe enqueue remains disabled, and active hidden / visible rows keep their existing probe fields.
+- Scan-time subtitle binding rebuild preserves the existing preferred subtitle when the same subtitle file is still matched after rebuild, and logs aggregate rebuild counts only.
+- Remove-from-library remains hide-only for 4.14b orphan carriers and does not clear probe fields or subtitle bindings. Delete-record remains the path that can remove source rows and related subtitle bindings.
+- TV Episode history remains available in Watch History, but TV still does not enter Movie Watch Insights, Watch Profile, AI recommendations, persona inputs, or recommendation fingerprints.
+
+Not done:
+
+- No Watch Insights statistic source change, TV recommendation input, online subtitle search, subtitle download, subtitle editor, playback-source-level subtitle binding, full-library probe, probe scheduler, scan rule expansion, media-library performance work, final UI redesign, schema migration, database update, commit, or push was added.
+- No historical data cleanup, orphan WatchHistory cleanup, or Movie / TV user-state migration was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- No new Phase 4.14d migration was added. The migrations diff still contains the existing Phase 4.14c `ScanTaskLogs.ReasonSummaryJson` migration.
+
 ### Phase 4.13e follow-up - Batch global order stability
 
 Completed:

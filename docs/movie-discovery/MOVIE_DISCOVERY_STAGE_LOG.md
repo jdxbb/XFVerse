@@ -830,3 +830,12 @@
 - Scan history cards no longer show full WebDAV target URLs or usernames; they use scan-path display names and reason totals instead.
 - This phase adds migration `20260524213322_AddScanTaskReasonSummary` but does not execute database update, commit, or push.
 - Follow-up: Movie success in the reason summary now counts only source rows that end bound to matched / manually confirmed Movie records. Failed Movie placeholders stay in the needs-review bucket and do not inflate Movie success counts.
+
+# Phase 4.14d Watch History / Probe / Subtitle Cross-impact
+
+- Watch Insights calendar navigation now applies a Watch History target date filter and highlight without changing Watch Insights statistic inputs. Movie Watch Insights, Watch Profile, AI recommendations, persona inputs, and recommendation fingerprints remain Movie-only.
+- Movie history rows continue to open Movie detail, including no-source Movie detail when a Movie record exists but has no active playable source.
+- Deleted / unavailable source rows in history are shown as unavailable instead of treated as active playback sources.
+- Direct probe now skips deleted `MediaFile` rows; remove-from-library continues to preserve Movie source probe fields, while delete-record keeps its software-record deletion semantics.
+- Scan-time subtitle binding rebuild preserves the existing preferred subtitle when the same subtitle file is still present after rebuild. Online subtitle search / download and playback-source-level subtitle binding remain out of scope.
+- Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, scan matching rules, schema, migrations, database update, commit, and push were not changed by this phase.

@@ -124,6 +124,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
     }
 
+    public event EventHandler<TvSeasonTargetEpisodeLocatedEventArgs>? TargetEpisodeLocated;
+
     public ObservableCollection<TvSeasonEpisodeListItem> Episodes { get; } = [];
 
     public ObservableCollection<SeasonCorrectionSourceMappingRowViewModel> SeasonCorrectionMappings { get; } = [];
@@ -558,9 +560,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             IsSeasonUnwatched = model.IsSeasonUnwatched;
             IsVisibleInLibrary = model.IsVisibleInLibrary;
             CurrentLibraryVisibilityState = model.LibraryVisibilityState;
+            var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
             Episodes.Clear();
             foreach (var episode in model.Episodes)
             {
+                episode.IsTargetEpisode = selectedEpisodeId.HasValue && episode.EpisodeId == selectedEpisodeId.Value;
                 Episodes.Add(episode);
             }
 
@@ -586,12 +590,30 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             OnPropertyChanged(nameof(HasNoEpisodes));
             OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
             OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
-            var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
-            StatusMessage = selectedEpisodeId.HasValue
-                ? $"已加载集列表，目标集 ID：{selectedEpisodeId.Value}。"
-                : Episodes.Count == 0
+            if (selectedEpisodeId.HasValue)
+            {
+                var targetEpisode = Episodes.FirstOrDefault(episode => episode.EpisodeId == selectedEpisodeId.Value);
+                if (targetEpisode is not null)
+                {
+                    StatusMessage = $"已定位到 {targetEpisode.EpisodeNumberText}。";
+                    TargetEpisodeLocated?.Invoke(this, new TvSeasonTargetEpisodeLocatedEventArgs(selectedEpisodeId.Value));
+                    ScanIdentificationDiagnostics.Write(
+                        $"event=watch-history-target-highlighted targetKind=episode seasonId={model.SeasonId} episodeId={selectedEpisodeId.Value}");
+                }
+                else
+                {
+                    StatusMessage = "历史记录关联的目标集已不存在或不在当前季。";
+                    ScanIdentificationDiagnostics.Write(
+                        $"event=watch-history-target-missing targetKind=episode seasonId={model.SeasonId} episodeId={selectedEpisodeId.Value}");
+                }
+            }
+            else
+            {
+                StatusMessage = Episodes.Count == 0
                     ? EpisodeEmptyText
                     : $"已加载 {Episodes.Count} 集。";
+            }
+
             _ = LoadRatingDisplayAsync(model.SeasonId, cancellationToken);
             if (shouldEnsureEpisodeMetadata)
             {
@@ -1727,5 +1749,15 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             AiSearchSuggestionStatus.Failed => "failed",
             _ => "unknown"
         };
+    }
+
+    public sealed class TvSeasonTargetEpisodeLocatedEventArgs : EventArgs
+    {
+        public TvSeasonTargetEpisodeLocatedEventArgs(int episodeId)
+        {
+            EpisodeId = episodeId;
+        }
+
+        public int EpisodeId { get; }
     }
 }

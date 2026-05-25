@@ -1,4 +1,5 @@
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Services.Interfaces;
@@ -57,12 +58,22 @@ public sealed class SubtitleBindingService : ISubtitleBindingService
         var existingBindings = await dbContext.SubtitleBindings
             .Where(binding => distinctIds.Contains(binding.MediaFileId))
             .ToListAsync(cancellationToken);
+        var preferredSubtitleByVideo = existingBindings
+            .Where(binding => binding.Priority == 0)
+            .GroupBy(binding => binding.MediaFileId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(binding => binding.UpdatedAt)
+                    .Select(binding => binding.SubtitleMediaFileId)
+                    .First());
 
         if (existingBindings.Count > 0)
         {
             dbContext.SubtitleBindings.RemoveRange(existingBindings);
         }
 
+        var preferredPreservedCount = 0;
         foreach (var video in videos)
         {
             var videoDirectory = GetDirectoryPath(video.FilePath);
@@ -77,20 +88,45 @@ public sealed class SubtitleBindingService : ISubtitleBindingService
                 .ToList();
 
             var priority = 1;
+            var preferredSubtitleMediaFileId = preferredSubtitleByVideo.GetValueOrDefault(video.Id);
+            var preferredPreserved = false;
             foreach (var subtitle in sameDirectorySubtitles
                          .Where(subtitle => IsSameNameSubtitle(videoBaseName, normalizedVideoBaseName, subtitle.FileName)))
             {
-                dbContext.SubtitleBindings.Add(CreateBinding(video.Id, subtitle, SubtitleMatchType.SameName, true, priority++));
+                var isPreferred = preferredSubtitleMediaFileId == subtitle.Id;
+                preferredPreserved |= isPreferred;
+                dbContext.SubtitleBindings.Add(
+                    CreateBinding(
+                        video.Id,
+                        subtitle,
+                        SubtitleMatchType.SameName,
+                        true,
+                        isPreferred ? 0 : priority++));
             }
 
             foreach (var subtitle in sameDirectorySubtitles
                          .Where(subtitle => !IsSameNameSubtitle(videoBaseName, normalizedVideoBaseName, subtitle.FileName)))
             {
-                dbContext.SubtitleBindings.Add(CreateBinding(video.Id, subtitle, SubtitleMatchType.SameFolder, false, priority++));
+                var isPreferred = preferredSubtitleMediaFileId == subtitle.Id;
+                preferredPreserved |= isPreferred;
+                dbContext.SubtitleBindings.Add(
+                    CreateBinding(
+                        video.Id,
+                        subtitle,
+                        SubtitleMatchType.SameFolder,
+                        isPreferred,
+                        isPreferred ? 0 : priority++));
+            }
+
+            if (preferredPreserved)
+            {
+                preferredPreservedCount++;
             }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        ScanIdentificationDiagnostics.Write(
+            $"event=subtitle-binding-rebuild-completed sourceConnectionId={sourceConnectionId} videoCount={videos.Count} removedBindingCount={existingBindings.Count} preferredPreservedCount={preferredPreservedCount}");
     }
 
     private static bool IsSameNameSubtitle(

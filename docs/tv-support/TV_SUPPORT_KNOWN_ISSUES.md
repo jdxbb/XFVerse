@@ -446,3 +446,21 @@ Noise:
 
 - Recent scan cards may show the same task-level reason summary on multiple path logs when one scan run processes multiple enabled paths.
 - Scan progress file text is throttled and safe-name-only, so very fast scans may skip over intermediate file names by design.
+
+## Phase 4.14d Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Watch History date positioning is date-level only. Per-history-item deep links, scan reason click-through, and richer timeline navigation remain future work.
+- Deleted or orphaned history rows are not cleaned up automatically; they remain visible where enough display metadata exists, with playback/detail actions bounded by current target availability.
+- Online subtitle search, subtitle download, subtitle version management, playback-source-level subtitle binding, full-library probe scheduling, and probe task-center UI remain later dedicated work.
+- If future manual online subtitles bind to Movie / Episode entities, automatic subtitle rebuild needs a separate preservation rule so it cannot overwrite manual choices.
+
+Noise:
+
+- Target-date and target-Episode highlights are intentionally short-lived visual hints. They are not persisted and may disappear after refresh or navigation.
+- Probe skip diagnostics for deleted source rows include only ids, source kind, protocol kind, and a safe file fingerprint.

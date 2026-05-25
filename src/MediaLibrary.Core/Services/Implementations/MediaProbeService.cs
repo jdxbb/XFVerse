@@ -565,6 +565,14 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         }
 
         var now = DateTime.UtcNow;
+        if (mediaFile.IsDeleted)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=probe-skipped-deleted-mediafile mediaFileId={mediaFile.Id} mediaFileKind={ResolveMediaFileKind(mediaFile)} protocolType={FormatProtocol(mediaFile.SourceConnection?.ProtocolType ?? ProtocolType.WebDav)} file={ScanIdentificationDiagnostics.FormatFileNameFingerprint(mediaFile.FileName)}");
+            WriteProbeSkipped(mediaFile, "deleted-media-file");
+            return null;
+        }
+
         if (mediaFile.MediaType != MediaType.Video)
         {
             mediaFile.MediaProbeStatus = MediaProbeStatus.Skipped;

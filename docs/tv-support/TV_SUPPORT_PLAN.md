@@ -1297,3 +1297,16 @@ Phase 4.13a starts the active correction work with a narrow single-source founda
 ## Phase 4.14c Deferred
 
 - Per-file reason history, click-to-item positioning from scan reasons, complex scan log UI, scan rule expansion, media-library performance work, TV Discovery closure, online subtitle search, final UI redesign, and TV Watch Insights / recommendation integration remain out of scope.
+
+## Phase 4.14d Watch History / Probe / Subtitle Boundary Goal
+
+- Watch Insights calendar clicks navigate to Watch History with a target date filter, scroll to the matching day group, and apply a short non-persistent highlight.
+- Watch History opens Movie rows to Movie detail and Episode rows to Season detail with the target Episode highlighted when present.
+- Missing detail targets, missing Season ids, deleted / unavailable `MediaFile` rows, and no-record target dates are handled with bounded user-facing status messages.
+- Probe remains detail-page lazy / manual only. Scan-time probe enqueue stays disabled, deleted source rows are skipped by direct probe, and remove-from-library does not clear probe fields.
+- Subtitle binding rebuild remains scan-time automatic binding only. Rebuild preserves the existing preferred subtitle when the same subtitle file is still matched; delete-record remains the path that clears related software subtitle bindings.
+- TV Episode history remains excluded from Movie Watch Insights, Watch Profile, AI recommendations, persona inputs, and recommendation fingerprints.
+
+## Phase 4.14d Deferred
+
+- Per-item history deep links, scan reason click-through, timeline UI, online subtitle search / download, subtitle version management, playback-source-level subtitle binding, full-library probe scheduling, probe task-center UI, TV Watch Insights, TV recommendation inputs, schema migrations, and database update remain out of scope.

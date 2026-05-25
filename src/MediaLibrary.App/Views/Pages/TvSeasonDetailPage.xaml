@@ -215,20 +215,37 @@
                     </StackPanel>
                 </Border>
 
-                <ScrollViewer Grid.Row="2"
+                <ScrollViewer x:Name="EpisodeScrollViewer"
+                              Grid.Row="2"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
-                    <ListBox ItemsSource="{Binding Episodes}"
+                    <ListBox x:Name="EpisodeListBox"
+                             ItemsSource="{Binding Episodes}"
                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
                              Style="{StaticResource SectionListBoxStyle}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="70" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="170" />
-                                    </Grid.ColumnDefinitions>
+                                <Border Padding="10"
+                                        BorderThickness="1"
+                                        CornerRadius="12">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="Transparent" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsTargetEpisode}" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="170" />
+                                        </Grid.ColumnDefinitions>
 
                                     <Border Width="52"
                                             Height="52"
@@ -284,43 +301,44 @@
                                         </WrapPanel>
                                     </StackPanel>
 
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                        <Button Margin="0,0,0,8"
-                                                Command="{Binding DataContext.OpenEpisodeDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Content="详情"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                        <Button Command="{Binding DataContext.PlayEpisodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Content="{Binding PlayButtonText}">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                    <Setter Property="IsEnabled" Value="False" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasPlayableSource}" Value="True">
-                                                            <Setter Property="IsEnabled" Value="True" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding DataContext.CanOpenEpisodePlayer, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
-                                                            <Setter Property="IsEnabled" Value="False" />
-                                                            <Setter Property="Content" Value="播放器打开中" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                        <WrapPanel Margin="0,8,0,0" HorizontalAlignment="Center">
-                                            <Button Margin="0,0,8,0"
-                                                    Command="{Binding DataContext.MarkEpisodeWatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <Button Margin="0,0,0,8"
+                                                    Command="{Binding DataContext.OpenEpisodeDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
-                                                    Content="{Binding WatchedActionText}"
+                                                    Content="详情"
                                                     Style="{StaticResource SecondaryButtonStyle}" />
-                                            <Button Command="{Binding DataContext.MarkEpisodeUnwatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            <Button Command="{Binding DataContext.PlayEpisodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
-                                                    Content="{Binding UnwatchedActionText}"
-                                                    Style="{StaticResource SecondaryButtonStyle}" />
-                                        </WrapPanel>
-                                    </StackPanel>
-                                </Grid>
+                                                    Content="{Binding PlayButtonText}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                        <Setter Property="IsEnabled" Value="False" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasPlayableSource}" Value="True">
+                                                                <Setter Property="IsEnabled" Value="True" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding DataContext.CanOpenEpisodePlayer, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                                <Setter Property="IsEnabled" Value="False" />
+                                                                <Setter Property="Content" Value="播放器打开中" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <WrapPanel Margin="0,8,0,0" HorizontalAlignment="Center">
+                                                <Button Margin="0,0,8,0"
+                                                        Command="{Binding DataContext.MarkEpisodeWatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="{Binding WatchedActionText}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                <Button Command="{Binding DataContext.MarkEpisodeUnwatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="{Binding UnwatchedActionText}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

@@ -138,6 +138,8 @@ public sealed class TvSeasonEpisodeListItem
     public string WatchedActionText => IsWatched ? "已看" : "标记已看";
 
     public string UnwatchedActionText => IsWatched ? "标记未看" : "未看";
+
+    public bool IsTargetEpisode { get; set; }
 }
 
 public sealed class TvSeasonCorrectionSourceItem

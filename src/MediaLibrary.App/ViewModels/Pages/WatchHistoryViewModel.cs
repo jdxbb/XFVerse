@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
@@ -22,9 +23,14 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
     private readonly IDataRefreshService _dataRefreshService;
     private bool _isActive;
     private bool _isLoading;
+    private bool _reloadRequestedAfterCurrentLoad;
     private bool _suppressFilterRefresh;
+    private int _filterVersion;
+    private int _targetHighlightVersion;
     private string _selectedDateFilter = FilterAll;
     private DateTime? _selectedCustomDate;
+    private DateTime? _targetDateForHighlight;
+    private DateTime? _activeTargetDate;
     private string _statusMessage = "正在加载观影历史。";
 
     public WatchHistoryViewModel(
@@ -42,6 +48,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsLoading);
         OpenMovieCommand = new RelayCommand(OpenMovie);
     }
+
+    public event EventHandler<WatchHistoryTargetDateLocatedEventArgs>? TargetDateLocated;
 
     public ObservableCollection<WatchHistoryDayGroupViewModel> DayGroups { get; } = [];
 
@@ -134,6 +142,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
     public override void Deactivate()
     {
         _isActive = false;
+        _reloadRequestedAfterCurrentLoad = false;
+        ClearTargetHighlight(clearPendingDate: true);
     }
 
     private void OnDataChanged(object? sender, AppDataChangedEventArgs e)
@@ -156,6 +166,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
 
     private void ApplyTargetDate(DateTime date)
     {
+        _filterVersion++;
+        _targetDateForHighlight = date.Date;
         _suppressFilterRefresh = true;
         try
         {
@@ -175,6 +187,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             return;
         }
 
+        ClearTargetHighlight(clearPendingDate: true);
+        _filterVersion++;
         _ = LoadAsync();
     }
 
@@ -182,16 +196,20 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
     {
         if (IsLoading)
         {
+            _reloadRequestedAfterCurrentLoad = true;
             return;
         }
 
+        var filterVersion = _filterVersion;
         IsLoading = true;
         try
         {
             StatusMessage = "正在加载观影历史。";
             var items = await _watchHistoryService.GetHistoryItemsAsync(BuildQuery(), cancellationToken);
             ReplaceGroups(BuildDayGroups(items));
-            StatusMessage = BuildStatusMessage(items.Count);
+            StatusMessage = filterVersion == _filterVersion
+                ? ApplyTargetDateHighlight(items.Count) ?? BuildStatusMessage(items.Count)
+                : BuildStatusMessage(items.Count);
         }
         catch (Exception exception)
         {
@@ -202,6 +220,76 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         finally
         {
             IsLoading = false;
+            if (_reloadRequestedAfterCurrentLoad && _isActive)
+            {
+                _reloadRequestedAfterCurrentLoad = false;
+                _ = Application.Current.Dispatcher.InvokeAsync(() => _ = LoadAsync());
+            }
+            else if (!_isActive)
+            {
+                _reloadRequestedAfterCurrentLoad = false;
+            }
+        }
+    }
+
+    private string? ApplyTargetDateHighlight(int itemCount)
+    {
+        if (!_targetDateForHighlight.HasValue)
+        {
+            return null;
+        }
+
+        var targetDate = _targetDateForHighlight.Value.Date;
+        _targetDateForHighlight = null;
+        var targetGroup = DayGroups.FirstOrDefault(group => group.Date == targetDate);
+        if (targetGroup is null)
+        {
+            Log($"watch-history-target-missing targetDate={targetDate:yyyy-MM-dd}");
+            return $"{targetDate:yyyy年M月d日} 没有观看记录。";
+        }
+
+        ClearTargetHighlight(clearPendingDate: false);
+        _activeTargetDate = targetDate;
+        targetGroup.IsTargetHighlightActive = true;
+        var version = ++_targetHighlightVersion;
+        TargetDateLocated?.Invoke(this, new WatchHistoryTargetDateLocatedEventArgs(targetDate));
+        Log($"watch-history-target-date-applied targetDate={targetDate:yyyy-MM-dd} itemCount={itemCount}");
+        Log($"watch-history-target-highlighted targetDate={targetDate:yyyy-MM-dd}");
+        _ = ClearTargetHighlightAfterDelayAsync(targetDate, version);
+        return $"已定位到 {targetDate:yyyy年M月d日} · {itemCount} 条观看记录。";
+    }
+
+    private async Task ClearTargetHighlightAfterDelayAsync(DateTime targetDate, int version)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (_targetHighlightVersion == version && _activeTargetDate == targetDate)
+                {
+                    ClearTargetHighlight(clearPendingDate: false);
+                }
+            });
+        }
+        catch
+        {
+            // Highlight cleanup is visual-only and must not affect history loading.
+        }
+    }
+
+    private void ClearTargetHighlight(bool clearPendingDate)
+    {
+        if (clearPendingDate)
+        {
+            _targetDateForHighlight = null;
+        }
+
+        _activeTargetDate = null;
+        _targetHighlightVersion++;
+        foreach (var group in DayGroups)
+        {
+            group.IsTargetHighlightActive = false;
         }
     }
 
@@ -311,8 +399,27 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             return;
         }
 
-        if (item.EpisodeId.HasValue && item.TvSeasonId.HasValue)
+        if (!item.CanOpenDetail)
         {
+            StatusMessage = "这条历史记录缺少可打开的详情目标，可能关联记录已被删除。";
+            Log($"watch-history-target-missing historyId={item.HistoryId} reason=missing-detail-target");
+            return;
+        }
+
+        if (item.IsMediaFileDeleted)
+        {
+            Log($"watch-history-mediafile-deleted historyId={item.HistoryId} mediaFileId={item.MediaFileId}");
+        }
+
+        if (item.EpisodeId.HasValue)
+        {
+            if (!item.TvSeasonId.HasValue)
+            {
+                StatusMessage = "这条剧集历史记录缺少所属季信息，无法打开详情。";
+                Log($"watch-history-target-missing historyId={item.HistoryId} reason=missing-season-id");
+                return;
+            }
+
             _navigationStateService.RequestTvSeasonDetail(item.TvSeasonId.Value, item.EpisodeId);
             return;
         }
@@ -323,8 +430,25 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         }
     }
 
-    public sealed class WatchHistoryDayGroupViewModel
+    private static void Log(string message)
     {
+        Debug.WriteLine("[WATCH-HISTORY] " + message);
+    }
+
+    public sealed class WatchHistoryTargetDateLocatedEventArgs : EventArgs
+    {
+        public WatchHistoryTargetDateLocatedEventArgs(DateTime targetDate)
+        {
+            TargetDate = targetDate.Date;
+        }
+
+        public DateTime TargetDate { get; }
+    }
+
+    public sealed class WatchHistoryDayGroupViewModel : ObservableObject
+    {
+        private bool _isTargetHighlightActive;
+
         public WatchHistoryDayGroupViewModel(
             DateTime date,
             string title,
@@ -343,6 +467,12 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         public string SummaryText { get; }
 
         public IReadOnlyList<WatchHistoryItemViewModel> Items { get; }
+
+        public bool IsTargetHighlightActive
+        {
+            get => _isTargetHighlightActive;
+            set => SetProperty(ref _isTargetHighlightActive, value);
+        }
     }
 
     public sealed class WatchHistoryItemViewModel
@@ -363,7 +493,9 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             HasProgressPercent = item.ProgressPercent.HasValue;
             ProgressText = BuildProgressText(item);
             MediaFileName = item.MediaFileName;
-            SourceStatusText = item.IsMediaFileDeleted ? "播放源已移出" : string.Empty;
+            MediaFileId = item.MediaFileId;
+            IsMediaFileDeleted = item.IsMediaFileDeleted;
+            SourceStatusText = item.IsMediaFileDeleted ? "播放源不可用" : string.Empty;
             CanOpenDetail = item.MovieId > 0 || (item.EpisodeId.HasValue && item.TvSeasonId.HasValue);
         }
 
@@ -374,6 +506,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         public int? EpisodeId { get; }
 
         public int? TvSeasonId { get; }
+
+        public int MediaFileId { get; }
 
         public string Title { get; }
 
@@ -398,6 +532,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         public string SourceStatusText { get; }
 
         public bool CanOpenDetail { get; }
+
+        public bool IsMediaFileDeleted { get; }
 
         public bool HasSourceStatus => !string.IsNullOrWhiteSpace(SourceStatusText);
     }
