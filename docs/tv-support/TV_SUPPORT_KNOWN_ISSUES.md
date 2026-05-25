@@ -464,3 +464,21 @@ Noise:
 
 - Target-date and target-Episode highlights are intentionally short-lived visual hints. They are not persisted and may disappear after refresh or navigation.
 - Probe skip diagnostics for deleted source rows include only ids, source kind, protocol kind, and a safe file fingerprint.
+
+## Phase 4.14 Closure Known Issues
+
+Blocker:
+
+- None after closure build verification.
+
+Deferred:
+
+- Historical `MediaFile.IsDeleted=true` rows created by older remove-from-library behavior are still not auto-restored.
+- Historical scan logs created before task-level reason summary support still have no reason summary unless superseded by later scans.
+- Watch History still does not provide per-item deep links, scan reason click-through, or data-health cleanup for orphaned history rows.
+- Online subtitle search / download, playback-source-level subtitle binding, full-library probe scheduling, probe task-center UI, TV Discovery closure, and media-library performance work remain later phases.
+
+Noise:
+
+- WebDAV scan log errors now intentionally show generic operation text plus exception type; detailed raw exception text is not persisted to avoid leaking URLs, paths, or credentials.
+- Reason summaries remain aggregate task explanations and are not used as scan matching rules.

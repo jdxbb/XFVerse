@@ -2448,6 +2448,30 @@ Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - No new Phase 4.14d migration was added. The migrations diff still contains the existing Phase 4.14c `ScanTaskLogs.ReasonSummaryJson` migration.
 
+### Phase 4.14 Closure Regression - Scan / rescan / history experience hardening
+
+Completed:
+
+- Re-audited the current Phase 4.14 implementation from the worktree instead of relying on prior prompt state. The active git diff at the start of closure was empty, and the Phase 4.14b / 4.14c / 4.14d code was already present in the branch.
+- Confirmed unchanged active unbound videos are requeued into full TV / Movie identification for both local and WebDAV scans, while `IsDeleted=true`, existing Movie binding, and existing Episode binding rows are excluded from that unbound requeue path.
+- Confirmed automatic TV scan candidate construction skips already-bound Episode sources, and automatic attach preserves a different existing Episode binding. User-initiated correction paths remain separate from that automatic guard.
+- Confirmed orphan / unassociated remove-from-library is hide-only through failed Movie placeholder carriers plus `LibraryVisibilityState.Hidden`; delete-record still owns source-row / subtitle-binding cleanup semantics.
+- Confirmed hidden failed Movie placeholders are excluded from Movie retry, rescan reattach, unknown Season append, and orphan grouping candidates until restored.
+- Confirmed scan progress reports current stages and safe file names through the local and WebDAV progress reporter, and scan history cards show task-level reason summaries without per-file reason history.
+- Confirmed Watch Insights calendar date navigation still only passes a target date to Watch History and does not alter Movie-only Watch Insights inputs.
+- Confirmed Watch History date filtering / highlight, Season detail Episode positioning, deleted-source history display state, probe deleted-source guard, and subtitle preferred-binding preservation are present.
+- Fixed a closure regression risk in WebDAV scan error handling: persisted scan log error messages and WebDAV scan diagnostics now use bounded generic text plus exception type instead of raw exception messages that could contain full URLs, remote paths, or credentials.
+
+Not done:
+
+- No Phase 4.15 media-library categorization / filtering / performance work, TV Discovery closure, online subtitle search, final UI redesign, scan rule expansion, new correction feature, schema migration, database update, commit, or push was added.
+- No Movie / TV user-state migration, real file deletion, WebDAV file deletion, full-library probe scheduling, or TV Watch Insights / AI recommendation integration was added.
+
+Verification:
+
+- Build verification is recorded in the final report for this closure pass.
+- Current migrations diff remained empty during the closure pass.
+
 ### Phase 4.13e follow-up - Batch global order stability
 
 Completed:

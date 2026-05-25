@@ -839,3 +839,9 @@
 - Direct probe now skips deleted `MediaFile` rows; remove-from-library continues to preserve Movie source probe fields, while delete-record keeps its software-record deletion semantics.
 - Scan-time subtitle binding rebuild preserves the existing preferred subtitle when the same subtitle file is still present after rebuild. Online subtitle search / download and playback-source-level subtitle binding remain out of scope.
 - Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, scan matching rules, schema, migrations, database update, commit, and push were not changed by this phase.
+
+# Phase 4.14 Closure Regression Cross-impact
+
+- Rechecked Movie scan / placeholder / Other cross-impact as part of the Phase 4.14 closure pass. Hidden failed Movie placeholders remain excluded from automatic retry, reattach, unknown append, and orphan grouping until restored.
+- WebDAV scan failure messages persisted to scan logs now use generic operation text plus exception type instead of raw exception messages, reducing the chance that full URLs, remote paths, or credentials appear on scan history cards.
+- Movie Discovery ranking, search, no-source Movie detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push were not changed by this closure pass.

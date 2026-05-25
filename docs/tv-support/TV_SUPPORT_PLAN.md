@@ -1310,3 +1310,10 @@ Phase 4.13a starts the active correction work with a narrow single-source founda
 ## Phase 4.14d Deferred
 
 - Per-item history deep links, scan reason click-through, timeline UI, online subtitle search / download, subtitle version management, playback-source-level subtitle binding, full-library probe scheduling, probe task-center UI, TV Watch Insights, TV recommendation inputs, schema migrations, and database update remain out of scope.
+
+## Phase 4.14 Closure Regression Goal
+
+- Phase 4.14 closure verifies the completed scan / rescan safety, scan progress explanation, reason summary persistence, Watch History positioning, probe boundary, and subtitle binding boundary as one combined surface.
+- Closure fixes are limited to Phase 4.14 blockers, regressions, data-safety issues, build failures, migration drift, and sensitive-log risks.
+- WebDAV scan error reporting uses generic operation text plus exception type for persisted scan logs and diagnostics so raw exception messages cannot expose full URLs, remote paths, credentials, tokens, or API keys.
+- Phase 4.15 media-library categorization / filtering / performance work, Phase 4.16 TV Discovery closure, online subtitle search, final UI redesign, scan rule expansion, new correction features, database update, commit, and push remain out of scope.

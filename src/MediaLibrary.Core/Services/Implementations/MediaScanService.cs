@@ -356,7 +356,7 @@ public sealed class MediaScanService : IMediaScanService
         }
         catch (Exception exception)
         {
-            postStage.AddError("Identify.Stage", TrimMessage(exception.Message));
+            postStage.AddError("Identify.Stage", exception.GetType().Name);
             AddReasonSummary(reasonSummary, totalResult, videoStats, postStage);
             reasonSummary.AddError("identify-stage-error", "识别阶段异常", 1);
         }
@@ -368,7 +368,7 @@ public sealed class MediaScanService : IMediaScanService
         }
         catch (Exception exception)
         {
-            postStage.AddWarning("Subtitle.Binding", TrimMessage(exception.Message));
+            postStage.AddWarning("Subtitle.Binding", exception.GetType().Name);
             reasonSummary.AddWarning("subtitle-binding-warning", "字幕绑定重建部分失败", 1);
         }
 
@@ -428,7 +428,7 @@ public sealed class MediaScanService : IMediaScanService
                 {
                     var durationMs = (long)(DateTime.UtcNow - startedAt).TotalMilliseconds;
                     ScanIdentificationDiagnostics.Write(
-                        $"event=scan-ai-classify-error source=webdav mediaFiles={ids.Length} durationMs={durationMs} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 180)}");
+                        $"event=scan-ai-classify-error source=webdav mediaFiles={ids.Length} durationMs={durationMs} error={ScanIdentificationDiagnostics.FormatValue(exception.GetType().Name, 180)}");
                 }
             });
     }
@@ -479,7 +479,7 @@ public sealed class MediaScanService : IMediaScanService
         catch (Exception exception)
         {
             result.ErrorCount++;
-            await CompletePathLogAsync(log, result, ScanTaskStatus.Failed, $"[WebDAV.List] {TrimMessage(exception.Message)}", dbContext, cancellationToken);
+            await CompletePathLogAsync(log, result, ScanTaskStatus.Failed, $"[WebDAV.List] WebDAV 列表读取失败：{exception.GetType().Name}", dbContext, cancellationToken);
             return result;
         }
 
@@ -636,7 +636,7 @@ public sealed class MediaScanService : IMediaScanService
         {
             result.ErrorCount++;
             result.IgnoredFiles.WriteDiagnostics("webdav", result.IgnoredFileCount);
-            await CompletePathLogAsync(log, result, ScanTaskStatus.Failed, $"[MediaFile.Upsert] {TrimMessage(exception.Message)}", dbContext, cancellationToken);
+            await CompletePathLogAsync(log, result, ScanTaskStatus.Failed, $"[MediaFile.Upsert] 媒体文件写入失败：{exception.GetType().Name}", dbContext, cancellationToken);
             return result;
         }
     }
