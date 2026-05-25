@@ -482,3 +482,125 @@ Noise:
 
 - WebDAV scan log errors now intentionally show generic operation text plus exception type; detailed raw exception text is not persisted to avoid leaking URLs, paths, or credentials.
 - Reason summaries remain aggregate task explanations and are not used as scan matching rules.
+
+## Phase 4.15b Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- The refresh query still uses the existing full `ILibraryQueryService.GetLibraryItemsAsync` path. Query split, projection reuse, pre-aggregation, and N+1 cleanup remain Phase 4.15c candidates and must be driven by the new timing logs.
+- The media library item controls and poster view are unchanged. Virtualization, image decode tuning, first-screen poster prioritization, and ObservableCollection differential updates remain later performance work.
+- Database index additions, if later justified by query timings, require a separately approved migration and were not added in this phase.
+- Already-running refreshes continue to completion after page deactivation. The active dirty gate prevents new inactive DataChanged refreshes but does not cancel in-flight UI application.
+
+Noise:
+
+- Debounced DataChanged bursts now produce request / debounced / completed diagnostics with merged reason names. Multiple request events in the same burst are expected; they should collapse to one completed refresh unless another request arrives during the refresh.
+- Refresh completion logs intentionally report aggregate counts and elapsed milliseconds only. They do not include item titles, local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
+
+## Phase 4.15c Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Query / projection optimization is still deferred until the new `library-query-*` diagnostics are collected on real media-library operations. This phase adds observability and removes a confirmed duplicate-refresh pattern, but does not rewrite LINQ or projection logic.
+- If service-level logs show repeated expensive source / state aggregation, Phase 4.15d may need targeted projection reuse or query splitting. Any database index work still requires a separately approved migration.
+- UI virtualization, poster decode prioritization, image cache behavior, and ObservableCollection differential updates remain later work because current refresh logs still show UI apply and filter / sort as negligible in the sampled library.
+
+Noise:
+
+- Operation-local refresh reasons now appear in `mergedReasons` together with DataChanged reasons, for example operation remove / delete reasons plus library / collection changes. This is expected and indicates coalescing.
+- `library-query-*` logs can appear before each `library-refresh-completed` event. They are aggregate timings only and do not log item names, local paths, WebDAV URLs, credentials, tokens, passwords, or API keys.
+
+## Phase 4.15d Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- The media library still performs a full query refresh for the active page. Phase 4.15d reduces TV projection materialization cost but does not add projection caching or differential refresh.
+- Movie-side query time, orphan / Other projection time, and external no-source collection projection remain unchanged. Revisit only if the new `library-query-*` logs show them as the next bottleneck.
+- If the new Season aggregate source query remains slow on a larger real library, index work may be needed, but that requires a separately approved migration and was not added in this phase.
+- UI virtualization, poster decode prioritization, image cache behavior, and ObservableCollection differential updates remain later work unless real logs show UI / image cost overtaking query cost.
+
+Noise:
+
+- `library-query-tv-series-completed` and `library-query-tv-season-completed` now include `episodeAggregateRowsMs`, `sourceAggregateRowsMs`, `episodeAggregateRows`, and `sourceAggregateRows`. The `episodeRows` and `sourceRows` fields are aggregate totals for comparison, not materialized row-list sizes.
+- Hidden-library TV projection also uses the aggregate path. Removed-library counts should remain semantically unchanged even though the internal query shape changed.
+
+## Phase 4.15d-fix Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- The flat source-row query must be re-sampled on the user library. If `sourceAggregateRowsMs` does not drop near the previous flat `sourceRowsMs` range, the next step is query-plan / index audit rather than UI work.
+- Full media-library refresh, projection caching, differential refresh, UI virtualization, poster decode prioritization, and image cache behavior remain unchanged.
+
+Noise:
+
+- `sourceAggregateRowsMs` now measures a flat minimal source read plus in-memory grouping. It should be compared against both the first 4.15d aggregate query and the older 4.15c `sourceRowsMs` values.
+
+## Phase 4.15e Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- The poster card grid still uses `ScrollViewer + ItemsControl + WrapPanel`, so it creates every visible card instead of virtualizing the first viewport. If background thumbnail decode is still not enough, the next performance phase should evaluate a virtualized poster panel or a list-first rendering strategy.
+- Poster downloads and cache misses are still handled by the existing poster cache service. This phase improves cached local decode pressure but does not add first-screen prioritization or a new download scheduler.
+- WPF render / layout duration is still not directly logged. If perceived latency persists, add render-priority dispatcher diagnostics before further UI structural changes.
+
+Noise:
+
+- Media-library card posters now request thumbnail-sized decode through `DecodePixelWidth=436`; detail pages that use the same image behavior keep their existing full decode behavior unless they opt in separately.
+
+## Phase 4.15d Frontend Poster Virtualization Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- The new virtualized poster panel should be sampled on the user's real library. If `library-render-ready` remains high while `library-poster-virtualization realized` is much smaller than `items`, the next step is targeted WPF template/layout profiling rather than another database query rewrite.
+- The panel keeps a fixed card width and an adaptive global row height to preserve wrap-grid virtualization. A later final UI phase can revisit fully responsive card sizing if visual polish needs it.
+- Poster cache misses and remote downloads still use the existing poster cache service. First-screen prioritization and a dedicated poster request scheduler remain deferred unless logs show poster request bursts as the next bottleneck.
+- Query caching, differential refresh, and index work remain separate decisions driven by real logs and require separate approval if they touch schema.
+
+Noise:
+
+- `library-poster-virtualization` diagnostics are aggregate layout evidence. They may repeat when the viewport size, realized count, or filtered item count changes.
+- The virtualized panel reports realized item containers, not business items selected by batch operations. Batch select-all continues to use the full current filtered collection.
+- Phase 4.15d follow-up reduces poster-view mouse-wheel speed and rate-limits virtualization diagnostics; users should retest scroll feel on mouse wheel and touchpad separately.
+
+## Phase 4.15 Closure Regression Known Issues
+
+Blocker:
+
+- None after closure build verification.
+
+Deferred:
+
+- First media-library entry after full application startup can still include one-time cold-start cost from process / WPF / EF / image-cache warmup. Phase 4.15 intentionally does not add cold-start prewarm.
+- If real-library samples later show `library-render-ready` remains high while `library-refresh-completed` stays low and `library-poster-virtualization realized` remains much smaller than `items`, the next step is targeted WPF template / layout profiling rather than another query rewrite.
+- If large-library query logs later show a new dominant `library-query-*` segment, query-plan / index work should be proposed separately; any index change still requires an approved migration.
+- First-screen poster prioritization and a dedicated poster request scheduler remain deferred unless cache-miss / remote-poster bursts become the next measured bottleneck.
+
+Noise:
+
+- `library-poster-virtualization` events are intentionally rate-limited aggregate layout evidence. A small number of repeated entries during viewport settle or scroll is expected.
+- `library-render-ready` measures dispatcher render readiness after refresh completion; it can include normal WPF layout / composition scheduling time and is not a database query duration.
+- Current Phase 4.15 logs are aggregate count / duration diagnostics and should not be treated as item-level audit logs.

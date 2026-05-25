@@ -1317,3 +1317,47 @@ Phase 4.13a starts the active correction work with a narrow single-source founda
 - Closure fixes are limited to Phase 4.14 blockers, regressions, data-safety issues, build failures, migration drift, and sensitive-log risks.
 - WebDAV scan error reporting uses generic operation text plus exception type for persisted scan logs and diagnostics so raw exception messages cannot expose full URLs, remote paths, credentials, tokens, or API keys.
 - Phase 4.15 media-library categorization / filtering / performance work, Phase 4.16 TV Discovery closure, online subtitle search, final UI redesign, scan rule expansion, new correction features, database update, commit, and push remain out of scope.
+
+## Phase 4.15b Media-library Performance Observation / Refresh Coalescing Goal
+
+- Phase 4.15b is limited to media-library performance observation and low-risk refresh scheduling hardening.
+- Add sanitized media-library refresh timing summaries for query-service, tag / decade option refresh, filter / sort, UI apply, and total elapsed time, including aggregate Movie / TV / Other and selection counts.
+- Route activation, manual refresh, batch-mode refresh, and relevant DataChanged notifications through one single-flight refresh scheduler.
+- Coalesce short Library / Metadata / Collection / Scan notification bursts with a 200 ms debounce while the media library page is active.
+- Mark the media library dirty while inactive and refresh once on the next activation, preserving merged reasons for diagnostics.
+- Preserve all existing media-library feature, UI, category, filter, batch selection, full-select, Movie / TV / Other projection, no-source display, scan, correction, aggregation, and AI semantics.
+- Query rewrite, projection cache, virtualization, poster / image optimization, ObservableCollection differential updates, index migrations, database update, online subtitle search, and final UI redesign remain out of scope for this phase.
+- Phase 4.15c / 4.15d should be selected from real refresh timing logs instead of assumptions.
+
+## Phase 4.15c Media-library Refresh Source / Query Projection Diagnostics Goal
+
+- Phase 4.15c follows the Phase 4.15b runtime logs. The confirmed issue is not UI apply or filter / sort; it is query / projection time plus one remaining duplicate refresh pattern where operation-local refresh and DataChanged notifications can both reload the library.
+- Route operation-local refreshes for remove / restore / delete / watched state / manual aggregation / batch AI through the same refresh scheduler with explicit operation reasons, so DataChanged notifications raised by the same operation can be merged into one refresh wave.
+- Add sanitized `LibraryQueryService` timing diagnostics for top-level Movie vs TV query time, sort time, Movie collection / row / orphan / external / projection time, TV Series / Season row / Episode / source / state / projection time, hidden-library query time, and aggregate row / result counts.
+- Preserve all existing media-library feature, UI, category, filter, batch selection, full-select, Movie / TV / Other projection, no-source display, scan, correction, aggregation, AI, and notification semantics.
+- Do not rewrite queries, add indexes, add migrations, change UI virtualization, change poster loading, or introduce projection caching until the new service-level timing logs identify the real hotspot.
+
+## Phase 4.15d Media-library TV Projection Aggregation Goal
+
+- Phase 4.15d follows the Phase 4.15c runtime logs. The confirmed hotspot is TV media-library query time, especially loading thousands of Episode / active source rows to project a small number of Series or Season cards.
+- Replace active media-library TV Series / TV Season projection internals with Season-level aggregate rows for Episode count, watched count, active source count, in-library Episode count, and source protocol flags.
+- Apply the same aggregate projection to removed-library hidden TV Season rows so restore / removed-library views do not keep the old full Episode / source materialization path.
+- Keep the existing Series / Season / unknown Season visibility rules, no-source rules, hidden / deleted filtering, watched-progress semantics, and Movie / TV / Other output shape unchanged.
+- Keep aggregate `library-query-tv-series-completed` and `library-query-tv-season-completed` diagnostics, now including aggregate-row counts and aggregate query timings so Phase 4.15e can be selected from real logs.
+- Do not change media-library UI, category / filter / batch selection semantics, scan rules, correction workflows, AI workflows, poster loading, ObservableCollection behavior, indexes, schema, migration, database update, commit, or push.
+
+## Phase 4.15e Media-library Poster Decode Goal
+
+- Phase 4.15e follows the post-4.15d-fix runtime logs. Query / filter / UI collection apply summaries are short, but perceived latency remains around poster-card rendering.
+- Reduce media-library poster-card UI-thread pressure by decoding cached local poster thumbnails on a background thread and limiting card decode size to the rendered poster size.
+- Preserve the existing poster cache service, poster source semantics, media-library layout, category / filter / batch behavior, and detail-page full poster behavior.
+- Do not add a virtualized wrap panel, UI redesign, poster download scheduler, schema, migration, database update, commit, or push in this phase.
+
+## Phase 4.15d Frontend Poster Virtualization Goal
+
+- Phase 4.15d frontend virtualization follows the user retest after 4.15e: query, filter, collection apply, and thumbnail decode are no longer enough to remove perceived delay, and the remaining root cause is the non-virtualized poster grid creating every card visual.
+- Replace the media-library poster view container with a virtualized, recycling item container path so the first viewport realizes only visible poster cards plus a small buffer instead of every filtered item.
+- Keep the existing card template, commands, batch selection state, content type filters, source filters, sorting, Movie / TV / Other projection, no-source display, hidden / deleted semantics, and poster cache behavior unchanged.
+- Add sanitized virtualization diagnostics for total item count, realized item count, column count, row range, item size, view mode, collection apply mode, and render-ready timing.
+- Use a range-reset collection apply to avoid hundreds of per-item collection notifications, but treat it as secondary to real poster-view virtualization.
+- Do not rewrite queries, add indexes, add migrations, change scan / correction / AI behavior, change product UI semantics, execute database update, commit, or push.

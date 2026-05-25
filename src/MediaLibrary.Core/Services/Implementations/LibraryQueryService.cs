@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Helpers;
@@ -14,8 +15,12 @@ public sealed class LibraryQueryService : ILibraryQueryService
         bool expandSeriesToSeasons,
         CancellationToken cancellationToken = default)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        var movieStopwatch = Stopwatch.StartNew();
         var movies = await GetLibraryMoviesAsync(cancellationToken);
+        movieStopwatch.Stop();
         IReadOnlyList<LibraryMovieListItem> tvItems;
+        var tvStopwatch = Stopwatch.StartNew();
         if (expandSeriesToSeasons)
         {
             tvItems = await GetTvSeasonLibraryItemsAsync(cancellationToken);
@@ -24,13 +29,19 @@ public sealed class LibraryQueryService : ILibraryQueryService
         {
             tvItems = await GetTvSeriesLibraryItemsAsync(includeUnknownSeriesAsOther: true, cancellationToken);
         }
+        tvStopwatch.Stop();
 
+        var sortStopwatch = Stopwatch.StartNew();
         var items = movies
             .Concat(tvItems)
             .OrderByDescending(x => x.UpdatedAt)
             .ThenBy(x => x.Title)
             .ToList();
+        sortStopwatch.Stop();
         LogLibraryContentCategorySummary(items);
+        totalStopwatch.Stop();
+        WriteLibraryQueryPerfEvent(
+            $"event=library-query-completed expandSeriesToSeasons={FormatBool(expandSeriesToSeasons)} movieMs={movieStopwatch.ElapsedMilliseconds} tvMs={tvStopwatch.ElapsedMilliseconds} sortMs={sortStopwatch.ElapsedMilliseconds} totalMs={totalStopwatch.ElapsedMilliseconds} movieItems={movies.Count} tvItems={tvItems.Count} resultItems={items.Count} movie={items.Count(x => x.IsMovie)} tv={items.Count(x => x.IsSeries || x.IsSeason)} other={items.Count(x => x.IsOther)}");
 
         return items;
     }
@@ -38,23 +49,36 @@ public sealed class LibraryQueryService : ILibraryQueryService
     public async Task<IReadOnlyList<LibraryMovieListItem>> GetHiddenLibraryItemsAsync(
         CancellationToken cancellationToken = default)
     {
+        var totalStopwatch = Stopwatch.StartNew();
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
+        var movieStopwatch = Stopwatch.StartNew();
         var movies = await GetHiddenMovieItemsAsync(dbContext, cancellationToken);
+        movieStopwatch.Stop();
+        var seasonStopwatch = Stopwatch.StartNew();
         var seasons = await GetHiddenSeasonItemsAsync(dbContext, cancellationToken);
+        seasonStopwatch.Stop();
 
-        return movies
+        var sortStopwatch = Stopwatch.StartNew();
+        var items = movies
             .Concat(seasons)
             .OrderByDescending(x => x.UpdatedAt)
             .ThenBy(x => x.Title)
             .ToList();
+        sortStopwatch.Stop();
+        totalStopwatch.Stop();
+        WriteLibraryQueryPerfEvent(
+            $"event=library-hidden-query-completed movieMs={movieStopwatch.ElapsedMilliseconds} seasonMs={seasonStopwatch.ElapsedMilliseconds} sortMs={sortStopwatch.ElapsedMilliseconds} totalMs={totalStopwatch.ElapsedMilliseconds} movieItems={movies.Count} seasonItems={seasons.Count} resultItems={items.Count}");
+        return items;
     }
 
     public async Task<IReadOnlyList<LibraryMovieListItem>> GetLibraryMoviesAsync(
         CancellationToken cancellationToken = default)
     {
+        var totalStopwatch = Stopwatch.StartNew();
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
+        var collectionStopwatch = Stopwatch.StartNew();
         var collectionStates = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
             .Where(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested || x.LibraryVisibilityState != LibraryVisibilityState.Auto)
@@ -71,6 +95,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.LibraryVisibilityState,
                     x.UpdatedAt))
             .ToListAsync(cancellationToken);
+        collectionStopwatch.Stop();
         var collectionMovieIds = collectionStates
             .Where(x => x.MovieId is > 0)
             .Select(x => x.MovieId!.Value)
@@ -80,6 +105,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
         var wantToWatchIndex = LibraryCollectionIdentityIndex.Create(collectionStates.Where(x => x.IsWantToWatch));
         var notInterestedIndex = LibraryCollectionIdentityIndex.Create(collectionStates.Where(x => x.IsNotInterested));
 
+        var movieRowsStopwatch = Stopwatch.StartNew();
         var movies = await dbContext.Movies
             .AsNoTracking()
             .Where(x => x.MediaFiles.Any(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
@@ -144,8 +170,15 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .ToList()
                 })
             .ToListAsync(cancellationToken);
+        movieRowsStopwatch.Stop();
 
+        var orphanStopwatch = Stopwatch.StartNew();
         var orphanItems = await GetOrphanMediaFileLibraryItemsAsync(dbContext, cancellationToken);
+        orphanStopwatch.Stop();
+        var externalStopwatch = Stopwatch.StartNew();
+        var externalItems = await GetExternalCollectionMoviesAsync(dbContext, cancellationToken);
+        externalStopwatch.Stop();
+        var projectionStopwatch = Stopwatch.StartNew();
         var items = movies
             .Select(
                 x =>
@@ -225,14 +258,18 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasWatchHistory = x.HasWatchHistory,
                         UpdatedAt = x.UpdatedAt
                     };
-                })
+            })
             .Where(x => x.IsVisibleInLibrary)
             .Concat(orphanItems)
-            .Concat(await GetExternalCollectionMoviesAsync(dbContext, cancellationToken))
+            .Concat(externalItems)
             .GroupBy(BuildLibraryItemKey, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(x => x.HasActiveSource).ThenByDescending(x => x.IsVisibleInLibrary).ThenByDescending(x => x.UpdatedAt).First())
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
+        projectionStopwatch.Stop();
+        totalStopwatch.Stop();
+        WriteLibraryQueryPerfEvent(
+            $"event=library-query-movie-completed collectionMs={collectionStopwatch.ElapsedMilliseconds} movieRowsMs={movieRowsStopwatch.ElapsedMilliseconds} orphanMs={orphanStopwatch.ElapsedMilliseconds} externalMs={externalStopwatch.ElapsedMilliseconds} projectionMs={projectionStopwatch.ElapsedMilliseconds} totalMs={totalStopwatch.ElapsedMilliseconds} collectionRows={collectionStates.Count} movieRows={movies.Count} orphanItems={orphanItems.Count} externalItems={externalItems.Count} resultItems={items.Count}");
 
         return items;
     }
@@ -241,6 +278,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        var queryStopwatch = Stopwatch.StartNew();
         var rows = await dbContext.MediaFiles
             .AsNoTracking()
             .Where(
@@ -263,7 +302,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         : null
                 })
             .ToListAsync(cancellationToken);
+        queryStopwatch.Stop();
 
+        var projectionStopwatch = Stopwatch.StartNew();
         var items = rows
             .Select(
                 x =>
@@ -294,11 +335,15 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsInLibrary = true,
                         UpdatedAt = updatedAt == default ? x.CreatedAt : updatedAt
                     };
-                })
+            })
             .ToList();
+        projectionStopwatch.Stop();
+        totalStopwatch.Stop();
 
         ScanIdentificationDiagnostics.Write(
             $"event=library-orphan-media-projection orphanMediaFilesProjectedToOther={items.Count} orphanMediaFilesHiddenBecauseGrouped=0 orphanMediaFilesWithoutProjection=0 unknownFileItemsCount={items.Count}");
+        WriteLibraryQueryPerfEvent(
+            $"event=library-query-orphan-completed queryMs={queryStopwatch.ElapsedMilliseconds} projectionMs={projectionStopwatch.ElapsedMilliseconds} totalMs={totalStopwatch.ElapsedMilliseconds} rows={rows.Count} resultItems={items.Count}");
         return items;
     }
 
@@ -510,44 +555,23 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
-        var episodeRows = await dbContext.TvEpisodes
-            .AsNoTracking()
-            .Where(x => seasonIds.Contains(x.TvSeasonId))
-            .Select(
-                x => new TvEpisodeLibraryRow
-                {
-                    EpisodeId = x.Id,
-                    SeasonId = x.TvSeasonId,
-                    IsWatched = x.IsWatched
-                })
-            .ToListAsync(cancellationToken);
-        var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
-        var sourceEpisodeIds = sourceRows.Select(x => x.EpisodeId).ToHashSet();
-        var episodesBySeason = episodeRows
-            .GroupBy(x => x.SeasonId)
-            .ToDictionary(x => x.Key, x => x.ToList());
-        var sourcesBySeason = sourceRows
-            .Join(
-                episodeRows,
-                source => source.EpisodeId,
-                episode => episode.EpisodeId,
-                (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
-            .GroupBy(x => x.SeasonId)
-            .ToDictionary(x => x.Key, x => x.ToList());
+        var episodeAggregateRows = await LoadTvEpisodeSeasonAggregateRowsAsync(dbContext, seasonIds, cancellationToken);
+        var sourceAggregateRows = await LoadTvSourceSeasonAggregateRowsAsync(dbContext, seasonIds, cancellationToken);
+        var episodeAggregatesBySeason = episodeAggregateRows.ToDictionary(x => x.SeasonId);
+        var sourceAggregatesBySeason = sourceAggregateRows.ToDictionary(x => x.SeasonId);
+        var metricsBySeason = seasonRows.ToDictionary(
+            x => x.SeasonId,
+            x => BuildTvSeasonProjectionMetrics(x, episodeAggregatesBySeason, sourceAggregatesBySeason));
 
         return seasonRows
             .Select(
                 season =>
                 {
                     stateBySeason.TryGetValue(season.SeasonId, out var state);
-                    var episodes = FilterCountableSeasonEpisodes(
-                        season,
-                        episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
-                        sourceEpisodeIds);
-                    var sources = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
-                    var watchedEpisodeCount = episodes.Count(x => x.IsWatched);
-                    var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(season, episodes.Count);
-                    var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
+                    var metrics = metricsBySeason[season.SeasonId];
+                    var watchedEpisodeCount = metrics.WatchedEpisodeCount;
+                    var totalEpisodeCount = metrics.TotalEpisodeCount;
+                    var isWatched = IsAggregateWatched(watchedEpisodeCount, metrics.CountableEpisodeCount, totalEpisodeCount);
                     return new LibraryMovieListItem
                     {
                         ItemKind = ResolveTvSeasonItemKind(season.IdentificationStatus),
@@ -565,22 +589,22 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Country = season.Country,
                         Language = season.Language,
                         IdentificationStatus = season.IdentificationStatus,
-                        SourceCount = sources.Count,
-                        ActiveSourceCount = sources.Count,
-                        HasActiveSource = sources.Count > 0,
-                        HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
-                        HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        SourceCount = metrics.SourceCount,
+                        ActiveSourceCount = metrics.SourceCount,
+                        HasActiveSource = metrics.SourceCount > 0,
+                        HasLocalSource = metrics.HasLocalSource,
+                        HasWebDavSource = metrics.HasWebDavSource,
                         IsVisibleInLibrary = false,
                         LibraryVisibilityState = LibraryVisibilityState.Hidden,
                         HasLibraryContext = true,
                         HasUserState = state?.IsFavorite == true || state?.IsWantToWatch == true || state?.IsNotInterested == true || watchedEpisodeCount > 0,
-                        IsInLibrary = sources.Count > 0,
+                        IsInLibrary = metrics.SourceCount > 0,
                         IsFavorite = state?.IsFavorite == true && isWatched,
                         IsWantToWatch = state?.IsWantToWatch == true && watchedEpisodeCount == 0,
                         IsNotInterested = state?.IsNotInterested == true,
                         IsWatched = isWatched,
                         WatchedEpisodeCount = watchedEpisodeCount,
-                        InLibraryEpisodeCount = sources.Select(x => x.EpisodeId).Distinct().Count(),
+                        InLibraryEpisodeCount = metrics.InLibraryEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
                     };
@@ -594,6 +618,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        var queryStopwatch = Stopwatch.StartNew();
         var rows = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
             .Where(
@@ -632,8 +658,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
+        queryStopwatch.Stop();
 
-        return rows
+        var projectionStopwatch = Stopwatch.StartNew();
+        var items = rows
             .Select(
                 x =>
                 {
@@ -680,9 +708,14 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasWatchHistory = false,
                         UpdatedAt = x.UpdatedAt
                     };
-                })
+            })
             .Where(x => x.IsVisibleInLibrary)
             .ToList();
+        projectionStopwatch.Stop();
+        totalStopwatch.Stop();
+        WriteLibraryQueryPerfEvent(
+            $"event=library-query-external-movie-completed queryMs={queryStopwatch.ElapsedMilliseconds} projectionMs={projectionStopwatch.ElapsedMilliseconds} totalMs={totalStopwatch.ElapsedMilliseconds} rows={rows.Count} resultItems={items.Count}");
+        return items;
     }
 
     private static string ResolveUnidentifiedMovieDisplayTitle(
@@ -726,6 +759,16 @@ public sealed class LibraryQueryService : ILibraryQueryService
         var unknownFileItems = items.Count(x => x.IsOther && x.OrphanMediaFileId > 0);
         ScanIdentificationDiagnostics.Write(
             $"event=library-content-category-summary movie={movieCount} tv={tvCount} other={otherCount} groupedTvLikePlaceholders={groupedCount} unknownMoviePlaceholders={unknownMoviePlaceholders} unknownFileItemsCount={unknownFileItems} otherCategoryCounts={otherCount} groupedRangesSelectable={groupedCount} groupedRangeDetailNavigationAvailable=true recognitionStatusFilterUiVisible=false");
+    }
+
+    private static void WriteLibraryQueryPerfEvent(string message)
+    {
+        AiPerfDiagnostics.WriteEvent(message);
+    }
+
+    private static string FormatBool(bool value)
+    {
+        return value ? "true" : "false";
     }
 
     private static string BuildLibraryItemKey(LibraryMovieListItem item)
@@ -804,8 +847,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
         bool includeUnknownSeriesAsOther,
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = Stopwatch.StartNew();
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
+        var seriesRowsStopwatch = Stopwatch.StartNew();
         var seriesRows = await dbContext.TvSeries
             .AsNoTracking()
             .Select(
@@ -824,12 +869,17 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
+        seriesRowsStopwatch.Stop();
         var seriesIds = seriesRows.Select(x => x.Id).ToArray();
         if (seriesIds.Length == 0)
         {
+            totalStopwatch.Stop();
+            WriteLibraryQueryPerfEvent(
+                $"event=library-query-tv-series-completed includeUnknownSeriesAsOther={FormatBool(includeUnknownSeriesAsOther)} seriesRowsMs={seriesRowsStopwatch.ElapsedMilliseconds} seasonRowsMs=0 episodeAggregateRowsMs=0 sourceAggregateRowsMs=0 stateRowsMs=0 projectionMs=0 totalMs={totalStopwatch.ElapsedMilliseconds} seriesRows=0 seasonRows=0 episodeRows=0 episodeAggregateRows=0 sourceRows=0 sourceAggregateRows=0 stateRows=0 resultItems=0");
             return [];
         }
 
+        var seasonRowsStopwatch = Stopwatch.StartNew();
         var seasonRows = await dbContext.TvSeasons
             .AsNoTracking()
             .Where(x => seriesIds.Contains(x.TvSeriesId))
@@ -849,43 +899,32 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
+        seasonRowsStopwatch.Stop();
         var seasonIds = seasonRows.Select(x => x.SeasonId).ToArray();
-        var episodeRows = seasonIds.Length == 0
-            ? []
-            : await dbContext.TvEpisodes
-                .AsNoTracking()
-                .Where(x => seasonIds.Contains(x.TvSeasonId))
-                .Select(
-                    x => new TvEpisodeLibraryRow
-                    {
-                        EpisodeId = x.Id,
-                        SeasonId = x.TvSeasonId,
-                        IsWatched = x.IsWatched
-                    })
-                .ToListAsync(cancellationToken);
-        var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
-        var sourceEpisodeIds = sourceRows.Select(x => x.EpisodeId).ToHashSet();
+        var episodeAggregateRowsStopwatch = Stopwatch.StartNew();
+        var episodeAggregateRows = await LoadTvEpisodeSeasonAggregateRowsAsync(dbContext, seasonIds, cancellationToken);
+        episodeAggregateRowsStopwatch.Stop();
+        var sourceAggregateRowsStopwatch = Stopwatch.StartNew();
+        var sourceAggregateRows = await LoadTvSourceSeasonAggregateRowsAsync(dbContext, seasonIds, cancellationToken);
+        sourceAggregateRowsStopwatch.Stop();
+        var stateRowsStopwatch = Stopwatch.StartNew();
         var stateRows = await LoadTvCollectionStateRowsAsync(dbContext, seasonIds, cancellationToken);
+        stateRowsStopwatch.Stop();
 
         var seasonsBySeries = seasonRows
             .GroupBy(x => x.SeriesId)
             .ToDictionary(x => x.Key, x => x.ToList());
-        var episodesBySeason = episodeRows
-            .GroupBy(x => x.SeasonId)
-            .ToDictionary(x => x.Key, x => x.ToList());
-        var sourcesBySeason = sourceRows
-            .Join(
-                episodeRows,
-                source => source.EpisodeId,
-                episode => episode.EpisodeId,
-                (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
-            .GroupBy(x => x.SeasonId)
-            .ToDictionary(x => x.Key, x => x.ToList());
+        var episodeAggregatesBySeason = episodeAggregateRows.ToDictionary(x => x.SeasonId);
+        var sourceAggregatesBySeason = sourceAggregateRows.ToDictionary(x => x.SeasonId);
+        var metricsBySeason = seasonRows.ToDictionary(
+            x => x.SeasonId,
+            x => BuildTvSeasonProjectionMetrics(x, episodeAggregatesBySeason, sourceAggregatesBySeason));
         var stateBySeason = stateRows
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.OrderByDescending(y => y.UpdatedAt).First());
 
-        return seriesRows
+        var projectionStopwatch = Stopwatch.StartNew();
+        var items = seriesRows
             .Select(
                 series =>
                 {
@@ -896,9 +935,6 @@ public sealed class LibraryQueryService : ILibraryQueryService
                                                     && !series.TmdbSeriesId.HasValue
                                                     && !hasRecognizedSeason
                                                     && seasons.Any(season => season.IdentificationStatus == IdentificationStatus.Failed);
-                    var sources = seasons
-                        .SelectMany(season => sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [])
-                        .ToList();
                     var visibleSeasonCount = 0;
                     var visibleSeasonIds = new HashSet<int>();
                     var displaySeasonIds = new HashSet<int>();
@@ -906,15 +942,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     foreach (var season in seasons)
                     {
                         stateBySeason.TryGetValue(season.SeasonId, out var state);
-                        var episodes = FilterCountableSeasonEpisodes(
-                            season,
-                            episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
-                            sourceEpisodeIds);
-                        var watchedInSeason = episodes.Count(x => x.IsWatched);
+                        var metrics = metricsBySeason[season.SeasonId];
+                        var watchedInSeason = metrics.WatchedEpisodeCount;
                         var seasonHasCurrentState = state?.HasUserState == true || watchedInSeason > 0;
-                        var seasonSourceRows = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
-                        var seasonHasActiveSource = seasonSourceRows.Count > 0;
-                        var seasonInLibraryEpisodeCount = seasonSourceRows.Select(x => x.EpisodeId).Distinct().Count();
+                        var seasonHasActiveSource = metrics.SourceCount > 0;
+                        var seasonInLibraryEpisodeCount = metrics.InLibraryEpisodeCount;
                         var visibilityState = state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
                         hasState |= seasonHasCurrentState;
                         var shouldShowSeason = ShouldShowSeasonInSeriesOverviewProjection(
@@ -941,32 +973,22 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var displaySeasons = seasons
                         .Where(season => displaySeasonIds.Contains(season.SeasonId))
                         .ToList();
-                    var visibleSources = sources
-                        .Where(x => visibleSeasonIds.Contains(x.SeasonId))
+                    var visibleMetrics = seasons
+                        .Where(season => visibleSeasonIds.Contains(season.SeasonId))
+                        .Select(season => metricsBySeason[season.SeasonId])
                         .ToList();
-                    var hasActiveSource = visibleSources.Count > 0;
+                    var displayMetrics = displaySeasons
+                        .Select(season => metricsBySeason[season.SeasonId])
+                        .ToList();
+                    var sourceCount = visibleMetrics.Sum(x => x.SourceCount);
+                    var hasActiveSource = sourceCount > 0;
                     var isVisibleInLibrary = visibleSeasonCount > 0
                                              && (hasRecognizedSeason || isUnknownSeriesProjection);
-                    var inLibraryEpisodeCount = visibleSources.Select(x => x.EpisodeId).Distinct().Count();
-                    var watchedEpisodeCount = displaySeasons
-                        .SelectMany(season => FilterCountableSeasonEpisodes(
-                            season,
-                            episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
-                            sourceEpisodeIds))
-                        .Count(x => x.IsWatched);
+                    var inLibraryEpisodeCount = visibleMetrics.Sum(x => x.InLibraryEpisodeCount);
+                    var watchedEpisodeCount = displayMetrics.Sum(x => x.WatchedEpisodeCount);
                     var hasWatchedEpisodeState = watchedEpisodeCount > 0;
-                    var totalEpisodeCount = displaySeasons.Sum(
-                        season => ResolveSeasonProgressTotalEpisodeCount(
-                            season,
-                            FilterCountableSeasonEpisodes(
-                                season,
-                                episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
-                                sourceEpisodeIds).Count));
-                    var knownEpisodeCount = displaySeasons.Sum(
-                        season => FilterCountableSeasonEpisodes(
-                            season,
-                            episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
-                            sourceEpisodeIds).Count);
+                    var totalEpisodeCount = displayMetrics.Sum(x => x.TotalEpisodeCount);
+                    var knownEpisodeCount = displayMetrics.Sum(x => x.CountableEpisodeCount);
                     var latestSeasonPoster = displaySeasons
                         .OrderByDescending(x => x.SeasonNumber)
                         .Select(x => x.PosterRemoteUrl)
@@ -988,11 +1010,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IdentificationStatus = seasons.Any(x => x.IdentificationStatus == IdentificationStatus.Failed)
                             ? IdentificationStatus.Failed
                             : IdentificationStatus.Matched,
-                        SourceCount = visibleSources.Count,
-                        ActiveSourceCount = visibleSources.Count,
+                        SourceCount = sourceCount,
+                        ActiveSourceCount = sourceCount,
                         HasActiveSource = hasActiveSource,
-                        HasLocalSource = visibleSources.Any(x => x.ProtocolType == ProtocolType.Local),
-                        HasWebDavSource = visibleSources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        HasLocalSource = visibleMetrics.Any(x => x.HasLocalSource),
+                        HasWebDavSource = visibleMetrics.Any(x => x.HasWebDavSource),
                         IsVisibleInLibrary = isVisibleInLibrary,
                         LibraryVisibilityState = LibraryVisibilityState.Auto,
                         HasLibraryContext = isVisibleInLibrary,
@@ -1009,13 +1031,20 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .Where(x => x.IsVisibleInLibrary)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
+        projectionStopwatch.Stop();
+        totalStopwatch.Stop();
+        WriteLibraryQueryPerfEvent(
+            $"event=library-query-tv-series-completed includeUnknownSeriesAsOther={FormatBool(includeUnknownSeriesAsOther)} seriesRowsMs={seriesRowsStopwatch.ElapsedMilliseconds} seasonRowsMs={seasonRowsStopwatch.ElapsedMilliseconds} episodeAggregateRowsMs={episodeAggregateRowsStopwatch.ElapsedMilliseconds} sourceAggregateRowsMs={sourceAggregateRowsStopwatch.ElapsedMilliseconds} stateRowsMs={stateRowsStopwatch.ElapsedMilliseconds} projectionMs={projectionStopwatch.ElapsedMilliseconds} totalMs={totalStopwatch.ElapsedMilliseconds} seriesRows={seriesRows.Count} seasonRows={seasonRows.Count} episodeRows={episodeAggregateRows.Sum(x => x.EpisodeCount)} episodeAggregateRows={episodeAggregateRows.Count} sourceRows={sourceAggregateRows.Sum(x => x.SourceCount)} sourceAggregateRows={sourceAggregateRows.Count} stateRows={stateRows.Count} resultItems={items.Count}");
+        return items;
     }
 
     private static async Task<IReadOnlyList<LibraryMovieListItem>> GetTvSeasonLibraryItemsAsync(
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = Stopwatch.StartNew();
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
+        var seasonRowsStopwatch = Stopwatch.StartNew();
         var seasonRows = await dbContext.TvSeasons
             .AsNoTracking()
             .Select(
@@ -1040,57 +1069,47 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
+        seasonRowsStopwatch.Stop();
         var seasonIds = seasonRows.Select(x => x.SeasonId).ToArray();
         if (seasonIds.Length == 0)
         {
+            totalStopwatch.Stop();
+            WriteLibraryQueryPerfEvent(
+                $"event=library-query-tv-season-completed seasonRowsMs={seasonRowsStopwatch.ElapsedMilliseconds} episodeAggregateRowsMs=0 sourceAggregateRowsMs=0 stateRowsMs=0 projectionMs=0 totalMs={totalStopwatch.ElapsedMilliseconds} seasonRows=0 episodeRows=0 episodeAggregateRows=0 sourceRows=0 sourceAggregateRows=0 stateRows=0 resultItems=0");
             return [];
         }
 
-        var episodeRows = await dbContext.TvEpisodes
-            .AsNoTracking()
-            .Where(x => seasonIds.Contains(x.TvSeasonId))
-            .Select(
-                x => new TvEpisodeLibraryRow
-                {
-                    EpisodeId = x.Id,
-                    SeasonId = x.TvSeasonId,
-                    IsWatched = x.IsWatched
-                })
-            .ToListAsync(cancellationToken);
-        var sourceRows = await LoadTvSourceRowsAsync(dbContext, episodeRows.Select(x => x.EpisodeId).ToArray(), cancellationToken);
-        var sourceEpisodeIds = sourceRows.Select(x => x.EpisodeId).ToHashSet();
+        var episodeAggregateRowsStopwatch = Stopwatch.StartNew();
+        var episodeAggregateRows = await LoadTvEpisodeSeasonAggregateRowsAsync(dbContext, seasonIds, cancellationToken);
+        episodeAggregateRowsStopwatch.Stop();
+        var sourceAggregateRowsStopwatch = Stopwatch.StartNew();
+        var sourceAggregateRows = await LoadTvSourceSeasonAggregateRowsAsync(dbContext, seasonIds, cancellationToken);
+        sourceAggregateRowsStopwatch.Stop();
+        var stateRowsStopwatch = Stopwatch.StartNew();
         var stateRows = await LoadTvCollectionStateRowsAsync(dbContext, seasonIds, cancellationToken);
+        stateRowsStopwatch.Stop();
         var stateBySeason = stateRows
             .GroupBy(x => x.SeasonId)
             .ToDictionary(x => x.Key, x => x.OrderByDescending(y => y.UpdatedAt).First());
-        var episodesBySeason = episodeRows
-            .GroupBy(x => x.SeasonId)
-            .ToDictionary(x => x.Key, x => x.ToList());
-        var sourcesBySeason = sourceRows
-            .Join(
-                episodeRows,
-                source => source.EpisodeId,
-                episode => episode.EpisodeId,
-                (source, episode) => new { episode.SeasonId, episode.EpisodeId, source.ProtocolType })
-            .GroupBy(x => x.SeasonId)
-            .ToDictionary(x => x.Key, x => x.ToList());
-        return seasonRows
+        var episodeAggregatesBySeason = episodeAggregateRows.ToDictionary(x => x.SeasonId);
+        var sourceAggregatesBySeason = sourceAggregateRows.ToDictionary(x => x.SeasonId);
+        var metricsBySeason = seasonRows.ToDictionary(
+            x => x.SeasonId,
+            x => BuildTvSeasonProjectionMetrics(x, episodeAggregatesBySeason, sourceAggregatesBySeason));
+        var projectionStopwatch = Stopwatch.StartNew();
+        var items = seasonRows
             .Select(
                 season =>
                 {
-                    var episodes = FilterCountableSeasonEpisodes(
-                        season,
-                        episodesBySeason.GetValueOrDefault(season.SeasonId) ?? [],
-                        sourceEpisodeIds);
-                    var sources = sourcesBySeason.GetValueOrDefault(season.SeasonId) ?? [];
                     stateBySeason.TryGetValue(season.SeasonId, out var state);
-                    var inLibraryEpisodeCount = sources.Select(x => x.EpisodeId).Distinct().Count();
-                    var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(season, episodes.Count);
-                    var watchedEpisodeCount = episodes.Count(x => x.IsWatched);
-                    var isWatched = IsAggregateWatched(watchedEpisodeCount, episodes.Count, totalEpisodeCount);
+                    var metrics = metricsBySeason[season.SeasonId];
+                    var countableEpisodeCount = metrics.CountableEpisodeCount;
+                    var totalEpisodeCount = metrics.TotalEpisodeCount;
+                    var watchedEpisodeCount = metrics.WatchedEpisodeCount;
+                    var isWatched = IsAggregateWatched(watchedEpisodeCount, countableEpisodeCount, totalEpisodeCount);
                     var isUnwatched = watchedEpisodeCount == 0;
                     var hasUserState = state?.HasUserState == true || watchedEpisodeCount > 0;
-                    var hasActiveSource = sources.Count > 0;
+                    var hasActiveSource = metrics.SourceCount > 0;
                     var visibilityState = state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
                     var isVisibleInLibrary = ResolveIsVisibleInLibrary(hasActiveSource, visibilityState, hasUserState);
                     return new LibraryMovieListItem
@@ -1110,11 +1129,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Country = season.Country,
                         Language = season.Language,
                         IdentificationStatus = season.IdentificationStatus,
-                        SourceCount = sources.Count,
-                        ActiveSourceCount = sources.Count,
+                        SourceCount = metrics.SourceCount,
+                        ActiveSourceCount = metrics.SourceCount,
                         HasActiveSource = hasActiveSource,
-                        HasLocalSource = sources.Any(x => x.ProtocolType == ProtocolType.Local),
-                        HasWebDavSource = sources.Any(x => x.ProtocolType == ProtocolType.WebDav),
+                        HasLocalSource = metrics.HasLocalSource,
+                        HasWebDavSource = metrics.HasWebDavSource,
                         IsVisibleInLibrary = isVisibleInLibrary,
                         LibraryVisibilityState = visibilityState,
                         HasLibraryContext = isVisibleInLibrary,
@@ -1125,7 +1144,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsNotInterested = state?.IsNotInterested == true,
                         IsWatched = isWatched,
                         WatchedEpisodeCount = watchedEpisodeCount,
-                        InLibraryEpisodeCount = inLibraryEpisodeCount,
+                        InLibraryEpisodeCount = metrics.InLibraryEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
                     };
@@ -1134,32 +1153,82 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .Where(ShouldShowTvSeasonLibraryItem)
             .OrderByDescending(x => x.UpdatedAt)
             .ToList();
+        projectionStopwatch.Stop();
+        totalStopwatch.Stop();
+        WriteLibraryQueryPerfEvent(
+            $"event=library-query-tv-season-completed seasonRowsMs={seasonRowsStopwatch.ElapsedMilliseconds} episodeAggregateRowsMs={episodeAggregateRowsStopwatch.ElapsedMilliseconds} sourceAggregateRowsMs={sourceAggregateRowsStopwatch.ElapsedMilliseconds} stateRowsMs={stateRowsStopwatch.ElapsedMilliseconds} projectionMs={projectionStopwatch.ElapsedMilliseconds} totalMs={totalStopwatch.ElapsedMilliseconds} seasonRows={seasonRows.Count} episodeRows={episodeAggregateRows.Sum(x => x.EpisodeCount)} episodeAggregateRows={episodeAggregateRows.Count} sourceRows={sourceAggregateRows.Sum(x => x.SourceCount)} sourceAggregateRows={sourceAggregateRows.Count} stateRows={stateRows.Count} resultItems={items.Count}");
+        return items;
     }
 
-    private static async Task<IReadOnlyList<TvSourceLibraryRow>> LoadTvSourceRowsAsync(
+    private static async Task<IReadOnlyList<TvEpisodeSeasonAggregateRow>> LoadTvEpisodeSeasonAggregateRowsAsync(
         AppDbContext dbContext,
-        IReadOnlyCollection<int> episodeIds,
+        IReadOnlyCollection<int> seasonIds,
         CancellationToken cancellationToken)
     {
-        if (episodeIds.Count == 0)
+        if (seasonIds.Count == 0)
         {
             return [];
         }
 
-        return await dbContext.MediaFiles
+        return await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => seasonIds.Contains(x.TvSeasonId))
+            .GroupBy(x => x.TvSeasonId)
+            .Select(
+                group => new TvEpisodeSeasonAggregateRow
+                {
+                    SeasonId = group.Key,
+                    EpisodeCount = group.Count(),
+                    WatchedEpisodeCount = group.Count(x => x.IsWatched)
+                })
+            .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<TvSourceSeasonAggregateRow>> LoadTvSourceSeasonAggregateRowsAsync(
+        AppDbContext dbContext,
+        IReadOnlyCollection<int> seasonIds,
+        CancellationToken cancellationToken)
+    {
+        if (seasonIds.Count == 0)
+        {
+            return [];
+        }
+
+        var sourceRows = await dbContext.MediaFiles
             .AsNoTracking()
             .Where(
                 x => x.EpisodeId.HasValue
-                     && episodeIds.Contains(x.EpisodeId.Value)
+                     && x.Episode != null
+                     && seasonIds.Contains(x.Episode.TvSeasonId)
                      && x.MediaType == MediaType.Video
                      && !x.IsDeleted)
             .Select(
-                x => new TvSourceLibraryRow
+                x => new TvSourceSeasonFlatRow
                 {
+                    SeasonId = x.Episode!.TvSeasonId,
                     EpisodeId = x.EpisodeId!.Value,
-                    ProtocolType = x.SourceConnection!.ProtocolType
+                    IsWatched = x.Episode.IsWatched,
+                    ProtocolType = x.SourceConnection == null ? null : x.SourceConnection.ProtocolType
                 })
             .ToListAsync(cancellationToken);
+
+        return sourceRows
+            .GroupBy(x => x.SeasonId)
+            .Select(
+                group => new TvSourceSeasonAggregateRow
+                {
+                    SeasonId = group.Key,
+                    SourceCount = group.Count(),
+                    InLibraryEpisodeCount = group.Select(x => x.EpisodeId).Distinct().Count(),
+                    WatchedSourceEpisodeCount = group
+                        .Where(x => x.IsWatched)
+                        .Select(x => x.EpisodeId)
+                        .Distinct()
+                        .Count(),
+                    HasLocalSource = group.Any(x => x.ProtocolType == ProtocolType.Local),
+                    HasWebDavSource = group.Any(x => x.ProtocolType == ProtocolType.WebDav)
+                })
+            .ToList();
     }
 
     private static async Task<IReadOnlyList<TvSeasonStateLibraryRow>> LoadTvCollectionStateRowsAsync(
@@ -1236,19 +1305,6 @@ public sealed class LibraryQueryService : ILibraryQueryService
         return knownEpisodeCount >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount;
     }
 
-    private static IReadOnlyList<TvEpisodeLibraryRow> FilterCountableSeasonEpisodes(
-        TvSeasonLibraryRow season,
-        IReadOnlyCollection<TvEpisodeLibraryRow> episodes,
-        ISet<int> sourceEpisodeIds)
-    {
-        if (!IsNoTmdbFailedUnknownSeason(season))
-        {
-            return episodes.ToList();
-        }
-
-        return episodes.Where(x => sourceEpisodeIds.Contains(x.EpisodeId)).ToList();
-    }
-
     private static int ResolveSeasonProgressTotalEpisodeCount(TvSeasonLibraryRow season, int countableEpisodeCount)
     {
         if (IsNoTmdbFailedUnknownSeason(season))
@@ -1259,6 +1315,31 @@ public sealed class LibraryQueryService : ILibraryQueryService
         return season.TotalEpisodeCount.GetValueOrDefault() > 0
             ? season.TotalEpisodeCount!.Value
             : countableEpisodeCount;
+    }
+
+    private static TvSeasonProjectionMetrics BuildTvSeasonProjectionMetrics(
+        TvSeasonLibraryRow season,
+        IReadOnlyDictionary<int, TvEpisodeSeasonAggregateRow> episodeAggregatesBySeason,
+        IReadOnlyDictionary<int, TvSourceSeasonAggregateRow> sourceAggregatesBySeason)
+    {
+        episodeAggregatesBySeason.TryGetValue(season.SeasonId, out var episodeAggregate);
+        sourceAggregatesBySeason.TryGetValue(season.SeasonId, out var sourceAggregate);
+        var countableEpisodeCount = IsNoTmdbFailedUnknownSeason(season)
+            ? sourceAggregate?.InLibraryEpisodeCount ?? 0
+            : episodeAggregate?.EpisodeCount ?? 0;
+        var watchedEpisodeCount = IsNoTmdbFailedUnknownSeason(season)
+            ? sourceAggregate?.WatchedSourceEpisodeCount ?? 0
+            : episodeAggregate?.WatchedEpisodeCount ?? 0;
+        var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(season, countableEpisodeCount);
+
+        return new TvSeasonProjectionMetrics(
+            countableEpisodeCount,
+            watchedEpisodeCount,
+            totalEpisodeCount,
+            sourceAggregate?.SourceCount ?? 0,
+            sourceAggregate?.InLibraryEpisodeCount ?? 0,
+            sourceAggregate?.HasLocalSource == true,
+            sourceAggregate?.HasWebDavSource == true);
     }
 
     private static bool ShouldShowTvSeasonLibraryItem(LibraryMovieListItem item)
@@ -1486,21 +1567,49 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public DateTime UpdatedAt { get; set; }
     }
 
-    private sealed class TvEpisodeLibraryRow
+    private sealed class TvEpisodeSeasonAggregateRow
     {
-        public int EpisodeId { get; set; }
-
         public int SeasonId { get; set; }
 
-        public bool IsWatched { get; set; }
+        public int EpisodeCount { get; set; }
+
+        public int WatchedEpisodeCount { get; set; }
     }
 
-    private sealed class TvSourceLibraryRow
+    private sealed class TvSourceSeasonAggregateRow
     {
+        public int SeasonId { get; set; }
+
+        public int SourceCount { get; set; }
+
+        public int InLibraryEpisodeCount { get; set; }
+
+        public int WatchedSourceEpisodeCount { get; set; }
+
+        public bool HasLocalSource { get; set; }
+
+        public bool HasWebDavSource { get; set; }
+    }
+
+    private sealed class TvSourceSeasonFlatRow
+    {
+        public int SeasonId { get; set; }
+
         public int EpisodeId { get; set; }
 
-        public ProtocolType ProtocolType { get; set; }
+        public bool IsWatched { get; set; }
+
+        public ProtocolType? ProtocolType { get; set; }
     }
+
+    private readonly record struct TvSeasonProjectionMetrics(
+        int CountableEpisodeCount,
+        int WatchedEpisodeCount,
+        int TotalEpisodeCount,
+        int SourceCount,
+        int InLibraryEpisodeCount,
+        bool HasLocalSource,
+        bool HasWebDavSource);
 
     private sealed class TvSeasonStateLibraryRow
     {

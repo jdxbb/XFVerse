@@ -1,9 +1,12 @@
 using System.Diagnostics;
 using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Threading;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.App.ViewModels.Collections;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -35,6 +38,17 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string DecadeAll = "全部年代";
     private const string LibraryScopeWithSource = "有播放源";
     private const string LibraryScopeWithoutSource = "无播放源";
+    private const string RefreshReasonActivate = "activate";
+    private const string RefreshReasonManual = "manual-refresh";
+    private const string RefreshReasonBatchModeChanged = "batch-mode-changed";
+    private const string RefreshReasonRemovedLibraryChanged = "operation-removed-library-changed";
+    private const string RefreshReasonBatchStatusChanged = "operation-batch-status-changed";
+    private const string RefreshReasonBatchRemoveFromLibrary = "operation-batch-remove-from-library";
+    private const string RefreshReasonBatchDeleteRecords = "operation-batch-delete-records";
+    private const string RefreshReasonManualAggregation = "operation-manual-aggregation";
+    private const string RefreshReasonBatchAiExitBatchMode = "operation-batch-ai-exit-batch-mode";
+    private const string RefreshReasonBatchAiResult = "operation-batch-ai-result";
+    private static readonly TimeSpan RefreshDebounceDelay = TimeSpan.FromMilliseconds(200);
     private static readonly string[] TypeTagLabels =
     [
         "动作", "冒险", "动画", "喜剧", "犯罪", "纪录片", "剧情", "家庭", "奇幻", "历史",
@@ -67,8 +81,18 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly List<LibraryMovieListItem> _allMovies = [];
     private readonly HashSet<string> _selectedItemKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _refreshGate = new();
+    private readonly HashSet<string> _queuedRefreshReasons = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _refreshDebounceCts;
+    private Task? _refreshLoopTask;
     private CancellationTokenSource? _batchIdentifyCancellationTokenSource;
+    private bool _isActive;
+    private bool _isRefreshRunning;
+    private bool _pendingRefresh;
+    private bool _queuedRefreshWasDebounced;
+    private bool _dirtyWhileInactive;
     private bool _suppressLibraryRefreshFromBatchNotification;
+    private long _refreshSequence;
     private string _searchText = string.Empty;
     private string _genreFilterText = string.Empty;
     private string _selectedSortOption = "最近更新";
@@ -161,13 +185,13 @@ public sealed class LibraryViewModel : PageViewModelBase
         RestoreRemovedLibraryGroupCommand = new AsyncRelayCommand(RestoreRemovedLibraryGroupAsync, parameter => !IsRemovedLibraryLoading && parameter is RemovedLibraryGroupViewModel { IsTvGroup: true });
         DeleteRemovedLibraryGroupCommand = new AsyncRelayCommand(DeleteRemovedLibraryGroupAsync, parameter => !IsRemovedLibraryLoading && parameter is RemovedLibraryGroupViewModel { IsTvGroup: true });
         OpenRemovedLibraryDetailCommand = new RelayCommand(OpenMovie);
-        RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
+        RefreshCommand = new AsyncRelayCommand(() => RequestLibraryRefreshAsync(RefreshReasonManual, debounce: false, allowWhenInactive: true));
         ApplySearchCommand = new RelayCommand(ApplyFilters);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
         RefreshTagOptions();
     }
 
-    public ObservableCollection<LibraryMovieItemViewModel> Movies { get; } = [];
+    public BulkObservableCollection<LibraryMovieItemViewModel> Movies { get; } = [];
 
     public ObservableCollection<LibraryMovieItemViewModel> RemovedLibraryItems { get; } = [];
 
@@ -657,28 +681,362 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public bool HasRemovedLibraryItems => RemovedLibraryGroups.Count > 0;
 
-    public override async Task ActivateAsync(CancellationToken cancellationToken = default)
+    public override Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        lock (_refreshGate)
+        {
+            _isActive = true;
+        }
+
+        return RequestLibraryRefreshAsync(RefreshReasonActivate, debounce: false, allowWhenInactive: true, cancellationToken);
+    }
+
+    public override void Deactivate()
+    {
+        lock (_refreshGate)
+        {
+            _isActive = false;
+        }
+    }
+
+    private Task RefreshLibraryAfterOperationAsync(string reason, CancellationToken cancellationToken = default)
+    {
+        return RequestLibraryRefreshAsync(reason, debounce: false, allowWhenInactive: true, cancellationToken);
+    }
+
+    private async Task ExecuteLibraryRefreshCoreAsync(RefreshRequestSnapshot refreshRequest, CancellationToken cancellationToken = default)
+    {
+        var refreshId = Interlocked.Increment(ref _refreshSequence);
+        var totalStopwatch = Stopwatch.StartNew();
+        var queryElapsedMs = 0L;
+        var tagDecadeElapsedMs = 0L;
+        var filterMetrics = LibraryFilterApplyMetrics.Empty;
+        WriteLibraryRefreshEvent(
+            "library-refresh-started",
+            BuildRefreshLogFields(refreshId, refreshRequest, queryElapsedMs, tagDecadeElapsedMs, filterMetrics, totalElapsedMs: 0));
+
         try
         {
+            var queryStopwatch = Stopwatch.StartNew();
             var movies = await _libraryQueryService.GetLibraryItemsAsync(IsBatchSelectionMode, cancellationToken);
+            queryStopwatch.Stop();
+            queryElapsedMs = queryStopwatch.ElapsedMilliseconds;
             _allMovies.Clear();
             _allMovies.AddRange(movies);
+
+            var tagDecadeStopwatch = Stopwatch.StartNew();
             RefreshTagOptions();
             RefreshDecadeOptions();
-            ApplyFilters();
+            tagDecadeStopwatch.Stop();
+            tagDecadeElapsedMs = tagDecadeStopwatch.ElapsedMilliseconds;
+
+            filterMetrics = ApplyFiltersWithMetrics();
 
             if (_allMovies.Count == 0)
             {
                 StatusMessage = "当前还没有可展示的影片数据。请先到扫描任务页执行扫描。";
             }
+            totalStopwatch.Stop();
+            WriteLibraryRefreshEvent(
+                "library-refresh-completed",
+                BuildRefreshLogFields(
+                    refreshId,
+                    refreshRequest,
+                    queryElapsedMs,
+                    tagDecadeElapsedMs,
+                    filterMetrics,
+                    totalStopwatch.ElapsedMilliseconds));
+            ScheduleRenderReadyDiagnostics(refreshId, refreshRequest, queryElapsedMs, tagDecadeElapsedMs, filterMetrics, totalStopwatch.ElapsedMilliseconds);
         }
         catch (Exception exception)
         {
-            Movies.Clear();
+            totalStopwatch.Stop();
+            Movies.ReplaceAll([]);
             OnPropertyChanged(nameof(HasMovies));
+            WriteLibraryRefreshEvent(
+                "library-refresh-failed",
+                BuildRefreshLogFields(
+                    refreshId,
+                    refreshRequest,
+                    queryElapsedMs,
+                    tagDecadeElapsedMs,
+                    filterMetrics,
+                    totalStopwatch.ElapsedMilliseconds,
+                    extraFields: $"errorType={exception.GetType().Name}"));
             StatusMessage = $"加载媒体库失败：{exception.Message}";
         }
+    }
+
+    private Task RequestLibraryRefreshAsync(
+        string reason,
+        bool debounce,
+        bool allowWhenInactive = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.CompletedTask;
+        }
+
+        Task? runningRefreshTask = null;
+        CancellationTokenSource? debounceToCancel = null;
+        CancellationTokenSource? debounceToSchedule = null;
+        var shouldStartRefresh = false;
+        var skippedInactive = false;
+        var pendingMarked = false;
+        var coalescedByDebounce = false;
+        var activeSnapshot = false;
+        string mergedReasons;
+
+        lock (_refreshGate)
+        {
+            activeSnapshot = _isActive;
+            _queuedRefreshReasons.Add(reason);
+            mergedReasons = FormatQueuedRefreshReasonsNoLock();
+
+            if (!activeSnapshot && !allowWhenInactive)
+            {
+                _dirtyWhileInactive = true;
+                skippedInactive = true;
+            }
+            else if (IsRefreshLoopActiveNoLock())
+            {
+                _pendingRefresh = true;
+                pendingMarked = true;
+                runningRefreshTask = _refreshLoopTask ?? Task.CompletedTask;
+            }
+            else if (debounce)
+            {
+                debounceToCancel = _refreshDebounceCts;
+                debounceToSchedule = new CancellationTokenSource();
+                _refreshDebounceCts = debounceToSchedule;
+                _queuedRefreshWasDebounced = true;
+                coalescedByDebounce = debounceToCancel is not null || _queuedRefreshReasons.Count > 1;
+            }
+            else
+            {
+                debounceToCancel = _refreshDebounceCts;
+                _refreshDebounceCts = null;
+                _queuedRefreshWasDebounced |= debounceToCancel is not null;
+                shouldStartRefresh = true;
+            }
+        }
+
+        WriteLibraryRefreshEvent(
+            "library-refresh-requested",
+            BuildRefreshRequestLogFields(reason, mergedReasons, activeSnapshot, debounce, coalescedByDebounce: false));
+
+        if (skippedInactive)
+        {
+            WriteLibraryRefreshEvent(
+                "library-refresh-skipped-inactive",
+                BuildRefreshRequestLogFields(reason, mergedReasons, activeSnapshot, debounce, coalescedByDebounce: false));
+            return Task.CompletedTask;
+        }
+
+        if (pendingMarked)
+        {
+            WriteLibraryRefreshEvent(
+                "library-refresh-pending-marked",
+                BuildRefreshRequestLogFields(reason, mergedReasons, activeSnapshot, debounce, coalescedByDebounce: false));
+            return runningRefreshTask ?? Task.CompletedTask;
+        }
+
+        debounceToCancel?.Cancel();
+
+        if (debounceToSchedule is not null)
+        {
+            WriteLibraryRefreshEvent(
+                "library-refresh-debounced",
+                BuildRefreshRequestLogFields(reason, mergedReasons, activeSnapshot, debounce, coalescedByDebounce));
+            _ = RunDebouncedLibraryRefreshAsync(debounceToSchedule);
+            return Task.CompletedTask;
+        }
+
+        return shouldStartRefresh
+            ? EnsureLibraryRefreshLoopAsync(cancellationToken)
+            : Task.CompletedTask;
+    }
+
+    private async Task RunDebouncedLibraryRefreshAsync(CancellationTokenSource debounceCts)
+    {
+        try
+        {
+            await Task.Delay(RefreshDebounceDelay, debounceCts.Token);
+            if (debounceCts.Token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            await EnsureLibraryRefreshLoopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            lock (_refreshGate)
+            {
+                if (ReferenceEquals(_refreshDebounceCts, debounceCts))
+                {
+                    _refreshDebounceCts = null;
+                }
+            }
+
+            debounceCts.Dispose();
+        }
+    }
+
+    private Task EnsureLibraryRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        lock (_refreshGate)
+        {
+            if (IsRefreshLoopActiveNoLock())
+            {
+                _pendingRefresh = true;
+                return _refreshLoopTask ?? Task.CompletedTask;
+            }
+
+            _refreshLoopTask = RunLibraryRefreshLoopAsync(cancellationToken);
+            return _refreshLoopTask;
+        }
+    }
+
+    private async Task RunLibraryRefreshLoopAsync(CancellationToken initialCancellationToken)
+    {
+        await Task.Yield();
+
+        var executePendingRefresh = false;
+        var cancellationToken = initialCancellationToken;
+        while (true)
+        {
+            RefreshRequestSnapshot refreshRequest;
+            lock (_refreshGate)
+            {
+                _isRefreshRunning = true;
+                _pendingRefresh = false;
+                refreshRequest = DrainRefreshRequestNoLock(executePendingRefresh);
+            }
+
+            if (refreshRequest.PendingRefreshExecuted)
+            {
+                WriteLibraryRefreshEvent(
+                    "library-refresh-pending-executed",
+                    BuildRefreshRequestLogFields(
+                        refreshRequest.PrimaryReason,
+                        refreshRequest.MergedReasons,
+                        refreshRequest.IsActive,
+                        debounce: false,
+                        coalescedByDebounce: refreshRequest.WasDebounced));
+            }
+
+            await ExecuteLibraryRefreshCoreAsync(refreshRequest, cancellationToken);
+            cancellationToken = CancellationToken.None;
+
+            lock (_refreshGate)
+            {
+                if (!_pendingRefresh)
+                {
+                    _isRefreshRunning = false;
+                    _refreshLoopTask = null;
+                    return;
+                }
+
+                executePendingRefresh = true;
+            }
+        }
+    }
+
+    private RefreshRequestSnapshot DrainRefreshRequestNoLock(bool pendingRefreshExecuted)
+    {
+        var reasons = _queuedRefreshReasons.Count == 0
+            ? [pendingRefreshExecuted ? "pending-refresh" : RefreshReasonManual]
+            : _queuedRefreshReasons.OrderBy(reason => reason, StringComparer.OrdinalIgnoreCase).ToArray();
+        var request = new RefreshRequestSnapshot(
+            reasons,
+            _isActive,
+            IsBatchSelectionMode,
+            _queuedRefreshWasDebounced,
+            _dirtyWhileInactive,
+            pendingRefreshExecuted);
+
+        _queuedRefreshReasons.Clear();
+        _queuedRefreshWasDebounced = false;
+        _dirtyWhileInactive = false;
+        return request;
+    }
+
+    private bool IsRefreshLoopActiveNoLock()
+    {
+        return _isRefreshRunning || _refreshLoopTask is { IsCompleted: false };
+    }
+
+    private string FormatQueuedRefreshReasonsNoLock()
+    {
+        return _queuedRefreshReasons.Count == 0
+            ? "none"
+            : string.Join("+", _queuedRefreshReasons.OrderBy(reason => reason, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static string BuildRefreshRequestLogFields(
+        string reason,
+        string mergedReasons,
+        bool isActive,
+        bool debounce,
+        bool coalescedByDebounce)
+    {
+        return $"reason={reason} mergedReasons={mergedReasons} active={FormatBool(isActive)} debounce={FormatBool(debounce)} coalescedByDebounce={FormatBool(coalescedByDebounce)}";
+    }
+
+    private string BuildRefreshLogFields(
+        long refreshId,
+        RefreshRequestSnapshot refreshRequest,
+        long queryElapsedMs,
+        long tagDecadeElapsedMs,
+        LibraryFilterApplyMetrics filterMetrics,
+        long totalElapsedMs,
+        string? extraFields = null)
+    {
+        var fields = $"refreshId={refreshId} reason={refreshRequest.PrimaryReason} mergedReasons={refreshRequest.MergedReasons} active={FormatBool(refreshRequest.IsActive)} batchMode={FormatBool(refreshRequest.IsBatchMode)} viewMode={filterMetrics.ViewMode} posterVirtualization={FormatBool(filterMetrics.PosterVirtualizationEnabled)} collectionApply={filterMetrics.CollectionApplyMode} queryMs={queryElapsedMs} tagDecadeMs={tagDecadeElapsedMs} filterSortMs={filterMetrics.FilterSortElapsedMs} uiApplyMs={filterMetrics.UiApplyElapsedMs} totalMs={totalElapsedMs} resultTotal={filterMetrics.ResultTotalCount} filtered={filterMetrics.FilteredCount} movie={filterMetrics.MovieCount} tv={filterMetrics.TvCount} other={filterMetrics.OtherCount} batchEligible={filterMetrics.BatchEligibleCount} selected={filterMetrics.SelectedCount} debounced={FormatBool(refreshRequest.WasDebounced)} coalesced={FormatBool(refreshRequest.IsCoalesced)} skippedInactive={FormatBool(refreshRequest.WasDirtyWhileInactive)} pendingExecuted={FormatBool(refreshRequest.PendingRefreshExecuted)}";
+        return string.IsNullOrWhiteSpace(extraFields) ? fields : $"{fields} {extraFields}";
+    }
+
+    private void ScheduleRenderReadyDiagnostics(
+        long refreshId,
+        RefreshRequestSnapshot refreshRequest,
+        long queryElapsedMs,
+        long tagDecadeElapsedMs,
+        LibraryFilterApplyMetrics filterMetrics,
+        long totalElapsedMs)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.HasShutdownStarted)
+        {
+            return;
+        }
+
+        var scheduledAt = Stopwatch.GetTimestamp();
+        _ = dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                var renderReadyElapsedMs = (long)Math.Round(Stopwatch.GetElapsedTime(scheduledAt).TotalMilliseconds);
+                WriteLibraryRefreshEvent(
+                    "library-render-ready",
+                    BuildRefreshLogFields(
+                        refreshId,
+                        refreshRequest,
+                        queryElapsedMs,
+                        tagDecadeElapsedMs,
+                        filterMetrics,
+                        totalElapsedMs,
+                        extraFields: $"renderReadyMs={renderReadyElapsedMs}"));
+            }),
+            DispatcherPriority.ContextIdle);
+    }
+
+    private static string FormatBool(bool value)
+    {
+        return value ? "true" : "false";
     }
 
     private async Task OpenRemovedLibraryAsync()
@@ -773,7 +1131,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await LoadRemovedLibraryItemsAsync();
-            await ActivateAsync();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonRemovedLibraryChanged);
         }
         catch (Exception exception)
         {
@@ -820,7 +1178,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await LoadRemovedLibraryItemsAsync();
-            await ActivateAsync();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonRemovedLibraryChanged);
         }
         catch (Exception exception)
         {
@@ -855,7 +1213,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             _dataRefreshService.NotifyMetadataChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await LoadRemovedLibraryItemsAsync();
-            await ActivateAsync();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonRemovedLibraryChanged);
         }
         catch (Exception exception)
         {
@@ -899,7 +1257,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             _dataRefreshService.NotifyMetadataChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await LoadRemovedLibraryItemsAsync();
-            await ActivateAsync();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonRemovedLibraryChanged);
         }
         catch (Exception exception)
         {
@@ -909,15 +1267,43 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private void OnDataChanged(object? sender, AppDataChangedEventArgs e)
     {
-        if (e.LibraryChanged || e.Reason == AppDataChangeReason.CollectionChanged)
+        if (!ShouldRefreshLibraryForDataChange(e))
         {
-            if (_suppressLibraryRefreshFromBatchNotification)
-            {
-                return;
-            }
-
-            _ = ActivateAsync();
+            return;
         }
+
+        if (_suppressLibraryRefreshFromBatchNotification)
+        {
+            return;
+        }
+
+        var reason = FormatDataChangeRefreshReason(e);
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            _ = RequestLibraryRefreshAsync(reason, debounce: true);
+            return;
+        }
+
+        _ = dispatcher.InvokeAsync(() => _ = RequestLibraryRefreshAsync(reason, debounce: true));
+    }
+
+    private static bool ShouldRefreshLibraryForDataChange(AppDataChangedEventArgs e)
+    {
+        return e.LibraryChanged || e.Reason == AppDataChangeReason.CollectionChanged;
+    }
+
+    private static string FormatDataChangeRefreshReason(AppDataChangedEventArgs e)
+    {
+        return e.Reason switch
+        {
+            AppDataChangeReason.CollectionChanged => "data-changed-collection",
+            AppDataChangeReason.MetadataChanged => "data-changed-metadata",
+            AppDataChangeReason.ScanChanged => "data-changed-scan",
+            AppDataChangeReason.LibraryChanged => "data-changed-library",
+            _ when e.LibraryChanged => "data-changed-library",
+            _ => $"data-changed-{e.Reason.ToString().ToLowerInvariant()}"
+        };
     }
 
     private void ClearFilters()
@@ -1080,6 +1466,12 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private void ApplyFilters()
     {
+        _ = ApplyFiltersWithMetrics();
+    }
+
+    private LibraryFilterApplyMetrics ApplyFiltersWithMetrics()
+    {
+        var filterSortStopwatch = Stopwatch.StartNew();
         var query = _allMovies.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(SearchText))
@@ -1167,25 +1559,43 @@ public sealed class LibraryViewModel : PageViewModelBase
         query = ApplySorting(query);
 
         var filtered = query.ToList();
+        filterSortStopwatch.Stop();
+        var uiApplyStopwatch = Stopwatch.StartNew();
         ReconcileSelectionWithVisibleItems(filtered);
 
-        Movies.Clear();
-        foreach (var movie in filtered)
-        {
-            var selectionKey = BuildSelectionKey(movie);
-            Movies.Add(
-                new LibraryMovieItemViewModel(
+        var viewModels = filtered
+            .Select(movie =>
+            {
+                var selectionKey = BuildSelectionKey(movie);
+                return new LibraryMovieItemViewModel(
                     movie,
                     selectionKey,
                     IsBatchSelectionMode,
-                    _selectedItemKeys.Contains(selectionKey)));
-        }
+                    _selectedItemKeys.Contains(selectionKey));
+            })
+            .ToList();
+        Movies.ReplaceAll(viewModels);
 
         OnPropertyChanged(nameof(HasMovies));
         RefreshBatchCommandState();
         StatusMessage = _allMovies.Count == 0
             ? "当前还没有可展示的影片数据。请先到扫描任务页执行扫描。"
             : BuildResultStatusMessage(filtered.Count);
+        uiApplyStopwatch.Stop();
+
+        return new LibraryFilterApplyMetrics(
+            _allMovies.Count,
+            filtered.Count,
+            filtered.Count(item => item.IsMovie),
+            filtered.Count(item => item.IsSeries || item.IsSeason),
+            filtered.Count(item => item.IsOther),
+            filtered.Count(IsBatchOperationTarget),
+            SelectedCount,
+            filterSortStopwatch.ElapsedMilliseconds,
+            uiApplyStopwatch.ElapsedMilliseconds,
+            IsPosterView ? "poster" : "list",
+            IsPosterView,
+            "range-reset");
     }
 
     private string BuildResultStatusMessage(int filteredCount)
@@ -1401,7 +1811,44 @@ public sealed class LibraryViewModel : PageViewModelBase
         return item.SeasonId > 0 && (item.IsSeason || item.IsOther);
     }
 
+    private static bool IsBatchOperationTarget(LibraryMovieListItem item)
+    {
+        return item.IsMovie || item.IsSeason || item.IsOther;
+    }
+
     private sealed record BatchSelectionSeriesSortKey(DateTime UpdatedAt, string Title, int ReleaseYear);
+
+    private sealed record RefreshRequestSnapshot(
+        IReadOnlyList<string> Reasons,
+        bool IsActive,
+        bool IsBatchMode,
+        bool WasDebounced,
+        bool WasDirtyWhileInactive,
+        bool PendingRefreshExecuted)
+    {
+        public string PrimaryReason => PendingRefreshExecuted ? "pending-refresh" : Reasons.FirstOrDefault() ?? RefreshReasonManual;
+
+        public string MergedReasons => Reasons.Count == 0 ? "none" : string.Join("+", Reasons);
+
+        public bool IsCoalesced => WasDebounced || PendingRefreshExecuted || Reasons.Count > 1;
+    }
+
+    private readonly record struct LibraryFilterApplyMetrics(
+        int ResultTotalCount,
+        int FilteredCount,
+        int MovieCount,
+        int TvCount,
+        int OtherCount,
+        int BatchEligibleCount,
+        int SelectedCount,
+        long FilterSortElapsedMs,
+        long UiApplyElapsedMs,
+        string ViewMode,
+        bool PosterVirtualizationEnabled,
+        string CollectionApplyMode)
+    {
+        public static LibraryFilterApplyMetrics Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, "unknown", false, "none");
+    }
 
     private void ToggleBatchSelectionMode()
     {
@@ -1415,14 +1862,14 @@ public sealed class LibraryViewModel : PageViewModelBase
             ClearSelection();
             IsBatchSelectionMode = false;
             BatchResultSummary = string.Empty;
-            _ = ActivateAsync();
+            _ = RequestLibraryRefreshAsync(RefreshReasonBatchModeChanged, debounce: false, allowWhenInactive: true);
             return;
         }
 
         IsBatchSelectionMode = true;
         BatchResultSummary = string.Empty;
         ClearSelection();
-        _ = ActivateAsync();
+        _ = RequestLibraryRefreshAsync(RefreshReasonBatchModeChanged, debounce: false, allowWhenInactive: true);
     }
 
     private void OpenOrToggleSelection(object? parameter)
@@ -1559,9 +2006,9 @@ public sealed class LibraryViewModel : PageViewModelBase
                 SetSelectionToFailures(errors);
             }
 
-            await ActivateAsync();
-            BatchResultSummary = BuildResultSummary(operationName, successCount, errors);
             NotifyAfterBatchStatusChange();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonBatchStatusChanged);
+            BatchResultSummary = BuildResultSummary(operationName, successCount, errors);
         }
         finally
         {
@@ -1651,9 +2098,9 @@ public sealed class LibraryViewModel : PageViewModelBase
                 SetSelectionToFailures(errors);
             }
 
-            await ActivateAsync();
-            BatchResultSummary = BuildRemoveFromLibraryResultSummary(successCount, hiddenCount, errors);
             NotifyAfterBatchRemoveFromLibrary();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonBatchRemoveFromLibrary);
+            BatchResultSummary = BuildRemoveFromLibraryResultSummary(successCount, hiddenCount, errors);
             WriteLibraryBatchEvent(
                 $"event=library-remove-from-library-complete success={successCount} hidden={hiddenCount} failed={errors.Count}");
         }
@@ -1725,9 +2172,9 @@ public sealed class LibraryViewModel : PageViewModelBase
                 SetSelectionToFailures(errors);
             }
 
-            await ActivateAsync();
-            BatchResultSummary = BuildResultSummary("删除软件记录", successCount, errors);
             NotifyAfterBatchMovieRecordDelete();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonBatchDeleteRecords);
+            BatchResultSummary = BuildResultSummary("删除软件记录", successCount, errors);
             WriteLibraryBatchEvent(
                 $"event=library-delete-movie-records-complete success={successCount} failed={errors.Count}");
         }
@@ -1867,7 +2314,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             ClearSelection();
             IsBatchSelectionMode = false;
             NotifyAfterManualAggregation();
-            await ActivateAsync();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonManualAggregation);
             WriteLibraryBatchEvent(
                 $"event=manual-season-aggregate-apply-succeeded seasonId={result.SeasonId} sourceCount={result.SourceCount} createdEpisodeCount={result.CreatedEpisodeCount} additionalSourceCount={result.AdditionalSourceCount} seasonNumber={request.SeasonNumber}");
         }
@@ -2003,7 +2450,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             IsManualAggregationBusy = false;
             try
             {
-                await ActivateAsync();
+                await RefreshLibraryAfterOperationAsync(RefreshReasonManualAggregation);
             }
             catch (Exception exception)
             {
@@ -2074,7 +2521,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             var cancellationToken = _batchIdentifyCancellationTokenSource.Token;
             var initialRefreshStopwatch = Stopwatch.StartNew();
             WriteBatch2Event("event=batch2-ai-identify-initial-refresh-start reason=exit-batch-selection");
-            await ActivateAsync(cancellationToken);
+            await RefreshLibraryAfterOperationAsync(RefreshReasonBatchAiExitBatchMode, cancellationToken);
             initialRefreshStopwatch.Stop();
             WriteBatch2Event($"event=batch2-ai-identify-initial-refresh-complete elapsedMs={initialRefreshStopwatch.ElapsedMilliseconds}");
             BatchResultSummary = $"正在批量 AI 辅助识别 0 / {selectedItems.Count}：正在创建处理单元。";
@@ -2085,7 +2532,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
             var refreshStopwatch = Stopwatch.StartNew();
             WriteBatch2Event("event=batch2-ai-identify-refresh-start");
-            await ActivateAsync();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonBatchAiResult);
             refreshStopwatch.Stop();
             WriteBatch2Event($"event=batch2-ai-identify-refresh-complete elapsedMs={refreshStopwatch.ElapsedMilliseconds}");
             BatchResultSummary = BuildAutoIdentifyResultSummary(result, retainedItems);
@@ -2216,7 +2663,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
             var refreshStopwatch = Stopwatch.StartNew();
             WriteBatch2Event("event=batch2-ai-identify-refresh-start");
-            await ActivateAsync();
+            await RefreshLibraryAfterOperationAsync(RefreshReasonBatchAiResult);
             refreshStopwatch.Stop();
             WriteBatch2Event($"event=batch2-ai-identify-refresh-complete elapsedMs={refreshStopwatch.ElapsedMilliseconds}");
             BatchResultSummary = BuildAutoIdentifyResultSummary(successCount, noResultCount, failedCount, cancelledCount, retainedItems);
@@ -2815,6 +3262,11 @@ public sealed class LibraryViewModel : PageViewModelBase
     private static void WriteLibraryBatchEvent(string message)
     {
         AiPerfDiagnostics.WriteEvent(message);
+    }
+
+    private static void WriteLibraryRefreshEvent(string eventName, string fields)
+    {
+        AiPerfDiagnostics.WriteEvent($"event={eventName} {fields}");
     }
 
     private static string FormatSelectionKeyForLog(string selectionKey)

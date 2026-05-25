@@ -16,6 +16,13 @@ public static class PosterCacheImageBehavior
             typeof(PosterCacheImageBehavior),
             new PropertyMetadata(null, OnSourceChanged));
 
+    public static readonly DependencyProperty DecodePixelWidthProperty =
+        DependencyProperty.RegisterAttached(
+            "DecodePixelWidth",
+            typeof(int),
+            typeof(PosterCacheImageBehavior),
+            new PropertyMetadata(0));
+
     private static readonly DependencyProperty RequestVersionProperty =
         DependencyProperty.RegisterAttached(
             "RequestVersion",
@@ -40,6 +47,16 @@ public static class PosterCacheImageBehavior
         target.SetValue(SourceProperty, value);
     }
 
+    public static int GetDecodePixelWidth(DependencyObject target)
+    {
+        return (int)target.GetValue(DecodePixelWidthProperty);
+    }
+
+    public static void SetDecodePixelWidth(DependencyObject target, int value)
+    {
+        target.SetValue(DecodePixelWidthProperty, value);
+    }
+
     private static void OnSourceChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
         if (target is not Image image)
@@ -61,13 +78,14 @@ public static class PosterCacheImageBehavior
         image.SetCurrentValue(Image.SourceProperty, null);
         var cancellation = new CancellationTokenSource();
         SetRequestCancellation(image, cancellation);
-        _ = ApplySourceAsync(image, source, version, cancellation.Token);
+        _ = ApplySourceAsync(image, source, version, GetDecodePixelWidth(image), cancellation.Token);
     }
 
     private static async Task ApplySourceAsync(
         Image image,
         string source,
         int version,
+        int decodePixelWidth,
         CancellationToken cancellationToken)
     {
         string displaySource;
@@ -90,10 +108,15 @@ public static class PosterCacheImageBehavior
             return;
         }
 
-        SetImageSource(image, displaySource);
+        await SetImageSourceAsync(image, displaySource, decodePixelWidth, version, cancellationToken);
     }
 
-    private static void SetImageSource(Image image, string source)
+    private static async Task SetImageSourceAsync(
+        Image image,
+        string source,
+        int decodePixelWidth,
+        int version,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(source))
         {
@@ -105,9 +128,17 @@ public static class PosterCacheImageBehavior
         {
             var uri = new Uri(source, UriKind.RelativeOrAbsolute);
             var imageSource = IsLocalFileSource(source, uri)
-                ? LoadLocalBitmap(uri)
+                ? await Task.Run(() => LoadLocalBitmap(uri, decodePixelWidth), cancellationToken)
                 : new BitmapImage(uri);
+            if (cancellationToken.IsCancellationRequested || GetRequestVersion(image) != version)
+            {
+                return;
+            }
+
             image.SetCurrentValue(Image.SourceProperty, imageSource);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch
         {
@@ -115,11 +146,16 @@ public static class PosterCacheImageBehavior
         }
     }
 
-    private static ImageSource LoadLocalBitmap(Uri uri)
+    private static ImageSource LoadLocalBitmap(Uri uri, int decodePixelWidth)
     {
         var bitmap = new BitmapImage();
         bitmap.BeginInit();
         bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        if (decodePixelWidth > 0)
+        {
+            bitmap.DecodePixelWidth = decodePixelWidth;
+        }
+
         bitmap.UriSource = uri;
         bitmap.EndInit();
         bitmap.Freeze();

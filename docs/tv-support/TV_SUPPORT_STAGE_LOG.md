@@ -2388,6 +2388,115 @@ Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
 
+### Phase 4.15d-fix - TV source aggregate query shape
+
+Completed:
+
+- Follow-up runtime sampling showed the first 4.15d source aggregate SQL shape was slower than the previous flat source-row read path on the current SQLite data set.
+- `LoadTvSourceSeasonAggregateRowsAsync` now reads only the minimal active source projection needed for media-library TV cards: Season id, Episode id, watched flag, and source protocol.
+- Source metrics are grouped in memory after the flat query: active source count, in-library Episode count, watched source-backed Episode count, and local / WebDAV flags.
+- Episode count aggregation remains database-side because the sampled `episodeAggregateRowsMs` stayed low.
+- This keeps the 4.15d semantic goal while avoiding the expensive DB-side `GroupBy` / `Distinct` / navigation aggregate shape that produced high `sourceAggregateRowsMs`.
+
+Not done:
+
+- No media-library UI, category, filter, batch selection, Movie / TV / Other projection result, no-source display, scan rule, correction workflow, AI workflow, schema, migration, database update, commit, or push was changed.
+- No database index was added. If the flat source query remains slow in real logs, index work should still be handled as a separate migration-backed decision.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.15e - Poster decode perceived-latency fix
+
+Completed:
+
+- Runtime sampling after 4.15d-fix showed media-library refresh work itself was short: latest activate / batch-mode refresh summaries were around 61-141 ms, while the user still felt 1-2 seconds of delay.
+- The remaining perceived latency is outside query / filter / UI collection apply timing and is consistent with WPF creating all poster cards in the non-virtualized poster view plus synchronous local bitmap decode.
+- `PosterCacheImageBehavior` now supports an optional `DecodePixelWidth` attached property.
+- Local cached poster images are decoded on a background thread into frozen `BitmapImage` instances before being assigned back to the UI image control.
+- The media-library poster grid sets `DecodePixelWidth=436`, matching the rendered card poster size closely enough for visual parity while avoiding full-size poster decode work for card thumbnails.
+
+Not done:
+
+- No media-library feature, category, filter, batch selection, Movie / TV / Other projection result, no-source display, scan rule, correction workflow, AI workflow, schema, migration, database update, commit, or push was changed.
+- No virtualized wrap panel, layout redesign, list/card UI redesign, image prefetch policy, or poster cache storage format change was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.15d - Media library TV projection aggregation
+
+Completed:
+
+- TV Series media-library projection no longer materializes every matching `TvEpisode` row and every active Episode source row before building Series cards.
+- TV Season media-library projection no longer materializes every matching `TvEpisode` row and every active Episode source row before building Season cards.
+- Hidden / removed-library TV Season projection now uses the same Season-level aggregate metrics instead of the old full Episode / source row path.
+- Added Season-level aggregate rows for Episode count, watched Episode count, active source count, in-library Episode count, watched source-backed Episode count, and local / WebDAV source flags.
+- Existing no-TMDB failed unknown Season semantics are preserved by counting only source-backed Episodes for those unknown Seasons, matching the old filtered Episode-row behavior.
+- Existing TMDB-backed Season progress semantics are preserved by using TMDB total Episode count first and falling back to known Episode count.
+- TV query diagnostics now report aggregate query timing fields and aggregate-row counts while keeping `episodeRows` and `sourceRows` as aggregate totals for comparison with previous logs.
+
+Not done:
+
+- No media-library feature, UI, category, filter, batch selection, full-select, Movie / TV / Other projection result, no-source display, scan rule, correction workflow, aggregation workflow, AI workflow, schema, migration, database update, commit, or push was changed.
+- No Movie query rewrite, projection cache, index migration, virtualization, poster loading, image decoding, or ObservableCollection differential update was added.
+- No database index was added; any index work still requires separate approval and a migration if later logs prove it is needed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.15c - Media library refresh source and query diagnostics
+
+Completed:
+
+- Operation-local media-library refreshes now use explicit scheduler reasons instead of calling page activation directly. Covered flows include removed-library restore / delete, batch watched-state changes, batch remove-from-library, batch delete-record, manual unknown Season aggregation, and batch AI refresh checkpoints.
+- Batch and manual operation notifications are raised before the operation-local refresh where applicable, allowing Library / Metadata / Collection DataChanged reasons from the same operation to merge into one scheduler refresh.
+- `LibraryQueryService.GetLibraryItemsAsync` now logs top-level Movie query, TV query, sort, total elapsed time, input mode, and aggregate Movie / TV / Other result counts.
+- Movie-side query diagnostics now split user collection state, Movie row query, orphan / Other source projection, external no-source collection projection, in-memory projection / dedupe / sort, total elapsed time, and aggregate row / result counts.
+- TV Series and TV Season diagnostics now split Series / Season rows, Episode rows, active source rows, collection state rows, in-memory projection, total elapsed time, and aggregate row / result counts.
+- Hidden-library query diagnostics now split hidden Movie, hidden Season, sort, total elapsed time, and aggregate result counts.
+- New diagnostics are aggregate-only and sanitized: counts, elapsed milliseconds, and stable event names only.
+
+Not done:
+
+- No media-library feature, UI, category, filter, batch selection, full-select, Movie / TV / Other projection, no-source display, scan rule, correction workflow, aggregation workflow, AI workflow, schema, migration, database update, commit, or push was changed.
+- No query rewrite, projection cache, index migration, virtualization, poster loading, image decoding, or ObservableCollection differential update was added in this phase.
+- Pending refresh still depends on a refresh request arriving while a previous refresh is active; the currently small sample library may not naturally trigger that branch.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.15b - Media library performance observation and refresh coalescing
+
+Completed:
+
+- Media library refresh now writes sanitized aggregate diagnostics for refresh request, debounce, inactive skip, refresh start, pending mark, pending execution, completion, and failure.
+- The refresh completion summary records refresh id, primary reason, merged reasons, active state, batch mode, query-service elapsed time, tag / decade option elapsed time, filter / sort elapsed time, UI apply elapsed time, total elapsed time, total result count, filtered count, Movie / TV / Other counts, batch-eligible count, selected count, debounce / coalescing state, inactive dirty state, and pending execution state.
+- `LibraryViewModel` now routes activation, manual refresh, batch-mode refresh, and DataChanged refreshes through a single refresh scheduler.
+- A single-flight guard prevents concurrent full media-library refreshes. New requests received during an active refresh mark a pending refresh instead of starting another full load.
+- Pending refresh reasons are merged. After the current refresh finishes, the scheduler executes at most one merged pending refresh for that wave, then only continues if newer requests arrived during that pending refresh.
+- DataChanged notifications for Library / Metadata / Collection / Scan-related library changes are debounced for a short 200 ms window while the media library page is active.
+- When the media library page is inactive, DataChanged notifications mark the page dirty and keep merged reasons. The next activation performs a refresh with the dirty reasons included.
+
+Not done:
+
+- No media-library feature, UI, category, filter, batch selection, full-select, Movie / TV / Other projection, no-source display, scan rule, correction workflow, aggregation workflow, AI workflow, schema, migration, database update, commit, or push was changed.
+- No query rewrite, projection rewrite, virtualization, poster loading, image decoding, ObservableCollection differential update, or database index work was added in this phase.
+- Already-running refreshes are not cancelled when the page is deactivated; inactive gating applies to new DataChanged-triggered refresh requests.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
 ### Phase 4.14c - Scan progress details and task-level reason summary
 
 Completed:
@@ -3239,6 +3348,62 @@ Verification:
 - Build verification is recorded in the final report for this follow-up.
 - Current migrations diff remained empty.
 
+### Phase 4.15d Frontend Poster Virtualization
+
+Completed:
+
+- Replaced the media-library poster view `ScrollViewer + ItemsControl + WrapPanel` path with a `ListBox` using a project-local `VirtualizingWrapPanel`.
+- The virtualized poster panel uses fixed card width, adaptive row height, vertical pixel scrolling, and recycling item containers so screen-off poster cards are not realized at refresh time.
+- Kept the existing poster card template, card commands, detail navigation, batch selection bindings, no-source badge, status badge, rating/source/progress text, and poster cache binding.
+- Kept the existing list view path separate; poster/list switching still uses the existing `IsPosterView` / `IsListView` flags.
+- Added aggregate `library-poster-virtualization` diagnostics with total item count, realized item count, column count, visible row range, and item size.
+- Added `library-render-ready` diagnostics after refresh completion so backend refresh time can be compared with dispatcher render-ready delay.
+- Extended media-library refresh summaries with `viewMode`, `posterVirtualization`, and `collectionApply`.
+- Added a small `BulkObservableCollection<T>.ReplaceAll` helper and changed media-library filter application from Clear plus per-item Add to a single range reset.
+
+Not done:
+
+- No media-library feature, UI semantic, category, filter, sort, batch selection, select-all, Movie / TV / Other projection, no-source, hidden / deleted, scan, correction, aggregation, or AI behavior was changed.
+- No query rewrite, projection cache, database index, schema migration, database update, online subtitle search, final UI redesign, commit, or push was performed.
+- No new poster download scheduler or cache semantics change was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4.15d Follow-up - Poster View Scroll Tuning
+
+Completed:
+
+- Reduced the custom poster virtualization panel mouse-wheel delta from a half-card jump to a smaller fixed pixel step so media-library poster scrolling no longer feels like it jumps between rows.
+- Reduced line-scroll delta for keyboard / scroll commands to match the smoother wheel behavior.
+- Rate-limited `library-poster-virtualization` diagnostics so continuous scrolling does not emit a dense log event stream while still proving virtualization state over time.
+
+Not done:
+
+- No media-library feature, category, filter, sort, batch selection, projection, poster cache, query, scan, correction, AI, schema, migration, database update, commit, or push behavior was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors after fixing the missing `System.Diagnostics` using in the new panel.
+- Current migrations diff remained empty.
+
+Manual acceptance matrix:
+
+1. Opening the media library shows the same poster cards and data as before.
+2. Poster view scrolls normally and does not blank or overlap cards.
+3. `library-poster-virtualization` logs show `realized` much smaller than `items` when filtered count is larger than one viewport.
+4. Switching to list view still works and does not use the poster virtualized panel.
+5. Switching category, source filter, collection filter, search, and sort keeps the same result semantics.
+6. Entering and exiting batch mode keeps the same selection semantics.
+7. Selecting one card, scrolling away, and scrolling back keeps that card selected.
+8. Select current filtered list still selects the full filtered `Movies` collection, not only realized cards.
+9. Card click, detail button, and batch selection dot still target the correct item.
+10. Poster image loading is triggered by realized card controls and keeps existing cache / placeholder behavior.
+11. Scan, correction, delete-record, remove-from-library, restore, and manual aggregation refresh paths still reach the same refresh scheduler.
+12. Logs remain aggregate-only and do not include full local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
+
 ### Phase 4.13 Closure Regression
 
 Completed:
@@ -3281,3 +3446,40 @@ Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
+
+### Phase 4.15 Closure Regression - Media library performance closure
+
+Completed:
+
+- Rechecked the active Phase 4.15 implementation from the worktree: refresh single-flight / pending refresh / debounce / active dirty gate, query diagnostics, TV projection aggregation, poster decode tuning, poster-view virtualization, collection range reset, render-ready diagnostics, and poster scroll tuning.
+- Confirmed media-library refresh logs now separate query, tag / decade refresh, filter / sort, UI apply, total refresh, render-ready, collection apply mode, view mode, and poster virtualization state.
+- Confirmed the latest sampled poster-view diagnostics show virtualization enabled with `items=165` and `realized=8` on initial viewport, then only a small realized range during scroll.
+- Confirmed the latest sampled first activate after scroll tuning completed with aggregate timings only: query 111 ms, total refresh 116 ms, render-ready 135 ms. Earlier cold-start samples were higher, so startup warmup remains a deferred observation rather than a 4.15 blocker.
+- Confirmed refresh diagnostics and virtualization diagnostics are aggregate-only and do not include full local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
+- Confirmed the current build passes and migrations diff is empty.
+
+Fixed in closure:
+
+- No additional product-code fix was required during this closure pass. No new Blocker, build regression, migration drift, sensitive log issue, or obvious media-library semantic regression was found.
+
+Not done:
+
+- No media-library feature, UI redesign, category / filter / sort semantic change, batch selection rewrite, Movie / TV / Other projection semantic change, no-source behavior change, scan rule change, TV Discovery work, Watch Insights / AI recommendation expansion, online subtitle search, cold-start prewarm, schema migration, database update, commit, or push was performed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Manual acceptance matrix:
+
+1. Opening the media library still uses the same library query / projection path and display semantics.
+2. Category switches keep the existing All / Movie / TV / Other result semantics.
+3. Source filter, collection filter, search, and sort keep the same filtered result semantics.
+4. Batch mode and select-current-filtered-list operate on the filtered item collection, not realized poster containers.
+5. Refreshes from activate, DataChanged, operation-local refresh, scan, correction, delete-record, remove-from-library, and restore still enter the same coalesced refresh scheduler.
+6. Inactive DataChanged events mark the media library dirty and are refreshed on activation instead of being dropped.
+7. Poster view virtualization realizes only the visible / overscan range while preserving the existing card template and bindings.
+8. Poster loading is triggered by realized image controls and keeps the existing cache / placeholder behavior.
+9. Card click, detail navigation, play command, context menu, and selection bindings remain item-VM based.
+10. Logs provide query / filter / UI apply / render-ready / realized-item evidence without logging private paths, URLs, credentials, tokens, passwords, or API keys.

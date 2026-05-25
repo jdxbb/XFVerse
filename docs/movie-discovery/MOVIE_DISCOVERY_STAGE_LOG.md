@@ -845,3 +845,47 @@
 - Rechecked Movie scan / placeholder / Other cross-impact as part of the Phase 4.14 closure pass. Hidden failed Movie placeholders remain excluded from automatic retry, reattach, unknown append, and orphan grouping until restored.
 - WebDAV scan failure messages persisted to scan logs now use generic operation text plus exception type instead of raw exception messages, reducing the chance that full URLs, remote paths, or credentials appear on scan history cards.
 - Movie Discovery ranking, search, no-source Movie detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push were not changed by this closure pass.
+
+# Phase 4.15b Media-library Refresh Cross-impact
+
+- Media-library Movie / no-source / placeholder rows now participate in the same refresh scheduler as TV and Other rows, but their projection and display semantics are unchanged.
+- DataChanged bursts from Movie detail correction, no-source state changes, collection state changes, delete-record, remove-from-library, restore, and scan completion are coalesced before reloading the media library.
+- New diagnostics are aggregate refresh timings and counts only. They do not log titles, local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
+- Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push were not changed by this phase.
+
+# Phase 4.15c Media-library Query Diagnostics Cross-impact
+
+- Movie / no-source / placeholder media-library rows now have additional aggregate query diagnostics through `LibraryQueryService`, including Movie collection-state, Movie row, orphan / Other, external no-source collection, and projection timings.
+- Operation-local media-library refreshes are routed through the refresh scheduler so Movie detail correction, no-source state changes, collection changes, delete-record, remove-from-library, restore, and scan completion notifications can merge with the operation refresh where they occur in the same wave.
+- The diagnostics do not change Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, or push.
+- No Movie query rewrite, projection cache, index migration, UI virtualization, poster loading, or image decoding change was added by this phase.
+
+# Phase 4.15d Media-library TV Projection Aggregation Cross-impact
+
+- TV media-library Series / Season projection now uses Season-level aggregate rows instead of materializing every Episode and active source row for card-level counts.
+- Movie / no-source / placeholder projection code paths were not rewritten. Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push were not changed.
+- The aggregate diagnostics remain sanitized and count / timing only; they do not log titles, local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
+
+# Phase 4.15d-fix TV Source Aggregate Query Cross-impact
+
+- TV source aggregate timing logs showed the first DB-side aggregate query shape was slower than the old flat read path, so the TV source metric path now reads minimal flat source rows and groups them in memory.
+- Movie / no-source / placeholder projection code paths were not changed by this fix.
+- Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push remain unchanged.
+
+# Phase 4.15e Poster Decode Cross-impact
+
+- Media-library poster cards now request thumbnail-sized cached poster decode and decode local cache files off the UI thread before assignment.
+- Movie / no-source / placeholder projection, Movie Discovery ranking, search, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push remain unchanged.
+- Movie detail and external-detail poster behavior keeps the existing full decode path unless a page opts into `DecodePixelWidth`.
+
+# Phase 4.15d Frontend Poster Virtualization Cross-impact
+
+- Media-library poster view now uses a virtualized recycling container and no longer realizes every filtered Movie / no-source / placeholder card at once.
+- Movie / no-source / placeholder projection, Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push remain unchanged.
+- The new diagnostics are aggregate-only layout / refresh timings and do not log movie titles, full local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
+
+# Phase 4.15 Closure Regression Cross-impact
+
+- Rechecked the Phase 4.15 media-library performance work from the active worktree and latest aggregate logs. Movie / no-source / placeholder cards still use the same projection and display semantics while benefiting from refresh coalescing, query diagnostics, poster decode tuning, collection range reset, and poster-view virtualization.
+- Latest sampled media-library logs show aggregate refresh / render / virtualization evidence only, including `items=165` and `realized=8` on the poster first viewport. They do not log movie titles, full local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
+- Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push remain unchanged by the Phase 4.15 closure pass.
