@@ -1,5 +1,21 @@
 # TV Support Known Issues
 
+## Phase 4.17 Closure Regression Known Issues
+
+Blocker:
+
+- None after the Phase 4.17a exclusion audit, closure regression review, and build validation.
+
+Deferred:
+
+- Future TV Watch Insights, TV AI recommendations, TV recommendation fingerprints, and TV-specific recommendation UX require a separate TV-only input model, TV-only fingerprint/cache namespace, and independent acceptance matrix.
+- Mixed Movie + TV watch profiles remain out of scope. Do not reuse Movie Watch Profile semantics to carry TV signals without a separate product design.
+- Automatic cleanup and stale-data policy for metadata-only TV Series / Seasons / Episodes created by Discovery browsing remains deferred.
+
+Noise:
+
+- Movie Watch Statistics source fingerprinting can still be broader than the final displayed Movie statistics in some Movie-only row-lifecycle cases. This may cause extra Movie statistics cache invalidation, but it does not read TV tables or import TV data.
+
 ## Phase 4.16 Closure Regression Known Issues
 
 Blocker:

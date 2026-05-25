@@ -1,5 +1,20 @@
 # TV Support Plan
 
+## Phase 4.17 Closure Scope
+
+Phase 4.17 closes the Watch Insights / AI recommendation exclusion review after the Phase 4.17a audit found no code Blocker and no required 4.17b repair scope.
+
+- Movie Watch Insights remains Movie-only. Watch statistics and Watch Profile inputs are bounded by `Movie`, `MovieId`, `UserMovieCollectionItem`, Movie rating/state/history rows, and identified Movie metadata.
+- TV Episode playback history remains separated through `WatchHistory.EpisodeId` and must not enter Movie statistics, Watch Profile, persona, Watch DNA, quadrant, watch-vs-like, or recommendation profile context.
+- Movie AI recommendations remain Movie-only. Recommendation input, candidate generation, filtering, prompt context, explanation, and fingerprinting use Movie-side library rows, `UserMovieCollectionItem`, Movie watch history/profile cache, and Movie TMDB resolution.
+- `TvSeries`, `TvSeason`, `TvEpisode`, TV Season user states, and TV Discovery metadata-only rows remain excluded from Movie Watch Insights, Movie Watch Profile, Movie AI recommendation prompts, and Movie recommendation fingerprints.
+- TV Discovery metadata-only navigation may create or update `TvSeries`, `TvSeason`, and `TvEpisode` summary/detail rows, but it must not create `Movie`, `MediaFile`, `UserMovieCollectionItem`, or Movie `WatchHistory` rows.
+- Future TV Watch Insights or TV AI recommendations require a separate TV-only input model, TV-only fingerprint/cache namespace, and independent acceptance matrix. Phase 4 does not create a mixed Movie + TV profile and does not reuse Movie profile semantics to carry TV signals.
+
+Phase 4.17 closure work is limited to documentation, regression validation, build / migration checks, and fixes for clear blockers, regressions, build failures, migration drift, or sensitive-log risks.
+
+Out of scope remains TV Watch Insights, TV AI recommendation, Movie + TV mixed profile, TV-specific recommendation UX, Movie Watch Insights statistic口径 changes, Movie AI recommendation semantic changes, scan rule changes, media-library category semantic changes, TV Discovery changes, online subtitle search, final UI redesign, database update, commit, and push.
+
 ## Phase 4.16 Closure Scope
 
 Phase 4.16 closes TV Discovery search and ranking after the Phase 4.16a audit found no required feature Blocker.

@@ -1,5 +1,22 @@
 # Watch Insights Stage Log
 
+## Phase 4.17 TV Exclusion Regression Note
+
+Goal: close the TV Support Phase 4.17 regression review by confirming TV data still does not enter Movie Watch Insights, Watch Profile, persona, DNA, quadrant, watch-vs-like, or recommendation profile context.
+
+Result:
+
+- Movie Watch Insights remains bounded by Movie-side inputs: `Movie`, `MediaFile.MovieId`, `WatchHistory.MovieId`, `UserMovieCollectionItem`, Movie rating sources, and Movie state history.
+- Watch Profile input and source fingerprinting still exclude unidentified / failed Movie rows and do not read `TvSeries`, `TvSeason`, `TvEpisode`, TV Season user states, or `WatchHistory.EpisodeId`.
+- TV Episode playback history remains available to Watch History UI through `EpisodeId`, but is excluded from Movie Watch Statistics and Movie Watch Profile inputs.
+- Recommendation profile context reads cached Movie Watch Profile data only and does not trigger profile AI generation.
+- Future TV Watch Insights requires a TV-only input model, TV-only fingerprint/cache namespace, and independent acceptance matrix. The Movie profile should not be reused as a mixed Movie + TV profile.
+
+Not done:
+
+- No Watch Insights statistic口径 change.
+- No profile prompt, profile cache schema, persona, DNA, quadrant, watch-vs-like, recommendation, database, migration, player, library, scan, or TV Discovery change.
+
 ## WI-0 Completed
 
 Goal: complete a read-only audit and data-capability assessment before implementation.

@@ -1,5 +1,47 @@
 # TV Support Stage Log
 
+## Phase 4.17 - Watch Insights / AI Recommendation Exclusion Closure Regression
+
+Completed:
+
+- Closed the Phase 4.17a read-only audit with no code Blocker and no required 4.17b repair scope.
+- Rechecked the Movie Watch Insights entry and query chain: `WatchInsightsViewModel` uses `IWatchStatisticsService` and `IWatchProfileService`; statistics/profile inputs are bounded by Movie-side data, `MediaFile.MovieId`, `WatchHistory.MovieId`, `UserMovieCollectionItem`, rating sources, and Movie state history.
+- Confirmed `TvSeries`, `TvSeason`, `TvEpisode`, `UserTvSeasonCollectionItem`, TV Season state history, and `WatchHistory.EpisodeId` are not read by Movie Watch Statistics, Watch Profile, persona, Watch DNA, quadrant, watch-vs-like, or profile source fingerprint paths.
+- Rechecked the Movie AI recommendation chain: recommendation input, candidate generation, hard filtering, prompt context, explanation, and fingerprinting use Movie library rows, `UserMovieCollectionItem`, Movie watch/profile cache context, custom recommendation preference, and TMDB Movie resolution.
+- Confirmed TV Season want-to-watch / favorite / not-interested state does not affect Movie AI recommendations.
+- Confirmed TV Discovery metadata-only Series / Season / Episode hydration does not create `Movie`, `MediaFile`, `UserMovieCollectionItem`, or Movie `WatchHistory` rows, and does not route TV results through `AiRecommendationItem`.
+- Confirmed Movie / TV playback history remains separated by the `WatchHistory.MovieId` / `WatchHistory.EpisodeId` boundary.
+- Confirmed Movie-to-TV correction, TV-to-Movie correction, manual unknown Season aggregation, and batch AI TV correction preserve the Movie / TV source boundary through the existing correction services.
+
+Fixed in closure:
+
+- No code fix was required.
+- Documentation now records the Phase 4.17a exclusion audit conclusion and future TV-only design boundary.
+
+Not done:
+
+- No TV Watch Insights, TV AI recommendation, mixed Movie + TV profile, TV-only recommendation system, Movie Watch Insights statistic口径 change, Movie AI recommendation semantic change, scan rule change, media-library category semantic change, TV Discovery change, online subtitle search, final UI redesign, migration, database update, commit, or push was performed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Manual acceptance matrix:
+
+1. Movie playback history continues to enter Movie Watch Insights through `WatchHistory.MovieId`.
+2. TV Episode playback history remains `WatchHistory.EpisodeId` and does not enter Movie Watch Insights.
+3. Watch Statistics and Watch Profile continue to use Movie / `MovieId` / Movie collection boundaries.
+4. `TvSeries`, `TvSeason`, `TvEpisode`, and TV Season states do not enter Movie profile, persona, DNA, quadrant, watch-vs-like, or fingerprint inputs.
+5. Movie AI recommendation prompt input remains Movie-side only.
+6. TV Season want-to-watch / favorite / not-interested state does not affect Movie AI recommendation results or fingerprints.
+7. TV Discovery metadata-only rows do not become Movie recommendation candidates.
+8. AI recommendation Tab remains Movie-only.
+9. Movie-to-TV correction removes the source from MovieId-based statistics paths.
+10. TV-to-Movie correction uses the Movie path only after the source is bound as a Movie source.
+11. Manual unknown Season aggregation moves sources to Episode / Season context and not Movie profile input.
+12. Batch AI TV correction uses TV correction paths and does not call the Movie recommendation candidate path.
+
 ## Phase 4.16 - TV Discovery Closure Regression
 
 Completed:
