@@ -1,5 +1,29 @@
 # TV Support Known Issues
 
+## Phase 4.18 Full Regression Known Issues
+
+Blocker:
+
+- None after the Phase 4.18 full-regression audit, documentation closeout, migration check, and build validation.
+
+Deferred:
+
+- Phase 5 online subtitle search remains a separate stage. Do not fold subtitle provider lookup, online matching, or subtitle download UX into Phase 4 closeout.
+- Final UI redesign, release packaging, and installer work remain later stages.
+- Future TV Watch Insights, TV AI recommendations, TV recommendation fingerprints, and TV-specific recommendation UX require TV-only inputs, TV-only fingerprint/cache namespace, TV-specific prompt/candidate/filter design, and an independent acceptance matrix.
+- Mixed Movie + TV profiles remain out of scope. Do not reuse Movie Watch Profile semantics to carry TV signals.
+- Automatic cleanup and stale-data policy for metadata-only TV Series / Seasons / Episodes created by Discovery browsing remains deferred.
+- Dedicated hidden-state badges on TV Discovery cards remain UI polish; current restore behavior uses the existing add / restore action.
+- TV Season rating persistence / Season-level rating-source normalization remains a later product/data-model decision.
+- Specialty automatic mapping for SP/OAD/OVA/special, theatrical, course, derivative-series, collection, and complex multi-episode/cross-season files remains manual-correction or later specialty work unless a future phase defines conservative gates.
+- No automated test project is currently present in `MediaLibrary.sln`; broad regression is audit/build/manual-matrix based until a test harness is added.
+
+Noise:
+
+- Movie Watch Statistics source fingerprinting can still invalidate more Movie-only cache rows than the final displayed Movie statistics require. This does not read TV tables or import TV data.
+- Metadata-only TV detail can show source-less Episode rows by design. These rows are non-playable until a real active Episode source exists.
+- Asynchronous TV Discovery Season-count enrichment can finish after a UI page/filter switch; request-version guards prevent stale values from overwriting the current visible result set.
+
 ## Phase 4.17 Closure Regression Known Issues
 
 Blocker:

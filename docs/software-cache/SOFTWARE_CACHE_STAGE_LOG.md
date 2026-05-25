@@ -27,3 +27,11 @@
 - Clear other cache and verify only TMDB / OMDb ExternalMetadataCache rows are affected.
 - Run `git status --short --branch` and `git diff --stat`.
 - Confirm no migration was created.
+
+## Phase 5.1 Online Subtitle Cache Groundwork
+
+- Phase 5.1 adds a managed online subtitle cache service and wires subtitle cache usage / clear primitives into the software cache service model.
+- The Settings software-cache UI is not expanded in 5.1; user-visible subtitle cache clearing remains Phase 5.4.
+- The subtitle cache root is isolated from poster cache, video cache, media files, and WebDAV files.
+- Supported cached subtitle extensions are `.srt`, `.ass`, `.ssa`, and `.vtt`.
+- Deleting an online subtitle binding remains separate from physical cache cleanup.

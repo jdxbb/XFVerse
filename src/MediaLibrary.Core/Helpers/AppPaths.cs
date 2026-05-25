@@ -32,4 +32,11 @@ public static class AppPaths
         Directory.CreateDirectory(posterCacheDirectory);
         return posterCacheDirectory;
     }
+
+    public static string GetOnlineSubtitleCacheDirectory()
+    {
+        var subtitleCacheDirectory = Path.Combine(GetAppDataDirectory(), "OnlineSubtitles");
+        Directory.CreateDirectory(subtitleCacheDirectory);
+        return subtitleCacheDirectory;
+    }
 }

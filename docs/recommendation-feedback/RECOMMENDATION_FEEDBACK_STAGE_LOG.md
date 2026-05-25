@@ -1,5 +1,21 @@
 # Recommendation Feedback Stage Log
 
+## Phase 4.18 Phase 4 Recommendation Boundary Note
+
+Goal: record the Phase 4 full-regression result for Movie AI recommendations after TV support stabilization.
+
+Result:
+
+- AI recommendations remain Movie-only. Recommendation input, prompt context, candidate generation, hard filters, explanation generation, and recommendation fingerprints continue to use Movie-side library rows, `UserMovieCollectionItem`, Movie watch history/profile cache context, custom recommendation preference, and Movie TMDB identity.
+- `TvSeries`, `TvSeason`, `TvEpisode`, `UserTvSeasonCollectionItem`, TV Season state history, and `WatchHistory.EpisodeId` remain excluded from recommendation prompts, candidates, filters, explanations, and fingerprints.
+- TV Season want-to-watch / favorite / not-interested state does not affect Movie AI recommendation results or fingerprints.
+- TV Discovery metadata-only Series / Season / Episode rows do not become `AiRecommendationItem` candidates and do not create Movie rows, `MediaFile` rows, `UserMovieCollectionItem` rows, or Movie `WatchHistory` rows.
+- Future TV recommendations require a TV-only input model, TV-only fingerprint/cache namespace, TV-specific prompt/candidate/filter design, and an independent acceptance matrix.
+
+Not done:
+
+- No TV AI recommendation, mixed Movie + TV profile, Movie recommendation semantic change, prompt behavior change, candidate-generation change, hard-filter change, database change, migration, scan change, player change, Watch Insights change, TV Discovery change, database update, commit, or push.
+
 ## Phase 4.17 Movie Recommendation TV Exclusion Regression
 
 Goal: close the TV Support Phase 4.17 regression review by confirming existing AI recommendations remain Movie-only while still using RF-1 / RF-2 feedback and cached Watch Profile context.

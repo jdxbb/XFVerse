@@ -45,5 +45,23 @@ public sealed class ApplicationSettingConfiguration : IEntityTypeConfiguration<A
 
         builder.Property(x => x.TmdbBaseUrl)
             .HasMaxLength(512);
+
+        builder.Property(x => x.OpenSubtitlesEndpoint)
+            .HasMaxLength(512);
+
+        builder.Property(x => x.OpenSubtitlesApiKey)
+            .HasMaxLength(512);
+
+        builder.Property(x => x.OpenSubtitlesUsername)
+            .HasMaxLength(256);
+
+        builder.Property(x => x.OpenSubtitlesPasswordEncrypted)
+            .HasMaxLength(2048);
+
+        builder.Property(x => x.OpenSubtitlesTokenEncrypted)
+            .HasMaxLength(4096);
+
+        builder.Property(x => x.OpenSubtitlesDefaultLanguageCode)
+            .HasMaxLength(32);
     }
 }

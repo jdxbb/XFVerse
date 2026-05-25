@@ -31,6 +31,8 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<SubtitleBinding> SubtitleBindings => Set<SubtitleBinding>();
 
+    public DbSet<OnlineSubtitleBinding> OnlineSubtitleBindings => Set<OnlineSubtitleBinding>();
+
     public DbSet<WatchHistory> WatchHistories => Set<WatchHistory>();
 
     public DbSet<ScanTaskLog> ScanTaskLogs => Set<ScanTaskLog>();
@@ -59,6 +61,7 @@ public sealed class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TvEpisodeConfiguration());
         modelBuilder.ApplyConfiguration(new RatingSourceConfiguration());
         modelBuilder.ApplyConfiguration(new SubtitleBindingConfiguration());
+        modelBuilder.ApplyConfiguration(new OnlineSubtitleBindingConfiguration());
         modelBuilder.ApplyConfiguration(new WatchHistoryConfiguration());
         modelBuilder.ApplyConfiguration(new ScanTaskLogConfiguration());
         modelBuilder.ApplyConfiguration(new UserMovieCollectionItemConfiguration());

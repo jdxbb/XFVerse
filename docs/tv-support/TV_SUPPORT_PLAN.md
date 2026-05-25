@@ -1,5 +1,25 @@
 # TV Support Plan
 
+## Phase 4.18 Closure Scope
+
+Phase 4.18 is the full Phase 4 stabilization and commit-readiness regression pass for TV support. It closes the TV mainline by validating the current code, documentation, migration state, and build without opening new product scope.
+
+The Phase 4 completed surface is:
+
+- TV Series / Season / Episode data model, Movie / TV source binding separation, and the `MediaFile.MovieId` / `MediaFile.EpisodeId` single-binding invariant.
+- Local and WebDAV TV scanning, directory pre-analysis, AI-on-uncertain batching, Movie / TV fallback gates, original-language title preference, part-offset handling, unknown Season / grouped TV-like placeholder handling, Other / orphan handling, and rescan safety gates.
+- Series overview, Season detail, Episode detail, Episode playback, Episode multi-source/default-source handling, and metadata-only TV detail with no fabricated playback source.
+- Unified correction workflows for source-to-Movie, source-to-TV Episode, Movie-to-TV, TV-to-Movie, joining existing unknown Seasons, manual aggregate-to-unknown-Season, aggregate-then-identify, Season-level correction, per-episode mapping, duplicate target episode multi-source handling, and batch AI-assisted correction.
+- Media-library category separation for All / Movie / TV / Other, no-source Movie / Season visibility, hidden / deleted / restore semantics, batch selection, refresh coalescing, library performance diagnostics, and poster-view virtualization.
+- TV Discovery search and ranking under the existing discovery surface, with metadata-only Series / Season summary hydration and Movie Discovery / Movie AI recommendation separation.
+- Movie Watch Insights and Movie AI recommendations remain Movie-only. TV data remains excluded from Movie Watch Statistics, Watch Profile, fingerprint, persona, quadrant, DNA, watch-vs-like, recommendation prompt, candidate generation, filtering, explanation, and recommendation fingerprints.
+
+Phase 4.18 may fix only Blockers, clear regressions, build failures, data-safety issues, migration drift, or sensitive-log issues discovered during regression. It does not add features.
+
+Out of scope remains Phase 5 online subtitle search, final UI redesign, release packaging, TV Watch Insights, TV AI recommendations, Movie + TV mixed profiles, expanded scan guessing rules, media-library category semantic changes, no-source detail semantic changes, database update, commit, and push.
+
+Future TV Watch Insights or TV AI recommendations must be designed as TV-only systems with TV-only inputs, TV-only fingerprint/cache namespace, TV-specific prompts/candidates/filters, and an independent acceptance matrix. The Movie Watch Profile must not be reused as a mixed Movie + TV profile carrier.
+
 ## Phase 4.17 Closure Scope
 
 Phase 4.17 closes the Watch Insights / AI recommendation exclusion review after the Phase 4.17a audit found no code Blocker and no required 4.17b repair scope.

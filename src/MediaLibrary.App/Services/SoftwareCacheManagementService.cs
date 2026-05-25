@@ -7,13 +7,16 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
 {
     private readonly IPosterCacheService _posterCacheService;
     private readonly IExternalMetadataCacheMaintenanceService _externalMetadataCacheMaintenanceService;
+    private readonly IOnlineSubtitleCacheService _onlineSubtitleCacheService;
 
     public SoftwareCacheManagementService(
         IPosterCacheService posterCacheService,
-        IExternalMetadataCacheMaintenanceService externalMetadataCacheMaintenanceService)
+        IExternalMetadataCacheMaintenanceService externalMetadataCacheMaintenanceService,
+        IOnlineSubtitleCacheService onlineSubtitleCacheService)
     {
         _posterCacheService = posterCacheService;
         _externalMetadataCacheMaintenanceService = externalMetadataCacheMaintenanceService;
+        _onlineSubtitleCacheService = onlineSubtitleCacheService;
     }
 
     public async Task<SoftwareCacheOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
@@ -21,14 +24,17 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
         var posterUsageTask = _posterCacheService.GetUsageAsync(cancellationToken);
         var posterSettingsTask = _posterCacheService.GetSettingsAsync(cancellationToken);
         var externalUsageTask = _externalMetadataCacheMaintenanceService.GetUsageAsync(cancellationToken);
+        var subtitleUsageTask = _onlineSubtitleCacheService.GetUsageAsync(cancellationToken);
 
-        await Task.WhenAll(posterUsageTask, posterSettingsTask, externalUsageTask);
+        await Task.WhenAll(posterUsageTask, posterSettingsTask, externalUsageTask, subtitleUsageTask);
 
         return BuildOverview(
             posterUsageTask.Result,
             posterSettingsTask.Result,
             externalUsageTask.Result.ManagedEntryCount,
-            externalUsageTask.Result.EstimatedBytes);
+            externalUsageTask.Result.EstimatedBytes,
+            subtitleUsageTask.Result.FileCount,
+            subtitleUsageTask.Result.UsedBytes);
     }
 
     public async Task<SoftwareCacheOverview> SavePosterCacheLimitAsync(
@@ -49,6 +55,7 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
         {
             SoftwareCacheCategoryKind.PosterCache => await ClearPosterCacheAsync(cancellationToken),
             SoftwareCacheCategoryKind.OtherCache => await ClearOtherCacheAsync(cancellationToken),
+            SoftwareCacheCategoryKind.SubtitleCache => await ClearSubtitleCacheAsync(cancellationToken),
             _ => new SoftwareCacheClearResult
             {
                 Kind = kind,
@@ -62,7 +69,9 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
         PosterCacheUsage posterUsage,
         PosterCacheSettings posterSettings,
         int externalEntryCount,
-        long externalEstimatedBytes)
+        long externalEstimatedBytes,
+        int subtitleFileCount,
+        long subtitleUsedBytes)
     {
         return new SoftwareCacheOverview
         {
@@ -85,6 +94,16 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
                 ItemCount = externalEntryCount,
                 IsClearable = externalEntryCount > 0,
                 ClearUnavailableReason = externalEntryCount > 0 ? string.Empty : "当前没有可清理的其他缓存。"
+            },
+            SubtitleCache = new SoftwareCacheCategoryModel
+            {
+                Kind = SoftwareCacheCategoryKind.SubtitleCache,
+                Name = "Online subtitle cache",
+                Description = "Managed downloaded online subtitle files. Removing a player binding does not delete these files.",
+                UsedBytes = subtitleUsedBytes,
+                ItemCount = subtitleFileCount,
+                IsClearable = subtitleFileCount > 0,
+                ClearUnavailableReason = subtitleFileCount > 0 ? string.Empty : "No online subtitle cache files are currently clearable."
             },
             PosterCacheMaxBytes = posterSettings.MaxBytes
         };
@@ -112,6 +131,19 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
             Succeeded = result.Succeeded,
             DeletedItemCount = result.DeletedEntryCount,
             FreedBytes = result.EstimatedFreedBytes,
+            Error = result.Error
+        };
+    }
+
+    private async Task<SoftwareCacheClearResult> ClearSubtitleCacheAsync(CancellationToken cancellationToken)
+    {
+        var result = await _onlineSubtitleCacheService.ClearAsync(cancellationToken);
+        return new SoftwareCacheClearResult
+        {
+            Kind = SoftwareCacheCategoryKind.SubtitleCache,
+            Succeeded = result.Succeeded,
+            DeletedItemCount = result.DeletedFileCount,
+            FreedBytes = result.FreedBytes,
             Error = result.Error
         };
     }

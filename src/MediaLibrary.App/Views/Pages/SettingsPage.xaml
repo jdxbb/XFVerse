@@ -282,6 +282,72 @@
 
                             <Border Margin="0,18,0,0" Style="{StaticResource CompactCardStyle}">
                                 <StackPanel>
+                                    <TextBlock Text="在线字幕配置" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Margin="0,10,0,0"
+                                               Text="用于 OpenSubtitles 在线字幕搜索、下载能力探测和后续播放器下载流程。账号密码可选；仅 API key 也可以保存并测试。"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyTextStyle}" />
+
+                                    <CheckBox Margin="0,18,0,0"
+                                              Content="启用在线字幕"
+                                              IsChecked="{Binding IsOpenSubtitlesEnabled}"
+                                              Style="{StaticResource FormCheckBoxStyle}" />
+
+                                    <TextBlock Margin="0,18,0,0" Text="Endpoint" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding OpenSubtitlesEndpoint, UpdateSourceTrigger=PropertyChanged}" />
+
+                                    <TextBlock Margin="0,10,0,0" Text="API Key" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding OpenSubtitlesApiKey, UpdateSourceTrigger=PropertyChanged}" />
+
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Username（可选）" Style="{StaticResource BodyTextStyle}" />
+                                            <TextBox Margin="0,6,0,0"
+                                                     Style="{StaticResource FormTextBoxStyle}"
+                                                     Text="{Binding OpenSubtitlesUsername, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Password（可选）" Style="{StaticResource BodyTextStyle}" />
+                                            <PasswordBox x:Name="OpenSubtitlesPasswordBox"
+                                                         Margin="0,6,0,0"
+                                                         PasswordChanged="OpenSubtitlesPasswordBox_PasswordChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Margin="0,10,0,0" Text="默认搜索语言" Style="{StaticResource BodyTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding OpenSubtitlesLanguages}"
+                                              SelectedItem="{Binding SelectedOpenSubtitlesLanguage}"
+                                              DisplayMemberPath="Name"
+                                              Style="{StaticResource FormComboBoxStyle}" />
+
+                                    <StackPanel Margin="0,18,0,0" Orientation="Horizontal">
+                                        <Button Width="120"
+                                                Content="保存配置"
+                                                Command="{Binding SaveOpenSubtitlesSettingsCommand}"
+                                                Style="{StaticResource PrimaryButtonStyle}" />
+                                        <Button Margin="12,0,0,0"
+                                                Width="150"
+                                                Content="测试在线字幕"
+                                                Command="{Binding TestOpenSubtitlesConnectionCommand}"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                    </StackPanel>
+
+                                    <TextBlock Margin="0,14,0,0"
+                                               Text="{Binding OpenSubtitlesStatusMessage}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,18,0,0" Style="{StaticResource CompactCardStyle}">
+                                <StackPanel>
                                     <TextBlock Text="大模型配置" Style="{StaticResource SectionTitleTextStyle}" />
                                     <TextBlock Margin="0,10,0,0"
                                                Text="用于 AI 分类、推荐理由和辅助识别。接口不可用时会使用本地规则降级。"

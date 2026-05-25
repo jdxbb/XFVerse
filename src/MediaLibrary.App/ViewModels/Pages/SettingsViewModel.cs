@@ -8,6 +8,7 @@ using MediaLibrary.App.Services;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
 using MediaLibrary.Core.Models.Entities;
+using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Models.Settings;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -20,6 +21,7 @@ public sealed class SettingsViewModel : PageViewModelBase
     private readonly IThemeService _themeService;
     private readonly ISoftwareCacheManagementService _softwareCacheManagementService;
     private readonly IConfirmationDialogService _confirmationDialogService;
+    private readonly IOpenSubtitlesClientService _openSubtitlesClientService;
     private readonly HttpClient _metadataApiHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(8)
@@ -35,6 +37,13 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _tmdbReadAccessToken = string.Empty;
     private string _tmdbApiKey = string.Empty;
     private string _omdbApiKey = string.Empty;
+    private string _openSubtitlesEndpoint = "https://api.opensubtitles.com/api/v1";
+    private string _openSubtitlesApiKey = string.Empty;
+    private string _openSubtitlesUsername = string.Empty;
+    private string _openSubtitlesPassword = string.Empty;
+    private string _openSubtitlesToken = string.Empty;
+    private bool _isOpenSubtitlesEnabled;
+    private OpenSubtitlesLanguageOption? _selectedOpenSubtitlesLanguage;
     private string _aiBaseUrl = string.Empty;
     private string _aiApiKey = string.Empty;
     private string _aiModel = string.Empty;
@@ -57,6 +66,7 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _scanPathStatusMessage = "当前还没有扫描路径。";
     private string _tmdbStatusMessage = "可在这里保存 TMDB 认证信息。";
     private string _omdbStatusMessage = "可在这里保存 OMDb 认证信息。";
+    private string _openSubtitlesStatusMessage = "可在这里保存 OpenSubtitles 在线字幕配置。";
     private string _apiStatusMessage = "可在这里保存大模型配置。";
     private string _themeStatusMessage = "默认使用浅色主题。";
     private string _softwareCacheStatusMessage = "软件缓存状态尚未加载。";
@@ -80,7 +90,8 @@ public sealed class SettingsViewModel : PageViewModelBase
         IWebDavService webDavService,
         IThemeService themeService,
         ISoftwareCacheManagementService softwareCacheManagementService,
-        IConfirmationDialogService confirmationDialogService)
+        IConfirmationDialogService confirmationDialogService,
+        IOpenSubtitlesClientService openSubtitlesClientService)
         : base("设置", "管理通用设置与 API 配置。")
     {
         _settingsService = settingsService;
@@ -88,14 +99,20 @@ public sealed class SettingsViewModel : PageViewModelBase
         _themeService = themeService;
         _softwareCacheManagementService = softwareCacheManagementService;
         _confirmationDialogService = confirmationDialogService;
+        _openSubtitlesClientService = openSubtitlesClientService;
 
         ThemeModes = _themeService.ThemeModes;
+        OpenSubtitlesLanguages = _openSubtitlesClientService.SupportedLanguages;
+        _selectedOpenSubtitlesLanguage = OpenSubtitlesLanguages.FirstOrDefault(x => x.Code == "zh-cn")
+                                         ?? OpenSubtitlesLanguages.FirstOrDefault();
         SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync);
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync);
         SaveTmdbSettingsCommand = new AsyncRelayCommand(SaveTmdbSettingsAsync);
         TestTmdbConnectionCommand = new AsyncRelayCommand(TestTmdbConnectionAsync);
         SaveOmdbSettingsCommand = new AsyncRelayCommand(SaveOmdbSettingsAsync);
         TestOmdbConnectionCommand = new AsyncRelayCommand(TestOmdbConnectionAsync);
+        SaveOpenSubtitlesSettingsCommand = new AsyncRelayCommand(SaveOpenSubtitlesSettingsAsync);
+        TestOpenSubtitlesConnectionCommand = new AsyncRelayCommand(TestOpenSubtitlesConnectionAsync);
         SaveAiSettingsCommand = new AsyncRelayCommand(SaveAiSettingsAsync);
         SaveThemeSettingsCommand = new AsyncRelayCommand(SaveThemeSettingsAsync);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath);
@@ -115,6 +132,8 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public IReadOnlyList<string> ThemeModes { get; }
 
+    public IReadOnlyList<OpenSubtitlesLanguageOption> OpenSubtitlesLanguages { get; }
+
     public AsyncRelayCommand SaveConnectionCommand { get; }
 
     public AsyncRelayCommand TestConnectionCommand { get; }
@@ -126,6 +145,10 @@ public sealed class SettingsViewModel : PageViewModelBase
     public AsyncRelayCommand SaveOmdbSettingsCommand { get; }
 
     public AsyncRelayCommand TestOmdbConnectionCommand { get; }
+
+    public AsyncRelayCommand SaveOpenSubtitlesSettingsCommand { get; }
+
+    public AsyncRelayCommand TestOpenSubtitlesConnectionCommand { get; }
 
     public AsyncRelayCommand SaveAiSettingsCommand { get; }
 
@@ -181,6 +204,22 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public string OmdbApiKey { get => _omdbApiKey; set => SetProperty(ref _omdbApiKey, value); }
 
+    public string OpenSubtitlesEndpoint { get => _openSubtitlesEndpoint; set => SetProperty(ref _openSubtitlesEndpoint, value); }
+
+    public string OpenSubtitlesApiKey { get => _openSubtitlesApiKey; set => SetProperty(ref _openSubtitlesApiKey, value); }
+
+    public string OpenSubtitlesUsername { get => _openSubtitlesUsername; set => SetProperty(ref _openSubtitlesUsername, value); }
+
+    public string OpenSubtitlesPassword { get => _openSubtitlesPassword; set => SetProperty(ref _openSubtitlesPassword, value); }
+
+    public bool IsOpenSubtitlesEnabled { get => _isOpenSubtitlesEnabled; set => SetProperty(ref _isOpenSubtitlesEnabled, value); }
+
+    public OpenSubtitlesLanguageOption? SelectedOpenSubtitlesLanguage
+    {
+        get => _selectedOpenSubtitlesLanguage;
+        set => SetProperty(ref _selectedOpenSubtitlesLanguage, value);
+    }
+
     public string AiBaseUrl { get => _aiBaseUrl; set => SetProperty(ref _aiBaseUrl, value); }
 
     public string AiApiKey { get => _aiApiKey; set => SetProperty(ref _aiApiKey, value); }
@@ -224,6 +263,8 @@ public sealed class SettingsViewModel : PageViewModelBase
     public string TmdbStatusMessage { get => _tmdbStatusMessage; set => SetProperty(ref _tmdbStatusMessage, value); }
 
     public string OmdbStatusMessage { get => _omdbStatusMessage; set => SetProperty(ref _omdbStatusMessage, value); }
+
+    public string OpenSubtitlesStatusMessage { get => _openSubtitlesStatusMessage; set => SetProperty(ref _openSubtitlesStatusMessage, value); }
 
     public string ApiStatusMessage { get => _apiStatusMessage; set => SetProperty(ref _apiStatusMessage, value); }
 
@@ -312,6 +353,7 @@ public sealed class SettingsViewModel : PageViewModelBase
             ConnectionStatusMessage = $"加载设置失败：{exception.Message}";
             TmdbStatusMessage = "TMDB 配置尚未加载。";
             OmdbStatusMessage = "OMDb 配置尚未加载。";
+            OpenSubtitlesStatusMessage = "OpenSubtitles 配置尚未加载。";
             ApiStatusMessage = "大模型配置尚未加载。";
             SoftwareCacheStatusMessage = "软件缓存状态尚未加载。";
         }
@@ -336,12 +378,22 @@ public sealed class SettingsViewModel : PageViewModelBase
         TmdbReadAccessToken = applicationSetting.TmdbReadAccessToken;
         TmdbApiKey = applicationSetting.TmdbApiKey;
         OmdbApiKey = applicationSetting.OmdbApiKey;
+        OpenSubtitlesEndpoint = string.IsNullOrWhiteSpace(applicationSetting.OpenSubtitlesEndpoint)
+            ? "https://api.opensubtitles.com/api/v1"
+            : applicationSetting.OpenSubtitlesEndpoint;
+        OpenSubtitlesApiKey = applicationSetting.OpenSubtitlesApiKey;
+        OpenSubtitlesUsername = applicationSetting.OpenSubtitlesUsername;
+        OpenSubtitlesPassword = applicationSetting.OpenSubtitlesPassword;
+        _openSubtitlesToken = applicationSetting.OpenSubtitlesToken;
+        IsOpenSubtitlesEnabled = applicationSetting.IsOpenSubtitlesEnabled;
+        SelectedOpenSubtitlesLanguage = FindOpenSubtitlesLanguage(applicationSetting.OpenSubtitlesDefaultLanguageCode);
         AiBaseUrl = applicationSetting.AiBaseUrl;
         AiApiKey = applicationSetting.AiApiKey;
         ApplyAiRouting(applicationSetting.AiRouting ?? AiModelRoutingSettings.FromStoredValue(applicationSetting.AiModel));
         SelectedThemeMode = string.IsNullOrWhiteSpace(applicationSetting.ThemeMode) ? "Light" : applicationSetting.ThemeMode;
         TmdbStatusMessage = "已加载 TMDB 配置。";
         OmdbStatusMessage = "已加载 OMDb 配置。";
+        OpenSubtitlesStatusMessage = "已加载 OpenSubtitles 配置。";
         ApiStatusMessage = "已加载大模型配置。";
         ThemeStatusMessage = $"当前主题：{SelectedThemeMode}";
     }
@@ -392,6 +444,63 @@ public sealed class SettingsViewModel : PageViewModelBase
                 RequireModel(AiWatchProfileModel, "观影画像模型"),
                 ParsePositiveSeconds(AiWatchProfileTimeoutSeconds, "观影画像超时"))
         };
+    }
+
+    private OpenSubtitlesClientOptions BuildOpenSubtitlesOptionsFromInputs()
+    {
+        return new OpenSubtitlesClientOptions
+        {
+            Endpoint = OpenSubtitlesEndpoint,
+            ApiKey = OpenSubtitlesApiKey,
+            Username = OpenSubtitlesUsername,
+            Password = OpenSubtitlesPassword,
+            Token = _openSubtitlesToken,
+            DefaultLanguageCode = SelectedOpenSubtitlesLanguage?.Code ?? "zh-cn"
+        };
+    }
+
+    private void ApplyOpenSubtitlesInputs(ApplicationSettingModel settings)
+    {
+        settings.OpenSubtitlesEndpoint = string.IsNullOrWhiteSpace(OpenSubtitlesEndpoint)
+            ? "https://api.opensubtitles.com/api/v1"
+            : OpenSubtitlesEndpoint;
+        settings.OpenSubtitlesApiKey = OpenSubtitlesApiKey;
+        settings.OpenSubtitlesUsername = OpenSubtitlesUsername;
+        settings.OpenSubtitlesPassword = OpenSubtitlesPassword;
+        settings.OpenSubtitlesToken = _openSubtitlesToken;
+        settings.OpenSubtitlesDefaultLanguageCode = SelectedOpenSubtitlesLanguage?.Code ?? "zh-cn";
+        settings.IsOpenSubtitlesEnabled = IsOpenSubtitlesEnabled;
+    }
+
+    private OpenSubtitlesLanguageOption? FindOpenSubtitlesLanguage(string? code)
+    {
+        var normalized = string.IsNullOrWhiteSpace(code) ? "zh-cn" : code.Trim();
+        return OpenSubtitlesLanguages.FirstOrDefault(
+                   x => string.Equals(x.Code, normalized, StringComparison.OrdinalIgnoreCase))
+               ?? OpenSubtitlesLanguages.FirstOrDefault(
+                   x => string.Equals(x.Code, "zh-cn", StringComparison.OrdinalIgnoreCase))
+               ?? OpenSubtitlesLanguages.FirstOrDefault();
+    }
+
+    private static string FormatOpenSubtitlesProbeResult(OpenSubtitlesProbeResult result)
+    {
+        if (!result.IsApiKeyConfigured)
+        {
+            return "OpenSubtitles API Key 未配置。";
+        }
+
+        if (!result.IsApiKeyAccepted)
+        {
+            return $"OpenSubtitles API Key 探测失败：{result.Message}";
+        }
+
+        var loginText = result.LoginAttempted
+            ? result.LoginSucceeded ? "登录成功" : "登录失败"
+            : "未配置账号密码，已跳过登录";
+        var quotaText = result.QuotaProbeSucceeded
+            ? $"额度：remaining={result.RemainingDownloads?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}, allowed={result.AllowedDownloads?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}"
+            : "额度：未能提前查询，将在下载返回中提示";
+        return $"API Key 可用；{loginText}；{quotaText}。";
     }
 
     private static string RequireModel(string value, string label)
@@ -534,6 +643,60 @@ public sealed class SettingsViewModel : PageViewModelBase
         catch (Exception exception)
         {
             OmdbStatusMessage = $"OMDb 连接失败：{exception.Message}";
+        }
+    }
+
+    private async Task SaveOpenSubtitlesSettingsAsync()
+    {
+        try
+        {
+            var saved = await SaveApplicationSettingsAsync(settings =>
+            {
+                ApplyOpenSubtitlesInputs(settings);
+            });
+            _applicationSettingId = saved.Id;
+            OpenSubtitlesStatusMessage = "OpenSubtitles 配置已保存。";
+        }
+        catch (Exception exception)
+        {
+            OpenSubtitlesStatusMessage = $"保存 OpenSubtitles 配置失败：{exception.Message}";
+        }
+    }
+
+    private async Task TestOpenSubtitlesConnectionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(OpenSubtitlesApiKey))
+        {
+            OpenSubtitlesStatusMessage = "请先填写 OpenSubtitles API Key。";
+            return;
+        }
+
+        try
+        {
+            OpenSubtitlesStatusMessage = "正在探测 OpenSubtitles API 能力...";
+            var result = await _openSubtitlesClientService.ProbeAsync(BuildOpenSubtitlesOptionsFromInputs());
+            if (!string.IsNullOrWhiteSpace(result.Token))
+            {
+                _openSubtitlesToken = result.Token;
+                await SaveApplicationSettingsAsync(settings =>
+                {
+                    ApplyOpenSubtitlesInputs(settings);
+                });
+            }
+            else if (result.ErrorKind == OpenSubtitlesErrorKind.Unauthorized && !string.IsNullOrWhiteSpace(_openSubtitlesToken))
+            {
+                _openSubtitlesToken = string.Empty;
+                await SaveApplicationSettingsAsync(settings =>
+                {
+                    ApplyOpenSubtitlesInputs(settings);
+                });
+            }
+
+            OpenSubtitlesStatusMessage = FormatOpenSubtitlesProbeResult(result);
+        }
+        catch (Exception exception)
+        {
+            OpenSubtitlesStatusMessage = $"OpenSubtitles 探测失败：{exception.GetType().Name}";
         }
     }
 
@@ -696,7 +859,14 @@ public sealed class SettingsViewModel : PageViewModelBase
             RecentAiRecommendationsJson = settings.RecentAiRecommendationsJson,
             CurrentAiRecommendationsJson = settings.CurrentAiRecommendationsJson,
             AiRecommendationLibraryFingerprint = settings.AiRecommendationLibraryFingerprint,
-            TmdbBaseUrl = settings.TmdbBaseUrl
+            TmdbBaseUrl = settings.TmdbBaseUrl,
+            OpenSubtitlesEndpoint = settings.OpenSubtitlesEndpoint,
+            OpenSubtitlesApiKey = settings.OpenSubtitlesApiKey,
+            OpenSubtitlesUsername = settings.OpenSubtitlesUsername,
+            OpenSubtitlesPassword = settings.OpenSubtitlesPassword,
+            OpenSubtitlesToken = settings.OpenSubtitlesToken,
+            OpenSubtitlesDefaultLanguageCode = settings.OpenSubtitlesDefaultLanguageCode,
+            IsOpenSubtitlesEnabled = settings.IsOpenSubtitlesEnabled
         };
     }
 

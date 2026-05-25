@@ -82,6 +82,15 @@ public sealed class SettingsService : ISettingsService
         entity.CurrentAiRecommendationsJson = settings.CurrentAiRecommendationsJson;
         entity.AiRecommendationLibraryFingerprint = settings.AiRecommendationLibraryFingerprint;
         entity.TmdbBaseUrl = settings.TmdbBaseUrl.Trim();
+        entity.OpenSubtitlesEndpoint = NormalizeOpenSubtitlesEndpoint(settings.OpenSubtitlesEndpoint);
+        entity.OpenSubtitlesApiKey = settings.OpenSubtitlesApiKey.Trim();
+        entity.OpenSubtitlesUsername = settings.OpenSubtitlesUsername.Trim();
+        entity.OpenSubtitlesPasswordEncrypted = SecretProtector.Protect(settings.OpenSubtitlesPassword);
+        entity.OpenSubtitlesTokenEncrypted = SecretProtector.Protect(settings.OpenSubtitlesToken);
+        entity.OpenSubtitlesDefaultLanguageCode = string.IsNullOrWhiteSpace(settings.OpenSubtitlesDefaultLanguageCode)
+            ? "zh-cn"
+            : settings.OpenSubtitlesDefaultLanguageCode.Trim();
+        entity.IsOpenSubtitlesEnabled = settings.IsOpenSubtitlesEnabled;
         entity.UpdatedAt = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -529,8 +538,25 @@ public sealed class SettingsService : ISettingsService
             RecentAiRecommendationsJson = entity.RecentAiRecommendationsJson,
             CurrentAiRecommendationsJson = entity.CurrentAiRecommendationsJson,
             AiRecommendationLibraryFingerprint = entity.AiRecommendationLibraryFingerprint,
-            TmdbBaseUrl = string.IsNullOrWhiteSpace(entity.TmdbBaseUrl) ? "https://api.tmdb.org/3/" : entity.TmdbBaseUrl
+            TmdbBaseUrl = string.IsNullOrWhiteSpace(entity.TmdbBaseUrl) ? "https://api.tmdb.org/3/" : entity.TmdbBaseUrl,
+            OpenSubtitlesEndpoint = NormalizeOpenSubtitlesEndpoint(entity.OpenSubtitlesEndpoint),
+            OpenSubtitlesApiKey = entity.OpenSubtitlesApiKey,
+            OpenSubtitlesUsername = entity.OpenSubtitlesUsername,
+            OpenSubtitlesPassword = SecretProtector.Unprotect(entity.OpenSubtitlesPasswordEncrypted),
+            OpenSubtitlesToken = SecretProtector.Unprotect(entity.OpenSubtitlesTokenEncrypted),
+            OpenSubtitlesDefaultLanguageCode = string.IsNullOrWhiteSpace(entity.OpenSubtitlesDefaultLanguageCode)
+                ? "zh-cn"
+                : entity.OpenSubtitlesDefaultLanguageCode,
+            IsOpenSubtitlesEnabled = entity.IsOpenSubtitlesEnabled
         };
+    }
+
+    private static string NormalizeOpenSubtitlesEndpoint(string? endpoint)
+    {
+        var normalized = string.IsNullOrWhiteSpace(endpoint)
+            ? "https://api.opensubtitles.com/api/v1"
+            : endpoint.Trim();
+        return normalized.TrimEnd('/');
     }
 
     private static string NormalizePath(string path)

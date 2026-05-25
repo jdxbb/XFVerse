@@ -1,5 +1,50 @@
 # TV Support Stage Log
 
+## Phase 4.18 - Full Phase 4 Regression And Commit Closeout
+
+Completed:
+
+- Ran a full Phase 4 read-through regression against the current worktree before changing code. No Phase 4 Blocker, build failure, migration drift, data-safety issue, or sensitive-log issue was found.
+- Confirmed Movie mainline behavior remains separated from TV support: Movie scan/detail/playback/multi-source/default-source/correction/search/ranking/AI recommendation/no-source detail/user-state/delete/remove/restore semantics are still Movie-side flows.
+- Confirmed TV scanning retains local and WebDAV paths, directory pre-analysis, AI-on-uncertain batching, Movie / TV fallback safety gates, original-language title preference, part offset, unknown Season / grouped placeholder behavior, Other / orphan behavior, rescan safety, no automatic overwrite of existing Episode bindings, and hidden failed placeholder protection.
+- Confirmed TV detail and playback retain Series overview, Season detail, Episode detail, Episode playback, Episode multi-source/default-source behavior, disabled playback for no-source Episodes, metadata-only TV detail, and the rule that metadata-only TV does not create `MediaFile` rows or playback sources.
+- Confirmed correction workflows preserve Movie / TV boundaries for single-source correction to Movie, single-source correction to TV Episode, Movie source to TV Episode, TV source to Movie, joining existing unknown Seasons, manual aggregate-to-unknown-Season, aggregate-then-identify, Season-level correction, per-episode mapping, duplicate target episode multi-source handling, and batch AI-assisted correction.
+- Confirmed media-library separation for All / Movie / TV / Other, no-source Movie / Season visibility, Other / orphan / failed placeholder / unknown Season projection, hidden / deleted / restore semantics, batch selection, refresh coalescing, library performance logs, poster-view virtualization, and interaction state.
+- Confirmed scan/history/probe/subtitle boundaries: scan progress and reason summaries remain diagnostic-only, Watch History opens Movie detail for Movie rows and Season detail with Episode focus for Episode rows, scan does not trigger probe, correction/remove paths do not clear probe fields, and delete-record software cleanup keeps the established subtitle-binding boundary.
+- Confirmed TV Discovery remains under the existing discovery surface with TV search, filters, pagination, loading / empty / error states, popular / top-rated / trending rankings, day / week trend windows, asynchronous Season-count enrichment, Series overview navigation, and metadata-only hydration that does not create playback sources.
+- Confirmed Movie Watch Insights, Movie Watch Profile, Movie fingerprint/persona/quadrant/DNA/watch-vs-like, and Movie AI recommendation prompt/candidate/filter/explanation/fingerprint inputs remain Movie-only and exclude TV rows and TV Season states.
+- Confirmed external AI / metadata service hardening remains in place: scan TV uncertain/full range and scan movie tagging use Flash routes, single-source correction and batch correction use Pro routes, Watch Profile uses Pro with high thinking where supported, recommendations use Flash, AI batch requests and TMDB / OMDb HTTP calls use adaptive concurrency / retry behavior, and diagnostic logs use sanitized values or hashes for sensitive data.
+
+Fixed in closure:
+
+- No code fix was required.
+- Documentation now records the Phase 4.18 full-regression conclusion, commit-readiness scope, Movie / TV exclusion boundaries, metadata-only TV semantics, no-source detail semantics, media-library safety semantics, and remaining Deferred items.
+
+Not done:
+
+- No new feature, Phase 5 online subtitle search, final UI redesign, release packaging, TV Watch Insights, TV AI recommendation, Movie + TV mixed profile, expanded scan guessing rule, media-library category semantic change, no-source detail semantic change, migration, database update, commit, or push was performed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+- No automated test project is currently present in `MediaLibrary.sln`; validation used code audit, document audit, required git checks, migration diff, and build.
+
+Manual acceptance matrix:
+
+1. Movie scan/detail/playback/multi-source/default-source/user-state/delete/remove/restore paths remain Movie-side and do not use TV state rows.
+2. Local and WebDAV TV scans preserve Movie / TV fallback gates and do not rebind an existing Episode source through the ordinary scan path.
+3. Unknown Season / grouped TV-like placeholders remain TV-side display and correction surfaces, while failed Movie placeholders and orphan files remain separated.
+4. Series overview, Season detail, and Episode detail support metadata-only rows without fabricating `MediaFile` rows or playback sources.
+5. Episode playback uses Episode sources and default-source pointers; no-source Episode playback remains unavailable.
+6. Movie-to-TV and TV-to-Movie corrections clear the previous side's source binding and reconcile default-source pointers.
+7. Manual aggregation and aggregate-then-identify move sources into Episode / Season context and do not feed Movie profile or Movie recommendation inputs.
+8. Media-library All / Movie / TV / Other filters keep no-source Movie / Season, Other, orphan, failed placeholder, and unknown Season projections separated.
+9. Watch History navigates Movie rows to Movie detail and Episode rows to Season detail with Episode focus.
+10. TV Discovery search / ranking navigation hydrates TV metadata only and does not create Movie rows, `MediaFile` rows, or playback sources.
+11. Movie Watch Insights / Watch Profile / fingerprint/persona/quadrant/DNA/watch-vs-like inputs remain bounded by Movie-side data.
+12. Movie AI recommendations remain Movie-only; TV Season states and TV Episode watch history do not affect prompt, candidates, filters, explanations, or fingerprints.
+
 ## Phase 4.17 - Watch Insights / AI Recommendation Exclusion Closure Regression
 
 Completed:

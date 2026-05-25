@@ -8,7 +8,8 @@
 
 ## Deferred
 
-- Subtitle cache directory and subtitle search integration.
+- Subtitle cache directory groundwork exists after Phase 5.1, but the user-visible subtitle cache clearing UI remains deferred to Phase 5.4.
+- Online subtitle search integration remains deferred to Phase 5.2 / 5.3.
 - AI, recommendation, Watch Insights, and user profile cache cleanup.
 - Cross-process poster failure markers.
 - More granular software cache categories.

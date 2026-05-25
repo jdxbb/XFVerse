@@ -1,5 +1,15 @@
 # 影片发现阶段日志
 
+## Phase 4.18 Phase 4 Discovery Regression Note
+
+- Movie Discovery remains the default discovery surface for Movie search, person search, Movie rankings, Movie detail navigation, no-source Movie detail, and Movie-side collection actions.
+- TV Discovery remains integrated into the existing discovery page through Movie / TV switches on search and ranking tabs; no independent TV Discovery page was added.
+- TV search and rankings still navigate through TV metadata hydration into `SeriesOverviewPage`.
+- metadata-only TV hydration is TV-only: it may create or update `TvSeries`, `TvSeason`, and `TvEpisode` summary/detail rows, but it must not create `Movie`, `MediaFile`, `UserMovieCollectionItem`, Movie `WatchHistory`, or playback-source rows.
+- The AI recommendation tab remains Movie-only and is not used as a TV recommendation entry.
+- Movie Discovery, Movie AI recommendation, Watch Insights, Watch Profile, and recommendation fingerprint boundaries were rechecked during Phase 4.18 with no required code fix.
+- No DB field, migration, database update, Phase 5 subtitle feature, final UI redesign, commit, or push was performed in this closeout.
+
 ## Phase 4.16 TV Discovery 收口回归
 
 - Phase 4.16a 审计结论已收口：当前 TV Discovery / TV 搜索 / TV 榜单基础能力已可用，没有必须新增功能的 Blocker。

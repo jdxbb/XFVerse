@@ -26,6 +26,20 @@ public sealed class ApplicationSetting
 
     public string TmdbBaseUrl { get; set; } = string.Empty;
 
+    public string OpenSubtitlesEndpoint { get; set; } = string.Empty;
+
+    public string OpenSubtitlesApiKey { get; set; } = string.Empty;
+
+    public string OpenSubtitlesUsername { get; set; } = string.Empty;
+
+    public string OpenSubtitlesPasswordEncrypted { get; set; } = string.Empty;
+
+    public string OpenSubtitlesTokenEncrypted { get; set; } = string.Empty;
+
+    public string OpenSubtitlesDefaultLanguageCode { get; set; } = string.Empty;
+
+    public bool IsOpenSubtitlesEnabled { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

@@ -27,4 +27,18 @@ public sealed class ApplicationSettingModel
     public string AiRecommendationLibraryFingerprint { get; set; } = string.Empty;
 
     public string TmdbBaseUrl { get; set; } = string.Empty;
+
+    public string OpenSubtitlesEndpoint { get; set; } = string.Empty;
+
+    public string OpenSubtitlesApiKey { get; set; } = string.Empty;
+
+    public string OpenSubtitlesUsername { get; set; } = string.Empty;
+
+    public string OpenSubtitlesPassword { get; set; } = string.Empty;
+
+    public string OpenSubtitlesToken { get; set; } = string.Empty;
+
+    public string OpenSubtitlesDefaultLanguageCode { get; set; } = "zh-cn";
+
+    public bool IsOpenSubtitlesEnabled { get; set; }
 }

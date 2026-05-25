@@ -30,6 +30,7 @@ public static class AppServiceProvider
         services.AddSingleton<IDatabaseInitializer, DatabaseInitializer>();
         services.AddSingleton<ITmdbService, TmdbService>();
         services.AddSingleton<IOmdbService, OmdbService>();
+        services.AddSingleton<IOpenSubtitlesClientService, OpenSubtitlesClientService>();
         services.AddSingleton<ISubtitleBindingService, SubtitleBindingService>();
         services.AddSingleton<ITvMetadataHydrationService, TvMetadataHydrationService>();
         services.AddSingleton<ITvScanDirectoryAnalysisService, TvScanDirectoryAnalysisService>();
@@ -64,6 +65,7 @@ public static class AppServiceProvider
         services.AddSingleton<IWatchProfileInputService, WatchProfileInputService>();
         services.AddSingleton<IWatchProfileService, WatchProfileService>();
         services.AddSingleton<IExternalMetadataCacheMaintenanceService, ExternalMetadataCacheMaintenanceService>();
+        services.AddSingleton<IOnlineSubtitleCacheService, OnlineSubtitleCacheService>();
 
         services.AddSingleton<INavigationStateService, NavigationStateService>();
         services.AddSingleton<IDataRefreshService, DataRefreshService>();

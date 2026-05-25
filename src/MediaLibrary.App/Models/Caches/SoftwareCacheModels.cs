@@ -3,7 +3,8 @@ namespace MediaLibrary.App.Models.Caches;
 public enum SoftwareCacheCategoryKind
 {
     PosterCache = 0,
-    OtherCache = 1
+    OtherCache = 1,
+    SubtitleCache = 2
 }
 
 public sealed class SoftwareCacheCategoryModel
@@ -28,6 +29,8 @@ public sealed class SoftwareCacheOverview
     public SoftwareCacheCategoryModel PosterCache { get; init; } = new();
 
     public SoftwareCacheCategoryModel OtherCache { get; init; } = new();
+
+    public SoftwareCacheCategoryModel SubtitleCache { get; init; } = new();
 
     public long PosterCacheMaxBytes { get; init; } = PosterCacheDefaults.DefaultMaxBytes;
 }
