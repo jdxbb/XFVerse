@@ -3,13 +3,28 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="智能影音库"
         Width="1440"
         Height="920"
         MinWidth="1180"
         MinHeight="760"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="False"
+        Background="{DynamicResource BrushBackground}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="6"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
     <Grid x:Name="RootGrid" Background="{DynamicResource BrushBackground}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{Binding DataContext.SidebarColumnWidth, ElementName=RootGrid}" />
@@ -183,7 +198,9 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource TopBarBorderStyle}">
+            <Border Grid.Row="0"
+                    Style="{StaticResource TopBarBorderStyle}"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid Margin="30,22">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -220,6 +237,27 @@
                         <Button Content="切换主题"
                                 Command="{Binding ToggleThemeCommand}"
                                 Style="{StaticResource SecondaryButtonStyle}" />
+
+                        <Border Width="1"
+                                Height="26"
+                                Margin="14,0,12,0"
+                                Background="{DynamicResource BrushDivider}" />
+
+                        <Button x:Name="MinimizeButton"
+                                Content="－"
+                                ToolTip="最小化"
+                                Click="MinimizeButton_Click"
+                                Style="{StaticResource WindowCaptionButtonStyle}" />
+                        <Button x:Name="MaximizeRestoreButton"
+                                Content="□"
+                                ToolTip="最大化"
+                                Click="MaximizeRestoreButton_Click"
+                                Style="{StaticResource WindowCaptionButtonStyle}" />
+                        <Button x:Name="CloseButton"
+                                Content="×"
+                                ToolTip="关闭"
+                                Click="CloseButton_Click"
+                                Style="{StaticResource WindowCaptionCloseButtonStyle}" />
                     </StackPanel>
                 </Grid>
             </Border>

@@ -197,6 +197,21 @@
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
     </Style>
 
+    <Style x:Key="WindowCaptionCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource WindowCaptionButtonStyle}">
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BrushDanger}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushDanger}" />
+                <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BrushDangerPressed}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushDangerPressed}" />
+                <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="LoadingButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
         <Setter Property="IsHitTestVisible" Value="False" />
         <Setter Property="Opacity" Value="0.72" />
