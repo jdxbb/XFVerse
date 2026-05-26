@@ -8,6 +8,10 @@ public sealed class OnlineSubtitleBindingListItem
 
     public int? EpisodeId { get; set; }
 
+    public int? MediaFileId { get; set; }
+
+    public string TargetKind { get; set; } = string.Empty;
+
     public string Provider { get; set; } = string.Empty;
 
     public string ProviderSubtitleId { get; set; } = string.Empty;
@@ -25,6 +29,8 @@ public sealed class OnlineSubtitleBindingListItem
     public string FileName { get; set; } = string.Empty;
 
     public string CacheRelativePath { get; set; } = string.Empty;
+
+    public string CacheHash { get; set; } = string.Empty;
 
     public string Format { get; set; } = string.Empty;
 

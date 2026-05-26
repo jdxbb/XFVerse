@@ -571,6 +571,17 @@ public sealed class MovieManagementService : IMovieManagementService
             }
         }
 
+        var onlineSubtitleBindings = await dbContext.OnlineSubtitleBindings
+            .Where(x => !x.IsDeleted
+                        && (x.MovieId == movieId
+                            || (x.MediaFileId.HasValue && mediaFileIdSet.Contains(x.MediaFileId.Value))))
+            .ToListAsync(cancellationToken);
+        foreach (var binding in onlineSubtitleBindings)
+        {
+            binding.IsDeleted = true;
+            binding.UpdatedAt = now;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (mediaFileIdSet.Count > 0)
@@ -912,6 +923,15 @@ public sealed class MovieManagementService : IMovieManagementService
         if (subtitleBindings.Count > 0)
         {
             dbContext.SubtitleBindings.RemoveRange(subtitleBindings);
+        }
+
+        var onlineSubtitleBindings = await dbContext.OnlineSubtitleBindings
+            .Where(x => !x.IsDeleted && x.MediaFileId.HasValue && mediaFileIdSet.Contains(x.MediaFileId.Value))
+            .ToListAsync(cancellationToken);
+        foreach (var binding in onlineSubtitleBindings)
+        {
+            binding.IsDeleted = true;
+            binding.UpdatedAt = now;
         }
 
         var retainedMediaFileIds = await dbContext.WatchHistories

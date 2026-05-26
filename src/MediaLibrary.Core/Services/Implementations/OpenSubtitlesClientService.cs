@@ -14,6 +14,7 @@ public sealed class OpenSubtitlesClientService : IOpenSubtitlesClientService
 {
     private const string DefaultEndpoint = "https://api.opensubtitles.com/api/v1";
     private const string UserAgent = "XFVerse/5.1";
+    private const long MaxDownloadBytes = 50L * 1024L * 1024L;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _httpClient = new()
@@ -348,6 +349,73 @@ public sealed class OpenSubtitlesClientService : IOpenSubtitlesClientService
         };
     }
 
+    public async Task<OpenSubtitlesDownloadResult> DownloadAsync(
+        OpenSubtitlesClientOptions options,
+        OpenSubtitlesDownloadContractRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var contract = await CheckDownloadContractAsync(options, request, cancellationToken);
+            if (!contract.Succeeded)
+            {
+                return new OpenSubtitlesDownloadResult
+                {
+                    Succeeded = false,
+                    Requests = contract.Requests,
+                    Remaining = contract.Remaining,
+                    ResetTime = contract.ResetTime,
+                    Message = contract.Message,
+                    ErrorKind = contract.ErrorKind
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(contract.DownloadUrl)
+                || !Uri.TryCreate(contract.DownloadUrl, UriKind.Absolute, out var downloadUri))
+            {
+                return new OpenSubtitlesDownloadResult
+                {
+                    Succeeded = false,
+                    Requests = contract.Requests,
+                    Remaining = contract.Remaining,
+                    ResetTime = contract.ResetTime,
+                    Message = "OpenSubtitles download response did not include a valid link.",
+                    ErrorKind = OpenSubtitlesErrorKind.InvalidResponse
+                };
+            }
+
+            var bytes = await DownloadFileBytesAsync(downloadUri, cancellationToken);
+            return new OpenSubtitlesDownloadResult
+            {
+                Succeeded = true,
+                Content = bytes,
+                FileName = contract.FileName,
+                Requests = contract.Requests,
+                Remaining = contract.Remaining,
+                ResetTime = contract.ResetTime,
+                Message = contract.Message
+            };
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return new OpenSubtitlesDownloadResult
+            {
+                Succeeded = false,
+                Message = AiPerfDiagnostics.SanitizeMessage(exception.Message),
+                ErrorKind = OpenSubtitlesErrorKind.Network
+            };
+        }
+        catch (InvalidOperationException exception)
+        {
+            return new OpenSubtitlesDownloadResult
+            {
+                Succeeded = false,
+                Message = exception.Message,
+                ErrorKind = MapFailureMessage(exception.Message)
+            };
+        }
+    }
+
     private async Task<LoginResult> LoginAsync(OpenSubtitlesClientOptions options, CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.Serialize(
@@ -451,6 +519,71 @@ public sealed class OpenSubtitlesClientService : IOpenSubtitlesClientService
             stopwatch.Stop();
             AiPerfDiagnostics.RecordExternalCall(purpose, stopwatch.Elapsed, isError);
         }
+    }
+
+    private async Task<byte[]> DownloadFileBytesAsync(Uri downloadUri, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);
+        request.Headers.UserAgent.ParseAdd(UserAgent);
+
+        var stopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            isError = !response.IsSuccessStatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(BuildFailureMessage(response.StatusCode));
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            return await ReadBoundedBytesAsync(stream, MaxDownloadBytes, cancellationToken);
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("opensubtitles-download-file", stopwatch.Elapsed, isError);
+        }
+    }
+
+    private static async Task<byte[]> ReadBoundedBytesAsync(
+        Stream source,
+        long maxBytes,
+        CancellationToken cancellationToken)
+    {
+        await using var target = new MemoryStream();
+        var buffer = new byte[81920];
+        while (true)
+        {
+            var read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            if (target.Length + read > maxBytes)
+            {
+                throw new InvalidOperationException("OpenSubtitles downloaded file is too large.");
+            }
+
+            await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        if (target.Length == 0)
+        {
+            throw new InvalidOperationException("OpenSubtitles downloaded file is empty.");
+        }
+
+        return target.ToArray();
     }
 
     private static string BuildSearchQuery(OpenSubtitlesSearchRequest request)
@@ -615,6 +748,32 @@ public sealed class OpenSubtitlesClientService : IOpenSubtitlesClientService
             _ when (int)statusCode >= 500 => OpenSubtitlesErrorKind.ServerError,
             _ => OpenSubtitlesErrorKind.Unknown
         };
+    }
+
+    private static OpenSubtitlesErrorKind MapFailureMessage(string message)
+    {
+        if (message.Contains("authentication", StringComparison.OrdinalIgnoreCase))
+        {
+            return OpenSubtitlesErrorKind.Unauthorized;
+        }
+
+        if (message.Contains("forbidden", StringComparison.OrdinalIgnoreCase))
+        {
+            return OpenSubtitlesErrorKind.Forbidden;
+        }
+
+        if (message.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("quota", StringComparison.OrdinalIgnoreCase))
+        {
+            return OpenSubtitlesErrorKind.RateLimited;
+        }
+
+        if (message.Contains("server error", StringComparison.OrdinalIgnoreCase))
+        {
+            return OpenSubtitlesErrorKind.ServerError;
+        }
+
+        return OpenSubtitlesErrorKind.InvalidResponse;
     }
 
     private static DateTime? ParseDateTime(string value)

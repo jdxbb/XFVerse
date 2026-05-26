@@ -88,5 +88,7 @@ public sealed class MediaFile
 
     public ICollection<SubtitleBinding> SubtitleBindingsAsSubtitle { get; set; } = new List<SubtitleBinding>();
 
+    public ICollection<OnlineSubtitleBinding> OnlineSubtitleBindings { get; set; } = new List<OnlineSubtitleBinding>();
+
     public ICollection<WatchHistory> WatchHistories { get; set; } = new List<WatchHistory>();
 }

@@ -18,6 +18,18 @@ public sealed class OnlineSubtitleCacheUsage
     public long UsedBytes { get; init; }
 
     public int FileCount { get; init; }
+
+    public long ReferencedBytes { get; init; }
+
+    public int ReferencedFileCount { get; init; }
+
+    public long OrphanBytes { get; init; }
+
+    public int OrphanFileCount { get; init; }
+
+    public int UnknownFileCount { get; init; }
+
+    public bool ReferenceScanSucceeded { get; init; } = true;
 }
 
 public sealed class OnlineSubtitleCacheClearResult
@@ -27,6 +39,8 @@ public sealed class OnlineSubtitleCacheClearResult
     public int DeletedFileCount { get; init; }
 
     public long FreedBytes { get; init; }
+
+    public int FailedFileCount { get; init; }
 
     public string Error { get; init; } = string.Empty;
 }

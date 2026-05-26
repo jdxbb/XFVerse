@@ -19,4 +19,9 @@ public interface IOpenSubtitlesClientService
         OpenSubtitlesClientOptions options,
         OpenSubtitlesDownloadContractRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<OpenSubtitlesDownloadResult> DownloadAsync(
+        OpenSubtitlesClientOptions options,
+        OpenSubtitlesDownloadContractRequest request,
+        CancellationToken cancellationToken = default);
 }

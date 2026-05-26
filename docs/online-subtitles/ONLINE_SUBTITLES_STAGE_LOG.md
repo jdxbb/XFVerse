@@ -48,7 +48,7 @@ Out of scope for 5.1:
 
 - 5.2: Player subtitle menu entry, search dialog, pause-on-open, auto search input fill, result list, sorting, and error/quota display.
 - 5.3: Download to subtitle cache, create Movie/Episode online binding, temporary unidentified subtitle loading, duplicate handling, player list insertion, and automatic subtitle switch.
-- 5.4: Software cache UI for subtitle cache, orphan cache cleanup, final API behavior documentation, and full regression.
+- 5.4: Software cache UI for subtitle cache, orphan cache cleanup, API/error wording polish, and full regression.
 
 ## Phase 5.1 - Online Subtitle Infrastructure
 
@@ -156,3 +156,87 @@ Manual validation scope:
 10. Manual language/type/keyword edits can be searched again without losing the typed keyword.
 11. Loading, empty, unconfigured API, auth/rate-limit/server/network failures show bounded user messages.
 12. Sorting can switch between composite, downloads, rating, upload date, and match score without crashing on missing fields.
+
+## Phase 5.3 - Download, Binding, Delete, And Auto Switch
+
+Completed:
+
+- Added download actions to online subtitle search results with per-row busy state and bounded download status text.
+- Added `OpenSubtitlesClientService.DownloadAsync`, which calls the provider download contract, fetches the returned file link without logging the URL, bounds download size, and carries download quota fields from the provider response.
+- Downloaded files are saved through the managed online subtitle cache service, so extension allow-list, zip validation, path traversal protection, hash calculation, and stable cache naming remain centralized.
+- Added an online subtitle binding write service on top of the Phase 5.1 table. It upserts Movie / Episode bindings, updates provider metadata, marks bindings used, and soft-deletes bindings without touching cache files.
+- Recognized Movie downloads write `OnlineSubtitleBindings.MovieId`; recognized Episode downloads write `OnlineSubtitleBindings.EpisodeId`. No `MediaFileId` binding is added.
+- Unidentified Movie / Episode-like playback downloads are cached and loaded only into the current player session as temporary subtitles. They do not create long-term Movie / Episode bindings.
+- Duplicate handling first reuses an existing active binding with the same provider file id / subtitle id and available cache file. The upsert path also deduplicates by provider file id, subtitle id, and cache hash for the current Movie / Episode target.
+- Download success adds the subtitle to the online subtitle menu and attempts immediate mpv `sub-add` selection without reloading playback.
+- The player online subtitle submenu now supports selecting cached online subtitles and deleting bindings. Deleting a binding soft-deletes the binding only and keeps the cache file.
+- Deleting the currently selected online subtitle switches to `None` before refreshing the menu.
+- Download quota / remaining / reset values are shown when the provider returns them; otherwise the UI states that no displayable quota was returned.
+- Download errors distinguish missing file id, unconfigured API, auth / forbidden, rate-limit or quota, server error, network failure, invalid download response, unsupported format, oversized file, empty file, invalid zip, and cache path rejection.
+
+Not done:
+
+- No full-library automatic download.
+- No OCR, translation, external subtitle editor, scan-stage integration, `MediaFile` masquerading, or playback-source-level long-term binding.
+- No physical subtitle cache deletion from the player menu.
+- No subtitle cache management UI; cache clearing remains Phase 5.4.
+- No new migration, database update, commit, or push.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+## Phase 5.3b - Persist Unidentified Online Subtitles
+
+Completed:
+
+- Updated `OnlineSubtitleBindings` so exactly one of `MovieId`, `EpisodeId`, or `MediaFileId` is required.
+- Added migration `20260525211655_AddOnlineSubtitleMediaFileBinding`.
+- Recognized Movie downloads still bind to `MovieId`; recognized Episode downloads still bind to `EpisodeId`.
+- Unidentified orphan / unidentified Episode-like playback downloads now bind to the current video `MediaFileId` instead of being session-only temporary subtitles.
+- The player online subtitle menu now queries current Movie/Episode bindings and current MediaFile bindings together.
+- When the same subtitle appears through both entity-level and MediaFile-level bindings, the list keeps one row and prefers Movie/Episode-level rows.
+- Selecting and deleting online subtitle bindings now uses the binding row's own target, so Movie, Episode, and MediaFile bindings can all be switched or deleted correctly.
+- Delete binding remains soft-delete only and does not physically delete cache files.
+- Delete-record paths for Movie records, Season records, grouped placeholders, and unassociated media files soft-delete affected MediaFile-level online subtitle bindings before clearing software records.
+- Remove-from-library / hide-only paths were not changed, so they do not clear MediaFile-level online subtitle bindings.
+- Correction / reattach flows were not changed, so MediaFile-level online subtitle bindings are not automatically migrated after a source is corrected.
+
+Not done:
+
+- No automatic migration from MediaFile-level bindings to Movie/Episode-level bindings after correction.
+- No subtitle cache management UI.
+- No physical subtitle cache deletion.
+- No full-library automatic download, OCR, translation, editor, scan-stage integration, database update, commit, or push.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff contains only the 5.3b OnlineSubtitleBinding target expansion.
+
+## Phase 5.4 - Online Subtitle Cache Management And Polish
+
+Completed:
+
+- Added online subtitle cache as a user-visible software-cache category in Settings > General.
+- The cache overview now reports total online subtitle cache size and file count.
+- The online subtitle cache service now reads active `OnlineSubtitleBindings` and separates referenced cache files from orphan cache files.
+- Orphan cleanup deletes only supported subtitle files under the managed online subtitle cache root that are not referenced by active binding `CacheRelativePath` or `CacheHash`.
+- Active Movie / Episode / MediaFile online subtitle bindings protect their referenced cache files from physical deletion.
+- If binding references cannot be read, cleanup is disabled instead of risking deletion of still-bound subtitle files.
+- Delete-binding remains soft-delete only; physical cleanup is handled later by the software-cache orphan cleanup action.
+- Download quota and download failure wording was tightened so unknown quota, expired token/API key, forbidden download, rate limit/quota, server, network, and invalid response states are clearer.
+- Existing search, download, player subtitle switching, Movie/Episode binding, and MediaFile-level unidentified binding semantics were not changed.
+
+Not done:
+
+- No cache management UI for deleting still-bound subtitle cache files.
+- No automatic migration from MediaFile-level bindings to Movie / Episode bindings.
+- No full-library automatic download, OCR, translation, editor, scan-stage integration, database update, commit, or push.
+- No new migration was added for 5.4.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained limited to the existing 5.1 and 5.3b online-subtitle migrations already present in the worktree; 5.4 added no migration.

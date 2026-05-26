@@ -35,3 +35,28 @@
 - The subtitle cache root is isolated from poster cache, video cache, media files, and WebDAV files.
 - Supported cached subtitle extensions are `.srt`, `.ass`, `.ssa`, and `.vtt`.
 - Deleting an online subtitle binding remains separate from physical cache cleanup.
+
+## Phase 5.3 Online Subtitle Cache Use
+
+- Phase 5.3 starts writing downloaded online subtitles into the managed subtitle cache.
+- The player can delete Movie / Episode online subtitle bindings, but that operation intentionally does not delete cache files.
+- Physical subtitle cache statistics and clearing remain Phase 5.4 software-cache UI scope.
+- The cache service remains the boundary for extension allow-list, zip validation, path traversal protection, file-size limits, hash naming, usage, and clearing primitives.
+
+## Phase 5.3b Online Subtitle MediaFile Binding Cache Boundary
+
+- Phase 5.3b persists unidentified playback subtitles as MediaFile-level online subtitle bindings.
+- Deleting Movie / Episode / MediaFile online subtitle bindings still does not physically delete cache files.
+- Delete-record cleanup clears affected binding records but leaves cached subtitle files for later software-cache management.
+- Move-from-library / hide-only operations do not clear online subtitle bindings.
+- User-visible subtitle cache statistics and clearing are handled by Phase 5.4 below.
+
+## Phase 5.4 Online Subtitle Cache Management
+
+- Settings > General now includes an Online Subtitle Cache card under software cache management.
+- The card shows total managed online subtitle cache size and file count.
+- The cache service classifies supported `.srt` / `.ass` / `.ssa` / `.vtt` files under the online subtitle cache root as bound or orphan by checking active `OnlineSubtitleBinding.CacheRelativePath` and `CacheHash` references.
+- The clear action deletes only orphan online subtitle cache files and leaves files referenced by active Movie / Episode / MediaFile online subtitle bindings untouched.
+- If binding references cannot be read, cleanup is disabled to avoid deleting still-used subtitle files.
+- Deleting online subtitle bindings in the player remains a soft-delete operation; physical deletion is deferred to this orphan cleanup path.
+- Existing poster cache and TMDB / OMDb other-cache behavior is unchanged.

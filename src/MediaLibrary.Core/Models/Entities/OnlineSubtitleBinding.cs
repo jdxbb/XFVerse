@@ -8,6 +8,8 @@ public sealed class OnlineSubtitleBinding
 
     public int? EpisodeId { get; set; }
 
+    public int? MediaFileId { get; set; }
+
     public string Provider { get; set; } = string.Empty;
 
     public string ProviderSubtitleId { get; set; } = string.Empty;
@@ -63,4 +65,6 @@ public sealed class OnlineSubtitleBinding
     public Movie? Movie { get; set; }
 
     public TvEpisode? Episode { get; set; }
+
+    public MediaFile? MediaFile { get; set; }
 }

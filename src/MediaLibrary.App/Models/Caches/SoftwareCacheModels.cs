@@ -19,6 +19,12 @@ public sealed class SoftwareCacheCategoryModel
 
     public int ItemCount { get; init; }
 
+    public long ClearableBytes { get; init; }
+
+    public int ClearableItemCount { get; init; }
+
+    public string DetailText { get; init; } = string.Empty;
+
     public bool IsClearable { get; init; }
 
     public string ClearUnavailableReason { get; init; } = string.Empty;

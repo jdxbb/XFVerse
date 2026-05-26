@@ -1,4 +1,5 @@
 using MediaLibrary.App.Models.Caches;
+using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 
 namespace MediaLibrary.App.Services;
@@ -33,8 +34,7 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
             posterSettingsTask.Result,
             externalUsageTask.Result.ManagedEntryCount,
             externalUsageTask.Result.EstimatedBytes,
-            subtitleUsageTask.Result.FileCount,
-            subtitleUsageTask.Result.UsedBytes);
+            subtitleUsageTask.Result);
     }
 
     public async Task<SoftwareCacheOverview> SavePosterCacheLimitAsync(
@@ -70,8 +70,7 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
         PosterCacheSettings posterSettings,
         int externalEntryCount,
         long externalEstimatedBytes,
-        int subtitleFileCount,
-        long subtitleUsedBytes)
+        OnlineSubtitleCacheUsage subtitleUsage)
     {
         return new SoftwareCacheOverview
         {
@@ -82,6 +81,8 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
                 Description = "缓存远程影片海报，清理后会按需重新生成。",
                 UsedBytes = posterUsage.UsedBytes,
                 ItemCount = posterUsage.FileCount,
+                ClearableBytes = posterUsage.UsedBytes,
+                ClearableItemCount = posterUsage.FileCount,
                 IsClearable = posterUsage.FileCount > 0,
                 ClearUnavailableReason = posterUsage.FileCount > 0 ? string.Empty : "当前没有可清理的海报缓存。"
             },
@@ -92,21 +93,48 @@ public sealed class SoftwareCacheManagementService : ISoftwareCacheManagementSer
                 Description = "仅包含可再生成的 TMDB / OMDb 外部元数据缓存，不包含用户状态或偏好。",
                 UsedBytes = externalEstimatedBytes,
                 ItemCount = externalEntryCount,
+                ClearableBytes = externalEstimatedBytes,
+                ClearableItemCount = externalEntryCount,
                 IsClearable = externalEntryCount > 0,
                 ClearUnavailableReason = externalEntryCount > 0 ? string.Empty : "当前没有可清理的其他缓存。"
             },
             SubtitleCache = new SoftwareCacheCategoryModel
             {
                 Kind = SoftwareCacheCategoryKind.SubtitleCache,
-                Name = "Online subtitle cache",
-                Description = "Managed downloaded online subtitle files. Removing a player binding does not delete these files.",
-                UsedBytes = subtitleUsedBytes,
-                ItemCount = subtitleFileCount,
-                IsClearable = subtitleFileCount > 0,
-                ClearUnavailableReason = subtitleFileCount > 0 ? string.Empty : "No online subtitle cache files are currently clearable."
+                Name = "在线字幕缓存",
+                Description = "下载的在线字幕缓存文件。删除播放器绑定不会物理删除缓存，孤立文件可在这里清理。",
+                UsedBytes = subtitleUsage.UsedBytes,
+                ItemCount = subtitleUsage.FileCount,
+                ClearableBytes = subtitleUsage.OrphanBytes,
+                ClearableItemCount = subtitleUsage.OrphanFileCount,
+                DetailText = BuildSubtitleCacheDetailText(subtitleUsage),
+                IsClearable = subtitleUsage.ReferenceScanSucceeded && subtitleUsage.OrphanFileCount > 0,
+                ClearUnavailableReason = BuildSubtitleCacheClearUnavailableReason(subtitleUsage)
             },
             PosterCacheMaxBytes = posterSettings.MaxBytes
         };
+    }
+
+    private static string BuildSubtitleCacheDetailText(OnlineSubtitleCacheUsage subtitleUsage)
+    {
+        if (!subtitleUsage.ReferenceScanSucceeded)
+        {
+            return "无法读取在线字幕绑定引用，暂不允许清理，以避免误删仍被使用的字幕缓存。";
+        }
+
+        return $"绑定保护 {subtitleUsage.ReferencedFileCount} 个文件，孤立可清理 {subtitleUsage.OrphanFileCount} 个文件。";
+    }
+
+    private static string BuildSubtitleCacheClearUnavailableReason(OnlineSubtitleCacheUsage subtitleUsage)
+    {
+        if (!subtitleUsage.ReferenceScanSucceeded)
+        {
+            return "无法读取在线字幕绑定引用，已禁用清理。";
+        }
+
+        return subtitleUsage.OrphanFileCount > 0
+            ? string.Empty
+            : "当前没有可清理的在线字幕孤立缓存。";
     }
 
     private async Task<SoftwareCacheClearResult> ClearPosterCacheAsync(CancellationToken cancellationToken)

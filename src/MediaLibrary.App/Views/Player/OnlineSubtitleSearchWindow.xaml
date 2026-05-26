@@ -158,10 +158,34 @@
                                            Text="{Binding PrimaryText}"
                                            TextWrapping="Wrap"
                                            Style="{StaticResource SectionTitleTextStyle}" />
-                                <TextBlock Grid.Column="1"
-                                           HorizontalAlignment="Right"
-                                           Text="{Binding MatchScoreText}"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                <StackPanel Grid.Column="1"
+                                            HorizontalAlignment="Right">
+                                    <TextBlock HorizontalAlignment="Right"
+                                               Text="{Binding MatchScoreText}"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                    <Button Margin="0,8,0,0"
+                                            MinWidth="92"
+                                            Height="34"
+                                            Content="{Binding DownloadButtonText}"
+                                            Command="{Binding DownloadCommand}"
+                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               MaxWidth="150"
+                                               Text="{Binding DownloadStatus}"
+                                               TextAlignment="Right"
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDownloadStatusVisible}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
 
                                 <TextBlock Grid.Row="1"
                                            Grid.ColumnSpan="2"

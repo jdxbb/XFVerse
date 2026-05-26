@@ -13,9 +13,13 @@ namespace MediaLibrary.App.ViewModels.Player;
 
 public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
 {
+    private const string ProviderName = "OpenSubtitles";
     private readonly IOpenSubtitlesClientService _openSubtitlesClientService;
     private readonly ISettingsService _settingsService;
+    private readonly IOnlineSubtitleBindingService _onlineSubtitleBindingService;
+    private readonly IOnlineSubtitleCacheService _onlineSubtitleCacheService;
     private readonly OnlineSubtitleSearchContext _context;
+    private readonly Func<OnlineSubtitlePlaybackRequest, Task<OnlineSubtitlePlaybackApplyResult>> _applySubtitleAsync;
     private readonly List<OnlineSubtitleSearchResultViewModel> _allResults = [];
     private CancellationTokenSource? _searchCts;
     private OpenSubtitlesLanguageOption? _selectedLanguage;
@@ -31,11 +35,17 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
     public OnlineSubtitleSearchViewModel(
         IOpenSubtitlesClientService openSubtitlesClientService,
         ISettingsService settingsService,
-        OnlineSubtitleSearchContext context)
+        IOnlineSubtitleBindingService onlineSubtitleBindingService,
+        IOnlineSubtitleCacheService onlineSubtitleCacheService,
+        OnlineSubtitleSearchContext context,
+        Func<OnlineSubtitlePlaybackRequest, Task<OnlineSubtitlePlaybackApplyResult>> applySubtitleAsync)
     {
         _openSubtitlesClientService = openSubtitlesClientService;
         _settingsService = settingsService;
+        _onlineSubtitleBindingService = onlineSubtitleBindingService;
+        _onlineSubtitleCacheService = onlineSubtitleCacheService;
         _context = context;
+        _applySubtitleAsync = applySubtitleAsync;
 
         Languages = _openSubtitlesClientService.SupportedLanguages;
         Types =
@@ -213,7 +223,8 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
                 _allResults.Add(new OnlineSubtitleSearchResultViewModel(
                     item,
                     ComputeMatchScore(item, request),
-                    SelectedLanguage?.Code ?? "zh-cn"));
+                    SelectedLanguage?.Code ?? "zh-cn",
+                    DownloadResultAsync));
             }
 
             ApplySort();
@@ -237,6 +248,144 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
         }
     }
 
+    private async Task DownloadResultAsync(OnlineSubtitleSearchResultViewModel result)
+    {
+        if (string.IsNullOrWhiteSpace(result.ProviderFileId))
+        {
+            result.DownloadStatus = "该结果缺少 OpenSubtitles file id，无法下载。";
+            return;
+        }
+
+        result.IsDownloading = true;
+        result.DownloadStatus = "正在准备下载...";
+        StatusMessage = $"正在下载：{result.PrimaryText}";
+
+        try
+        {
+            var settings = await _settingsService.GetApplicationSettingAsync();
+            if (!settings.IsOpenSubtitlesEnabled || string.IsNullOrWhiteSpace(settings.OpenSubtitlesApiKey))
+            {
+                result.DownloadStatus = "请先到设置页配置并启用在线字幕 API。";
+                StatusMessage = result.DownloadStatus;
+                return;
+            }
+
+            var options = BuildOptions(settings);
+            var existing = await FindExistingCachedBindingAsync(result);
+            if (existing is not null)
+            {
+                var existingPath = _onlineSubtitleCacheService.GetAbsolutePath(existing.CacheRelativePath);
+                var existingApply = await _applySubtitleAsync(
+                    new OnlineSubtitlePlaybackRequest
+                    {
+                        Binding = existing,
+                        AbsolutePath = existingPath,
+                        DisplayName = result.PrimaryText,
+                        FileName = existing.FileName,
+                        ProviderFileId = existing.ProviderFileId
+                    });
+                result.DownloadStatus = existingApply.Succeeded
+                    ? "已存在相同绑定，已直接切换。"
+                    : existingApply.Message;
+                StatusMessage = result.DownloadStatus;
+                return;
+            }
+
+            var download = await _openSubtitlesClientService.DownloadAsync(
+                options,
+                new OpenSubtitlesDownloadContractRequest
+                {
+                    FileId = result.ProviderFileId,
+                    FileName = FirstNonEmpty(result.FileName, result.ReleaseName, $"{result.ProviderFileId}.srt")
+                });
+
+            if (!download.Succeeded)
+            {
+                var message = MapDownloadFailure(download);
+                result.DownloadStatus = message;
+                StatusMessage = message;
+                return;
+            }
+
+            QuotaHint = BuildQuotaHint(download);
+
+            await using var content = new MemoryStream(download.Content, writable: false);
+            var cache = await _onlineSubtitleCacheService.SaveAsync(
+                ProviderName,
+                result.ProviderFileId,
+                FirstNonEmpty(download.FileName, result.FileName, result.ReleaseName, $"{result.ProviderFileId}.srt"),
+                content);
+
+            OnlineSubtitleBindingListItem? binding = null;
+            if (_context.BindingMovieId.HasValue || _context.BindingEpisodeId.HasValue || _context.BindingMediaFileId.HasValue)
+            {
+                binding = await _onlineSubtitleBindingService.UpsertBindingAsync(
+                    new OnlineSubtitleBindingUpsertRequest
+                    {
+                        MovieId = _context.BindingMovieId,
+                        EpisodeId = _context.BindingEpisodeId,
+                        MediaFileId = _context.BindingMediaFileId,
+                        Provider = ProviderName,
+                        ProviderSubtitleId = result.SubtitleId,
+                        ProviderFileId = result.ProviderFileId,
+                        LanguageCode = result.LanguageCode,
+                        LanguageName = result.LanguageName,
+                        DisplayName = result.PrimaryText,
+                        ReleaseName = result.ReleaseName,
+                        FileName = cache.FileName,
+                        CacheRelativePath = cache.RelativePath,
+                        CacheHash = cache.Hash,
+                        Format = cache.Extension.TrimStart('.'),
+                        Extension = cache.Extension,
+                        DownloadCount = result.DownloadCount,
+                        Rating = result.Rating,
+                        Votes = result.Votes,
+                        IsHearingImpaired = result.IsHearingImpaired,
+                        IsMachineTranslated = result.IsMachineTranslated,
+                        IsAiTranslated = result.IsAiTranslated,
+                        IsTrustedUploader = result.IsTrustedUploader,
+                        Fps = result.Fps,
+                        UploadedAt = result.UploadedAt,
+                        MetadataJson = result.RawMetadataJson
+                    });
+            }
+
+            var applyResult = await _applySubtitleAsync(
+                new OnlineSubtitlePlaybackRequest
+                {
+                    Binding = binding,
+                    AbsolutePath = _onlineSubtitleCacheService.GetAbsolutePath(cache.RelativePath),
+                    DisplayName = binding is null ? $"临时 · {result.PrimaryText}" : BuildBindingDisplayName(binding),
+                    FileName = cache.FileName,
+                    ProviderFileId = result.ProviderFileId
+                });
+
+            result.DownloadStatus = applyResult.Succeeded
+                ? BuildDownloadSuccessMessage(download, binding is null)
+                : applyResult.Message;
+            StatusMessage = result.DownloadStatus;
+            MpvPlaybackDiagnostics.Write(
+                $"online-subtitle-download-complete bound={(binding is not null).ToString().ToLowerInvariant()} remaining={(download.Remaining?.ToString(CultureInfo.InvariantCulture) ?? "unknown")}");
+        }
+        catch (InvalidOperationException exception)
+        {
+            var message = MapCacheFailure(exception.Message);
+            result.DownloadStatus = message;
+            StatusMessage = message;
+            MpvPlaybackDiagnostics.Write($"online-subtitle-download-failed errorType={exception.GetType().Name}");
+        }
+        catch (Exception exception)
+        {
+            result.DownloadStatus = "在线字幕下载失败，请检查网络、API 配置或稍后重试。";
+            StatusMessage = result.DownloadStatus;
+            MpvPlaybackDiagnostics.Write($"online-subtitle-download-failed errorType={exception.GetType().Name}");
+        }
+        finally
+        {
+            result.IsDownloading = false;
+        }
+    }
+
     private OpenSubtitlesClientOptions BuildOptions(ApplicationSettingModel settings)
     {
         return new OpenSubtitlesClientOptions
@@ -247,6 +396,98 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
             Password = settings.OpenSubtitlesPassword,
             Token = settings.OpenSubtitlesToken,
             DefaultLanguageCode = SelectedLanguage?.Code ?? settings.OpenSubtitlesDefaultLanguageCode
+        };
+    }
+
+    private async Task<OnlineSubtitleBindingListItem?> FindExistingCachedBindingAsync(
+        OnlineSubtitleSearchResultViewModel result)
+    {
+        if (!_context.BindingMovieId.HasValue && !_context.BindingEpisodeId.HasValue && !_context.BindingMediaFileId.HasValue)
+        {
+            return null;
+        }
+
+        var bindings = await _onlineSubtitleBindingService.GetActiveBindingsAsync(
+            _context.BindingMovieId,
+            _context.BindingEpisodeId,
+            _context.BindingMediaFileId);
+        return bindings.FirstOrDefault(
+            x => x.HasCacheFile
+                 && string.Equals(x.Provider, ProviderName, StringComparison.OrdinalIgnoreCase)
+                 && string.Equals(x.ProviderFileId, result.ProviderFileId, StringComparison.OrdinalIgnoreCase))
+               ?? bindings.FirstOrDefault(
+                   x => x.HasCacheFile
+                        && !string.IsNullOrWhiteSpace(result.SubtitleId)
+                        && string.Equals(x.Provider, ProviderName, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(x.ProviderSubtitleId, result.SubtitleId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildBindingDisplayName(OnlineSubtitleBindingListItem binding)
+    {
+        var name = FirstNonEmpty(binding.DisplayName, binding.ReleaseName, binding.FileName, $"在线字幕 {binding.Id}");
+        var language = FirstNonEmpty(binding.LanguageName, binding.LanguageCode);
+        return string.IsNullOrWhiteSpace(language) ? name : $"{language} · {name}";
+    }
+
+    private static string BuildQuotaHint(OpenSubtitlesDownloadResult result)
+    {
+        var parts = new List<string>();
+        if (result.Remaining.HasValue)
+        {
+            parts.Add($"剩余下载次数：{result.Remaining.Value.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (result.Requests.HasValue)
+        {
+            parts.Add($"本次请求计数：{result.Requests.Value.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ResetTime))
+        {
+            parts.Add($"重置时间：{result.ResetTime}");
+        }
+
+        return parts.Count == 0
+            ? "下载已完成；OpenSubtitles 本次未返回剩余额度，后续下载仍以服务端返回为准。"
+            : string.Join("；", parts);
+    }
+
+    private static string BuildDownloadSuccessMessage(OpenSubtitlesDownloadResult result, bool isTemporary)
+    {
+        var scope = isTemporary
+            ? "字幕已下载并临时加载到当前播放会话。"
+            : "字幕已下载、绑定并切换。";
+        var quota = BuildQuotaHint(result);
+        return $"{scope} {quota}";
+    }
+
+    private static string MapDownloadFailure(OpenSubtitlesDownloadResult result)
+    {
+        return result.ErrorKind switch
+        {
+            OpenSubtitlesErrorKind.NotConfigured => "OpenSubtitles API Key 未配置，请到设置页填写有效 API Key。",
+            OpenSubtitlesErrorKind.Unauthorized => "OpenSubtitles 下载鉴权失败：API Key 或登录 token 已失效，请到设置页重新测试在线字幕配置。",
+            OpenSubtitlesErrorKind.Forbidden => "OpenSubtitles 拒绝下载：API Key 无效、无权限、下载额度受限，或下载链接已不可用。",
+            OpenSubtitlesErrorKind.RateLimited => "OpenSubtitles 下载被限流或额度不足，请稍后重试；具体额度以下载返回为准。",
+            OpenSubtitlesErrorKind.ServerError => "OpenSubtitles 下载服务暂时不可用，请稍后重试。",
+            OpenSubtitlesErrorKind.Network => "无法下载字幕文件，请检查网络、代理或防火墙设置。",
+            OpenSubtitlesErrorKind.InvalidResponse => "OpenSubtitles 下载响应异常，未拿到可保存的字幕文件。",
+            _ => string.IsNullOrWhiteSpace(result.Message)
+                ? "OpenSubtitles 下载失败，原因未知。"
+                : $"OpenSubtitles 下载失败：{result.Message}"
+        };
+    }
+
+    private static string MapCacheFailure(string error)
+    {
+        return error switch
+        {
+            "UnsupportedSubtitleExtension" => "下载文件格式不支持，仅支持 .srt / .ass / .ssa / .vtt。",
+            "SubtitleFileTooLarge" => "下载字幕文件过大，已拒绝保存。",
+            "SubtitleFileEmpty" => "下载字幕文件为空，已拒绝保存。",
+            "ZipDoesNotContainSupportedSubtitle" => "下载压缩包中没有受支持的字幕文件。",
+            "SubtitleCachePathEmpty" or "SubtitleCachePathEscapesRoot" => "字幕缓存路径异常，已拒绝保存。",
+            _ => "字幕缓存保存失败，未写入绑定。"
         };
     }
 
@@ -408,6 +649,11 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
         return trimmed[..160];
     }
 
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
     private static string MapSearchStatus(string message)
     {
         if (string.IsNullOrWhiteSpace(message) || message.Equals("No subtitles returned.", StringComparison.OrdinalIgnoreCase))
@@ -476,9 +722,15 @@ public sealed class OnlineSubtitleSearchContext
 
     public int? MovieReleaseYear { get; init; }
 
+    public int? BindingMovieId { get; init; }
+
     public string SeriesImdbId { get; init; } = string.Empty;
 
     public int? SeriesTmdbId { get; init; }
+
+    public int? BindingEpisodeId { get; init; }
+
+    public int? BindingMediaFileId { get; init; }
 
     public int? SeasonNumber { get; init; }
 
@@ -508,6 +760,8 @@ public sealed class OnlineSubtitleSearchContext
                 SafeFileNameWithoutExtension = safeFileNameWithoutExtension,
                 FileSize = source?.FileSize ?? 0,
                 SeriesTmdbId = session.SeriesTmdbId,
+                BindingEpisodeId = isRecognized && session.EpisodeId is > 0 ? session.EpisodeId : null,
+                BindingMediaFileId = isRecognized ? null : source?.MediaFileId,
                 SeasonNumber = session.SeasonNumber > 0 ? session.SeasonNumber : null,
                 EpisodeNumber = session.EpisodeNumber > 0 ? session.EpisodeNumber : null
             };
@@ -527,7 +781,9 @@ public sealed class OnlineSubtitleSearchContext
             FileSize = source?.FileSize ?? 0,
             MovieImdbId = session?.MovieImdbId ?? string.Empty,
             MovieTmdbId = session?.MovieTmdbId,
-            MovieReleaseYear = session?.MovieReleaseYear
+            MovieReleaseYear = session?.MovieReleaseYear,
+            BindingMovieId = recognizedMovie && session!.MovieId > 0 ? session.MovieId : null,
+            BindingMediaFileId = recognizedMovie ? null : source?.MediaFileId
         };
     }
 
@@ -606,9 +862,16 @@ public sealed class OnlineSubtitleSearchContext
     }
 }
 
-public sealed class OnlineSubtitleSearchResultViewModel
+public sealed class OnlineSubtitleSearchResultViewModel : ViewModelBase
 {
-    public OnlineSubtitleSearchResultViewModel(OpenSubtitlesSearchItem item, int matchScore, string requestedLanguageCode)
+    private bool _isDownloading;
+    private string _downloadStatus = string.Empty;
+
+    public OnlineSubtitleSearchResultViewModel(
+        OpenSubtitlesSearchItem item,
+        int matchScore,
+        string requestedLanguageCode,
+        Func<OnlineSubtitleSearchResultViewModel, Task> downloadAsync)
     {
         SubtitleId = item.SubtitleId;
         ProviderFileId = item.ProviderFileId;
@@ -633,6 +896,8 @@ public sealed class OnlineSubtitleSearchResultViewModel
         MatchScore = matchScore;
         CompositeScore = BuildCompositeScore(item, matchScore, requestedLanguageCode);
         Tags = BuildTags(item, matchScore);
+        RawMetadataJson = item.RawMetadataJson;
+        DownloadCommand = new AsyncRelayCommand(_ => downloadAsync(this), _ => CanDownload);
     }
 
     public string SubtitleId { get; }
@@ -680,6 +945,41 @@ public sealed class OnlineSubtitleSearchResultViewModel
     public double CompositeScore { get; }
 
     public IReadOnlyList<string> Tags { get; }
+
+    public string RawMetadataJson { get; }
+
+    public AsyncRelayCommand DownloadCommand { get; }
+
+    public bool IsDownloading
+    {
+        get => _isDownloading;
+        set
+        {
+            if (SetProperty(ref _isDownloading, value))
+            {
+                OnPropertyChanged(nameof(DownloadButtonText));
+                DownloadCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string DownloadStatus
+    {
+        get => _downloadStatus;
+        set
+        {
+            if (SetProperty(ref _downloadStatus, value))
+            {
+                OnPropertyChanged(nameof(IsDownloadStatusVisible));
+            }
+        }
+    }
+
+    public bool IsDownloadStatusVisible => !string.IsNullOrWhiteSpace(DownloadStatus);
+
+    public bool CanDownload => !IsDownloading && !string.IsNullOrWhiteSpace(ProviderFileId);
+
+    public string DownloadButtonText => IsDownloading ? "下载中..." : "下载";
 
     public string PrimaryText => ReleaseName;
 
@@ -797,7 +1097,42 @@ public sealed class OnlineSubtitleMenuItemViewModel
 {
     public int BindingId { get; init; }
 
+    public int? MovieId { get; init; }
+
+    public int? EpisodeId { get; init; }
+
+    public int? MediaFileId { get; init; }
+
+    public string TargetKind { get; init; } = string.Empty;
+
+    public int TemporaryId { get; init; }
+
     public string DisplayName { get; init; } = string.Empty;
 
     public string ToolTip { get; init; } = string.Empty;
+
+    public bool HasCacheFile { get; init; }
+
+    public bool IsTemporary { get; init; }
+
+    public string SubtitleUniqueKey { get; init; } = string.Empty;
+
+    public string CacheRelativePath { get; init; } = string.Empty;
+
+    public string FileName { get; init; } = string.Empty;
 }
+
+public sealed class OnlineSubtitlePlaybackRequest
+{
+    public OnlineSubtitleBindingListItem? Binding { get; init; }
+
+    public string AbsolutePath { get; init; } = string.Empty;
+
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string FileName { get; init; } = string.Empty;
+
+    public string ProviderFileId { get; init; } = string.Empty;
+}
+
+public sealed record OnlineSubtitlePlaybackApplyResult(bool Succeeded, string Message);

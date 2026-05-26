@@ -12,7 +12,7 @@ public sealed class OnlineSubtitleBindingConfiguration : IEntityTypeConfiguratio
             "OnlineSubtitleBindings",
             table => table.HasCheckConstraint(
                 "CK_OnlineSubtitleBindings_Target",
-                "((MovieId IS NOT NULL AND EpisodeId IS NULL) OR (MovieId IS NULL AND EpisodeId IS NOT NULL))"));
+                "((MovieId IS NOT NULL AND EpisodeId IS NULL AND MediaFileId IS NULL) OR (MovieId IS NULL AND EpisodeId IS NOT NULL AND MediaFileId IS NULL) OR (MovieId IS NULL AND EpisodeId IS NULL AND MediaFileId IS NOT NULL))"));
 
         builder.HasKey(x => x.Id);
 
@@ -67,6 +67,9 @@ public sealed class OnlineSubtitleBindingConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(x => new { x.EpisodeId, x.Provider, x.ProviderFileId, x.IsDeleted })
             .IsUnique();
 
+        builder.HasIndex(x => new { x.MediaFileId, x.Provider, x.ProviderFileId, x.IsDeleted })
+            .IsUnique();
+
         builder.HasIndex(x => x.ProviderSubtitleId);
         builder.HasIndex(x => x.CacheHash);
         builder.HasIndex(x => x.IsDeleted);
@@ -80,6 +83,11 @@ public sealed class OnlineSubtitleBindingConfiguration : IEntityTypeConfiguratio
         builder.HasOne(x => x.Episode)
             .WithMany()
             .HasForeignKey(x => x.EpisodeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(x => x.MediaFile)
+            .WithMany(x => x.OnlineSubtitleBindings)
+            .HasForeignKey(x => x.MediaFileId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

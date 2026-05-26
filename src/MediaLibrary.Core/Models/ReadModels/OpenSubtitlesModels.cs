@@ -140,6 +140,25 @@ public sealed class OpenSubtitlesDownloadContractResult
     public OpenSubtitlesErrorKind ErrorKind { get; init; } = OpenSubtitlesErrorKind.None;
 }
 
+public sealed class OpenSubtitlesDownloadResult
+{
+    public bool Succeeded { get; init; }
+
+    public byte[] Content { get; init; } = [];
+
+    public string FileName { get; init; } = string.Empty;
+
+    public int? Requests { get; init; }
+
+    public int? Remaining { get; init; }
+
+    public string ResetTime { get; init; } = string.Empty;
+
+    public string Message { get; init; } = string.Empty;
+
+    public OpenSubtitlesErrorKind ErrorKind { get; init; } = OpenSubtitlesErrorKind.None;
+}
+
 public sealed class OpenSubtitlesProbeResult
 {
     public bool IsApiKeyConfigured { get; init; }

@@ -633,13 +633,40 @@ public partial class PlayerWindow : Window
         {
             foreach (var subtitle in viewModel.OnlineSubtitleMenuItems)
             {
+                var isSelected = viewModel.IsOnlineSubtitleSelected(subtitle);
                 var item = new MenuItem
                 {
-                    Header = CreateMenuHeader(subtitle.DisplayName),
+                    Header = CreateMenuHeader(isSelected ? $"\u2713 {subtitle.DisplayName}" : subtitle.DisplayName),
                     ToolTip = subtitle.ToolTip,
-                    IsEnabled = false
+                    IsEnabled = true
                 };
                 SuppressRightClick(item);
+                if (subtitle.HasCacheFile)
+                {
+                    var selectItem = new MenuItem
+                    {
+                        Header = CreateMenuHeader("\u5207\u6362\u5230\u6b64\u5b57\u5e55")
+                    };
+                    SuppressRightClick(selectItem);
+                    selectItem.Click += (_, _) => viewModel.SelectOnlineSubtitleFromMenu(subtitle);
+                    item.Items.Add(selectItem);
+                }
+                else
+                {
+                    item.Items.Add(new MenuItem
+                    {
+                        Header = "\u7f13\u5b58\u6587\u4ef6\u4e0d\u53ef\u7528\uff0c\u8bf7\u91cd\u65b0\u4e0b\u8f7d",
+                        IsEnabled = false
+                    });
+                }
+
+                var deleteItem = new MenuItem
+                {
+                    Header = CreateMenuHeader(subtitle.IsTemporary ? "\u79fb\u9664\u4e34\u65f6\u5b57\u5e55" : "\u5220\u9664\u7ed1\u5b9a")
+                };
+                SuppressRightClick(deleteItem);
+                deleteItem.Click += (_, _) => viewModel.DeleteOnlineSubtitleFromMenu(subtitle);
+                item.Items.Add(deleteItem);
                 onlineGroup.Items.Add(item);
             }
         }

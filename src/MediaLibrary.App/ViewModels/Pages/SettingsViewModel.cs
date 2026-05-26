@@ -82,6 +82,10 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _otherCacheDescriptionText = "仅包含可再生成的 TMDB / OMDb 外部元数据缓存。";
     private string _otherCacheStatusMessage = "其他缓存状态尚未加载。";
     private bool _isOtherCacheClearAvailable;
+    private string _subtitleCacheUsageText = "在线字幕缓存状态尚未加载。";
+    private string _subtitleCacheDetailText = "删除播放器里的在线字幕绑定不会物理删除缓存文件。";
+    private string _subtitleCacheStatusMessage = "在线字幕缓存状态尚未加载。";
+    private bool _isSubtitleCacheClearAvailable;
     private string _aboutStatusMessage = "XFVerse 影音管理系统";
     private int? _editingScanPathId;
     private string _editingScanPathValue = string.Empty;
@@ -128,6 +132,7 @@ public sealed class SettingsViewModel : PageViewModelBase
         SavePosterCacheLimitCommand = new AsyncRelayCommand(SavePosterCacheLimitAsync);
         ClearPosterCacheCommand = new AsyncRelayCommand(ClearPosterCacheAsync);
         ClearOtherCacheCommand = new AsyncRelayCommand(ClearOtherCacheAsync, () => IsOtherCacheClearAvailable);
+        ClearSubtitleCacheCommand = new AsyncRelayCommand(ClearSubtitleCacheAsync, () => IsSubtitleCacheClearAvailable);
         RefreshSoftwareCacheCommand = new AsyncRelayCommand(RefreshSoftwareCacheAsync);
         ToggleAboutDetailsCommand = new RelayCommand(ToggleAboutDetails);
     }
@@ -175,6 +180,8 @@ public sealed class SettingsViewModel : PageViewModelBase
     public AsyncRelayCommand ClearPosterCacheCommand { get; }
 
     public AsyncRelayCommand ClearOtherCacheCommand { get; }
+
+    public AsyncRelayCommand ClearSubtitleCacheCommand { get; }
 
     public AsyncRelayCommand RefreshSoftwareCacheCommand { get; }
 
@@ -298,6 +305,24 @@ public sealed class SettingsViewModel : PageViewModelBase
             if (SetProperty(ref _isOtherCacheClearAvailable, value))
             {
                 ClearOtherCacheCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string SubtitleCacheUsageText { get => _subtitleCacheUsageText; set => SetProperty(ref _subtitleCacheUsageText, value); }
+
+    public string SubtitleCacheDetailText { get => _subtitleCacheDetailText; set => SetProperty(ref _subtitleCacheDetailText, value); }
+
+    public string SubtitleCacheStatusMessage { get => _subtitleCacheStatusMessage; set => SetProperty(ref _subtitleCacheStatusMessage, value); }
+
+    public bool IsSubtitleCacheClearAvailable
+    {
+        get => _isSubtitleCacheClearAvailable;
+        set
+        {
+            if (SetProperty(ref _isSubtitleCacheClearAvailable, value))
+            {
+                ClearSubtitleCacheCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -1040,6 +1065,35 @@ public sealed class SettingsViewModel : PageViewModelBase
         }
     }
 
+    private async Task ClearSubtitleCacheAsync()
+    {
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "清理孤立在线字幕缓存？",
+            "只会删除在线字幕缓存目录中没有被 Movie、Episode 或当前播放源绑定引用的字幕文件。不会删除仍在绑定中的字幕缓存、本地媒体、WebDAV 文件或扫描发现的外挂字幕。",
+            "清理孤立缓存",
+            "取消");
+
+        if (!confirmed)
+        {
+            SubtitleCacheStatusMessage = "已取消清理在线字幕孤立缓存。";
+            return;
+        }
+
+        try
+        {
+            var result = await _softwareCacheManagementService.ClearAsync(SoftwareCacheCategoryKind.SubtitleCache);
+            ApplySoftwareCacheOverview(await _softwareCacheManagementService.GetOverviewAsync());
+            SubtitleCacheStatusMessage = result.Succeeded
+                ? $"已清理在线字幕孤立缓存，删除 {result.DeletedItemCount} 个文件，释放 {FormatFileSize(result.FreedBytes)}。"
+                : $"在线字幕孤立缓存清理未完全完成：{FormatCacheError(result.Error)}";
+            SoftwareCacheStatusMessage = "软件缓存状态已更新。";
+        }
+        catch (Exception exception)
+        {
+            SubtitleCacheStatusMessage = $"清理在线字幕孤立缓存失败：{FormatCacheError(exception)}";
+        }
+    }
+
     private void ApplySoftwareCacheOverview(SoftwareCacheOverview overview)
     {
         PosterCacheUsageText = FormatFileSize(overview.PosterCache.UsedBytes);
@@ -1054,6 +1108,15 @@ public sealed class SettingsViewModel : PageViewModelBase
         OtherCacheStatusMessage = overview.OtherCache.IsClearable
             ? "可清理 TMDB / OMDb 外部元数据缓存。"
             : overview.OtherCache.ClearUnavailableReason;
+
+        SubtitleCacheUsageText = overview.SubtitleCache.ItemCount > 0
+            ? $"{overview.SubtitleCache.ItemCount} 个文件，占用 {FormatFileSize(overview.SubtitleCache.UsedBytes)}"
+            : "当前没有在线字幕缓存文件。";
+        SubtitleCacheDetailText = overview.SubtitleCache.DetailText;
+        IsSubtitleCacheClearAvailable = overview.SubtitleCache.IsClearable;
+        SubtitleCacheStatusMessage = overview.SubtitleCache.IsClearable
+            ? $"可清理 {overview.SubtitleCache.ClearableItemCount} 个孤立字幕文件，预计释放 {FormatFileSize(overview.SubtitleCache.ClearableBytes)}。"
+            : overview.SubtitleCache.ClearUnavailableReason;
     }
 
     private static long ParseMegabytes(string value, string fieldName)
@@ -1106,6 +1169,17 @@ public sealed class SettingsViewModel : PageViewModelBase
         return exception is InvalidOperationException or FormatException
             ? exception.Message
             : exception.GetType().Name;
+    }
+
+    private static string FormatCacheError(string? error)
+    {
+        return error switch
+        {
+            null or "" => "缓存清理失败。",
+            "OnlineSubtitleBindingReferenceUnavailable" => "无法读取在线字幕绑定引用，已停止清理以避免误删仍在使用的字幕缓存。",
+            "SomeOrphanSubtitleCacheFilesCouldNotBeDeleted" => "部分孤立字幕缓存文件无法删除，可能正在被播放器或系统占用。",
+            _ => error
+        };
     }
 
     private void BeginAddScanPath()

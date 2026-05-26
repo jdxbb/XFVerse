@@ -23,15 +23,18 @@ Phase 5 adds online subtitle search and download support centered on the existin
 - Full local paths and full WebDAV URLs must never be uploaded.
 - Unidentified orphan playback defaults to Movie search.
 - Episodes inside unidentified episodes / unidentified seasons default to TV Episode search.
-- Unidentified content may search and temporarily load subtitles, but it must not create long-term Movie / Episode online subtitle bindings.
-- Temporary subtitle relationships for unidentified content live only for the current playback item lifetime and are not preserved separately after delete-record or no-source cleanup.
+- Unidentified orphan / unidentified Episode-like playback may search and download subtitles, but it must not create long-term Movie / Episode online subtitle bindings.
+- Unidentified playback online subtitles bind long term to the current video `MediaFile` only. They do not bind to unidentified Movie placeholders, unknown Seasons, or grouped placeholders.
+- MediaFile-level online subtitles survive closing the player and are shown again when the same playback source is opened.
+- If that playback source is later corrected to a recognized Movie or Episode, the old MediaFile-level binding is not automatically migrated. New downloads after correction bind to the recognized Movie / Episode target.
+- A recognized current playback source may show both Movie/Episode-level online subtitles and current MediaFile-level online subtitles.
 - Downloaded subtitles for recognized content bind to Movie / Episode, not to a concrete playback source.
 - Movie subtitles bind to Movie.
 - Episode subtitles bind to Episode.
-- Playback sources are only used to determine the active Movie / Episode. They are not long-term online subtitle binding targets.
+- Playback sources are used to determine the active Movie / Episode. `MediaFile` is also allowed as the fallback long-term target for unidentified playback and as a source-following legacy binding after later correction.
 - One Movie / Episode can bind multiple online subtitles.
 - A successful download saves the file into the subtitle cache, adds it to the player subtitle list, and switches to the downloaded subtitle.
-- Deduplication should prefer OpenSubtitles file id, subtitle id, cache file hash, and Movie/Episode binding relationship where available.
+- Deduplication should prefer OpenSubtitles file id, subtitle id, cache file hash, and Movie/Episode/MediaFile binding relationship where available.
 - Deleting a binding is supported, but the player menu must not physically delete cache files.
 - Physical subtitle cache deletion belongs to software cache management.
 - Settings > API configuration adds an Online Subtitles card.
@@ -56,21 +59,23 @@ Phase 5 adds online subtitle search and download support centered on the existin
 - No external subtitle editor.
 - No scan-stage integration.
 - No online subtitle rows masquerading as `MediaFile`.
-- No playback-source-level long-term online subtitle binding.
+- No playback-source-level long-term online subtitle binding for recognized Movie / Episode downloads. MediaFile-level binding is allowed only for unidentified fallback and source-following legacy subtitles.
 
 ## Suggested Stage Split
 
 - 5.1 Online subtitle infrastructure: model, migration, subtitle cache service, OpenSubtitles client, settings card, credential protection, and live contract check plumbing.
 - 5.2 Player menu plus search dialog: add menu entry, pause-on-open, auto-fill search inputs, static language dropdown, result list, sorting, error and quota display.
 - 5.3 Download / bind / delete binding / auto switch: save downloaded files, create Movie/Episode bindings, temporary unidentified playback subtitles, duplicate checks, add to player list, and select downloaded subtitle.
-- 5.4 Cache management and closeout: expose subtitle cache usage and clear in software cache management, document real API behavior, and run player/settings/cache regression.
+- 5.3b Unidentified persistence: add MediaFile as the third online-subtitle target, bind unidentified downloads to the current MediaFile, merge Movie/Episode and MediaFile bindings in the player menu, and keep correction from automatically migrating MediaFile-level bindings.
+- 5.4 Cache management and polish: expose subtitle cache usage and orphan-cache cleanup in software cache management, keep bound cache files protected, polish download quota/error wording, and run player/settings/cache regression.
 
 ## Current Implementation Status
 
 - 5.1 is implemented in the current codebase: dedicated online subtitle binding model/migration, managed subtitle cache service, OpenSubtitles client, static language list, and Settings API card.
 - 5.2 is implemented as search-only UI: the player subtitle menu has the online downloaded subtitles submenu, the search action pauses playback and opens the search dialog, and results can be searched and sorted through OpenSubtitles.
-- 5.2 intentionally keeps existing downloaded online subtitle rows read-only in the player menu. Switching, delete-binding actions, download, cache write, binding writes, and auto-switch remain 5.3.
-- 5.2 does not add any migration.
+- 5.3 is implemented: search results can download subtitles, save them through the managed online subtitle cache, upsert Movie / Episode bindings for recognized playback, refresh the player online subtitle menu, select cached online subtitles, soft-delete bindings, and auto-switch after successful download.
+- 5.3b changes unidentified playback from session-only temporary subtitles to MediaFile-level persistent online subtitle bindings through migration `20260525211655_AddOnlineSubtitleMediaFileBinding`.
+- 5.4 is implemented: Settings > General software-cache management now includes online subtitle cache usage, bound/orphan breakdown, and an orphan-cache cleanup action that refuses to delete files referenced by active `OnlineSubtitleBindings`.
 
 ## Data Safety, Credentials, And Privacy
 
@@ -81,6 +86,7 @@ Phase 5 adds online subtitle search and download support centered on the existin
 - Store downloaded subtitles only under the managed subtitle cache directory.
 - Enforce extension allow-list, size limit, safe file names, safe zip extraction, and path traversal checks.
 - Deleting bindings must not delete local media files, WebDAV media files, or subtitle cache files.
+- Software-cache cleanup may physically delete only orphaned files under the online subtitle cache root. Active Movie / Episode / MediaFile `OnlineSubtitleBinding` rows protect their `CacheRelativePath` and `CacheHash` from deletion.
 - Online subtitles must not change scan rules, `SubtitleBindingService.RebuildBindingsAsync`, or the existing scan-time external subtitle binding table.
 
 ## OpenSubtitles API Audit Summary
@@ -99,3 +105,5 @@ Phase 5 adds online subtitle search and download support centered on the existin
 ## Why Migration Is Required
 
 The existing `SubtitleBinding` table is source-level and scan-owned: it binds `MediaFileId` to subtitle `MediaFileId` and can be rebuilt by scan logic. Phase 5 requires Movie/Episode-level online subtitle bindings to managed cache files with provider metadata and without creating fake `MediaFile` rows. A dedicated online subtitle binding table is therefore required to avoid corrupting scan subtitle behavior and to support provider/file/hash deduplication.
+
+Phase 5.3b adds a second migration because the product semantics changed after 5.3: unidentified playback now needs persistent MediaFile-level online subtitle bindings. `OnlineSubtitleBindings` therefore has exactly one target among `MovieId`, `EpisodeId`, and `MediaFileId`.

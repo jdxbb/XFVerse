@@ -616,6 +616,17 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
             dbContext.MediaFiles.RemoveRange(mediaFiles);
         }
 
+        var onlineSubtitleBindings = await dbContext.OnlineSubtitleBindings
+            .Where(x => !x.IsDeleted
+                        && ((x.EpisodeId.HasValue && episodeIds.Contains(x.EpisodeId.Value))
+                            || (x.MediaFileId.HasValue && mediaFileIdSet.Contains(x.MediaFileId.Value))))
+            .ToListAsync(cancellationToken);
+        foreach (var binding in onlineSubtitleBindings)
+        {
+            binding.IsDeleted = true;
+            binding.UpdatedAt = now;
+        }
+
         var episodes = await dbContext.TvEpisodes
             .Where(x => x.TvSeasonId == tvSeasonId)
             .ToListAsync(cancellationToken);

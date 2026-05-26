@@ -1,9 +1,12 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace MediaLibrary.Core.Services.Implementations;
 
@@ -52,93 +55,227 @@ public sealed class OnlineSubtitleCacheService : IOnlineSubtitleCacheService
             cancellationToken);
     }
 
-    public Task<OnlineSubtitleCacheUsage> GetUsageAsync(CancellationToken cancellationToken = default)
+    public async Task<OnlineSubtitleCacheUsage> GetUsageAsync(CancellationToken cancellationToken = default)
     {
+        var rootDirectory = GetRootDirectory();
         var itemsDirectory = GetItemsDirectory();
         if (!Directory.Exists(itemsDirectory))
         {
-            return Task.FromResult(new OnlineSubtitleCacheUsage());
+            return new OnlineSubtitleCacheUsage();
         }
 
         long usedBytes = 0;
+        long referencedBytes = 0;
+        long orphanBytes = 0;
         var fileCount = 0;
-        foreach (var file in Directory.EnumerateFiles(itemsDirectory, "*", SearchOption.AllDirectories))
+        var referencedFileCount = 0;
+        var orphanFileCount = 0;
+        var unknownFileCount = 0;
+        var references = await TryLoadReferencesAsync(cancellationToken);
+        foreach (var entry in EnumerateSupportedCacheFiles(rootDirectory, itemsDirectory, cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var info = new FileInfo(file);
-                if (!ExtensionSet.Contains(info.Extension))
-                {
-                    continue;
-                }
+            usedBytes += entry.Bytes;
+            fileCount++;
 
-                usedBytes += info.Length;
-                fileCount++;
-            }
-            catch (IOException)
+            if (references is null)
             {
+                unknownFileCount++;
+                continue;
             }
-            catch (UnauthorizedAccessException)
+
+            var state = ClassifyReferenceState(entry, references);
+            if (state == CacheFileReferenceState.Referenced)
             {
+                referencedBytes += entry.Bytes;
+                referencedFileCount++;
+            }
+            else if (state == CacheFileReferenceState.Orphan)
+            {
+                orphanBytes += entry.Bytes;
+                orphanFileCount++;
+            }
+            else
+            {
+                unknownFileCount++;
             }
         }
 
-        return Task.FromResult(
-            new OnlineSubtitleCacheUsage
-            {
-                UsedBytes = usedBytes,
-                FileCount = fileCount
-            });
+        return new OnlineSubtitleCacheUsage
+        {
+            UsedBytes = usedBytes,
+            FileCount = fileCount,
+            ReferencedBytes = referencedBytes,
+            ReferencedFileCount = referencedFileCount,
+            OrphanBytes = orphanBytes,
+            OrphanFileCount = orphanFileCount,
+            UnknownFileCount = unknownFileCount,
+            ReferenceScanSucceeded = references is not null
+        };
     }
 
-    public Task<OnlineSubtitleCacheClearResult> ClearAsync(CancellationToken cancellationToken = default)
+    public async Task<OnlineSubtitleCacheClearResult> ClearAsync(CancellationToken cancellationToken = default)
     {
+        var references = await TryLoadReferencesAsync(cancellationToken);
+        if (references is null)
+        {
+            return new OnlineSubtitleCacheClearResult
+            {
+                Succeeded = false,
+                Error = "OnlineSubtitleBindingReferenceUnavailable"
+            };
+        }
+
+        var rootDirectory = GetRootDirectory();
         var itemsDirectory = GetItemsDirectory();
         if (!Directory.Exists(itemsDirectory))
         {
-            return Task.FromResult(new OnlineSubtitleCacheClearResult { Succeeded = true });
+            return new OnlineSubtitleCacheClearResult { Succeeded = true };
         }
 
         var deletedCount = 0;
+        var failedCount = 0;
         long freedBytes = 0;
-        try
+        foreach (var entry in EnumerateSupportedCacheFiles(rootDirectory, itemsDirectory, cancellationToken))
         {
-            foreach (var file in Directory.EnumerateFiles(itemsDirectory, "*", SearchOption.AllDirectories))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (ClassifyReferenceState(entry, references) != CacheFileReferenceState.Orphan)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var info = new FileInfo(file);
-                if (!ExtensionSet.Contains(info.Extension))
-                {
-                    continue;
-                }
-
-                var length = info.Length;
-                File.Delete(file);
-                deletedCount++;
-                freedBytes += length;
+                continue;
             }
 
-            RemoveEmptyDirectories(itemsDirectory, cancellationToken);
-            return Task.FromResult(
-                new OnlineSubtitleCacheClearResult
-                {
-                    Succeeded = true,
-                    DeletedFileCount = deletedCount,
-                    FreedBytes = freedBytes
-                });
+            try
+            {
+                File.Delete(entry.AbsolutePath);
+                deletedCount++;
+                freedBytes += entry.Bytes;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                failedCount++;
+            }
+        }
+
+        RemoveEmptyDirectories(itemsDirectory, cancellationToken);
+        return new OnlineSubtitleCacheClearResult
+        {
+            Succeeded = failedCount == 0,
+            DeletedFileCount = deletedCount,
+            FreedBytes = freedBytes,
+            FailedFileCount = failedCount,
+            Error = failedCount == 0
+                ? string.Empty
+                : "SomeOrphanSubtitleCacheFilesCouldNotBeDeleted"
+        };
+    }
+
+    private static IEnumerable<CacheFileEntry> EnumerateSupportedCacheFiles(
+        string rootDirectory,
+        string itemsDirectory,
+        CancellationToken cancellationToken)
+    {
+        foreach (var file in Directory.EnumerateFiles(itemsDirectory, "*", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            FileInfo info;
+            try
+            {
+                info = new FileInfo(file);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            if (!ExtensionSet.Contains(info.Extension))
+            {
+                continue;
+            }
+
+            var fullPath = Path.GetFullPath(info.FullName);
+            if (!IsUnderRoot(rootDirectory, fullPath))
+            {
+                continue;
+            }
+
+            yield return new CacheFileEntry(
+                fullPath,
+                NormalizeRelativePath(Path.GetRelativePath(rootDirectory, fullPath)),
+                info.Length);
+        }
+    }
+
+    private static async Task<CacheReferenceSet?> TryLoadReferencesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+            var rows = await dbContext.OnlineSubtitleBindings
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted)
+                .Select(x => new { x.CacheRelativePath, x.CacheHash })
+                .ToListAsync(cancellationToken);
+
+            return new CacheReferenceSet(
+                rows.Select(x => NormalizeRelativePath(x.CacheRelativePath))
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase),
+                rows.Select(x => x.CacheHash?.Trim() ?? string.Empty)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase));
+        }
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static CacheFileReferenceState ClassifyReferenceState(CacheFileEntry entry, CacheReferenceSet references)
+    {
+        if (references.RelativePaths.Contains(entry.RelativePath))
+        {
+            return CacheFileReferenceState.Referenced;
+        }
+
+        if (references.Hashes.Count == 0)
+        {
+            return CacheFileReferenceState.Orphan;
+        }
+
+        try
+        {
+            using var stream = File.OpenRead(entry.AbsolutePath);
+            var hash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+            return references.Hashes.Contains(hash)
+                ? CacheFileReferenceState.Referenced
+                : CacheFileReferenceState.Orphan;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return Task.FromResult(
-                new OnlineSubtitleCacheClearResult
-                {
-                    Succeeded = false,
-                    DeletedFileCount = deletedCount,
-                    FreedBytes = freedBytes,
-                    Error = exception.GetType().Name
-                });
+            return CacheFileReferenceState.Unknown;
         }
+    }
+
+    private static string NormalizeRelativePath(string? relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return string.Empty;
+        }
+
+        return relativePath
+            .Replace('\\', '/')
+            .TrimStart('/');
+    }
+
+    private sealed record CacheFileEntry(string AbsolutePath, string RelativePath, long Bytes);
+
+    private sealed record CacheReferenceSet(HashSet<string> RelativePaths, HashSet<string> Hashes);
+
+    private enum CacheFileReferenceState
+    {
+        Orphan,
+        Referenced,
+        Unknown
     }
 
     public string GetAbsolutePath(string relativePath)
@@ -308,9 +445,15 @@ public sealed class OnlineSubtitleCacheService : IOnlineSubtitleCacheService
                      .OrderByDescending(path => path.Length))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Directory.EnumerateFileSystemEntries(directory).Any())
+            try
             {
-                Directory.Delete(directory);
+                if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                {
+                    Directory.Delete(directory);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
+            {
             }
         }
     }

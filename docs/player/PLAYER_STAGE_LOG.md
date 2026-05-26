@@ -794,6 +794,59 @@ Kept boundaries:
 Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 
+## Phase 5.3 Online Subtitle Download And Switching
+
+Goal: complete the player-side online subtitle download, binding, delete-binding, and auto-switch loop without changing embedded subtitle or scanned external subtitle behavior.
+
+Changed player surface:
+- Search-result rows now expose a download action.
+- Download success adds the cached online subtitle into the player online subtitle menu and attempts immediate mpv `sub-add` selection.
+- The online subtitle submenu now allows selecting cached online subtitles and deleting the current Movie / Episode binding.
+- Temporary online subtitles for unidentified playback are session-only and can be removed from the current player menu.
+
+Kept boundaries:
+- Existing `None`, embedded, and scanned external subtitle menu behavior is unchanged.
+- Online subtitles are not written to scan-owned `SubtitleBinding` and are not represented as `MediaFile`.
+- Deleting a player online subtitle binding does not physically delete the cache file.
+- No player core reload path was introduced for online subtitle switching.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+## Phase 5.3b Online Subtitle MediaFile Persistence
+
+Goal: persist online subtitles downloaded for unidentified playback sources without changing existing embedded or scanned external subtitle behavior.
+
+Changed player surface:
+- Unidentified playback downloads now create MediaFile-level online subtitle bindings and appear again when the same playback source is opened later.
+- Recognized Movie / Episode playback now shows entity-level online subtitles plus current MediaFile-level online subtitles.
+- The online subtitle submenu can switch and delete Movie, Episode, and MediaFile online subtitle bindings.
+
+Kept boundaries:
+- Recognized new downloads still bind to Movie / Episode instead of MediaFile.
+- Existing embedded subtitle and scanned external subtitle switching are unchanged.
+- Online subtitles are still not written to scan-owned `SubtitleBinding` and are still not represented as `MediaFile`.
+- Deleting an online subtitle binding does not physically delete the cache file.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+## Phase 5.4 Online Subtitle Cache Management Polish
+
+Goal: connect online subtitle cache cleanup to software cache management without changing player subtitle switching semantics.
+
+Changed player-adjacent surface:
+- Search/download quota wording now makes unknown remaining quota and provider-side download denial clearer.
+- Player online subtitle menu behavior remains the 5.3b behavior: Movie / Episode / MediaFile bindings can be displayed, selected, and soft-deleted; deleting a binding does not physically delete the cached subtitle file.
+
+Kept boundaries:
+- Existing `None`, embedded, scanned external subtitles, and online subtitle switching are unchanged.
+- No player core reload path, scan-time `SubtitleBinding` change, or MediaFile masquerading was introduced.
+- Physical deletion of online subtitle cache files is handled only by software-cache orphan cleanup.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
 ## Maintenance Rules
 
 - Update this file after every stage.

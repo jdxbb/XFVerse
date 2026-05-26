@@ -31,7 +31,9 @@ public static class AppServiceProvider
         services.AddSingleton<ITmdbService, TmdbService>();
         services.AddSingleton<IOmdbService, OmdbService>();
         services.AddSingleton<IOpenSubtitlesClientService, OpenSubtitlesClientService>();
-        services.AddSingleton<IOnlineSubtitleBindingQueryService, OnlineSubtitleBindingQueryService>();
+        services.AddSingleton<OnlineSubtitleBindingQueryService>();
+        services.AddSingleton<IOnlineSubtitleBindingQueryService>(provider => provider.GetRequiredService<OnlineSubtitleBindingQueryService>());
+        services.AddSingleton<IOnlineSubtitleBindingService>(provider => provider.GetRequiredService<OnlineSubtitleBindingQueryService>());
         services.AddSingleton<ISubtitleBindingService, SubtitleBindingService>();
         services.AddSingleton<ITvMetadataHydrationService, TvMetadataHydrationService>();
         services.AddSingleton<ITvScanDirectoryAnalysisService, TvScanDirectoryAnalysisService>();
