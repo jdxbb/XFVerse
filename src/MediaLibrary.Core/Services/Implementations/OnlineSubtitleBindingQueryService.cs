@@ -238,13 +238,21 @@ public sealed class OnlineSubtitleBindingQueryService : IOnlineSubtitleBindingSe
         try
         {
             var combined = Path.GetFullPath(Path.Combine(cacheRoot, relativePath));
-            return combined.StartsWith(cacheRoot, StringComparison.OrdinalIgnoreCase)
+            return IsUnderRoot(cacheRoot, combined)
                    && File.Exists(combined);
         }
         catch
         {
             return false;
         }
+    }
+
+    private static bool IsUnderRoot(string root, string candidate)
+    {
+        var normalizedRoot = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+        return candidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<OnlineSubtitleBindingListItem> DeduplicateRows(

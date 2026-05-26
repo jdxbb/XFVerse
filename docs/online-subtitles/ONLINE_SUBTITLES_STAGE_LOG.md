@@ -240,3 +240,29 @@ Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Migration diff remained limited to the existing 5.1 and 5.3b online-subtitle migrations already present in the worktree; 5.4 added no migration.
+
+## Phase 5.5 - Full Regression And Closeout
+
+Completed:
+
+- Audited Phase 5 documentation against the current implementation for settings, OpenSubtitles client behavior, player subtitle menu, search dialog, download/cache/binding flow, Movie / Episode / MediaFile targets, delete-record boundaries, and software-cache cleanup.
+- Confirmed the settings probe uses a real OpenSubtitles subtitle search request for API-key acceptance checks, with username/password login remaining optional.
+- Confirmed player search still pauses active playback, uses the static language table, fills safe file-name based queries, and does not upload full local paths or WebDAV URLs.
+- Confirmed downloads save through the managed online subtitle cache service, enforce the `.srt` / `.ass` / `.ssa` / `.vtt` allow-list, bound sizes, safe zip extraction, hash naming, and path traversal checks.
+- Confirmed recognized Movie downloads bind to `MovieId`, recognized Episode downloads bind to `EpisodeId`, and unidentified playback downloads bind to `MediaFileId`.
+- Confirmed the player online subtitle menu merges current Movie / Episode bindings with current MediaFile bindings, can select cached entries, and soft-deletes bindings without physically deleting cache files.
+- Confirmed remove-from-library / hide-only paths do not clear online subtitle bindings, while delete-record paths clear affected online subtitle bindings and leave cache cleanup to software-cache management.
+- Confirmed Settings > General reports online subtitle cache usage and clears only orphan files not referenced by active `OnlineSubtitleBindings`.
+- Fixed one closeout safety issue: binding menu cache-file availability now uses a strict cache-root boundary check before reporting a managed cache file as available.
+
+Not done:
+
+- No new online subtitle feature scope was added.
+- No full-library automatic download, OCR, translation, external subtitle editor, scan-stage integration, MediaFile masquerading, still-bound cache deletion, final UI redesign, database update, commit, or push.
+- No live OpenSubtitles download regression was executed during closeout to avoid consuming user quota or exposing credentials outside the running app.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- No migration was added in Phase 5.5.
+- Migration diff remained limited to the already-existing Phase 5 online-subtitle migrations in the repository baseline.

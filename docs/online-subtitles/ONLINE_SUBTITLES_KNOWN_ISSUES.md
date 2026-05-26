@@ -2,19 +2,19 @@
 
 ## Blocker
 
-- No code blocker after Phase 5.4 build validation.
+- No code blocker after Phase 5.5 build validation.
 - Database update was intentionally not executed. Runtime use of the new online subtitle settings and bindings requires applying migration `20260525184522_AddOnlineSubtitlesInfrastructure` outside this agent run.
 - Phase 5.3b adds migration `20260525211655_AddOnlineSubtitleMediaFileBinding`. Runtime use of unidentified MediaFile-level online subtitle persistence requires applying this migration outside this agent run.
 
 ## Deferred
 
 - TV Series IMDb ID hydration for stronger Episode searches.
-- OpenSubtitles real-result field drift after live contract checks.
+- OpenSubtitles real-result field drift should continue to be sampled with broader real queries after Phase 5 closeout.
 - Search-result pagination beyond the first result page.
-- OpenSubtitles live search and download result field drift should be sampled with broader real queries before a final Phase 5.5 closeout.
 - Optional cache tooling for deliberately clearing still-bound online subtitle cache files is deferred; Phase 5.4 intentionally clears only orphan cache files.
 - Automatic migration from old MediaFile-level online subtitle bindings to Movie / Episode bindings after user correction is intentionally deferred and not part of 5.3b.
 - A richer download progress bar is deferred; Phase 5.3 exposes per-row busy state and final status only.
+- Replacing the current project-level `SecretProtector` placeholder with an OS-backed secret store remains a broader credentials-hardening task; Phase 5 keeps using the existing protected-storage abstraction and avoids plain-text logging.
 
 ## Noise
 

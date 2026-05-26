@@ -847,6 +847,19 @@ Kept boundaries:
 Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 
+## Phase 5.5 Online Subtitle Player Closeout
+
+Goal: verify Phase 5 online subtitle player behavior against current code and docs without adding new player scope.
+
+Closeout result:
+- The subtitle menu still keeps `None`, embedded, scanned external, and online downloaded subtitle groups.
+- The online group still opens search, pauses active playback on dialog open, displays Movie / Episode / MediaFile online bindings, switches cached online subtitles, and soft-deletes bindings only.
+- Existing embedded subtitle and scanned external subtitle switching paths were not changed in 5.5.
+- Online subtitle cache-file availability now uses a strict managed-cache-root boundary check before a binding row is treated as playable.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
 ## Maintenance Rules
 
 - Update this file after every stage.

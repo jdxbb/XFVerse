@@ -68,6 +68,7 @@ Phase 5 adds online subtitle search and download support centered on the existin
 - 5.3 Download / bind / delete binding / auto switch: save downloaded files, create Movie/Episode bindings, temporary unidentified playback subtitles, duplicate checks, add to player list, and select downloaded subtitle.
 - 5.3b Unidentified persistence: add MediaFile as the third online-subtitle target, bind unidentified downloads to the current MediaFile, merge Movie/Episode and MediaFile bindings in the player menu, and keep correction from automatically migrating MediaFile-level bindings.
 - 5.4 Cache management and polish: expose subtitle cache usage and orphan-cache cleanup in software cache management, keep bound cache files protected, polish download quota/error wording, and run player/settings/cache regression.
+- 5.5 Full regression and closeout: audit documentation against code, fix Phase 5 blockers or regressions only, verify build and migration state, and prepare the feature for commit.
 
 ## Current Implementation Status
 
@@ -76,6 +77,7 @@ Phase 5 adds online subtitle search and download support centered on the existin
 - 5.3 is implemented: search results can download subtitles, save them through the managed online subtitle cache, upsert Movie / Episode bindings for recognized playback, refresh the player online subtitle menu, select cached online subtitles, soft-delete bindings, and auto-switch after successful download.
 - 5.3b changes unidentified playback from session-only temporary subtitles to MediaFile-level persistent online subtitle bindings through migration `20260525211655_AddOnlineSubtitleMediaFileBinding`.
 - 5.4 is implemented: Settings > General software-cache management now includes online subtitle cache usage, bound/orphan breakdown, and an orphan-cache cleanup action that refuses to delete files referenced by active `OnlineSubtitleBindings`.
+- 5.5 closeout is complete in the current codebase: Phase 5 code and docs were audited together, build passed with 0 warnings and 0 errors, no additional migration was required, and a strict cache-root availability check was added for online subtitle binding menu rows.
 
 ## Data Safety, Credentials, And Privacy
 

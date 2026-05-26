@@ -60,3 +60,12 @@
 - If binding references cannot be read, cleanup is disabled to avoid deleting still-used subtitle files.
 - Deleting online subtitle bindings in the player remains a soft-delete operation; physical deletion is deferred to this orphan cleanup path.
 - Existing poster cache and TMDB / OMDb other-cache behavior is unchanged.
+
+## Phase 5.5 Online Subtitle Cache Closeout
+
+- Re-checked the online subtitle cache management boundary during Phase 5 closeout.
+- Online subtitle cache statistics still count only supported subtitle files under the managed online subtitle cache root.
+- Orphan cleanup still requires readable active `OnlineSubtitleBinding` references and deletes only unreferenced online subtitle cache files.
+- Bound Movie / Episode / MediaFile online subtitle cache files remain protected from physical deletion.
+- The player binding-list availability check now uses the same strict cache-root boundary principle as the cache service.
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
