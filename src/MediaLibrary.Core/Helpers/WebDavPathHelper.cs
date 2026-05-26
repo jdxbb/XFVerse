@@ -141,13 +141,16 @@ public static class WebDavPathHelper
 
     public static string BuildPlaybackUrl(string baseUrl, string filePath, string? remoteUri)
     {
+        var baseUri = CreateBaseUri(baseUrl);
         if (!string.IsNullOrWhiteSpace(remoteUri)
             && Uri.TryCreate(remoteUri, UriKind.Absolute, out var absoluteRemoteUri))
         {
-            return absoluteRemoteUri.AbsoluteUri;
+            if (IsUnderCurrentBaseUri(baseUri, absoluteRemoteUri))
+            {
+                return absoluteRemoteUri.AbsoluteUri;
+            }
         }
 
-        var baseUri = CreateBaseUri(baseUrl);
         var normalizedFilePath = NormalizeVirtualPath(filePath);
         var baseSegments = baseUri.AbsolutePath
             .Trim('/')
@@ -170,5 +173,25 @@ public static class WebDavPathHelper
 
         var remaining = fileSegments.Skip(overlap).Select(Uri.EscapeDataString);
         return new Uri(baseUri, string.Join("/", remaining)).AbsoluteUri;
+    }
+
+    private static bool IsUnderCurrentBaseUri(Uri baseUri, Uri remoteUri)
+    {
+        if (!string.Equals(baseUri.Scheme, remoteUri.Scheme, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(baseUri.Host, remoteUri.Host, StringComparison.OrdinalIgnoreCase)
+            || baseUri.Port != remoteUri.Port)
+        {
+            return false;
+        }
+
+        var basePath = Uri.UnescapeDataString(baseUri.AbsolutePath).TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(basePath))
+        {
+            return true;
+        }
+
+        var remotePath = Uri.UnescapeDataString(remoteUri.AbsolutePath).TrimEnd('/');
+        return remotePath.Equals(basePath, StringComparison.OrdinalIgnoreCase)
+               || remotePath.StartsWith(basePath + "/", StringComparison.OrdinalIgnoreCase);
     }
 }

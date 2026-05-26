@@ -2,26 +2,80 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:player="clr-namespace:MediaLibrary.App.Views.Player"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="{Binding MovieTitle}"
         Width="1180"
         Height="760"
         MinWidth="900"
         MinHeight="600"
         WindowStartupLocation="CenterOwner"
-        Background="#080B10"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="False"
+        Background="{DynamicResource BrushPlayerBackground}"
         Foreground="White"
         Focusable="True"
         KeyDown="Window_KeyDown"
         PreviewKeyDown="Window_KeyDown"
         PreviewMouseWheel="Window_PreviewMouseWheel"
         MouseMove="Window_MouseMove">
-    <Grid x:Name="RootLayout"
-          Background="Transparent"
-          PreviewMouseWheel="Window_PreviewMouseWheel"
-          PreviewMouseMove="Window_MouseMove"
-          PreviewMouseLeftButtonDown="VideoSurface_PreviewMouseLeftButtonDown"
-          PreviewMouseRightButtonDown="PlayerSurface_PreviewMouseRightButton"
-          PreviewMouseRightButtonUp="PlayerSurface_PreviewMouseRightButton">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="6"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid Background="{DynamicResource BrushPlayerBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="PlayerTitleBar"
+                Grid.Row="0"
+                Style="{StaticResource PlayerWindowCaptionStyle}"
+                MouseLeftButtonDown="PlayerTitleBar_MouseLeftButtonDown">
+            <Grid Margin="14,0,8,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding MovieTitle}"
+                           Style="{StaticResource PlayerWindowCaptionTextStyle}" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button x:Name="PlayerMinimizeButton"
+                            Content="－"
+                            ToolTip="最小化"
+                            Click="PlayerMinimizeButton_Click"
+                            Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
+                    <Button x:Name="PlayerMaximizeRestoreButton"
+                            Content="□"
+                            ToolTip="最大化"
+                            Click="PlayerMaximizeRestoreButton_Click"
+                            Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
+                    <Button x:Name="PlayerCloseButton"
+                            Content="×"
+                            ToolTip="关闭"
+                            Click="PlayerCloseButton_Click"
+                            Style="{StaticResource PlayerWindowCaptionCloseButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid x:Name="RootLayout"
+              Grid.Row="1"
+              Background="Transparent"
+              PreviewMouseWheel="Window_PreviewMouseWheel"
+              PreviewMouseMove="Window_MouseMove"
+              PreviewMouseLeftButtonDown="VideoSurface_PreviewMouseLeftButtonDown"
+              PreviewMouseRightButtonDown="PlayerSurface_PreviewMouseRightButton"
+              PreviewMouseRightButtonUp="PlayerSurface_PreviewMouseRightButton">
         <Border Background="#05070A"
                 PreviewMouseWheel="Window_PreviewMouseWheel"
                 MouseMove="Window_MouseMove"
@@ -37,6 +91,49 @@
                                      PreviewMouseRightButtonDown="PlayerSurface_PreviewMouseRightButton"
                                      PreviewMouseRightButtonUp="PlayerSurface_PreviewMouseRightButton" />
         </Border>
+
+        <Popup x:Name="PlayerTitleBarPopup"
+               AllowsTransparency="True"
+               Placement="Relative"
+               PlacementTarget="{Binding ElementName=RootLayout}"
+               StaysOpen="True">
+            <Border x:Name="FullscreenPlayerTitleBar"
+                    Width="{Binding ActualWidth, ElementName=RootLayout}"
+                    Style="{StaticResource PlayerWindowCaptionStyle}"
+                    MouseMove="Window_MouseMove"
+                    PreviewMouseMove="Window_MouseMove"
+                    MouseLeftButtonDown="PlayerTitleBar_MouseLeftButtonDown">
+                <Grid Margin="14,0,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="{Binding MovieTitle}"
+                               Style="{StaticResource PlayerWindowCaptionTextStyle}" />
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button x:Name="FullscreenPlayerMinimizeButton"
+                                Content="－"
+                                ToolTip="最小化"
+                                Click="PlayerMinimizeButton_Click"
+                                Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
+                        <Button x:Name="FullscreenPlayerMaximizeRestoreButton"
+                                Content="□"
+                                ToolTip="最大化"
+                                Click="PlayerMaximizeRestoreButton_Click"
+                                Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
+                        <Button x:Name="FullscreenPlayerCloseButton"
+                                Content="×"
+                                ToolTip="关闭"
+                                Click="PlayerCloseButton_Click"
+                                Style="{StaticResource PlayerWindowCaptionCloseButtonStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Popup>
 
         <Popup x:Name="BufferingOverlayPopup"
                AllowsTransparency="True"
@@ -247,7 +344,6 @@
                PlacementTarget="{Binding ElementName=RootLayout}"
                StaysOpen="True">
             <Border x:Name="ControlBar"
-                    Width="{Binding ActualWidth, ElementName=RootLayout}"
                     Padding="18"
                     Background="#E6131720"
                     MouseMove="Window_MouseMove"
@@ -398,5 +494,6 @@
                 </Grid>
             </Border>
         </Popup>
+        </Grid>
     </Grid>
 </Window>

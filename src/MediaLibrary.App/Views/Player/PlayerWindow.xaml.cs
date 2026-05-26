@@ -19,17 +19,31 @@ public partial class PlayerWindow : Window
 {
     private const int WmKeyDown = 0x0100;
     private const int WmSysKeyDown = 0x0104;
+    private const int WmNcHitTest = 0x0084;
+    private const int WmGetMinMaxInfo = 0x0024;
+    private const int WmSizing = 0x0214;
     private const int WmLButtonDown = 0x0201;
     private const int WmLButtonDblClk = 0x0203;
     private const int WmMouseWheel = 0x020A;
     private const int WmMouseHWheel = 0x020E;
     private const int WhMouseLl = 14;
+    private const int MonitorDefaultToNearest = 0x00000002;
+    private const int WmszLeft = 1;
+    private const int WmszRight = 2;
+    private const int WmszTop = 3;
+    private const int WmszTopLeft = 4;
+    private const int WmszTopRight = 5;
+    private const int WmszBottom = 6;
+    private const int WmszBottomLeft = 7;
+    private const int WmszBottomRight = 8;
     private const int SmCxDoubleClk = 36;
     private const int SmCyDoubleClk = 37;
     private const int VkEscape = 0x1B;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
     private const long DoubleClickSuppressMilliseconds = 250;
+    private const long ControlBarAutoHideMilliseconds = 2500;
+    private const double ResizeHitTestThickness = 6d;
     private readonly DispatcherTimer _controlBarTimer;
     private readonly DispatcherTimer _cursorPollTimer;
     private readonly DispatcherTimer _interactionFeedbackTimer;
@@ -44,10 +58,13 @@ public partial class PlayerWindow : Window
     private bool _isAudioTrackMenuOpen;
     private bool _closeRequested;
     private bool _closeConfirmed;
+    private bool _isFullScreenChromeVisible = true;
+    private double _windowAspectRatio = 1180d / 760d;
     private OnlineSubtitleSearchWindow? _onlineSubtitleSearchWindow;
     private POINT? _lastVideoClickPoint;
     private long _lastVideoClickTick;
     private long _lastVideoDoubleClickToggleTick;
+    private long _lastControlBarActivityTick;
     private bool _isPlayerCursorHidden;
     private HwndSource? _windowSource;
     private IntPtr _mouseHook;
@@ -62,7 +79,7 @@ public partial class PlayerWindow : Window
         InitializeComponent();
         _controlBarTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(2.5)
+            Interval = TimeSpan.FromMilliseconds(ControlBarAutoHideMilliseconds)
         };
         _controlBarTimer.Tick += OnControlBarTimerTick;
 
@@ -82,6 +99,7 @@ public partial class PlayerWindow : Window
         Loaded += (_, _) =>
         {
             _viewModel?.SetPlaybackHostHandle(PlaybackHost.HostHandle);
+            CaptureWindowAspectRatio();
             Keyboard.Focus(this);
             ShowControlBar();
             RestartControlBarTimer();
@@ -89,8 +107,11 @@ public partial class PlayerWindow : Window
         };
         Activated += OnWindowActivated;
         Deactivated += OnWindowDeactivated;
+        StateChanged += OnWindowStateChanged;
         LocationChanged += (_, _) => UpdatePopupPlacements();
         SizeChanged += (_, _) => UpdatePopupPlacements();
+        UpdatePlayerChromeVisibility();
+        UpdatePlayerMaximizeRestoreButton();
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -194,6 +215,7 @@ public partial class PlayerWindow : Window
     {
         NotifyCloseLifecycleStarted();
         CleanupInputHooks();
+        StateChanged -= OnWindowStateChanged;
         base.OnClosed(e);
     }
 
@@ -218,6 +240,162 @@ public partial class PlayerWindow : Window
     private void ToggleFullScreen_Click(object sender, RoutedEventArgs e)
     {
         ToggleFullScreen();
+    }
+
+    private void PlayerMinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void PlayerMaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        TogglePlayerMaximizeRestore();
+    }
+
+    private void PlayerCloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void PlayerTitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left
+            || IsInteractiveElement(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        if (e.ClickCount == 2)
+        {
+            ToggleFullScreen();
+            e.Handled = true;
+            return;
+        }
+
+        if (_isFullScreen)
+        {
+            return;
+        }
+
+        BeginWindowDrag(e);
+    }
+
+    private void OnWindowStateChanged(object? sender, EventArgs e)
+    {
+        UpdatePlayerMaximizeRestoreButton();
+    }
+
+    private void BeginWindowDrag(MouseButtonEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized)
+        {
+            RestoreWindowForDrag(e);
+        }
+
+        try
+        {
+            DragMove();
+        }
+        catch (InvalidOperationException)
+        {
+            // DragMove requires the left mouse button to remain pressed.
+        }
+    }
+
+    private void RestoreWindowForDrag(MouseButtonEventArgs e)
+    {
+        var restoreBounds = RestoreBounds;
+        var mousePosition = PointToScreen(e.GetPosition(this));
+        var source = PresentationSource.FromVisual(this);
+
+        if (source?.CompositionTarget is not null)
+        {
+            mousePosition = source.CompositionTarget.TransformFromDevice.Transform(mousePosition);
+        }
+
+        WindowState = WindowState.Normal;
+        Left = mousePosition.X - (restoreBounds.Width * 0.5);
+        Top = Math.Max(SystemParameters.VirtualScreenTop, mousePosition.Y - 12);
+    }
+
+    private void TogglePlayerMaximizeRestore()
+    {
+        if (_isFullScreen)
+        {
+            ExitFullScreen();
+            return;
+        }
+
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void UpdatePlayerMaximizeRestoreButton()
+    {
+        UpdateMaximizeRestoreButton(PlayerMaximizeRestoreButton);
+        UpdateMaximizeRestoreButton(FullscreenPlayerMaximizeRestoreButton);
+    }
+
+    private void UpdatePlayerChromeVisibility()
+    {
+        if (PlayerTitleBar is null || PlayerTitleBarPopup is null)
+        {
+            return;
+        }
+
+        PlayerTitleBar.Visibility = _isFullScreen ? Visibility.Collapsed : Visibility.Visible;
+        PlayerTitleBarPopup.IsOpen = _isFullScreen
+                                      && _isFullScreenChromeVisible
+                                      && IsActive
+                                      && !_closeRequested;
+        UpdatePlayerTitleBarPopupPlacement();
+    }
+
+    private void UpdateMaximizeRestoreButton(Button? button)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        if (_isFullScreen || WindowState == WindowState.Maximized)
+        {
+            button.Content = "\u2750";
+            button.ToolTip = "\u8fd8\u539f";
+            return;
+        }
+
+        button.Content = "\u25a1";
+        button.ToolTip = "\u6700\u5927\u5316";
+    }
+
+    private void CaptureWindowAspectRatio()
+    {
+        if (ActualWidth > 0 && ActualHeight > 0)
+        {
+            _windowAspectRatio = ActualWidth / ActualHeight;
+        }
+    }
+
+    private void ShowFullScreenChrome()
+    {
+        if (!_isFullScreen)
+        {
+            return;
+        }
+
+        _isFullScreenChromeVisible = true;
+        UpdatePlayerChromeVisibility();
+    }
+
+    private void HideFullScreenChrome()
+    {
+        if (!_isFullScreen)
+        {
+            return;
+        }
+
+        _isFullScreenChromeVisible = false;
+        UpdatePlayerChromeVisibility();
     }
 
     private void ControlBar_PreviewMouseRightButton(object sender, MouseButtonEventArgs e)
@@ -302,9 +480,17 @@ public partial class PlayerWindow : Window
 
         if (TryGetCursorPosition(out var cursorPosition))
         {
+            var hasMoved = !_lastCursorPosition.HasValue
+                           || _lastCursorPosition.Value.X != cursorPosition.X
+                           || _lastCursorPosition.Value.Y != cursorPosition.Y;
             _lastCursorPosition = cursorPosition;
+            if (_isFullScreen && !hasMoved)
+            {
+                return;
+            }
         }
 
+        MarkControlBarActivity();
         HandleFullScreenPointerMovement();
     }
 
@@ -1021,7 +1207,20 @@ public partial class PlayerWindow : Window
     private void OnControlBarTimerTick(object? sender, EventArgs e)
     {
         _controlBarTimer.Stop();
-        if (!IsAnyPlayerMenuOpen() || !IsActive)
+        if (IsAnyPlayerMenuOpen())
+        {
+            RestartControlBarTimer();
+            return;
+        }
+
+        var idleMilliseconds = Environment.TickCount64 - _lastControlBarActivityTick;
+        if (idleMilliseconds < ControlBarAutoHideMilliseconds)
+        {
+            StartControlBarTimer(ControlBarAutoHideMilliseconds - idleMilliseconds);
+            return;
+        }
+
+        if (IsActive || _isFullScreen)
         {
             HideControlBar();
         }
@@ -1089,23 +1288,26 @@ public partial class PlayerWindow : Window
         _previousState = WindowState;
         _previousStyle = WindowStyle;
         _previousResizeMode = ResizeMode;
-        WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.NoResize;
-        WindowState = WindowState.Maximized;
         _isFullScreen = true;
+        _isFullScreenChromeVisible = true;
+        WindowState = WindowState.Maximized;
+        UpdatePlayerChromeVisibility();
         _lastCursorPosition = null;
+        MarkControlBarActivity();
         ShowControlBar();
         RestartControlBarTimer();
     }
 
     private void ExitFullScreen()
     {
-        WindowStyle = _previousStyle;
-        ResizeMode = _previousResizeMode;
-        WindowState = _previousState;
         _isFullScreen = false;
+        _isFullScreenChromeVisible = true;
+        WindowState = _previousState;
+        UpdatePlayerChromeVisibility();
+        UpdatePlayerMaximizeRestoreButton();
         _controlBarTimer.Stop();
         _lastCursorPosition = null;
+        MarkControlBarActivity();
         ShowControlBar();
         RestartControlBarTimer();
     }
@@ -1115,13 +1317,26 @@ public partial class PlayerWindow : Window
         _controlBarTimer.Stop();
         if (!IsAnyPlayerMenuOpen() && IsActive)
         {
-            _controlBarTimer.Start();
+            StartControlBarTimer(ControlBarAutoHideMilliseconds);
         }
+    }
+
+    private void StartControlBarTimer(long dueMilliseconds)
+    {
+        _controlBarTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(100, dueMilliseconds));
+        _controlBarTimer.Start();
+    }
+
+    private void MarkControlBarActivity()
+    {
+        _lastControlBarActivityTick = Environment.TickCount64;
     }
 
     private void ShowControlBar()
     {
+        MarkControlBarActivity();
         ShowPlayerCursor();
+        ShowFullScreenChrome();
         if (!IsActive)
         {
             HideControlBar();
@@ -1140,6 +1355,7 @@ public partial class PlayerWindow : Window
         _controlBarTimer.Stop();
         ControlBarPopup.IsOpen = false;
         ControlBar.IsHitTestVisible = false;
+        HideFullScreenChrome();
         UpdatePlayerCursorForControlBarState();
     }
 
@@ -1150,16 +1366,37 @@ public partial class PlayerWindow : Window
             return;
         }
 
-        ControlBarPopup.HorizontalOffset = 0d;
+        var resizeInset = GetControlBarResizeInset();
+        ControlBar.Width = Math.Max(1d, RootLayout.ActualWidth - (resizeInset * 2d));
+        ControlBarPopup.HorizontalOffset = resizeInset;
         ControlBarPopup.VerticalOffset = Math.Max(0d, RootLayout.ActualHeight - ControlBar.ActualHeight);
         MoveControlBarPopupWindow();
     }
 
+    private double GetControlBarResizeInset()
+    {
+        return !_isFullScreen && WindowState != WindowState.Maximized
+            ? ResizeHitTestThickness
+            : 0d;
+    }
+
     private void UpdatePopupPlacements()
     {
+        UpdatePlayerTitleBarPopupPlacement();
         UpdateControlBarPopupPlacement();
         UpdateInteractionFeedbackPopupPlacement();
         UpdatePromptOverlayPopupPlacement();
+    }
+
+    private void UpdatePlayerTitleBarPopupPlacement()
+    {
+        if (!IsLoaded || PlayerTitleBarPopup is null)
+        {
+            return;
+        }
+
+        PlayerTitleBarPopup.HorizontalOffset = 0d;
+        PlayerTitleBarPopup.VerticalOffset = 0d;
     }
 
     private void UpdateInteractionFeedbackPopupPlacement()
@@ -1210,11 +1447,13 @@ public partial class PlayerWindow : Window
             return;
         }
 
+        var resizeInset = GetControlBarResizeInset();
+        var popupWidth = Math.Max(1d, RootLayout.ActualWidth - (resizeInset * 2d));
         var popupTopLeft = RootLayout.PointToScreen(
-            new Point(0d, Math.Max(0d, RootLayout.ActualHeight - ControlBar.ActualHeight)));
+            new Point(resizeInset, Math.Max(0d, RootLayout.ActualHeight - ControlBar.ActualHeight)));
         var transformToDevice = PresentationSource.FromVisual(RootLayout)?.CompositionTarget?.TransformToDevice
                                 ?? Matrix.Identity;
-        var popupSize = transformToDevice.Transform(new Point(RootLayout.ActualWidth, ControlBar.ActualHeight));
+        var popupSize = transformToDevice.Transform(new Point(popupWidth, ControlBar.ActualHeight));
 
         _ = SetWindowPos(
             popupHandle,
@@ -1312,6 +1551,7 @@ public partial class PlayerWindow : Window
         }
 
         _lastCursorPosition = cursorPosition;
+        MarkControlBarActivity();
         HandleFullScreenPointerMovement();
     }
 
@@ -1343,13 +1583,41 @@ public partial class PlayerWindow : Window
                && point.Y <= ControlBar.ActualHeight;
     }
 
+    private bool IsCursorInsidePlayerTitleBar(POINT cursorPosition)
+    {
+        if (!_isFullScreen && IsCursorInsideElement(PlayerTitleBar, cursorPosition))
+        {
+            return true;
+        }
+
+        return PlayerTitleBarPopup.IsOpen
+               && IsCursorInsideElement(FullscreenPlayerTitleBar, cursorPosition);
+    }
+
+    private static bool IsCursorInsideElement(FrameworkElement element, POINT cursorPosition)
+    {
+        if (element.Visibility != Visibility.Visible
+            || element.ActualWidth <= 0
+            || element.ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        var point = element.PointFromScreen(new Point(cursorPosition.X, cursorPosition.Y));
+        return point.X >= 0
+               && point.Y >= 0
+               && point.X <= element.ActualWidth
+               && point.Y <= element.ActualHeight;
+    }
+
     private bool IsCursorInsideVideoInteractionArea(POINT cursorPosition)
     {
         return IsActive
                && !_closeRequested
                && !IsAnyPlayerMenuOpen()
                && IsCursorInsidePlayer(cursorPosition)
-               && !IsCursorInsideControlBar(cursorPosition);
+               && !IsCursorInsideControlBar(cursorPosition)
+               && !IsCursorInsidePlayerTitleBar(cursorPosition);
     }
 
     private void HandleFullScreenPointerMovement()
@@ -1458,7 +1726,23 @@ public partial class PlayerWindow : Window
 
     private IntPtr PlayerWindowWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if ((msg == WmMouseWheel || msg == WmMouseHWheel)
+        if (msg == WmNcHitTest && !_isFullScreen && IsSideResizeHit(GetScreenPoint(lParam)))
+        {
+            handled = true;
+            return new IntPtr(1);
+        }
+
+        if (msg == WmGetMinMaxInfo && !_isFullScreen)
+        {
+            ApplyMonitorWorkArea(lParam);
+            handled = true;
+        }
+        else if (msg == WmSizing && !_isFullScreen)
+        {
+            ApplyAspectRatioToSizingRect(wParam, lParam);
+            handled = true;
+        }
+        else if ((msg == WmMouseWheel || msg == WmMouseHWheel)
             && TryHandleNativeMouseWheel(GetWheelDelta(wParam), GetScreenPoint(lParam)))
         {
             handled = true;
@@ -1469,6 +1753,142 @@ public partial class PlayerWindow : Window
         }
 
         return IntPtr.Zero;
+    }
+
+    private bool IsSideResizeHit(POINT cursorPosition)
+    {
+        if (!IsLoaded
+            || WindowState == WindowState.Maximized
+            || ActualWidth <= 0
+            || ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        var point = PointFromScreen(new Point(cursorPosition.X, cursorPosition.Y));
+        var onLeft = point.X >= 0 && point.X <= ResizeHitTestThickness;
+        var onRight = point.X >= ActualWidth - ResizeHitTestThickness && point.X <= ActualWidth;
+        var onTop = point.Y >= 0 && point.Y <= ResizeHitTestThickness;
+        var onBottom = point.Y >= ActualHeight - ResizeHitTestThickness && point.Y <= ActualHeight;
+        var onHorizontalEdge = onLeft || onRight;
+        var onVerticalEdge = onTop || onBottom;
+
+        return onHorizontalEdge ^ onVerticalEdge;
+    }
+
+    private void ApplyMonitorWorkArea(IntPtr lParam)
+    {
+        if (_windowSource?.Handle is not { } handle || handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var monitor = MonitorFromWindow(handle, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var monitorInfo = new MONITORINFO
+        {
+            Size = Marshal.SizeOf<MONITORINFO>()
+        };
+
+        if (!GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            return;
+        }
+
+        var minMaxInfo = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+        var workArea = monitorInfo.WorkArea;
+        var monitorArea = monitorInfo.MonitorArea;
+
+        minMaxInfo.MaxPosition.X = Math.Abs(workArea.Left - monitorArea.Left);
+        minMaxInfo.MaxPosition.Y = Math.Abs(workArea.Top - monitorArea.Top);
+        minMaxInfo.MaxSize.X = Math.Abs(workArea.Right - workArea.Left);
+        minMaxInfo.MaxSize.Y = Math.Abs(workArea.Bottom - workArea.Top);
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        minMaxInfo.MinTrackSize.X = (int)Math.Ceiling(MinWidth * dpi.DpiScaleX);
+        minMaxInfo.MinTrackSize.Y = (int)Math.Ceiling(MinHeight * dpi.DpiScaleY);
+
+        Marshal.StructureToPtr(minMaxInfo, lParam, true);
+    }
+
+    private void ApplyAspectRatioToSizingRect(IntPtr edgeParam, IntPtr lParam)
+    {
+        var rect = Marshal.PtrToStructure<RECT>(lParam);
+        var edge = edgeParam.ToInt32();
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var minimumWidth = Math.Max(1, (int)Math.Ceiling(MinWidth * dpi.DpiScaleX));
+        var minimumHeight = Math.Max(1, (int)Math.Ceiling(MinHeight * dpi.DpiScaleY));
+        var width = Math.Max(minimumWidth, rect.Right - rect.Left);
+        var height = Math.Max(minimumHeight, rect.Bottom - rect.Top);
+
+        switch (edge)
+        {
+            case WmszLeft:
+            case WmszRight:
+                height = Math.Max(minimumHeight, (int)Math.Round(width / _windowAspectRatio));
+                SetVerticalFromCenter(ref rect, height);
+                break;
+            case WmszTop:
+            case WmszBottom:
+                width = Math.Max(minimumWidth, (int)Math.Round(height * _windowAspectRatio));
+                SetHorizontalFromCenter(ref rect, width);
+                break;
+            case WmszTopLeft:
+            case WmszTopRight:
+            case WmszBottomLeft:
+            case WmszBottomRight:
+                height = Math.Max(minimumHeight, (int)Math.Round(width / _windowAspectRatio));
+                if (height == minimumHeight)
+                {
+                    width = Math.Max(minimumWidth, (int)Math.Round(height * _windowAspectRatio));
+                }
+
+                SetHorizontalFromSizingEdge(ref rect, width, edge);
+                SetVerticalFromSizingEdge(ref rect, height, edge);
+                break;
+        }
+
+        Marshal.StructureToPtr(rect, lParam, true);
+    }
+
+    private static void SetHorizontalFromCenter(ref RECT rect, int width)
+    {
+        var center = rect.Left + ((rect.Right - rect.Left) / 2);
+        rect.Left = center - (width / 2);
+        rect.Right = rect.Left + width;
+    }
+
+    private static void SetVerticalFromCenter(ref RECT rect, int height)
+    {
+        var center = rect.Top + ((rect.Bottom - rect.Top) / 2);
+        rect.Top = center - (height / 2);
+        rect.Bottom = rect.Top + height;
+    }
+
+    private static void SetHorizontalFromSizingEdge(ref RECT rect, int width, int edge)
+    {
+        if (edge is WmszLeft or WmszTopLeft or WmszBottomLeft)
+        {
+            rect.Left = rect.Right - width;
+            return;
+        }
+
+        rect.Right = rect.Left + width;
+    }
+
+    private static void SetVerticalFromSizingEdge(ref RECT rect, int height, int edge)
+    {
+        if (edge is WmszTop or WmszTopLeft or WmszTopRight)
+        {
+            rect.Top = rect.Bottom - height;
+            return;
+        }
+
+        rect.Bottom = rect.Top + height;
     }
 
     private void InstallMouseWheelHook()
@@ -1562,6 +1982,12 @@ public partial class PlayerWindow : Window
     private static extern bool GetCursorPos(out POINT lpPoint);
 
     [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, int flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO monitorInfo);
+
+    [DllImport("user32.dll")]
     private static extern uint GetDoubleClickTime();
 
     [DllImport("user32.dll")]
@@ -1619,6 +2045,32 @@ public partial class PlayerWindow : Window
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct MINMAXINFO
+    {
+        public POINT Reserved;
+
+        public POINT MaxSize;
+
+        public POINT MaxPosition;
+
+        public POINT MinTrackSize;
+
+        public POINT MaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MONITORINFO
+    {
+        public int Size;
+
+        public RECT MonitorArea;
+
+        public RECT WorkArea;
+
+        public int Flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct MSLLHOOKSTRUCT
     {
         public POINT Point;
@@ -1652,6 +2104,28 @@ public partial class PlayerWindow : Window
         }
 
         return null;
+    }
+
+    private static bool IsInteractiveElement(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is ButtonBase
+                or TextBoxBase
+                or PasswordBox
+                or Selector
+                or MenuItem
+                or Thumb
+                or Slider
+                or ScrollBar)
+            {
+                return true;
+            }
+
+            source = VisualTreeHelper.GetParent(source) ?? LogicalTreeHelper.GetParent(source);
+        }
+
+        return false;
     }
 
     private static Thumb? FindThumb(DependencyObject? current)

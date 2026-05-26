@@ -52,6 +52,43 @@
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
 
+    <Style x:Key="PlayerWindowCaptionStyle" TargetType="Border">
+        <Setter Property="Height" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="Background" Value="{DynamicResource BrushPlayerSurface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+
+    <Style x:Key="PlayerWindowCaptionTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="PlayerWindowCaptionButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayerIconButtonStyle}">
+        <Setter Property="Width" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="Height" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="MinWidth" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="MinHeight" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextSecondary}" />
+    </Style>
+
+    <Style x:Key="PlayerWindowCaptionCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayerWindowCaptionButtonStyle}">
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BrushPlayerDanger}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerDanger}" />
+                <Setter Property="Foreground" Value="{DynamicResource BrushPlayerBackground}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Opacity" Value="0.78" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="PlayerMenuStyle" TargetType="ContextMenu">
         <Setter Property="Background" Value="{DynamicResource BrushPlayerMenuBackground}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
