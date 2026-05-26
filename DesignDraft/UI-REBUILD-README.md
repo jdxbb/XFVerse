@@ -71,19 +71,20 @@ Codex 应按以下顺序阅读文档。
 4. `page-spec/user-profile-dialog.md`
 5. `page-spec/scan-task-page.md`
 6. `page-spec/settings-page.md`
-7. `page-spec/media-library-page.md`
-8. `page-spec/media-library-special-items.md`
-9. `page-spec/movie-detail-page.md`
-10. `page-spec/tv-detail-page.md`
-11. `page-spec/episode-detail-page.md`
-12. `page-spec/correction-flow.md`
-13. `page-spec/watch-history-page.md`
-14. `page-spec/favorites-page.md`
-15. `page-spec/movie-discovery-page.md`
-16. `page-spec/recommendation-page.md`
-17. `page-spec/player-page.md`
-18. `page-spec/online-subtitle-search-page.md`
-19. `page-spec/watch-insights-page.md`
+7. `page-spec/cache-management-page.md`
+8. `page-spec/media-library-page.md`
+9. `page-spec/media-library-special-items.md`
+10. `page-spec/movie-detail-page.md`
+11. `page-spec/tv-detail-page.md`
+12. `page-spec/episode-detail-page.md`
+13. `page-spec/correction-flow.md`
+14. `page-spec/watch-history-page.md`
+15. `page-spec/favorites-page.md`
+16. `page-spec/movie-discovery-page.md`
+17. `page-spec/recommendation-page.md`
+18. `page-spec/player-page.md`
+19. `page-spec/online-subtitle-search-page.md`
+20. `page-spec/watch-insights-page.md`
 
 ### 第 3 组：截图辅助
 
@@ -117,6 +118,7 @@ DesignDraft/
 │  ├─ user-profile-dialog.md
 │  ├─ scan-task-page.md
 │  ├─ settings-page.md
+│  ├─ cache-management-page.md
 │  ├─ media-library-page.md
 │  ├─ media-library-special-items.md
 │  ├─ movie-detail-page.md
@@ -159,6 +161,7 @@ DesignDraft/
 - 用户资料弹窗
 - 扫描任务页面
 - 设置页面
+- 软件缓存管理、在线字幕孤立缓存保护与清理确认
 - 媒体库页面
 - 媒体库特殊媒体项、未识别季与人工聚合流程
 - 影片详情页
@@ -225,6 +228,7 @@ Phase 7 正式实施前必须先完成全局 token / 控件基线：
 - 主窗口与播放器的自定义标题栏及窗口按钮
 - 播放器固定深色的 Menu、Popup、Popover、在线字幕搜索 Dialog
 - EmptyState、Loading、Error、Disabled、ConfigMissing
+- 设置页敏感字段输入、缓存卡、扫描日志卡与轻量警示 Popover
 - 深色 / 浅色主题资源
 
 Phase 6 只更新设计文档，不修改 UI 代码或资源字典。

@@ -27,6 +27,7 @@
 - 打开窗口时，如当前正在播放则暂停；关闭窗口后不自动恢复播放。
 - 下载成功后将新字幕加入已绑定在线字幕列表，并自动切换为当前字幕。
 - OpenSubtitles 配置在设置页维护；物理缓存清理在软件缓存管理中执行。
+- 设置页的 OpenSubtitles 凭据遵循敏感字段显示 / 隐藏规则；本窗口不提供凭据编辑。
 - 电影、剧、季、集详情页不新增在线字幕入口。
 - 不设计全库自动下载、OCR、翻译或字幕编辑器。
 
@@ -189,7 +190,7 @@ OnlineSubtitleSearchWindow
 - 字幕菜单入口、四类分类与删除绑定轻量确认：`player-page.md`。
 - 删除绑定 Popover 的统一确认语义：`global-dialogs.md`。
 - 播放器与弹窗深色资源、长字段规则：`DESIGN.md` 与 `codex-ui-rules.md`。
-- OpenSubtitles 配置与缓存管理组件的完整规格在对应设置 / 缓存阶段补齐。
+- OpenSubtitles 配置完整规格见 `settings-page.md`；在线字幕孤立缓存保护和物理清理规格见 `cache-management-page.md`。
 
 ---
 
