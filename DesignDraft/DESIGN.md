@@ -603,6 +603,20 @@ XFVerse 支持浅色 / 深色双主题。
 - 剧、季、集详情均不新增字幕入口，也不新增删除记录或移出媒体库入口
 - 修正入口统一引用弹窗式 `page-spec/correction-flow.md`
 
+### 影片发现与 AI 推荐
+
+影片发现链路：
+
+- 影片发现保留 `影片搜索`、`榜单`、`AI 推荐` 三个 Tab，并使用旧设计标题与副标题
+- Movie 与 TV 共用影片发现页；Movie / TV 仅在搜索和榜单内作为媒介切换，不拆独立 TV Discovery 页面
+- Movie 支持影片 / 人物搜索模式切换；TV 不提供人物搜索
+- 搜索支持真实海报 / 列表切换和布局记忆，作为 Phase 7 目标
+- 榜单按当前功能保留热门、高分、趋势，以及趋势的今日 / 本周，不新增月榜 / 年榜
+- TV 搜索与榜单可以进入 metadata-only 剧详情；metadata 不可用时使用页面内提示
+- 首页 `发现更多影片` 进入影片发现页的 `AI 推荐` Tab
+- AI 推荐只推荐 Movie；TV 不进入电影 AI 推荐、Watch Profile、fingerprint 或 persona
+- 推荐卡片、偏好弹窗和推荐状态矩阵详见 `page-spec/recommendation-page.md`
+
 ### 扫描任务页
 
 扫描任务页：

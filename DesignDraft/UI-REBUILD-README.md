@@ -80,8 +80,9 @@ Codex 应按以下顺序阅读文档。
 13. `page-spec/watch-history-page.md`
 14. `page-spec/favorites-page.md`
 15. `page-spec/movie-discovery-page.md`
-16. `page-spec/player-page.md`
-17. `page-spec/watch-insights-page.md`
+16. `page-spec/recommendation-page.md`
+17. `page-spec/player-page.md`
+18. `page-spec/watch-insights-page.md`
 
 ### 第 3 组：截图辅助
 
@@ -124,6 +125,7 @@ DesignDraft/
 │  ├─ watch-history-page.md
 │  ├─ favorites-page.md
 │  ├─ movie-discovery-page.md
+│  ├─ recommendation-page.md
 │  ├─ player-page.md
 │  └─ watch-insights-page.md
 └─ screenshots/
@@ -164,6 +166,7 @@ DesignDraft/
 - 观影历史页面
 - 收藏夹页面
 - 影片发现页面
+- 影片发现内的 AI 推荐 Tab 与推荐偏好弹窗
 - 播放器
 - 观影洞察页面
 

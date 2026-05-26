@@ -29,6 +29,7 @@
 
 核心边界：
 
+- 影片发现的 TV 搜索卡片和 TV 榜单卡片进入 Series 剧详情页
 - 普通模式中的 Series 先进入剧详情页，再进入季详情页
 - 已识别季和未识别季共用同一套基础详情布局
 - Grouped placeholder 已有详情承载，进入未识别剧详情页后可继续进入未识别季详情页
@@ -41,6 +42,11 @@
 ## 3. 入口与层级
 
 ```text
+MovieDiscovery TV Search / Ranking Card
+└─ SeriesOverviewPage（可为 metadata-only）
+   └─ Season Card
+      └─ TvSeasonDetailPage
+
 Library Series Card
 └─ SeriesOverviewPage
    └─ Season Card
@@ -57,6 +63,7 @@ Grouped Placeholder
 说明：
 
 - 上述 grouped placeholder 链路以用户已验证的现有能力为事实基础
+- Discovery 中的 metadata-only TV 仍可进入剧详情；若 metadata 暂不可用，默认在发现页结果区域显示页面内提示，不使用打断式信息弹窗
 - 如果某个对象无法解析到目标详情而显示提示，该提示只作为 fallback / 异常状态，不改变正常详情入口定义
 
 ---
