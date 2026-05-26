@@ -72,12 +72,13 @@ Codex 应按以下顺序阅读文档。
 5. `page-spec/scan-task-page.md`
 6. `page-spec/settings-page.md`
 7. `page-spec/media-library-page.md`
-8. `page-spec/movie-detail-page.md`
-9. `page-spec/watch-history-page.md`
-10. `page-spec/favorites-page.md`
-11. `page-spec/movie-discovery-page.md`
-12. `page-spec/player-page.md`
-13. `page-spec/watch-insights-page.md`
+8. `page-spec/media-library-special-items.md`
+9. `page-spec/movie-detail-page.md`
+10. `page-spec/watch-history-page.md`
+11. `page-spec/favorites-page.md`
+12. `page-spec/movie-discovery-page.md`
+13. `page-spec/player-page.md`
+14. `page-spec/watch-insights-page.md`
 
 ### 第 3 组：截图辅助
 
@@ -112,6 +113,7 @@ DesignDraft/
 │  ├─ scan-task-page.md
 │  ├─ settings-page.md
 │  ├─ media-library-page.md
+│  ├─ media-library-special-items.md
 │  ├─ movie-detail-page.md
 │  ├─ watch-history-page.md
 │  ├─ favorites-page.md
@@ -148,6 +150,7 @@ DesignDraft/
 - 扫描任务页面
 - 设置页面
 - 媒体库页面
+- 媒体库特殊媒体项、未识别季与人工聚合流程
 - 影片详情页
 - 观影历史页面
 - 收藏夹页面
