@@ -57,8 +57,9 @@ AI 推荐只推荐 Movie。
 - TV 不进入 movie fingerprint
 - TV 不进入 movie persona
 - TV 不作为推荐解释输入候选
+- Episode、Season、Series 也不进入 Movie Watch Insights、Movie Watch Profile、movie fingerprint、movie persona 或 AI 推荐画像
 
-TV 可在影片发现页中进行搜索、查看榜单和进入剧详情，但不因此进入 AI 推荐链路。未来若需要 TV 推荐，必须另开独立阶段定义业务语义和设计规格。
+TV 可在影片发现页中进行搜索、查看榜单和进入剧详情；Episode 可出现在观影历史、Season 可出现在收藏夹，但这些展示与导航能力均不因此进入电影洞察或 AI 推荐链路。未来若需要 TV 推荐，必须另开独立阶段定义业务语义和设计规格。
 
 ---
 
@@ -197,6 +198,7 @@ AI 推荐 Tab
 - 推荐卡片点击进入 `movie-detail-page.md` 定义的电影详情
 - metadata-only Movie 或外部候选可按电影详情承载状态展示，不意味着当前已有播放源
 - TV 详情入口只来自搜索或榜单，由 `tv-detail-page.md` 定义
+- 观影历史中的 Episode 和收藏夹中的 Season 仅按各自详情链路导航，不作为本 Tab 的画像或推荐输入
 
 ---
 

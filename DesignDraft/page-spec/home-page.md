@@ -342,9 +342,9 @@
 
 统计口径：
 
-- 首页片库预览只展示本月统计，不展示全部累计统计
-- 统计口径参考观影统计页已有“全部 / 本月”逻辑
-- 首页只取本月概览
+- 首页片库预览展示全部统计，不限定为本月统计
+- 统计项与观影统计页的“全部”口径保持一致
+- 趋势字段单独按月度变化计算，展示相比上个月的变化
 - 不保留“未看”统计
 
 每个统计卡片包含：
@@ -938,10 +938,10 @@ HomePage
 
 ### 片库预览
 
-- `WatchedThisMonthCount`
-- `FavoriteThisMonthCount`
-- `WantToWatchThisMonthCount`
-- `NotInterestedThisMonthCount`
+- `WatchedCount`
+- `FavoriteCount`
+- `WantToWatchCount`
+- `NotInterestedCount`
 - `WatchedPreviousMonthDelta`
 - `FavoritePreviousMonthDelta`
 - `WantToWatchPreviousMonthDelta`
@@ -949,7 +949,7 @@ HomePage
 
 说明：
 
-- 首页片库预览使用本月统计
+- 首页片库预览使用全部统计
 - 趋势对比上个月
 - 不保留“未看”统计字段
 
@@ -1040,7 +1040,7 @@ Codex 实现时必须遵守：
 - 窗口变小时允许整体缩放或压缩间距
 - 导航栏需要支持展开 / 收起
 - 展开导航栏状态下首页保留旧设计欢迎语，不用全局壳层 title / subtitle 替代
-- 片库预览只展示本月统计
+- 片库预览只展示全部统计
 - 片库预览趋势对比上个月，不再写“较上周”
 - 片库预览不保留“未看”统计
 - 收起导航栏后切换按钮移动到首页左上区域
@@ -1109,7 +1109,7 @@ Codex 实现时必须遵守：
 - 显示主题切换按钮
 - 显示片库预览区域
 - 片库预览包含已看、喜爱、想看、不想看
-- 片库预览统计为本月统计
+- 片库预览统计为全部统计
 - 片库预览趋势为相比上个月
 - 片库预览不显示“未看”
 - 片库预览统计卡不可点击

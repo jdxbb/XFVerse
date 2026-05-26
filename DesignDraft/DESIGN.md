@@ -100,6 +100,7 @@ Phase 7 正式实施 UI 重构前，第一批工作必须先完成全局 token /
 - 圆角和间距：窗口、卡片、按钮、输入框、菜单、Popup、Dialog
 - 按钮等级：主按钮、次按钮、图标按钮、危险按钮、disabled 按钮
 - 公共组件：卡片、导航项、Popup、Dialog、EmptyState、Loading、Error、Disabled、ConfigMissing
+- 数据组件：统计卡、图表、日历热力图、图表 Empty / Loading / Error / DataInsufficient 状态
 - 窗口框架：主窗口与播放器的自定义标题栏、拖动区域、最小化、最大化 / 还原、关闭按钮
 - 播放器浮层：固定深色的 Menu、Popup、轻量确认 Popover、在线字幕搜索 Dialog
 - 深色 / 浅色主题下的对应资源
@@ -565,6 +566,16 @@ XFVerse 支持浅色 / 深色双主题。
 - 标签组合
 - 清晰图表
 
+最终统计与边界规则：
+
+- 洞察总览统计卡为 `已看`、`喜爱`、`想看`、`不想看` 四项，不包含“未看”卡。
+- 观影统计支持 `全部` / `本月` 切换，趋势文案统一为“相比上个月”。
+- 首页片库预览展示全部统计，首页趋势同样使用“相比上个月”，不得继续使用“本月统计”或“较上周”作为最终口径。
+- 日历日期可跳转观影历史，应用指定日期筛选、滚动定位并短暂高亮目标分组。
+- 图表、统计卡和画像区域需要覆盖 loading、empty、error、data insufficient、AI config missing、生成失败与缓存结果回退状态。
+- Watch Insights、Watch Profile、fingerprint、persona 和 AI 推荐画像只使用 Movie；Episode 历史与 Season 收藏可以展示和导航，但不进入电影洞察或画像。
+- Movie-only 边界只作为产品与实现规则维护，不在页面中额外显示“TV 已排除”提示。
+
 用户画像关键词：
 
 - AI 总结
@@ -625,6 +636,7 @@ XFVerse 支持浅色 / 深色双主题。
 - TV 搜索与榜单可以进入 metadata-only 剧详情；metadata 不可用时使用页面内提示
 - 首页 `发现更多影片` 进入影片发现页的 `AI 推荐` Tab
 - AI 推荐只推荐 Movie；TV 不进入电影 AI 推荐、Watch Profile、fingerprint 或 persona
+- Episode、Season、Series 也不进入 Movie Watch Insights、Watch Profile、fingerprint、persona 或 AI 推荐画像
 - 推荐卡片、偏好弹窗和推荐状态矩阵详见 `page-spec/recommendation-page.md`
 
 ### 扫描任务页
@@ -734,6 +746,7 @@ XFVerse 支持浅色 / 深色双主题。
 - TMDB / IMDb 评分卡
 - 扫描日志列表项
 - 观影日历热力图
+- 统计卡、图表与日历状态基线
 - 偏好图谱气泡图
 - 标签偏好榜
 - 观影节奏图表
