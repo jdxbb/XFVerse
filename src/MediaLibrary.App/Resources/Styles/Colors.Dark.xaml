@@ -7,18 +7,84 @@
     <Color x:Key="ColorSurface">#192231</Color>
     <Color x:Key="ColorSurfaceAlt">#223047</Color>
     <Color x:Key="ColorSurfaceRaised">#202B3D</Color>
+    <Color x:Key="ColorSurfaceElevated">#202B3D</Color>
+    <Color x:Key="ColorCard">#192231</Color>
+    <Color x:Key="ColorCompactCard">#202B3D</Color>
     <Color x:Key="ColorBorder">#334156</Color>
+    <Color x:Key="ColorDivider">#2A3648</Color>
     <Color x:Key="ColorAccent">#72D2C5</Color>
+    <Color x:Key="ColorAccentHover">#88DDD3</Color>
+    <Color x:Key="ColorAccentPressed">#54B8AD</Color>
     <Color x:Key="ColorAccentSoft">#254C50</Color>
     <Color x:Key="ColorSuccess">#58C78A</Color>
+    <Color x:Key="ColorSuccessHover">#6AD79A</Color>
+    <Color x:Key="ColorSuccessPressed">#3FAE73</Color>
     <Color x:Key="ColorWarning">#E6B75F</Color>
+    <Color x:Key="ColorWarningHover">#F0C878</Color>
+    <Color x:Key="ColorWarningPressed">#C99A42</Color>
     <Color x:Key="ColorDanger">#EF7B7B</Color>
+    <Color x:Key="ColorDangerHover">#F58D8D</Color>
+    <Color x:Key="ColorDangerPressed">#D76565</Color>
+    <Color x:Key="ColorInfo">#7CB7FF</Color>
+    <Color x:Key="ColorInfoHover">#99C8FF</Color>
+    <Color x:Key="ColorInfoPressed">#5C9BE5</Color>
     <Color x:Key="ColorForegroundPrimary">#F5F7FB</Color>
     <Color x:Key="ColorForegroundSecondary">#C1CBDA</Color>
     <Color x:Key="ColorForegroundMuted">#8996A9</Color>
+    <Color x:Key="ColorTextPrimary">#F5F7FB</Color>
+    <Color x:Key="ColorTextSecondary">#C1CBDA</Color>
+    <Color x:Key="ColorTextMuted">#8996A9</Color>
+    <Color x:Key="ColorTextDisabled">#667386</Color>
     <Color x:Key="ColorOnAccent">#102028</Color>
     <Color x:Key="ColorSidebarForeground">#F5F7FB</Color>
     <Color x:Key="ColorSidebarMuted">#8D99AA</Color>
+    <Color x:Key="ColorDisabledBackground">#1D2635</Color>
+    <Color x:Key="ColorDisabledBorder">#2A3648</Color>
+    <Color x:Key="ColorDisabledForeground">#667386</Color>
+    <Color x:Key="ColorOverlay">#CC05070A</Color>
+    <Color x:Key="ColorScrim">#B305070A</Color>
+    <Color x:Key="ColorFocusRing">#8872D2C5</Color>
+    <Color x:Key="ColorSelection">#3372D2C5</Color>
+    <Color x:Key="ColorHoverBackground">#223047</Color>
+    <Color x:Key="ColorPressedBackground">#2A394F</Color>
+    <Color x:Key="ColorInputBackground">#111827</Color>
+    <Color x:Key="ColorInputBorder">#334156</Color>
+    <Color x:Key="ColorInputFocusBorder">#72D2C5</Color>
+    <Color x:Key="ColorPopupBackground">#202B3D</Color>
+    <Color x:Key="ColorTooltipBackground">#0B1018</Color>
+    <Color x:Key="ColorTooltipForeground">#F5F7FB</Color>
+    <Color x:Key="ColorDialogBackground">#192231</Color>
+    <Color x:Key="ColorMenuBackground">#202B3D</Color>
+
+    <Color x:Key="ColorLoadingForeground">#72D2C5</Color>
+    <Color x:Key="ColorEmptyForeground">#8996A9</Color>
+    <Color x:Key="ColorErrorForeground">#F58D8D</Color>
+    <Color x:Key="ColorErrorBackground">#3A1E27</Color>
+    <Color x:Key="ColorErrorBorder">#7A3B47</Color>
+    <Color x:Key="ColorWarningForeground">#F0C878</Color>
+    <Color x:Key="ColorWarningBackground">#3B2E18</Color>
+    <Color x:Key="ColorWarningBorder">#766033</Color>
+    <Color x:Key="ColorSuccessForeground">#6AD79A</Color>
+    <Color x:Key="ColorSuccessBackground">#173427</Color>
+    <Color x:Key="ColorSuccessBorder">#35694D</Color>
+    <Color x:Key="ColorInfoForeground">#99C8FF</Color>
+    <Color x:Key="ColorInfoBackground">#172B43</Color>
+    <Color x:Key="ColorInfoBorder">#375B84</Color>
+    <Color x:Key="ColorConfigMissingForeground">#F0C878</Color>
+    <Color x:Key="ColorConfigMissingBackground">#3B2E18</Color>
+    <Color x:Key="ColorConfigMissingBorder">#766033</Color>
+    <Color x:Key="ColorNoSourceForeground">#D9C08A</Color>
+    <Color x:Key="ColorNoSourceBackground">#332B1D</Color>
+    <Color x:Key="ColorNoSourceBorder">#6C5A39</Color>
+    <Color x:Key="ColorDataInsufficientForeground">#C9BFE2</Color>
+    <Color x:Key="ColorDataInsufficientBackground">#29263A</Color>
+    <Color x:Key="ColorDataInsufficientBorder">#5B5377</Color>
+    <Color x:Key="ColorCacheProtectedForeground">#8BD4DD</Color>
+    <Color x:Key="ColorCacheProtectedBackground">#173238</Color>
+    <Color x:Key="ColorCacheProtectedBorder">#376871</Color>
+    <Color x:Key="ColorScanRunningForeground">#99C8FF</Color>
+    <Color x:Key="ColorScanRunningBackground">#172B43</Color>
+    <Color x:Key="ColorScanRunningBorder">#375B84</Color>
 
     <SolidColorBrush x:Key="BrushBackground" Color="{StaticResource ColorBackground}" />
     <SolidColorBrush x:Key="BrushBackgroundAccent" Color="{StaticResource ColorBackgroundAccent}" />
@@ -27,18 +93,84 @@
     <SolidColorBrush x:Key="BrushSurface" Color="{StaticResource ColorSurface}" />
     <SolidColorBrush x:Key="BrushSurfaceAlt" Color="{StaticResource ColorSurfaceAlt}" />
     <SolidColorBrush x:Key="BrushSurfaceRaised" Color="{StaticResource ColorSurfaceRaised}" />
+    <SolidColorBrush x:Key="BrushSurfaceElevated" Color="{StaticResource ColorSurfaceElevated}" />
+    <SolidColorBrush x:Key="BrushCard" Color="{StaticResource ColorCard}" />
+    <SolidColorBrush x:Key="BrushCompactCard" Color="{StaticResource ColorCompactCard}" />
     <SolidColorBrush x:Key="BrushBorder" Color="{StaticResource ColorBorder}" />
+    <SolidColorBrush x:Key="BrushDivider" Color="{StaticResource ColorDivider}" />
     <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
+    <SolidColorBrush x:Key="BrushAccentHover" Color="{StaticResource ColorAccentHover}" />
+    <SolidColorBrush x:Key="BrushAccentPressed" Color="{StaticResource ColorAccentPressed}" />
     <SolidColorBrush x:Key="BrushAccentSoft" Color="{StaticResource ColorAccentSoft}" />
     <SolidColorBrush x:Key="BrushSuccess" Color="{StaticResource ColorSuccess}" />
+    <SolidColorBrush x:Key="BrushSuccessHover" Color="{StaticResource ColorSuccessHover}" />
+    <SolidColorBrush x:Key="BrushSuccessPressed" Color="{StaticResource ColorSuccessPressed}" />
     <SolidColorBrush x:Key="BrushWarning" Color="{StaticResource ColorWarning}" />
+    <SolidColorBrush x:Key="BrushWarningHover" Color="{StaticResource ColorWarningHover}" />
+    <SolidColorBrush x:Key="BrushWarningPressed" Color="{StaticResource ColorWarningPressed}" />
     <SolidColorBrush x:Key="BrushDanger" Color="{StaticResource ColorDanger}" />
+    <SolidColorBrush x:Key="BrushDangerHover" Color="{StaticResource ColorDangerHover}" />
+    <SolidColorBrush x:Key="BrushDangerPressed" Color="{StaticResource ColorDangerPressed}" />
+    <SolidColorBrush x:Key="BrushInfo" Color="{StaticResource ColorInfo}" />
+    <SolidColorBrush x:Key="BrushInfoHover" Color="{StaticResource ColorInfoHover}" />
+    <SolidColorBrush x:Key="BrushInfoPressed" Color="{StaticResource ColorInfoPressed}" />
     <SolidColorBrush x:Key="BrushForegroundPrimary" Color="{StaticResource ColorForegroundPrimary}" />
     <SolidColorBrush x:Key="BrushForegroundSecondary" Color="{StaticResource ColorForegroundSecondary}" />
     <SolidColorBrush x:Key="BrushForegroundMuted" Color="{StaticResource ColorForegroundMuted}" />
+    <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}" />
+    <SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}" />
+    <SolidColorBrush x:Key="BrushTextMuted" Color="{StaticResource ColorTextMuted}" />
+    <SolidColorBrush x:Key="BrushTextDisabled" Color="{StaticResource ColorTextDisabled}" />
     <SolidColorBrush x:Key="BrushOnAccent" Color="{StaticResource ColorOnAccent}" />
     <SolidColorBrush x:Key="BrushSidebarForeground" Color="{StaticResource ColorSidebarForeground}" />
     <SolidColorBrush x:Key="BrushSidebarMuted" Color="{StaticResource ColorSidebarMuted}" />
+    <SolidColorBrush x:Key="BrushDisabledBackground" Color="{StaticResource ColorDisabledBackground}" />
+    <SolidColorBrush x:Key="BrushDisabledBorder" Color="{StaticResource ColorDisabledBorder}" />
+    <SolidColorBrush x:Key="BrushDisabledForeground" Color="{StaticResource ColorDisabledForeground}" />
+    <SolidColorBrush x:Key="BrushOverlay" Color="{StaticResource ColorOverlay}" />
+    <SolidColorBrush x:Key="BrushScrim" Color="{StaticResource ColorScrim}" />
+    <SolidColorBrush x:Key="BrushFocusRing" Color="{StaticResource ColorFocusRing}" />
+    <SolidColorBrush x:Key="BrushSelection" Color="{StaticResource ColorSelection}" />
+    <SolidColorBrush x:Key="BrushHoverBackground" Color="{StaticResource ColorHoverBackground}" />
+    <SolidColorBrush x:Key="BrushPressedBackground" Color="{StaticResource ColorPressedBackground}" />
+    <SolidColorBrush x:Key="BrushInputBackground" Color="{StaticResource ColorInputBackground}" />
+    <SolidColorBrush x:Key="BrushInputBorder" Color="{StaticResource ColorInputBorder}" />
+    <SolidColorBrush x:Key="BrushInputFocusBorder" Color="{StaticResource ColorInputFocusBorder}" />
+    <SolidColorBrush x:Key="BrushPopupBackground" Color="{StaticResource ColorPopupBackground}" />
+    <SolidColorBrush x:Key="BrushTooltipBackground" Color="{StaticResource ColorTooltipBackground}" />
+    <SolidColorBrush x:Key="BrushTooltipForeground" Color="{StaticResource ColorTooltipForeground}" />
+    <SolidColorBrush x:Key="BrushDialogBackground" Color="{StaticResource ColorDialogBackground}" />
+    <SolidColorBrush x:Key="BrushMenuBackground" Color="{StaticResource ColorMenuBackground}" />
+
+    <SolidColorBrush x:Key="BrushLoadingForeground" Color="{StaticResource ColorLoadingForeground}" />
+    <SolidColorBrush x:Key="BrushEmptyForeground" Color="{StaticResource ColorEmptyForeground}" />
+    <SolidColorBrush x:Key="BrushErrorForeground" Color="{StaticResource ColorErrorForeground}" />
+    <SolidColorBrush x:Key="BrushErrorBackground" Color="{StaticResource ColorErrorBackground}" />
+    <SolidColorBrush x:Key="BrushErrorBorder" Color="{StaticResource ColorErrorBorder}" />
+    <SolidColorBrush x:Key="BrushWarningForeground" Color="{StaticResource ColorWarningForeground}" />
+    <SolidColorBrush x:Key="BrushWarningBackground" Color="{StaticResource ColorWarningBackground}" />
+    <SolidColorBrush x:Key="BrushWarningBorder" Color="{StaticResource ColorWarningBorder}" />
+    <SolidColorBrush x:Key="BrushSuccessForeground" Color="{StaticResource ColorSuccessForeground}" />
+    <SolidColorBrush x:Key="BrushSuccessBackground" Color="{StaticResource ColorSuccessBackground}" />
+    <SolidColorBrush x:Key="BrushSuccessBorder" Color="{StaticResource ColorSuccessBorder}" />
+    <SolidColorBrush x:Key="BrushInfoForeground" Color="{StaticResource ColorInfoForeground}" />
+    <SolidColorBrush x:Key="BrushInfoBackground" Color="{StaticResource ColorInfoBackground}" />
+    <SolidColorBrush x:Key="BrushInfoBorder" Color="{StaticResource ColorInfoBorder}" />
+    <SolidColorBrush x:Key="BrushConfigMissingForeground" Color="{StaticResource ColorConfigMissingForeground}" />
+    <SolidColorBrush x:Key="BrushConfigMissingBackground" Color="{StaticResource ColorConfigMissingBackground}" />
+    <SolidColorBrush x:Key="BrushConfigMissingBorder" Color="{StaticResource ColorConfigMissingBorder}" />
+    <SolidColorBrush x:Key="BrushNoSourceForeground" Color="{StaticResource ColorNoSourceForeground}" />
+    <SolidColorBrush x:Key="BrushNoSourceBackground" Color="{StaticResource ColorNoSourceBackground}" />
+    <SolidColorBrush x:Key="BrushNoSourceBorder" Color="{StaticResource ColorNoSourceBorder}" />
+    <SolidColorBrush x:Key="BrushDataInsufficientForeground" Color="{StaticResource ColorDataInsufficientForeground}" />
+    <SolidColorBrush x:Key="BrushDataInsufficientBackground" Color="{StaticResource ColorDataInsufficientBackground}" />
+    <SolidColorBrush x:Key="BrushDataInsufficientBorder" Color="{StaticResource ColorDataInsufficientBorder}" />
+    <SolidColorBrush x:Key="BrushCacheProtectedForeground" Color="{StaticResource ColorCacheProtectedForeground}" />
+    <SolidColorBrush x:Key="BrushCacheProtectedBackground" Color="{StaticResource ColorCacheProtectedBackground}" />
+    <SolidColorBrush x:Key="BrushCacheProtectedBorder" Color="{StaticResource ColorCacheProtectedBorder}" />
+    <SolidColorBrush x:Key="BrushScanRunningForeground" Color="{StaticResource ColorScanRunningForeground}" />
+    <SolidColorBrush x:Key="BrushScanRunningBackground" Color="{StaticResource ColorScanRunningBackground}" />
+    <SolidColorBrush x:Key="BrushScanRunningBorder" Color="{StaticResource ColorScanRunningBorder}" />
 
     <LinearGradientBrush x:Key="BrushHeroGradient" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#1A2435" Offset="0" />

@@ -8,8 +8,21 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Styles/Colors.Light.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Tokens.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Player.Dark.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Theme.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Controls.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Cards.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Buttons.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Inputs.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Navigation.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Badges.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Text.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Menus.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Dialogs.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Status.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Progress.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Player.Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <DataTemplate DataType="{x:Type viewModels:HomeViewModel}">

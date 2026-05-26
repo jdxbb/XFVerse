@@ -3,27 +3,27 @@
     <Style TargetType="Window">
         <Setter Property="Background" Value="{DynamicResource BrushBackground}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
-        <Setter Property="FontFamily" Value="Microsoft YaHei UI" />
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
     </Style>
 
     <Style x:Key="PageCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource BrushSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="22" />
-        <Setter Property="Padding" Value="22" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusCard}" />
+        <Setter Property="Padding" Value="{StaticResource CardPadding}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
     </Style>
 
     <Style x:Key="CompactCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
-        <Setter Property="CornerRadius" Value="18" />
-        <Setter Property="Padding" Value="16" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}" />
     </Style>
 
     <Style x:Key="HeroCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushHeroGradient}" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="28" />
+        <Setter Property="Padding" Value="{StaticResource HeroCardPadding}" />
     </Style>
 
     <Style x:Key="SidebarBorderStyle" TargetType="Border">
@@ -39,66 +39,66 @@
 
     <Style x:Key="SidebarFooterCardStyle" TargetType="Border">
         <Setter Property="Background" Value="#223047" />
-        <Setter Property="CornerRadius" Value="18" />
-        <Setter Property="Padding" Value="16" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}" />
     </Style>
 
     <Style x:Key="SearchBoxBorderStyle" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="14" />
-        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusInput}" />
+        <Setter Property="Padding" Value="{StaticResource InputPadding}" />
     </Style>
 
     <Style x:Key="PageTitleTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="30" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizePageTitle}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
     </Style>
 
     <Style x:Key="SidebarBrandTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="25" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBrandTitle}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource BrushSidebarForeground}" />
     </Style>
 
     <Style x:Key="SidebarHintTextStyle" TargetType="TextBlock">
         <Setter Property="Margin" Value="0,8,0,0" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushSidebarMuted}" />
     </Style>
 
     <Style x:Key="CardTitleTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCardTitle}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
     </Style>
 
     <Style x:Key="SectionTitleTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSectionTitle}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
     </Style>
 
     <Style x:Key="MetricTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="34" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeMetric}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
     </Style>
 
     <Style x:Key="BodyTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
     </Style>
 
     <Style x:Key="BodyMutedTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeMetadata}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
     </Style>
 
     <Style x:Key="NavigationItemTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeNavigation}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" />
     </Style>

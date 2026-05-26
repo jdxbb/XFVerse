@@ -1,0 +1,93 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <FontFamily x:Key="FontFamilyBase">Microsoft YaHei UI</FontFamily>
+    <FontFamily x:Key="FontFamilyMono">Consolas</FontFamily>
+
+    <sys:Double x:Key="FontSizePageTitle">30</sys:Double>
+    <sys:Double x:Key="FontSizeBrandTitle">25</sys:Double>
+    <sys:Double x:Key="FontSizeSectionTitle">16</sys:Double>
+    <sys:Double x:Key="FontSizeCardTitle">20</sys:Double>
+    <sys:Double x:Key="FontSizeBody">14</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">12</sys:Double>
+    <sys:Double x:Key="FontSizeMetadata">13</sys:Double>
+    <sys:Double x:Key="FontSizeButton">14</sys:Double>
+    <sys:Double x:Key="FontSizeTag">12</sys:Double>
+    <sys:Double x:Key="FontSizeNavigation">15</sys:Double>
+    <sys:Double x:Key="FontSizeMetric">34</sys:Double>
+
+    <sys:Double x:Key="LineHeightPageTitle">38</sys:Double>
+    <sys:Double x:Key="LineHeightSectionTitle">24</sys:Double>
+    <sys:Double x:Key="LineHeightBody">22</sys:Double>
+    <sys:Double x:Key="LineHeightCaption">18</sys:Double>
+    <sys:Double x:Key="LineHeightMetadata">20</sys:Double>
+    <sys:Double x:Key="LineHeightButton">20</sys:Double>
+
+    <CornerRadius x:Key="RadiusWindow">20</CornerRadius>
+    <CornerRadius x:Key="RadiusCard">22</CornerRadius>
+    <CornerRadius x:Key="RadiusCompactCard">18</CornerRadius>
+    <CornerRadius x:Key="RadiusInput">14</CornerRadius>
+    <CornerRadius x:Key="RadiusButton">14</CornerRadius>
+    <CornerRadius x:Key="RadiusIconButton">12</CornerRadius>
+    <CornerRadius x:Key="RadiusPopup">16</CornerRadius>
+    <CornerRadius x:Key="RadiusDialog">18</CornerRadius>
+    <CornerRadius x:Key="RadiusTag">999</CornerRadius>
+    <CornerRadius x:Key="RadiusPill">999</CornerRadius>
+    <CornerRadius x:Key="RadiusAvatar">999</CornerRadius>
+
+    <Thickness x:Key="PagePadding">28</Thickness>
+    <Thickness x:Key="PageSectionGap">0,0,0,24</Thickness>
+    <Thickness x:Key="CardPadding">22</Thickness>
+    <Thickness x:Key="CompactCardPadding">16</Thickness>
+    <Thickness x:Key="HeroCardPadding">28</Thickness>
+    <Thickness x:Key="SectionGap">0,18,0,0</Thickness>
+    <Thickness x:Key="InlineGap">8,0,0,0</Thickness>
+    <Thickness x:Key="ControlGap">10,0,0,0</Thickness>
+    <Thickness x:Key="ButtonPadding">18,10</Thickness>
+    <Thickness x:Key="InputPadding">12,10</Thickness>
+    <Thickness x:Key="ToolbarGap">10,0,0,0</Thickness>
+    <Thickness x:Key="ListItemGap">0,0,0,10</Thickness>
+    <Thickness x:Key="DialogPadding">24</Thickness>
+    <Thickness x:Key="PopupPadding">16</Thickness>
+
+    <sys:Double x:Key="ButtonHorizontalPadding">18</sys:Double>
+    <sys:Double x:Key="ButtonVerticalPadding">10</sys:Double>
+    <sys:Double x:Key="IconButtonSize">42</sys:Double>
+    <sys:Double x:Key="SmallIconButtonSize">34</sys:Double>
+    <sys:Double x:Key="WindowCaptionHeight">44</sys:Double>
+    <sys:Double x:Key="NavigationWidthExpanded">248</sys:Double>
+    <sys:Double x:Key="NavigationWidthCollapsed">64</sys:Double>
+    <sys:Double x:Key="ToolbarHeight">48</sys:Double>
+    <sys:Double x:Key="InputHeight">40</sys:Double>
+    <sys:Double x:Key="ButtonHeight">40</sys:Double>
+    <sys:Double x:Key="SmallButtonHeight">34</sys:Double>
+    <sys:Double x:Key="TagHeight">26</sys:Double>
+    <sys:Double x:Key="AvatarSize">38</sys:Double>
+    <sys:Double x:Key="PosterCardWidth">230</sys:Double>
+    <sys:Double x:Key="PosterCardHeight">300</sys:Double>
+
+    <DropShadowEffect x:Key="ShadowCard"
+                      BlurRadius="16"
+                      Direction="270"
+                      Opacity="0.12"
+                      ShadowDepth="4"
+                      Color="#000000" />
+    <DropShadowEffect x:Key="ShadowPopup"
+                      BlurRadius="22"
+                      Direction="270"
+                      Opacity="0.18"
+                      ShadowDepth="8"
+                      Color="#000000" />
+    <DropShadowEffect x:Key="ShadowDialog"
+                      BlurRadius="28"
+                      Direction="270"
+                      Opacity="0.20"
+                      ShadowDepth="10"
+                      Color="#000000" />
+    <DropShadowEffect x:Key="ShadowWindow"
+                      BlurRadius="34"
+                      Direction="270"
+                      Opacity="0.22"
+                      ShadowDepth="12"
+                      Color="#000000" />
+</ResourceDictionary>
