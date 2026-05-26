@@ -19,6 +19,10 @@
 
 - `media-library-page.md`
 - `global-dialogs.md`
+- `movie-detail-page.md`
+- `tv-detail-page.md`
+- `episode-detail-page.md`
+- `correction-flow.md`
 
 ---
 
@@ -54,15 +58,15 @@
 | Unknown Movie | 已形成电影占位但未识别完成的项目 | 单片待补 metadata 或待修正项目 | 未识别电影详情页 / 电影详情占位态 |
 | Orphan | 有媒体文件但尚未稳定归属 Movie 或 Season | 待确认归属的媒体文件项 | Orphan / 未识别媒体详情页 |
 | Failed Placeholder | 识别失败后保留的占位项目 | 显示失败和继续处理入口的承载项 | 对应电影或季详情占位态 |
-| Grouped Placeholder | 多个疑似同剧集文件的分组候选 | 尚未成为正式 Season 的集合项 | 未识别季详情页 |
+| Grouped Placeholder | 多个疑似同剧集文件的分组候选 | 尚未成为正式 Season 的集合项 | 未识别剧详情页，再进入未识别季详情页 |
 | Unknown Season | 已形成季结构但尚未识别到正式剧集 metadata | 可播放或可修正的电视剧季 | 未识别季详情页 |
 | Other | 无法归入当前 Movie / TV 展示模型的项目 | 其它待处理内容集合 | 对应 Other 详情页 |
 
 说明：
 
-- Grouped placeholder 不设计为“无详情”项目
-- 如果当前实现尚未能为某类项目打开详情，Phase 7 需要补齐入口和对应占位详情态
-- 详情页是否最终复用 Movie / Season 页面结构，由详情链路审计阶段确定
+- Grouped placeholder 不设计为“无详情”项目；用户已验证其可以进入未识别剧详情页，并继续进入未识别季详情页
+- 个别无法定位详情对象或仅显示提示的 fallback 分支，只作为边界状态记录，不代表 grouped placeholder 的默认详情能力
+- 未识别电影使用电影详情占位态；未识别剧和未识别季使用 `tv-detail-page.md` 的共用基础布局；单集详情使用 `episode-detail-page.md`
 
 ---
 
@@ -124,7 +128,7 @@
 | Unknown Movie | 文件名或推测标题、占位海报、来源摘要 | 来源类型、文件摘要、年份候选（如有） | 未识别电影 / 待修正 / 无播放源 | 未识别电影详情 |
 | Orphan | 文件名、占位海报、来源摘要 | 文件来源、可播放源情况 | 未识别 / 待修正 | Orphan 详情 |
 | Failed Placeholder | 标题或文件摘要、占位海报、来源 | 失败状态说明 | 识别失败 / 待修正 | 对应占位详情 |
-| Grouped Placeholder | 分组名或剧名候选、季号（如有）、文件数 | 集号覆盖范围、来源数量 | 未识别季 / 待修正 / 无播放源 | 未识别季详情 |
+| Grouped Placeholder | 分组名或剧名候选、季号（如有）、文件数 | 集号覆盖范围、来源数量 | 未识别季 / 待修正 / 无播放源 | 未识别剧详情，再进入未识别季详情 |
 | Unknown Season | 剧名、季号、季名、集数、来源状态 | 已看集数、来源数量 | 未识别季 / 待修正 | 未识别季详情 |
 | Other | 标题 / 摘要、占位海报、来源 | 当前可解释的类型原因 | 其他 / placeholder / 无播放源 | Other 详情 |
 
@@ -149,6 +153,12 @@
 - 提供该类型适用的修正入口
 - 在没有播放源时呈现无播放源状态
 - 在资料不完整时呈现占位 / 待修正状态
+
+已确认的特殊入口关系：
+
+- Grouped placeholder 已有详情承载，进入未识别剧详情页后可继续进入未识别季详情页
+- 未识别季与已识别季复用基础布局，差异区域由 `tv-detail-page.md` 定义
+- 修正从详情页打开 `correction-flow.md` 定义的统一弹窗，不使用普通卡片主入口
 
 ### 不放在卡片上的动作
 
@@ -297,7 +307,7 @@ ManualUnknownSeasonAggregationDialog
 
 ## 11. Phase 7 实施注意事项
 
-- 补齐 grouped placeholder 等当前缺少的详情入口
+- 保持并设计化 grouped placeholder 已有的未识别剧 / 未识别季详情链路；只将 fallback 提示状态纳入边界处理
 - 详情页承载修正动作，媒体库卡片不承载修正主入口
 - 人工聚合只通过批量模式打开
 - 特殊项的卡片和列表项沿用媒体库统一样式，不另造视觉体系
@@ -310,6 +320,8 @@ ManualUnknownSeasonAggregationDialog
 - Unknown Movie、Orphan、Failed Placeholder、Grouped Placeholder、Unknown Season 和 Other 均有设计规格
 - 所有特殊项目在普通模式下均可进入对应详情
 - Grouped Placeholder 不被设计为无详情状态
+- Grouped Placeholder 的默认入口按已确认能力进入未识别剧详情并可继续进入未识别季详情
+- fallback 提示仅作为异常或边界状态，不覆盖正常详情链路
 - 卡片不存在修正或人工聚合主入口
 - 修正入口明确归属详情页
 - 人工聚合明确归属批量模式

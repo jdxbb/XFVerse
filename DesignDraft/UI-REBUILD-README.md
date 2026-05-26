@@ -74,11 +74,14 @@ Codex 应按以下顺序阅读文档。
 7. `page-spec/media-library-page.md`
 8. `page-spec/media-library-special-items.md`
 9. `page-spec/movie-detail-page.md`
-10. `page-spec/watch-history-page.md`
-11. `page-spec/favorites-page.md`
-12. `page-spec/movie-discovery-page.md`
-13. `page-spec/player-page.md`
-14. `page-spec/watch-insights-page.md`
+10. `page-spec/tv-detail-page.md`
+11. `page-spec/episode-detail-page.md`
+12. `page-spec/correction-flow.md`
+13. `page-spec/watch-history-page.md`
+14. `page-spec/favorites-page.md`
+15. `page-spec/movie-discovery-page.md`
+16. `page-spec/player-page.md`
+17. `page-spec/watch-insights-page.md`
 
 ### 第 3 组：截图辅助
 
@@ -115,6 +118,9 @@ DesignDraft/
 │  ├─ media-library-page.md
 │  ├─ media-library-special-items.md
 │  ├─ movie-detail-page.md
+│  ├─ tv-detail-page.md
+│  ├─ episode-detail-page.md
+│  ├─ correction-flow.md
 │  ├─ watch-history-page.md
 │  ├─ favorites-page.md
 │  ├─ movie-discovery-page.md
@@ -152,6 +158,9 @@ DesignDraft/
 - 媒体库页面
 - 媒体库特殊媒体项、未识别季与人工聚合流程
 - 影片详情页
+- 电视剧剧详情页与季详情页
+- 单集详情页
+- 电影 / TV / Unknown 统一修正弹窗
 - 观影历史页面
 - 收藏夹页面
 - 影片发现页面
@@ -221,6 +230,9 @@ Phase 6 只更新设计文档，不修改 UI 代码或资源字典。
 包括但不限于：
 
 - 影片详情页
+- 电视剧剧详情页
+- 电视剧季详情页
+- 单集详情页
 - 播放器
 - 从菜单进入的全屏功能页，如扫描任务、设置等，若设计文档中指定为返回按钮
 
