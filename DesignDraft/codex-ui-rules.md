@@ -135,6 +135,7 @@ Phase 7 前置要求：
 - 播放器控制栏
 - 播放器音量 / 亮度浮层
 - 自定义窗口标题栏与窗口按钮
+- 详情页统一返回图标按钮
 - 播放器播放源 / 字幕 / 音轨菜单
 - 在线字幕搜索深色弹窗
 - 在线字幕删除绑定轻量确认 Popover
@@ -234,6 +235,16 @@ Codex 不得破坏现有业务逻辑。
 - 日历热度颜色、统计卡、图表和数据状态必须资源化；图表需统一 Empty、Loading、Error、DataInsufficient 状态。
 - Watch Insights、Watch Profile、fingerprint、persona 与 AI 推荐画像只使用 Movie；TV、Episode、Season、Series 不进入电影洞察或画像。
 - Movie-only 边界不在最终 UI 中新增排除提示，仅作为设计与实现约束。
+
+### 详情页返回导航规则
+
+- `MovieDetailPage`、`SeriesOverviewPage`、`TvSeasonDetailPage`、`EpisodeDetailPage` 使用同一详情返回图标按钮组件。
+- 按钮固定在详情内容 Hero 左上角，不与壳层侧边栏展开 / 收起控件争夺位置。
+- 统一覆盖图标、尺寸、hover、pressed、focus、disabled 和 Tooltip；默认 Tooltip 为 `返回上一页`。
+- 返回优先恢复真实来源上下文，包括媒体库、影片发现、AI 推荐、首页、观影历史或收藏夹的可保存状态。
+- 来源不可恢复时：Episode 返回 Season，Season 返回 Series，Movie / Series 返回媒体库或已知的影片发现来源；来源不可知时使用媒体库。
+- 未识别、metadata-only、无播放源和 grouped placeholder 详情不能省略返回按钮。
+- 若当前导航服务尚不支持来源状态或返回栈，应在 Phase 7 将其作为导航能力差距处理，不得在 Phase 6 修改实现。
 
 ---
 

@@ -27,9 +27,31 @@
 边界：
 
 - 单集详情来自季详情的 Episode 列表入口
+- 详情链路内修正完成后可以跳转到对应 Episode detail
+- 当前观影历史与首页的 Episode 入口可先进入季详情并定位 Episode；若后续进入单集详情，仍应用本页统一返回规则
 - 修正使用弹窗式统一流程
 - 字幕选择与在线字幕搜索属于播放器，不是单集详情组件
 - 删除记录和移出媒体库仍以媒体库为主，本页不新增这类入口
+
+---
+
+## 2.1 统一返回入口与当前审计事实
+
+Phase 6.0i 审计确认：当前 `EpisodeDetailPage` 在右侧操作区显示文字按钮 `返回季详情`，并通过 `NavigateBackToSeasonCommand` 固定请求当前季详情；该入口不是统一详情返回按钮，也不恢复观影历史等实际来源状态。
+
+Phase 7 目标：
+
+- 单集详情在 Hero 左上角使用与电影、剧、季详情相同的统一返回图标按钮。
+- 当前操作区文字按钮 `返回季详情` 不作为最终主返回入口；层级信息需要保留时使用 Tooltip `返回季详情` 或轻量面包屑。
+- 默认 Tooltip 为 `返回上一页`；fallback 到季详情时可显示 `返回季详情`。
+- 有可靠来源时优先返回来源页面。例如从观影历史进入 Episode 相关详情，应返回历史页并恢复日期筛选 / 定位状态。
+- 无可靠来源时，Episode fallback 返回当前 Season detail。
+- 无播放源、metadata-only、未识别 Episode 与修正完成后进入的单集详情同样显示统一返回按钮。
+
+实现差距：
+
+- 当前导航能力仅能固定返回季详情，不具备通用返回栈或来源状态恢复能力。
+- 本规格定义 Phase 7 目标，不在 Phase 6 修改 `NavigationStateService` 或命令绑定。
 
 ---
 
@@ -37,7 +59,7 @@
 
 ```text
 EpisodeDetailPage
-├─ BackButton
+├─ UnifiedDetailBackButton
 ├─ EpisodeHero
 │  ├─ Still / Poster
 │  ├─ SeriesTitle
@@ -146,6 +168,8 @@ EpisodeDetailPage
 ## 9. 验收标准
 
 - 季详情可进入单集详情页
+- 单集详情 Hero 左上角显示统一返回图标按钮，不以操作区文字按钮作为最终主入口
+- 有可靠来源时返回进入单集详情的来源状态；缺少来源时 fallback 返回季详情
 - 页面展示 Episode 标题信息、still / 海报、简介、状态和播放源
 - 无播放源、无默认源、metadata-only、loading、error、disabled 均有明确设计状态
 - 来源探测和设置默认源为普通操作，来源拆分使用警示确认

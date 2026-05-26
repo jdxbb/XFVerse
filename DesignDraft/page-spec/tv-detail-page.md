@@ -54,6 +54,12 @@ Library Series Card
          └─ Episode Row
             └─ EpisodeDetailPage
 
+Favorites Season Card
+└─ TvSeasonDetailPage
+
+WatchHistory Episode Item / Home Continue Watching Episode
+└─ TvSeasonDetailPage（定位 Episode）
+
 Grouped Placeholder
 └─ 未识别剧详情
    └─ 未识别季详情
@@ -63,8 +69,40 @@ Grouped Placeholder
 说明：
 
 - 上述 grouped placeholder 链路以用户已验证的现有能力为事实基础
+- 收藏夹 Season 当前直接进入季详情；观影历史 Episode 与首页剧集继续观看当前进入季详情并定位 Episode
 - Discovery 中的 metadata-only TV 仍可进入剧详情；若 metadata 暂不可用，默认在发现页结果区域显示页面内提示，不使用打断式信息弹窗
 - 如果某个对象无法解析到目标详情而显示提示，该提示只作为 fallback / 异常状态，不改变正常详情入口定义
+
+---
+
+## 3.1 统一返回入口与当前审计事实
+
+Phase 6.0i 审计事实：
+
+| 页面 | 当前成品返回入口 | 当前行为 |
+|---|---|---|
+| `SeriesOverviewPage` | 无可见返回按钮 | 只能通过其它导航重新离开详情 |
+| `TvSeasonDetailPage` | 操作区文字按钮 `返回剧页` | 调用当前 `_seriesId` 返回剧详情，不处理真实来源页 |
+
+Phase 7 目标：
+
+- `SeriesOverviewPage` 与 `TvSeasonDetailPage` 均显示统一详情返回按钮。
+- 按钮为内容 Hero 左上角的图标按钮，视觉、尺寸、hover、pressed、focus、disabled 与 Tooltip 均引用统一基线。
+- 当前季页的 `返回剧页` 文字按钮不作为最终主入口；由统一图标按钮取代。需要强调层级时，可使用辅助面包屑或 Tooltip，不额外制造第二个主返回按钮。
+- metadata-only、未识别剧、未识别季和 grouped placeholder 的详情承载均显示相同返回按钮。
+
+返回行为优先级：
+
+1. 有可靠上一界面时，返回实际来源并恢复可保存的来源状态，例如媒体库、影片发现、收藏夹或观影历史。
+2. `TvSeasonDetailPage` 无可靠来源时，fallback 返回当前 `SeriesOverviewPage`。
+3. `SeriesOverviewPage` 无可靠来源时，如可判断来自影片发现则返回影片发现，否则 fallback 返回媒体库。
+4. 从观影历史进入 Season 并定位 Episode 的链路，有可靠来源时返回观影历史并保留日期筛选与定位状态。
+5. 从收藏夹进入 Season 的链路，有可靠来源时返回收藏夹并保留当前 Tab。
+
+当前实现差距：
+
+- 当前 `NavigationStateService` 没有来源路由、页面状态快照或通用返回栈；季页仅具备固定返回剧详情能力。
+- 以上“返回真实来源并恢复状态”为 Phase 7 导航能力目标，本阶段不修改实现。
 
 ---
 
@@ -72,7 +110,7 @@ Grouped Placeholder
 
 ```text
 SeriesOverviewPage
-├─ BackButton
+├─ UnifiedDetailBackButton
 ├─ SeriesHero
 │  ├─ Poster
 │  ├─ SeriesTitle / OriginalTitle
@@ -118,7 +156,7 @@ SeriesOverviewPage
 
 ```text
 TvSeasonDetailPage
-├─ BackButton
+├─ UnifiedDetailBackButton
 ├─ SeasonHero
 │  ├─ Poster
 │  ├─ SeriesTitle
@@ -206,6 +244,9 @@ TvSeasonDetailPage
 ## 11. 验收标准
 
 - Series 从媒体库进入剧详情，并可从季列表进入季详情
+- 剧详情与季详情均在 Hero 左上角显示统一返回图标按钮
+- 季详情不再以操作区文字按钮 `返回剧页` 作为最终主返回入口
+- 有来源导航状态时返回实际来源；缺少来源时季详情 fallback 至剧详情，剧详情 fallback 至媒体库或已知影片发现来源
 - 剧详情覆盖 metadata-only、无播放源、无 Season、loading、error 与 disabled 状态
 - 已识别季和未识别季使用同一基础布局，并表达必要差异
 - Grouped placeholder 按已确认事实进入未识别剧详情，并可继续进入未识别季详情
