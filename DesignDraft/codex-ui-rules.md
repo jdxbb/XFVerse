@@ -102,6 +102,14 @@ Codex 实现 UI 时，按以下优先级理解需求：
 - 深色 / 浅色主题必须通过资源切换实现
 - 组件样式应尽量复用 StaticResource / DynamicResource
 
+Phase 7 前置要求：
+
+- 正式页面重构前先完成全局 token / 控件基线
+- token 至少覆盖颜色、字体、圆角、间距、按钮等级和危险按钮
+- 公共控件至少覆盖卡片、导航项、Popup、Dialog、EmptyState、Loading、Error、Disabled、ConfigMissing
+- 页面实现不得绕过公共基线自行定义重复样式
+- Phase 6 仅更新设计文档，不修改资源字典
+
 ---
 
 ## 6. Componentization Rules
@@ -228,7 +236,7 @@ Codex 不要做：
 重构策略：
 
 - 新建一套 Views / Controls
-- 先建立主题资源和公共组件
+- Phase 7 第一批先建立全局 token / 控件基线、主题资源和公共组件
 - 再按页面逐步替换旧 UI
 - 每个页面完成后单独验收
 - 最后做全局统一和细节修复

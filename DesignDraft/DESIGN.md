@@ -89,6 +89,29 @@ XFVerse 的产品气质是：
 
 ---
 
+## 3.1 Phase 7 Global Token / Control Baseline
+
+Phase 7 正式实施 UI 重构前，第一批工作必须先完成全局 token / 控件基线。
+
+该基线必须覆盖：
+
+- 颜色角色：背景、表面、边框、文字、主色、成功、警告、危险、disabled
+- 字体层级：页面标题、区块标题、正文、辅助文案、按钮、标签
+- 圆角和间距：窗口、卡片、按钮、输入框、菜单、Popup、Dialog
+- 按钮等级：主按钮、次按钮、图标按钮、危险按钮、disabled 按钮
+- 公共组件：卡片、导航项、Popup、Dialog、EmptyState、Loading、Error、Disabled、ConfigMissing
+- 深色 / 浅色主题下的对应资源
+
+Phase 7 的顺序要求：
+
+1. 先建立 token 和公共控件基线。
+2. 再实施全局壳层、首页和其它页面重构。
+3. 页面不得先行硬编码一套仅自身可用的视觉样式。
+
+Phase 6 只更新设计文档，不修改 ResourceDictionary 或 UI 代码。
+
+---
+
 ## 4. Theme System
 
 XFVerse 支持浅色 / 深色双主题。
@@ -639,6 +662,9 @@ XFVerse 支持浅色 / 深色双主题。
 
 以下组件不完全依赖 WPF UI 默认样式，需要按本软件风格封装：
 
+- 全局壳层与侧边栏
+- 用户账号菜单
+- 全局确认弹窗及危险确认变体
 - 影片卡片
 - 海报占位卡片
 - 播放源卡片
@@ -661,3 +687,8 @@ XFVerse 支持浅色 / 深色双主题。
 - 播放源 / 字幕 / 音轨菜单
 - 识别修正结果卡片
 - EmptyState 空状态组件
+
+全局壳层、用户菜单和确认弹窗的详细规格分别见：
+
+- `page-spec/global-shell.md`
+- `page-spec/global-dialogs.md`

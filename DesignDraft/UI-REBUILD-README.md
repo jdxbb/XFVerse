@@ -61,21 +61,23 @@ Codex 应按以下顺序阅读文档。
 
 ### 第 2 组：页面规格
 
-然后阅读 `pages/` 目录下的页面说明。
+然后阅读 `page-spec/` 目录下的页面说明。
 
 建议阅读顺序：
 
-1. `pages/home-page.md`
-2. `pages/user-profile-dialog.md`
-3. `pages/scan-task-page.md`
-4. `pages/settings-page.md`
-5. `pages/media-library-page.md`
-6. `pages/movie-detail-page.md`
-7. `pages/watch-history-page.md`
-8. `pages/favorites-page.md`
-9. `pages/movie-discovery-page.md`
-10. `pages/player-page.md`
-11. `pages/watch-insights-page.md`
+1. `page-spec/global-shell.md`
+2. `page-spec/global-dialogs.md`
+3. `page-spec/home-page.md`
+4. `page-spec/user-profile-dialog.md`
+5. `page-spec/scan-task-page.md`
+6. `page-spec/settings-page.md`
+7. `page-spec/media-library-page.md`
+8. `page-spec/movie-detail-page.md`
+9. `page-spec/watch-history-page.md`
+10. `page-spec/favorites-page.md`
+11. `page-spec/movie-discovery-page.md`
+12. `page-spec/player-page.md`
+13. `page-spec/watch-insights-page.md`
 
 ### 第 3 组：截图辅助
 
@@ -102,7 +104,9 @@ DesignDraft/
 ├─ DESIGN.md
 ├─ resources-note.md
 ├─ codex-ui-rules.md
-├─ pages/
+├─ page-spec/
+│  ├─ global-shell.md
+│  ├─ global-dialogs.md
 │  ├─ home-page.md
 │  ├─ user-profile-dialog.md
 │  ├─ scan-task-page.md
@@ -137,6 +141,8 @@ DesignDraft/
 
 本设计文档已覆盖以下模块：
 
+- 全局壳层、导航与账号菜单
+- 全局确认弹窗及危险确认变体
 - 首页
 - 用户资料弹窗
 - 扫描任务页面
@@ -181,6 +187,27 @@ DesignDraft/
 
 - 导航栏展开 / 关闭按钮不是 App Logo
 - App Logo 只用于侧边栏品牌区、关于 XFVerse 行、应用图标等品牌位置
+- 品牌区最终显示左侧图标和 `XFVerse`
+- 不以 `智能影音库 / WebDAV 路径 · Metadata 识别 · AI` 作为最终品牌展示
+- 主题切换使用旧设计图标化入口
+- 展开态首页保留旧设计欢迎语，收起态按旧设计显示紧凑标题
+- 隐藏路由只作为内部路由，不加入主导航
+
+详细规格见 `page-spec/global-shell.md`。
+
+---
+
+## 6.1 Phase 7 实施前置
+
+Phase 7 正式实施前必须先完成全局 token / 控件基线：
+
+- 颜色、字体、圆角、间距
+- 主按钮、次按钮、图标按钮、危险按钮
+- 卡片、导航项、Popup、Dialog
+- EmptyState、Loading、Error、Disabled、ConfigMissing
+- 深色 / 浅色主题资源
+
+Phase 6 只更新设计文档，不修改 UI 代码或资源字典。
 
 ---
 
