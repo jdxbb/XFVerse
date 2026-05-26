@@ -82,7 +82,8 @@ Codex 应按以下顺序阅读文档。
 15. `page-spec/movie-discovery-page.md`
 16. `page-spec/recommendation-page.md`
 17. `page-spec/player-page.md`
-18. `page-spec/watch-insights-page.md`
+18. `page-spec/online-subtitle-search-page.md`
+19. `page-spec/watch-insights-page.md`
 
 ### 第 3 组：截图辅助
 
@@ -127,6 +128,7 @@ DesignDraft/
 │  ├─ movie-discovery-page.md
 │  ├─ recommendation-page.md
 │  ├─ player-page.md
+│  ├─ online-subtitle-search-page.md
 │  └─ watch-insights-page.md
 └─ screenshots/
    ├─ home/
@@ -168,6 +170,7 @@ DesignDraft/
 - 影片发现页面
 - 影片发现内的 AI 推荐 Tab 与推荐偏好弹窗
 - 播放器
+- 在线字幕搜索窗口、字幕绑定与播放器内删除绑定轻量确认
 - 观影洞察页面
 
 其中观影洞察页面包含：
@@ -219,6 +222,8 @@ Phase 7 正式实施前必须先完成全局 token / 控件基线：
 - 颜色、字体、圆角、间距
 - 主按钮、次按钮、图标按钮、危险按钮
 - 卡片、导航项、Popup、Dialog
+- 主窗口与播放器的自定义标题栏及窗口按钮
+- 播放器固定深色的 Menu、Popup、Popover、在线字幕搜索 Dialog
 - EmptyState、Loading、Error、Disabled、ConfigMissing
 - 深色 / 浅色主题资源
 
@@ -293,16 +298,19 @@ Phase 6 只更新设计文档，不修改 UI 代码或资源字典。
 
 - 播放器永远使用深色沉浸式风格
 - 播放器不随普通页面浅色主题变成浅色
+- 播放器和在线字幕搜索弹窗不使用原生标题栏作为最终 UI，且固定为深色
 - 控制栏使用半透明深灰 / 黑灰浮层
 - 播放进度使用主色
-- 缓存进度使用半透明浅灰
+- 仅在 mpv 能可靠提供时展示独立缓冲进度；当前不把离线缓存作为播放器能力，也不伪造缓存进度
 - 普通音量和亮度使用主色
 - 音量增强使用低饱和橙色
 - 音量范围为 0% - 200%
 - 超过 100% 为音量增强
 - 亮度范围为 0% - 100%
+- 字幕菜单包含无字幕、内嵌、外挂、在线下载字幕，在线字幕绑定删除仅使用轻量确认并保留缓存文件
+- 文件路径可以展示，完整 WebDAV URL 不裸露，长字段省略并支持 Tooltip 查看允许展示的完整内容
 
-播放器具体规则以 `pages/player-page.md` 为准。
+播放器具体规则以 `page-spec/player-page.md` 与 `page-spec/online-subtitle-search-page.md` 为准。
 
 ---
 
