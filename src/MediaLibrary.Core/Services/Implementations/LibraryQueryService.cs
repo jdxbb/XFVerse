@@ -123,6 +123,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.Title,
                     x.OriginalTitle,
                     x.ReleaseYear,
+                    x.ReleaseDate,
                     x.PosterRemoteUrl,
                     x.GenresText,
                     x.AiTagsText,
@@ -144,7 +145,29 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .OrderBy(mediaFile => mediaFile.FileName)
                         .Select(mediaFile => mediaFile.FileName)
                         .FirstOrDefault(),
-                    HasWatchHistory = x.WatchHistories.Any(),
+                    HasWatchHistory = x.WatchHistories.Any()
+                                      || x.MediaFiles.Any(
+                                          mediaFile => !mediaFile.IsDeleted
+                                                       && mediaFile.MediaType == MediaType.Video
+                                                       && mediaFile.WatchHistories.Any()),
+                    LatestHistoryLastPlayPositionSeconds = x.MediaFiles
+                        .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                        .SelectMany(mediaFile => mediaFile.WatchHistories)
+                        .OrderByDescending(history => history.StartedAt)
+                        .Select(history => (int?)history.LastPlayPositionSeconds)
+                        .FirstOrDefault(),
+                    LatestHistoryDurationSeconds = x.MediaFiles
+                        .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                        .SelectMany(mediaFile => mediaFile.WatchHistories)
+                        .OrderByDescending(history => history.StartedAt)
+                        .Select(history => history.MediaFile == null ? null : history.MediaFile.DurationSeconds)
+                        .FirstOrDefault(),
+                    LatestHistoryIsCompleted = x.MediaFiles
+                        .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                        .SelectMany(mediaFile => mediaFile.WatchHistories)
+                        .OrderByDescending(history => history.StartedAt)
+                        .Select(history => (bool?)history.IsCompleted)
+                        .FirstOrDefault(),
                     SourceCount = x.MediaFiles.Count(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video),
                     HasLocalSource = x.MediaFiles.Any(
                         mediaFile => !mediaFile.IsDeleted
@@ -205,6 +228,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
                                        || x.HasWatchHistory
                                        || isWantToWatch
                                        || isNotInterested;
+                    var progressPercent = ResolvePlaybackProgressPercent(
+                        x.LatestHistoryLastPlayPositionSeconds.GetValueOrDefault(),
+                        x.LatestHistoryDurationSeconds ?? ResolveRuntimeDurationSeconds(x.RuntimeMinutes));
                     var isVisibleInLibrary = ResolveIsVisibleInLibrary(
                         hasActiveSource,
                         visibilityState,
@@ -218,6 +244,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Title = ResolveUnidentifiedMovieDisplayTitle(x.IdentificationStatus, x.Title, x.DefaultMediaFileName),
                         OriginalTitle = x.OriginalTitle ?? string.Empty,
                         ReleaseYear = x.ReleaseYear,
+                        ReleaseDate = x.ReleaseDate,
                         PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
                         GenresText = x.GenresText ?? string.Empty,
                         AiTagsText = x.AiTagsText ?? string.Empty,
@@ -256,6 +283,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsNotInterested = isNotInterested,
                         HasUserState = hasUserState,
                         HasWatchHistory = x.HasWatchHistory,
+                        ProgressPercent = progressPercent,
                         UpdatedAt = x.UpdatedAt
                     };
             })
@@ -363,6 +391,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.Title,
                     x.OriginalTitle,
                     x.ReleaseYear,
+                    x.ReleaseDate,
                     x.PosterRemoteUrl,
                     x.Overview,
                     x.GenresText,
@@ -407,6 +436,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         x.Title,
                         x.OriginalTitle,
                         x.ReleaseYear,
+                        x.ReleaseDate,
                         x.PosterRemoteUrl,
                         x.Overview,
                         x.GenresText,
@@ -459,6 +489,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                             movie?.DefaultMediaFileName),
                         OriginalTitle = FirstNonEmpty(movie?.OriginalTitle, row.OriginalTitle),
                         ReleaseYear = movie?.ReleaseYear ?? row.ReleaseYear,
+                        ReleaseDate = movie?.ReleaseDate ?? row.ReleaseDate,
                         PosterRemoteUrl = FirstNonEmpty(movie?.PosterRemoteUrl, row.PosterRemoteUrl),
                         GenresText = FirstNonEmpty(movie?.GenresText, row.GenresText),
                         AiTagsText = movie?.AiTagsText ?? string.Empty,
@@ -496,6 +527,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsWatched = movie?.IsWatched == true || row.IsWatched,
                         IsWantToWatch = row.IsWantToWatch,
                         IsNotInterested = row.IsNotInterested,
+                        ProgressPercent = 0d,
                         UpdatedAt = row.UpdatedAt
                     };
                 })
@@ -549,6 +581,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     GenresText = x.Series.GenresText ?? string.Empty,
                     Country = x.Series.Country ?? string.Empty,
                     Language = x.Series.Language ?? string.Empty,
+                    AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
                     IdentificationStatus = x.IdentificationStatus,
@@ -583,6 +616,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         SeriesTitle = season.SeriesName,
                         OriginalTitle = season.OriginalSeriesName,
                         ReleaseYear = season.AirYear,
+                        ReleaseDate = season.AirDate,
                         PosterRemoteUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl),
                         GenresText = season.GenresText,
                         Overview = season.Overview,
@@ -606,6 +640,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         WatchedEpisodeCount = watchedEpisodeCount,
                         InLibraryEpisodeCount = metrics.InLibraryEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
+                        ProgressPercent = ResolveEpisodeProgressPercent(watchedEpisodeCount, totalEpisodeCount, isWatched),
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
                     };
                 })
@@ -637,6 +672,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.Title,
                     x.OriginalTitle,
                     x.ReleaseYear,
+                    x.ReleaseDate,
                     x.PosterRemoteUrl,
                     x.GenresText,
                     x.Overview,
@@ -675,6 +711,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Title = x.Title,
                         OriginalTitle = x.OriginalTitle,
                         ReleaseYear = x.ReleaseYear,
+                        ReleaseDate = x.ReleaseDate,
                         PosterRemoteUrl = x.PosterRemoteUrl,
                         GenresText = x.GenresText,
                         Overview = x.Overview,
@@ -706,6 +743,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsWantToWatch = x.IsWantToWatch,
                         IsNotInterested = x.IsNotInterested,
                         HasWatchHistory = false,
+                        ProgressPercent = 0d,
                         UpdatedAt = x.UpdatedAt
                     };
             })
@@ -862,6 +900,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.OriginalName,
                     x.Overview,
                     x.PosterRemoteUrl,
+                    x.FirstAirDate,
                     x.FirstAirYear,
                     x.GenresText,
                     x.Country,
@@ -893,6 +932,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     SeasonNumber = x.SeasonNumber,
                     Name = x.Name,
                     PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
+                    AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : (int?)null,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
                     IdentificationStatus = x.IdentificationStatus,
@@ -989,6 +1029,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var hasWatchedEpisodeState = watchedEpisodeCount > 0;
                     var totalEpisodeCount = displayMetrics.Sum(x => x.TotalEpisodeCount);
                     var knownEpisodeCount = displayMetrics.Sum(x => x.CountableEpisodeCount);
+                    var watchedSeasonCount = displayMetrics.Count(x => IsAggregateWatched(x.WatchedEpisodeCount, x.CountableEpisodeCount, x.TotalEpisodeCount));
+                    var isWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount);
                     var latestSeasonPoster = displaySeasons
                         .OrderByDescending(x => x.SeasonNumber)
                         .Select(x => x.PosterRemoteUrl)
@@ -1002,6 +1044,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Title = series.Name,
                         OriginalTitle = series.OriginalName ?? string.Empty,
                         ReleaseYear = series.FirstAirYear,
+                        ReleaseDate = series.FirstAirDate,
                         PosterRemoteUrl = FirstNonEmpty(series.PosterRemoteUrl, latestSeasonPoster),
                         GenresText = series.GenresText ?? string.Empty,
                         Overview = series.Overview ?? string.Empty,
@@ -1020,11 +1063,13 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasLibraryContext = isVisibleInLibrary,
                         HasUserState = hasState || hasWatchedEpisodeState,
                         IsInLibrary = hasActiveSource,
-                        IsWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount),
+                        IsWatched = isWatched,
                         SeasonCount = displaySeasons.Count,
+                        WatchedSeasonCount = watchedSeasonCount,
                         InLibraryEpisodeCount = inLibraryEpisodeCount,
                         WatchedEpisodeCount = watchedEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
+                        ProgressPercent = ResolveEpisodeProgressPercent(watchedSeasonCount, displaySeasons.Count, isWatched),
                         UpdatedAt = seasons.Select(x => x.UpdatedAt).Append(series.UpdatedAt).Max()
                     };
                 })
@@ -1063,6 +1108,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     GenresText = x.Series.GenresText ?? string.Empty,
                     Country = x.Series.Country ?? string.Empty,
                     Language = x.Series.Language ?? string.Empty,
+                    AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
                     IdentificationStatus = x.IdentificationStatus,
@@ -1123,6 +1169,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         SeriesTitle = season.SeriesName,
                         OriginalTitle = season.OriginalSeriesName,
                         ReleaseYear = season.AirYear,
+                        ReleaseDate = season.AirDate,
                         PosterRemoteUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl),
                         GenresText = season.GenresText,
                         Overview = season.Overview,
@@ -1146,6 +1193,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         WatchedEpisodeCount = watchedEpisodeCount,
                         InLibraryEpisodeCount = metrics.InLibraryEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
+                        ProgressPercent = ResolveEpisodeProgressPercent(watchedEpisodeCount, totalEpisodeCount, isWatched),
                         UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
                     };
                 })
@@ -1303,6 +1351,41 @@ public sealed class LibraryQueryService : ILibraryQueryService
         }
 
         return knownEpisodeCount >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount;
+    }
+
+    private static int? ResolveRuntimeDurationSeconds(int? runtimeMinutes)
+    {
+        return runtimeMinutes is > 0 ? runtimeMinutes.Value * 60 : null;
+    }
+
+    private static double? ResolvePlaybackProgressPercent(
+        int positionSeconds,
+        int? durationSeconds)
+    {
+        if (!durationSeconds.HasValue || durationSeconds.Value <= 0 || positionSeconds <= 0)
+        {
+            return 0d;
+        }
+
+        return Math.Clamp(Math.Round(positionSeconds * 100d / durationSeconds.Value, 1), 0d, 100d);
+    }
+
+    private static double? ResolveEpisodeProgressPercent(
+        int watchedEpisodeCount,
+        int totalEpisodeCount,
+        bool isCompleted)
+    {
+        if (isCompleted)
+        {
+            return 100d;
+        }
+
+        if (totalEpisodeCount <= 0 || watchedEpisodeCount <= 0)
+        {
+            return 0d;
+        }
+
+        return Math.Clamp(Math.Round(watchedEpisodeCount * 100d / totalEpisodeCount, 1), 0d, 100d);
     }
 
     private static int ResolveSeasonProgressTotalEpisodeCount(TvSeasonLibraryRow season, int countableEpisodeCount)
@@ -1557,6 +1640,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public string Country { get; set; } = string.Empty;
 
         public string Language { get; set; } = string.Empty;
+
+        public DateTime? AirDate { get; set; }
 
         public int? AirYear { get; set; }
 

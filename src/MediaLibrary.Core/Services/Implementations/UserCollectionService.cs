@@ -25,6 +25,7 @@ public sealed class UserCollectionService : IUserCollectionService
                     Title = x.Title,
                     OriginalTitle = x.OriginalTitle ?? string.Empty,
                     ReleaseYear = x.ReleaseYear,
+                    ReleaseDate = x.ReleaseDate,
                     PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
                     Overview = x.Overview ?? string.Empty,
                     GenresText = x.GenresText ?? string.Empty,
@@ -83,6 +84,7 @@ public sealed class UserCollectionService : IUserCollectionService
                     Title = x.Title,
                     OriginalTitle = x.OriginalTitle,
                     ReleaseYear = x.ReleaseYear,
+                    ReleaseDate = x.ReleaseDate,
                     PosterRemoteUrl = x.PosterRemoteUrl,
                     Overview = x.Overview,
                     GenresText = x.GenresText,
@@ -179,6 +181,7 @@ public sealed class UserCollectionService : IUserCollectionService
         entity.Title = recommendation.Title;
         entity.OriginalTitle = recommendation.OriginalTitle;
         entity.ReleaseYear = recommendation.ReleaseYear;
+        entity.ReleaseDate = recommendation.ReleaseDate;
         entity.PosterRemoteUrl = recommendation.PosterRemoteUrl;
         entity.Overview = recommendation.Overview;
         entity.GenresText = recommendation.Tags;
@@ -909,6 +912,7 @@ public sealed class UserCollectionService : IUserCollectionService
         entity.Title = recommendation.Title;
         entity.OriginalTitle = recommendation.OriginalTitle;
         entity.ReleaseYear = recommendation.ReleaseYear;
+        entity.ReleaseDate = recommendation.ReleaseDate;
         entity.PosterRemoteUrl = recommendation.PosterRemoteUrl;
         entity.Overview = recommendation.Overview;
         entity.GenresText = recommendation.Tags;
@@ -935,6 +939,7 @@ public sealed class UserCollectionService : IUserCollectionService
         entity.Title = movie.Title;
         entity.OriginalTitle = movie.OriginalTitle ?? string.Empty;
         entity.ReleaseYear = movie.ReleaseYear;
+        entity.ReleaseDate = movie.ReleaseDate;
         entity.PosterRemoteUrl = movie.PosterRemoteUrl ?? string.Empty;
         entity.Overview = movie.Overview ?? string.Empty;
         entity.GenresText = movie.GenresText ?? string.Empty;

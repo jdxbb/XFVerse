@@ -34,6 +34,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                     x.Title,
                     x.OriginalTitle,
                     x.ReleaseYear,
+                    x.ReleaseDate,
                     x.PosterRemoteUrl,
                     x.Overview,
                     x.GenresText,
@@ -92,6 +93,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                     x.Title,
                     x.OriginalTitle,
                     x.ReleaseYear,
+                    x.ReleaseDate,
                     x.PosterRemoteUrl,
                     x.Overview,
                     x.GenresText,
@@ -142,6 +144,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                 Title = movie.Title,
                 OriginalTitle = movie.OriginalTitle ?? string.Empty,
                 ReleaseYear = movie.ReleaseYear,
+                ReleaseDate = movie.ReleaseDate,
                 PosterRemoteUrl = movie.PosterRemoteUrl ?? string.Empty,
                 Overview = movie.Overview ?? string.Empty,
                 GenresText = movie.GenresText ?? string.Empty,
@@ -180,6 +183,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                     Title = collection.Title,
                     OriginalTitle = collection.OriginalTitle,
                     ReleaseYear = collection.ReleaseYear,
+                    ReleaseDate = collection.ReleaseDate,
                     PosterRemoteUrl = collection.PosterRemoteUrl,
                     Overview = collection.Overview,
                     GenresText = collection.GenresText,
@@ -214,6 +218,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
             status.OmdbLastUpdatedAt ??= collection.OmdbLastUpdatedAt;
             status.TmdbRating ??= collection.TmdbRating;
             status.TmdbVoteCount ??= collection.TmdbVoteCount;
+            status.ReleaseDate ??= collection.ReleaseDate;
         }
 
         return result;

@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Caches;
 using MediaLibrary.Core.Helpers;
 
@@ -18,7 +20,8 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
     private const string SettingsFileName = "settings.json";
     private const string TemporaryExtension = ".tmp";
     private const string DefaultImageExtension = ".img";
-    private static readonly TimeSpan FailureCooldown = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan PermanentFailureCooldown = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan TransientFailureCooldown = TimeSpan.FromSeconds(10);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -186,6 +189,8 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
             }
 
             DeleteEmptyDirectoriesUnderItemsRoot();
+            _downloadsByKey.Clear();
+            _failureCooldownUntilUtcByHash.Clear();
             return new PosterCacheClearResult
             {
                 Succeeded = true,
@@ -229,6 +234,9 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
         var normalizedSource = NormalizeSource(source);
         if (!TryCreateRemoteImageUri(normalizedSource, out var remoteUri))
         {
+            PosterCacheDiagnostics.Write(
+                "cache-skip-non-remote",
+                $"source={PosterCacheDiagnostics.SourceId(normalizedSource)}");
             return normalizedSource;
         }
 
@@ -237,11 +245,17 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
         if (!forceRefresh && !string.IsNullOrWhiteSpace(existingCachePath))
         {
             Touch(existingCachePath);
+            PosterCacheDiagnostics.Write(
+                "disk-hit",
+                $"source={PosterCacheDiagnostics.SourceId(normalizedSource)} hash={ShortHash(hash)} forceRefresh=false");
             return existingCachePath;
         }
 
         if (!forceRefresh && IsInFailureCooldown(hash))
         {
+            PosterCacheDiagnostics.Write(
+                "failure-cooldown",
+                $"source={PosterCacheDiagnostics.SourceId(normalizedSource)} hash={ShortHash(hash)}");
             return normalizedSource;
         }
 
@@ -249,28 +263,39 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
             ? existingCachePath
             : normalizedSource;
         var downloadKey = forceRefresh ? $"{hash}:force" : hash;
+        var createdDownload = false;
         var downloadTask = _downloadsByKey.GetOrAdd(
             downloadKey,
-            _downloadKey => new Lazy<Task<string>>(
-                () =>
-                {
-                    var task = DownloadAndCacheAsync(
-                        remoteUri,
-                        hash,
-                        fallback,
-                        forceRefresh,
-                        _disposeCts.Token);
-                    _ = task.ContinueWith(
-                        _ =>
-                        {
-                            _downloadsByKey.TryRemove(downloadKey, out var removedDownload);
-                        },
-                        CancellationToken.None,
-                        TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
-                    return task;
-                },
-                LazyThreadSafetyMode.ExecutionAndPublication));
+            _downloadKey =>
+            {
+                createdDownload = true;
+                return new Lazy<Task<string>>(
+                    () =>
+                    {
+                        var task = DownloadAndCacheAsync(
+                            remoteUri,
+                            hash,
+                            fallback,
+                            forceRefresh,
+                            _disposeCts.Token);
+                        _ = task.ContinueWith(
+                            _ =>
+                            {
+                                _downloadsByKey.TryRemove(downloadKey, out var removedDownload);
+                                PosterCacheDiagnostics.Write(
+                                    "download-task-remove",
+                                    $"source={PosterCacheDiagnostics.SourceId(normalizedSource)} hash={ShortHash(hash)} forceRefresh={forceRefresh.ToString().ToLowerInvariant()}");
+                            },
+                            CancellationToken.None,
+                            TaskContinuationOptions.ExecuteSynchronously,
+                            TaskScheduler.Default);
+                        return task;
+                    },
+                    LazyThreadSafetyMode.ExecutionAndPublication);
+            });
+        PosterCacheDiagnostics.Write(
+            createdDownload ? "download-task-create" : "download-task-join",
+            $"source={PosterCacheDiagnostics.SourceId(normalizedSource)} hash={ShortHash(hash)} forceRefresh={forceRefresh.ToString().ToLowerInvariant()}");
 
         return await downloadTask.Value.WaitAsync(cancellationToken);
     }
@@ -294,11 +319,17 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
                     if (!string.IsNullOrWhiteSpace(existingCachePath))
                     {
                         Touch(existingCachePath);
+                        PosterCacheDiagnostics.Write(
+                            "disk-hit-after-wait",
+                            $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)}");
                         return existingCachePath;
                     }
 
                     if (IsInFailureCooldown(hash))
                     {
+                        PosterCacheDiagnostics.Write(
+                            "failure-cooldown-after-wait",
+                            $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)}");
                         return fallback;
                     }
                 }
@@ -315,25 +346,28 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    MarkFailure(hash);
+                    var cooldown = IsTransientStatusCode(response.StatusCode)
+                        ? TransientFailureCooldown
+                        : PermanentFailureCooldown;
+                    MarkFailure(hash, cooldown);
+                    PosterCacheDiagnostics.Write(
+                        "download-http-failed",
+                        $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} status={(int)response.StatusCode} cooldownSeconds={cooldown.TotalSeconds:0}");
                     return fallback;
                 }
 
                 var contentType = response.Content.Headers.ContentType;
                 if (!IsImageContentType(contentType))
                 {
-                    MarkFailure(hash);
+                    MarkFailure(hash, PermanentFailureCooldown);
+                    PosterCacheDiagnostics.Write(
+                        "download-content-type-failed",
+                        $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} contentType={(contentType?.MediaType ?? "none").Replace(' ', '_')} cooldownSeconds={PermanentFailureCooldown.TotalSeconds:0}");
                     return fallback;
                 }
 
                 await using (var remoteStream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                await using (var localStream = new FileStream(
-                                 tempPath,
-                                 FileMode.CreateNew,
-                                 FileAccess.Write,
-                                 FileShare.None,
-                                 BufferSize,
-                                 FileOptions.Asynchronous | FileOptions.SequentialScan))
+                await using (var localStream = CreateTemporaryCacheFileStream(itemDirectory, tempPath))
                 {
                     await remoteStream.CopyToAsync(localStream, BufferSize, cancellationToken);
                     await localStream.FlushAsync(cancellationToken);
@@ -341,18 +375,25 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
 
                 if (!File.Exists(tempPath) || new FileInfo(tempPath).Length == 0)
                 {
-                    MarkFailure(hash);
+                    MarkFailure(hash, TransientFailureCooldown);
+                    PosterCacheDiagnostics.Write(
+                        "download-empty",
+                        $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} cooldownSeconds={TransientFailureCooldown.TotalSeconds:0}");
                     return fallback;
                 }
 
                 var extension = ResolveImageExtension(remoteUri, contentType);
                 var contentPath = Path.Combine(itemDirectory, $"{hash}{extension}");
+                Directory.CreateDirectory(itemDirectory);
                 File.Move(tempPath, contentPath, overwrite: true);
                 tempPath = string.Empty;
                 DeleteSiblingCacheFiles(hash, contentPath);
                 _failureCooldownUntilUtcByHash.TryRemove(hash, out _);
                 Touch(contentPath);
                 await TrimToConfiguredLimitBestEffortAsync(contentPath, cancellationToken);
+                PosterCacheDiagnostics.Write(
+                    "download-success",
+                    $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} extension={extension}");
                 return contentPath;
             }
             finally
@@ -362,11 +403,17 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            PosterCacheDiagnostics.Write(
+                "download-canceled",
+                $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)}");
             return fallback;
         }
-        catch
+        catch (Exception exception)
         {
-            MarkFailure(hash);
+            MarkFailure(hash, TransientFailureCooldown);
+            PosterCacheDiagnostics.Write(
+                "download-error",
+                $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} error={exception.GetType().Name} cooldownSeconds={TransientFailureCooldown.TotalSeconds:0}");
             return fallback;
         }
         finally
@@ -510,9 +557,17 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
         return false;
     }
 
-    private void MarkFailure(string hash)
+    private void MarkFailure(string hash, TimeSpan cooldown)
     {
-        _failureCooldownUntilUtcByHash[hash] = DateTime.UtcNow.Add(FailureCooldown);
+        _failureCooldownUntilUtcByHash[hash] = DateTime.UtcNow.Add(cooldown);
+    }
+
+    private static bool IsTransientStatusCode(HttpStatusCode statusCode)
+    {
+        var numericStatusCode = (int)statusCode;
+        return statusCode == HttpStatusCode.RequestTimeout
+               || numericStatusCode == 429
+               || numericStatusCode >= 500;
     }
 
     private string GetItemDirectory(string hash)
@@ -525,6 +580,11 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private static string ShortHash(string hash)
+    {
+        return string.IsNullOrWhiteSpace(hash) ? "empty" : hash[..Math.Min(10, hash.Length)];
     }
 
     private static void Touch(string path)
@@ -551,6 +611,31 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
         catch
         {
             // Cache temp cleanup is best-effort.
+        }
+    }
+
+    private static FileStream CreateTemporaryCacheFileStream(string itemDirectory, string tempPath)
+    {
+        try
+        {
+            return new FileStream(
+                tempPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                BufferSize,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            Directory.CreateDirectory(itemDirectory);
+            return new FileStream(
+                tempPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                BufferSize,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
         }
     }
 
@@ -619,7 +704,8 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
                 }
             }
 
-            DeleteEmptyDirectoriesUnderItemsRoot();
+            // Empty directory cleanup is reserved for full cache clear. Running it during normal
+            // trim can race with concurrent downloads that have just created a shard directory.
             return Task.FromResult(
                 new PosterCacheTrimResult
                 {

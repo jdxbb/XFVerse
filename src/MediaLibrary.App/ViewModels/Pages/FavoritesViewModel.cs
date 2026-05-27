@@ -306,6 +306,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
             Title = movie.Title,
             OriginalTitle = movie.OriginalTitle,
             ReleaseYear = movie.ReleaseYear,
+            ReleaseDate = movie.ReleaseDate,
             PosterRemoteUrl = movie.PosterRemoteUrl,
             Overview = movie.Overview,
             Country = movie.Country,
@@ -369,6 +370,8 @@ public sealed class FavoritesViewModel : PageViewModelBase
         public string OriginalTitle => _item.OriginalTitle;
 
         public int? ReleaseYear => _item.ReleaseYear;
+
+        public DateTime? ReleaseDate => _item.ReleaseDate;
 
         public string PosterRemoteUrl => _item.PosterRemoteUrl;
 

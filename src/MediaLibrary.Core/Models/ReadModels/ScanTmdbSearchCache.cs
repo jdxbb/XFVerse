@@ -140,6 +140,7 @@ public sealed class ScanTmdbSearchCache
                     Title = x.Title,
                     OriginalTitle = x.OriginalTitle,
                     ReleaseYear = x.ReleaseYear,
+                    ReleaseDate = x.ReleaseDate,
                     Overview = x.Overview,
                     PosterRemoteUrl = x.PosterRemoteUrl,
                     GenresText = x.GenresText,

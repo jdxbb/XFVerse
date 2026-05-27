@@ -85,7 +85,7 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         var viewportHeight = NormalizeViewportLength(availableSize.Height);
         var itemWidth = Math.Max(1d, ItemWidth);
         var minimumItemHeight = Math.Max(1d, ItemHeight);
-        _effectiveItemHeight = Math.Max(_effectiveItemHeight, minimumItemHeight);
+        _effectiveItemHeight = minimumItemHeight;
 
         var columns = Math.Max(1, (int)Math.Floor(viewportWidth / itemWidth));
         var rowCount = itemCount == 0 ? 0 : (int)Math.Ceiling(itemCount / (double)columns);

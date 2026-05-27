@@ -1,4 +1,3 @@
-using System.Text;
 using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.ReadModels;
@@ -12,15 +11,7 @@ public sealed class ExternalMetadataCacheMaintenanceService : IExternalMetadataC
     public async Task<ExternalMetadataCacheUsage> GetUsageAsync(CancellationToken cancellationToken = default)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
-        var entries = await ApplyManagedScopeFilter(dbContext.ExternalMetadataCaches)
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        return new ExternalMetadataCacheUsage
-        {
-            ManagedEntryCount = entries.Count,
-            EstimatedBytes = entries.Sum(EstimateEntryBytes)
-        };
+        return await GetUsageAsync(dbContext, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ExternalMetadataCacheClearResult> ClearManagedAsync(CancellationToken cancellationToken = default)
@@ -28,18 +19,19 @@ public sealed class ExternalMetadataCacheMaintenanceService : IExternalMetadataC
         try
         {
             await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
-            var entries = await ApplyManagedScopeFilter(dbContext.ExternalMetadataCaches)
-                .ToListAsync(cancellationToken);
-            var estimatedBytes = entries.Sum(EstimateEntryBytes);
+            var usage = await GetUsageAsync(dbContext, cancellationToken).ConfigureAwait(false);
+            var deletedCount = usage.ManagedEntryCount == 0
+                ? 0
+                : await ApplyManagedScopeFilter(dbContext.ExternalMetadataCaches)
+                    .ExecuteDeleteAsync(cancellationToken)
+                    .ConfigureAwait(false);
 
-            dbContext.ExternalMetadataCaches.RemoveRange(entries);
-            await dbContext.SaveChangesAsync(cancellationToken);
 
             return new ExternalMetadataCacheClearResult
             {
                 Succeeded = true,
-                DeletedEntryCount = entries.Count,
-                EstimatedFreedBytes = estimatedBytes
+                DeletedEntryCount = deletedCount,
+                EstimatedFreedBytes = usage.EstimatedBytes
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -66,16 +58,35 @@ public sealed class ExternalMetadataCacheMaintenanceService : IExternalMetadataC
                      || (entry.Provider == "OMDb" && entry.CacheType == "Rating"));
     }
 
-    private static long EstimateEntryBytes(ExternalMetadataCache entry)
+    private static async Task<ExternalMetadataCacheUsage> GetUsageAsync(
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
     {
-        return EstimateStringBytes(entry.Provider)
-               + EstimateStringBytes(entry.CacheType)
-               + EstimateStringBytes(entry.CacheKey)
-               + EstimateStringBytes(entry.PayloadJson);
-    }
+        var summary = await ApplyManagedScopeFilter(dbContext.ExternalMetadataCaches)
+            .AsNoTracking()
+            .Select(
+                entry => new
+                {
+                    EstimatedBytes =
+                        (long)entry.Provider.Length
+                        + entry.CacheType.Length
+                        + entry.CacheKey.Length
+                        + entry.PayloadJson.Length
+                })
+            .GroupBy(_ => 1)
+            .Select(
+                group => new
+                {
+                    Count = group.Count(),
+                    EstimatedBytes = group.Sum(entry => entry.EstimatedBytes)
+                })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
 
-    private static long EstimateStringBytes(string? value)
-    {
-        return string.IsNullOrEmpty(value) ? 0 : Encoding.UTF8.GetByteCount(value);
+        return new ExternalMetadataCacheUsage
+        {
+            ManagedEntryCount = summary?.Count ?? 0,
+            EstimatedBytes = summary?.EstimatedBytes ?? 0
+        };
     }
 }

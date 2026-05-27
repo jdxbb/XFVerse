@@ -130,12 +130,14 @@ public sealed class TmdbService : ITmdbService
 
             foreach (var item in resultArray.EnumerateArray())
             {
+                var releaseDate = GetString(item, "release_date");
                 results.Add(new MetadataSearchCandidate
                 {
                     TmdbId = item.GetProperty("id").GetInt32(),
                     Title = GetString(item, "title"),
                     OriginalTitle = GetString(item, "original_title"),
-                    ReleaseYear = ParseYear(GetString(item, "release_date")),
+                    ReleaseYear = ParseYear(releaseDate),
+                    ReleaseDate = ParseReleaseDate(releaseDate),
                     Overview = GetString(item, "overview"),
                     PosterRemoteUrl = BuildPosterUrl(GetString(item, "poster_path")),
                     TmdbRating = GetDouble(item, "vote_average"),
@@ -1317,12 +1319,14 @@ public sealed class TmdbService : ITmdbService
 
     private static MetadataSearchCandidate BuildDetailsCandidate(int tmdbId, JsonElement details)
     {
+        var releaseDate = GetString(details, "release_date");
         return new MetadataSearchCandidate
         {
             TmdbId = tmdbId,
             Title = GetString(details, "title"),
             OriginalTitle = GetString(details, "original_title"),
-            ReleaseYear = ParseYear(GetString(details, "release_date")),
+            ReleaseYear = ParseYear(releaseDate),
+            ReleaseDate = ParseReleaseDate(releaseDate),
             Overview = GetString(details, "overview"),
             PosterRemoteUrl = BuildPosterUrl(GetString(details, "poster_path")),
             GenresText = string.Join(" / ", EnumerateArrayStrings(details, "genres", "name")),
@@ -1713,6 +1717,7 @@ public sealed class TmdbService : ITmdbService
             Title = candidate.Title,
             OriginalTitle = candidate.OriginalTitle,
             ReleaseYear = candidate.ReleaseYear,
+            ReleaseDate = candidate.ReleaseDate,
             Overview = candidate.Overview,
             PosterRemoteUrl = candidate.PosterRemoteUrl,
             GenresText = candidate.GenresText,
@@ -1956,12 +1961,19 @@ public sealed class TmdbService : ITmdbService
 
     private static int? ParseYear(string releaseDate)
     {
-        if (DateTime.TryParse(releaseDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        return ParseReleaseDate(releaseDate)?.Year;
+    }
+
+    private static DateTime? ParseReleaseDate(string releaseDate)
+    {
+        if (DateTime.TryParseExact(releaseDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var exactDate))
         {
-            return date.Year;
+            return exactDate.Date;
         }
 
-        return null;
+        return DateTime.TryParse(releaseDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date.Date
+            : null;
     }
 
     private static int GetYearSortGroup(int expectedYear, int? candidateYear)

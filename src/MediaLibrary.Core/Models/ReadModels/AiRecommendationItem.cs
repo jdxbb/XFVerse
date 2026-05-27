@@ -23,6 +23,8 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
 
     public int? ReleaseYear { get; set; }
 
+    public DateTime? ReleaseDate { get; set; }
+
     public string PosterRemoteUrl { get; set; } = string.Empty;
 
     public string Overview { get; set; } = string.Empty;
@@ -116,6 +118,40 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
     public string WantToWatchButtonText => IsWantToWatch ? "取消想看" : "+ 想看";
 
     public string NotInterestedButtonText => IsNotInterested ? "取消不想看" : "不想看";
+
+    public string ReleaseDateText => ReleaseDate.HasValue
+        ? ReleaseDate.Value.ToString("yyyy-MM-dd")
+        : ReleaseYear?.ToString() ?? "年份 -";
+
+    public string WeightedAverageRatingText
+    {
+        get
+        {
+            var ratings = new List<(double Score, int Votes)>();
+            if (TmdbRating.HasValue)
+            {
+                ratings.Add((TmdbRating.Value, Math.Max(TmdbVoteCount ?? 0, 0)));
+            }
+
+            if (OmdbRating is { ScoreValue: > 0, ScoreScale: > 0 } omdbRating)
+            {
+                var normalizedScore = omdbRating.ScoreValue / omdbRating.ScoreScale * 10d;
+                ratings.Add((normalizedScore, Math.Max(omdbRating.VoteCount ?? 0, 0)));
+            }
+
+            if (ratings.Count == 0)
+            {
+                return "-";
+            }
+
+            var totalVotes = ratings.Sum(x => x.Votes);
+            var score = totalVotes > 0
+                ? ratings.Sum(x => x.Score * x.Votes) / totalVotes
+                : ratings.Average(x => x.Score);
+
+            return $"{score:0.0}";
+        }
+    }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

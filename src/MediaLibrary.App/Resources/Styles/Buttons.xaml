@@ -191,14 +191,14 @@
     </Style>
 
     <Style x:Key="WindowCaptionButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
-        <Setter Property="Height" Value="{StaticResource WindowCaptionHeight}" />
-        <Setter Property="MinHeight" Value="{StaticResource WindowCaptionHeight}" />
-        <Setter Property="Width" Value="48" />
-        <Setter Property="MinWidth" Value="48" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Width" Value="40" />
+        <Setter Property="MinWidth" Value="40" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
     </Style>

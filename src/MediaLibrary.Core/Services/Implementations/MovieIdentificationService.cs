@@ -1835,6 +1835,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         collectionItem.Title = movie.Title;
         collectionItem.OriginalTitle = movie.OriginalTitle ?? string.Empty;
         collectionItem.ReleaseYear = movie.ReleaseYear;
+        collectionItem.ReleaseDate = movie.ReleaseDate;
         collectionItem.PosterRemoteUrl = movie.PosterRemoteUrl ?? string.Empty;
         collectionItem.Overview = movie.Overview ?? string.Empty;
         collectionItem.GenresText = movie.GenresText ?? string.Empty;
@@ -1870,6 +1871,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         movie.Title = candidate.Title;
         movie.OriginalTitle = string.IsNullOrWhiteSpace(candidate.OriginalTitle) ? null : candidate.OriginalTitle;
         movie.ReleaseYear = candidate.ReleaseYear;
+        movie.ReleaseDate = candidate.ReleaseDate;
         movie.Overview = string.IsNullOrWhiteSpace(candidate.Overview) ? null : candidate.Overview;
         movie.PosterRemoteUrl = string.IsNullOrWhiteSpace(candidate.PosterRemoteUrl) ? null : candidate.PosterRemoteUrl;
         movie.Country = string.IsNullOrWhiteSpace(candidate.Country) ? null : candidate.Country;
@@ -1984,6 +1986,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         targetMovie.Title = title;
         targetMovie.OriginalTitle = null;
         targetMovie.ReleaseYear = releaseYear;
+        targetMovie.ReleaseDate = null;
         targetMovie.Overview = null;
         targetMovie.PosterRemoteUrl = null;
         targetMovie.Country = null;

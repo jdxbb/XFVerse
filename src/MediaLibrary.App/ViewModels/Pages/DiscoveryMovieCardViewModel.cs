@@ -202,6 +202,7 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             Title = string.IsNullOrWhiteSpace(status.Title) ? Title : status.Title;
             OriginalTitle = string.IsNullOrWhiteSpace(status.OriginalTitle) ? OriginalTitle : status.OriginalTitle;
             ReleaseYear = status.ReleaseYear ?? ReleaseYear;
+            ReleaseDate = status.ReleaseDate?.ToString("yyyy-MM-dd") ?? ReleaseDate;
             PosterRemoteUrl = string.IsNullOrWhiteSpace(status.PosterRemoteUrl) ? PosterRemoteUrl : status.PosterRemoteUrl;
             Overview = string.IsNullOrWhiteSpace(status.Overview) ? Overview : status.Overview;
             GenresText = string.IsNullOrWhiteSpace(status.GenresText) ? GenresText : status.GenresText;
@@ -243,6 +244,7 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(OriginalTitleText));
             OnPropertyChanged(nameof(TitleWithOriginalText));
             OnPropertyChanged(nameof(ReleaseYear));
+            OnPropertyChanged(nameof(ReleaseDate));
             OnPropertyChanged(nameof(YearText));
             OnPropertyChanged(nameof(PosterRemoteUrl));
             OnPropertyChanged(nameof(Overview));

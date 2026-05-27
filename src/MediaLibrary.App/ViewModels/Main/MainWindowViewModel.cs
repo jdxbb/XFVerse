@@ -12,7 +12,7 @@ namespace MediaLibrary.App.ViewModels.Main;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {
-    private const double SidebarExpandedWidth = 248;
+    private const double SidebarExpandedWidth = 220;
     private const double SidebarCollapsedWidth = 64;
 
     private readonly Dictionary<NavigationPageKey, NavigationItemViewModel> _routeMap;
@@ -23,6 +23,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private PageViewModelBase? _currentPageViewModel;
     private string _currentPageTitle = string.Empty;
     private string _currentPageSubtitle = string.Empty;
+    private bool _isHomePageActive;
     private bool _isSidebarExpanded = true;
     private bool _isUserMenuOpen;
     private string _userMenuStatusMessage = string.Empty;
@@ -136,6 +137,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(IsSidebarCollapsed));
                 OnPropertyChanged(nameof(SidebarColumnWidth));
+                OnPropertyChanged(nameof(ShellPageTitle));
             }
         }
     }
@@ -191,7 +193,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string CurrentPageTitle
     {
         get => _currentPageTitle;
-        private set => SetProperty(ref _currentPageTitle, value);
+        private set
+        {
+            if (SetProperty(ref _currentPageTitle, value))
+            {
+                OnPropertyChanged(nameof(ShellPageTitle));
+            }
+        }
     }
 
     public string CurrentPageSubtitle
@@ -199,6 +207,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _currentPageSubtitle;
         private set => SetProperty(ref _currentPageSubtitle, value);
     }
+
+    public bool IsHomePageActive
+    {
+        get => _isHomePageActive;
+        private set
+        {
+            if (SetProperty(ref _isHomePageActive, value))
+            {
+                OnPropertyChanged(nameof(ShellPageTitle));
+            }
+        }
+    }
+
+    public string ShellPageTitle => IsHomePageActive && IsSidebarExpanded
+        ? $"欢迎回来，{UserDisplayName} 👋"
+        : CurrentPageTitle;
 
     private async void OnNavigationRequested(object? sender, NavigationRequest request)
     {
@@ -229,6 +253,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         CurrentPageViewModel = pageViewModel;
+        IsHomePageActive = pageViewModel is HomeViewModel;
         CurrentPageTitle = pageViewModel.Title;
         CurrentPageSubtitle = pageViewModel.Subtitle;
         await pageViewModel.ActivateAsync();

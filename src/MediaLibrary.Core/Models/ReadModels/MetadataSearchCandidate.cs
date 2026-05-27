@@ -10,6 +10,8 @@ public sealed class MetadataSearchCandidate
 
     public int? ReleaseYear { get; set; }
 
+    public DateTime? ReleaseDate { get; set; }
+
     public string Overview { get; set; } = string.Empty;
 
     public string PosterRemoteUrl { get; set; } = string.Empty;

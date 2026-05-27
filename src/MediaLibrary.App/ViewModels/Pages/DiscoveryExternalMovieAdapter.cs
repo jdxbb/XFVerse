@@ -13,6 +13,7 @@ internal static class DiscoveryExternalMovieAdapter
             Title = movie.Title,
             OriginalTitle = movie.OriginalTitle,
             ReleaseYear = movie.ReleaseYear,
+            ReleaseDate = ParseReleaseDate(movie.ReleaseDate),
             PosterRemoteUrl = movie.PosterRemoteUrl,
             Overview = movie.Overview,
             Country = movie.Country,
@@ -36,5 +37,10 @@ internal static class DiscoveryExternalMovieAdapter
             WatchStateText = movie.WatchStateText,
             Reason = string.IsNullOrWhiteSpace(movie.Overview) ? "来自 TMDB 影片搜索结果。" : movie.Overview
         };
+    }
+
+    private static DateTime? ParseReleaseDate(string value)
+    {
+        return DateTime.TryParse(value, out var date) ? date.Date : null;
     }
 }

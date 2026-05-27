@@ -324,8 +324,11 @@
 
             <Border Grid.Row="0"
                     Style="{StaticResource TopBarBorderStyle}"
-                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid Margin="30,22">
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
+                    MouseLeftButtonUp="TitleBar_MouseLeftButtonUp"
+                    MouseMove="TitleBar_MouseMove">
+                <Grid Height="44"
+                      Margin="30,6,2,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -353,16 +356,44 @@
                                    Foreground="{DynamicResource BrushForegroundSecondary}" />
                     </Button>
 
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Text="{Binding CurrentPageTitle}" Style="{StaticResource PageTitleTextStyle}" />
-                        <TextBlock Margin="0,6,0,0"
-                                   Text="{Binding CurrentPageSubtitle}"
-                                   Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Grid.Column="1"
+                                Height="36"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ShellPageTitle}"
+                                   VerticalAlignment="Center"
+                                   FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource BrushForegroundPrimary}" />
+                        <TextBlock Margin="12,0,0,5"
+                                   Text="{Binding CurrentPageSubtitle}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Setter Property="FontSize" Value="13" />
+                                    <Setter Property="VerticalAlignment" Value="Bottom" />
+                                    <Setter Property="Margin" Value="12,0,0,5" />
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0">
                         <Button Command="{Binding ToggleThemeCommand}"
-                                Style="{StaticResource IconButtonStyle}"
+                                Width="36"
+                                Height="36"
+                                MinWidth="36"
+                                MinHeight="36"
+                                Style="{StaticResource SmallIconButtonStyle}"
                                 ToolTip="{Binding ThemeToggleToolTip}">
                             <TextBlock Text="{Binding ThemeToggleIcon}"
                                        Style="{StaticResource ShellIconGlyphTextStyle}"
@@ -370,24 +401,25 @@
                         </Button>
 
                         <Border Width="1"
-                                Height="26"
-                                Margin="14,0,12,0"
+                                Height="22"
+                                Margin="10,0,8,0"
+                                VerticalAlignment="Center"
                                 Background="{DynamicResource BrushDivider}" />
 
                         <Button x:Name="MinimizeButton"
-                                Margin="0,-14,0,0"
+                                Margin="0"
                                 Content="&#xE921;"
                                 ToolTip="最小化"
                                 Click="MinimizeButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="MaximizeRestoreButton"
-                                Margin="0,-14,0,0"
+                                Margin="0"
                                 Content="&#xE922;"
                                 ToolTip="最大化"
                                 Click="MaximizeRestoreButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="CloseButton"
-                                Margin="0,-14,-14,0"
+                                Margin="0"
                                 Content="&#xE8BB;"
                                 ToolTip="关闭"
                                 Click="CloseButton_Click"

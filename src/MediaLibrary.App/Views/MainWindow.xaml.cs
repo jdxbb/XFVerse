@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private const int MonitorDefaultToNearest = 0x00000002;
 
     private HwndSource? _hwndSource;
+    private Point? _pendingMaximizedDragStart;
 
     public MainWindow()
     {
@@ -74,10 +75,53 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (WindowState == WindowState.Maximized)
+        {
+            _pendingMaximizedDragStart = e.GetPosition(this);
+            if (sender is UIElement element)
+            {
+                element.CaptureMouse();
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         BeginWindowDrag(e);
     }
 
-    private void BeginWindowDrag(MouseButtonEventArgs e)
+    private void TitleBar_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_pendingMaximizedDragStart is null || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var currentPosition = e.GetPosition(this);
+        if (!HasMovedBeyondDragThreshold(_pendingMaximizedDragStart.Value, currentPosition))
+        {
+            return;
+        }
+
+        _pendingMaximizedDragStart = null;
+        if (sender is UIElement element)
+        {
+            element.ReleaseMouseCapture();
+        }
+
+        BeginWindowDrag(e);
+    }
+
+    private void TitleBar_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _pendingMaximizedDragStart = null;
+        if (sender is UIElement element && element.IsMouseCaptured)
+        {
+            element.ReleaseMouseCapture();
+        }
+    }
+
+    private void BeginWindowDrag(MouseEventArgs e)
     {
         if (WindowState == WindowState.Maximized)
         {
@@ -94,7 +138,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RestoreWindowForDrag(MouseButtonEventArgs e)
+    private static bool HasMovedBeyondDragThreshold(Point start, Point current)
+    {
+        return Math.Abs(current.X - start.X) >= SystemParameters.MinimumHorizontalDragDistance
+            || Math.Abs(current.Y - start.Y) >= SystemParameters.MinimumVerticalDragDistance;
+    }
+
+    private void RestoreWindowForDrag(MouseEventArgs e)
     {
         var restoreBounds = RestoreBounds;
         var mousePosition = PointToScreen(e.GetPosition(this));

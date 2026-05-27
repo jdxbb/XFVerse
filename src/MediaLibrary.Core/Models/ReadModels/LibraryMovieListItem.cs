@@ -16,6 +16,8 @@ public sealed class LibraryMovieListItem
 
     public int SeasonCount { get; set; }
 
+    public int WatchedSeasonCount { get; set; }
+
     public int OrphanMediaFileId { get; set; }
 
     public string GroupedRangeKey { get; set; } = string.Empty;
@@ -47,6 +49,8 @@ public sealed class LibraryMovieListItem
     public string SeriesTitle { get; set; } = string.Empty;
 
     public int? ReleaseYear { get; set; }
+
+    public DateTime? ReleaseDate { get; set; }
 
     public string PosterRemoteUrl { get; set; } = string.Empty;
 
@@ -143,6 +147,19 @@ public sealed class LibraryMovieListItem
 
     public bool HasWatchHistory { get; set; }
 
+    public double? ProgressPercent { get; set; } = 0d;
+
+    public double ProgressValue => ProgressPercent.GetValueOrDefault();
+
+    public bool HasProgressPercent => true;
+
+    public string ProgressLabel => ItemKind switch
+    {
+        LibraryMediaItemKind.Series => $"已看 {WatchedSeasonCount} / {SeasonCount} 季",
+        LibraryMediaItemKind.Season => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集",
+        _ => $"{ProgressValue:0}%"
+    };
+
     public DateTime UpdatedAt { get; set; }
 
     public bool IsMovie => ItemKind == LibraryMediaItemKind.Movie;
@@ -164,7 +181,7 @@ public sealed class LibraryMovieListItem
     public string ProgressSummary => ItemKind switch
     {
         LibraryMediaItemKind.Series => SeasonCount > 0
-            ? $"{SeasonCount} 季 · 有播放源 {InLibraryEpisodeCount} 集"
+            ? $"已看 {WatchedSeasonCount} / {SeasonCount} 季"
             : $"有播放源 {InLibraryEpisodeCount} 集",
         LibraryMediaItemKind.Season => InLibraryEpisodeCount > 0
             ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 有播放源 {InLibraryEpisodeCount} 集"

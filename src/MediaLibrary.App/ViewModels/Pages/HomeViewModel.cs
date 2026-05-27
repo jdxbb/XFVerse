@@ -39,7 +39,7 @@ public sealed class HomeViewModel : PageViewModelBase
         IPlayerWindowService playerWindowService,
         MovieDiscoveryViewModel movieDiscoveryViewModel,
         RecommendationsViewModel aiRecommendationViewModel)
-        : base($"欢迎回来，{DefaultUserDisplayName} 👋", HomeWelcomeSubtitle)
+        : base("首页", HomeWelcomeSubtitle)
     {
         _dashboardQueryService = dashboardQueryService;
         _watchStatisticsService = watchStatisticsService;
@@ -48,6 +48,7 @@ public sealed class HomeViewModel : PageViewModelBase
         _playerWindowService = playerWindowService;
         _movieDiscoveryViewModel = movieDiscoveryViewModel;
         AiRecommendationViewModel = aiRecommendationViewModel;
+        AiRecommendationViewModel.Recommendations.CollectionChanged += (_, _) => OnPropertyChanged(nameof(AiRecommendationPreview));
         _dataRefreshService.DataChanged += OnDataChanged;
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
 
@@ -68,7 +69,11 @@ public sealed class HomeViewModel : PageViewModelBase
 
     public IEnumerable<HomeMovieItem> RecentlyPlayedPreview => RecentlyPlayed.Take(3);
 
-    public IEnumerable<HomeMovieItem> RecentlyAddedPreview => RecentlyAdded.Take(4);
+    public IEnumerable<HomeMovieItem> RecentlyAddedPreview => RecentlyAdded.Take(5);
+
+    public IEnumerable<HomeMovieItem> RecentlyAddedCollapsedPreview => RecentlyAdded.Take(6);
+
+    public IEnumerable<AiRecommendationItem> AiRecommendationPreview => AiRecommendationViewModel.Recommendations.Take(3);
 
     public ObservableCollection<HomeMovieItem> Favorites { get; } = [];
 
@@ -243,6 +248,7 @@ public sealed class HomeViewModel : PageViewModelBase
         LastScanStatus = dashboard.LastScanStatus;
         Replace(RecentlyAdded, dashboard.RecentlyAdded);
         OnPropertyChanged(nameof(RecentlyAddedPreview));
+        OnPropertyChanged(nameof(RecentlyAddedCollapsedPreview));
         Replace(Favorites, dashboard.Favorites);
         Replace(GenreDistribution, dashboard.GenreDistribution);
         Replace(YearDistribution, dashboard.YearDistribution);
@@ -261,6 +267,7 @@ public sealed class HomeViewModel : PageViewModelBase
         LastScanStatus = dashboard.LastScanStatus;
         Replace(RecentlyAdded, dashboard.RecentlyAdded);
         OnPropertyChanged(nameof(RecentlyAddedPreview));
+        OnPropertyChanged(nameof(RecentlyAddedCollapsedPreview));
         await RefreshLibraryStatusOverviewAsync(cancellationToken);
     }
 
@@ -282,6 +289,7 @@ public sealed class HomeViewModel : PageViewModelBase
     private async Task RefreshRecommendationsAsync(CancellationToken cancellationToken = default)
     {
         await AiRecommendationViewModel.ActivateAsync(cancellationToken);
+        OnPropertyChanged(nameof(AiRecommendationPreview));
     }
 
     private async Task RefreshLibraryStatusOverviewAsync(CancellationToken cancellationToken = default)
@@ -514,6 +522,7 @@ public sealed class HomeViewModel : PageViewModelBase
                 Title = movie.Title,
                 OriginalTitle = movie.OriginalTitle,
                 ReleaseYear = movie.ReleaseYear,
+                ReleaseDate = movie.ReleaseDate,
                 PosterRemoteUrl = movie.PosterRemoteUrl,
                 Overview = movie.Overview,
                 Country = movie.Country,

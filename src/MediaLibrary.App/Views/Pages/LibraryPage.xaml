@@ -5,13 +5,118 @@
              xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
-        <Style x:Key="SelectionDotButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="28" />
+        <SolidColorBrush x:Key="LibraryMediaCardBackgroundBrush" Color="#121821" />
+        <SolidColorBrush x:Key="LibraryMediaCardSurfaceBrush" Color="#202938" />
+        <SolidColorBrush x:Key="LibraryMediaCardTextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="LibraryMediaCardMutedTextBrush" Color="#D8DEE9" />
+        <SolidColorBrush x:Key="LibraryMediaCardAccentBrush" Color="#E2E8F0" />
+        <SolidColorBrush x:Key="LibraryMediaCardAccentTextBrush" Color="#111827" />
+        <SolidColorBrush x:Key="LibraryMediaCardDividerBrush" Color="#E5E7EB" />
+        <SolidColorBrush x:Key="LibraryMediaProgressFillBrush" Color="#67C7F2" />
+        <SolidColorBrush x:Key="LibraryMediaProgressTrackBrush" Color="#E5E7EB" />
+        <SolidColorBrush x:Key="LibraryTagDividerBrush" Color="#7DD3FC" />
+        <SolidColorBrush x:Key="LibraryRatingGoldBrush" Color="#F5C84B" />
+
+        <Style x:Key="LibraryMediaProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Background" Value="{StaticResource LibraryMediaProgressTrackBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource LibraryMediaProgressFillBrush}" />
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid Height="{TemplateBinding Height}"
+                              SnapsToDevicePixels="True">
+                            <Border x:Name="PART_Track"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="2" />
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="2" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LibraryMediaChipStyle" TargetType="Border">
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{StaticResource LibraryMediaCardAccentBrush}" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+
+        <Style x:Key="LibraryMediaChipTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource LibraryMediaCardAccentTextBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="LibraryMediaMutedTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource LibraryMediaCardMutedTextBrush}" />
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="LibraryTagLineContainerStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="450" />
+            <Setter Property="ToolTipService.BetweenShowDelay" Value="0" />
+            <Setter Property="ToolTipService.ShowDuration" Value="20000" />
+        </Style>
+
+        <Style x:Key="LibraryMediaTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource LibraryMediaCardTextBrush}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="LibrarySearchBoxStyle" TargetType="TextBox" BasedOn="{StaticResource SearchBoxStyle}">
+            <Setter Property="MinHeight" Value="28" />
             <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="LibraryCompactComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource FormComboBoxStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="LibraryFilterMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource MenuItemStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="LibraryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallButtonStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="LibraryToolbarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="SelectionDotButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderThickness" Value="1.5" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Visibility" Value="Collapsed" />
             <Setter Property="Template">
@@ -20,7 +125,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="14" />
+                                CornerRadius="11" />
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -60,13 +165,13 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Style="{StaticResource PageCardStyle}">
+        <Border Padding="8" Style="{StaticResource PageCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="14" />
+                    <RowDefinition Height="5" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="12" />
+                    <RowDefinition Height="5" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
@@ -82,9 +187,9 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="搜索媒体" Style="{StaticResource BodyMutedTextStyle}" />
+                        <TextBlock Text="搜索媒体" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <TextBox MinWidth="320"
-                                 Style="{StaticResource SearchBoxStyle}"
+                                 Style="{StaticResource LibrarySearchBoxStyle}"
                                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}" />
@@ -95,7 +200,7 @@
                     <Button Grid.Column="2"
                             VerticalAlignment="Bottom"
                             Command="{Binding ApplySearchCommand}"
-                            Style="{StaticResource IconButtonStyle}">
+                            Style="{StaticResource LibraryToolbarIconButtonStyle}">
                         <TextBlock FontFamily="Segoe MDL2 Assets"
                                    FontSize="16"
                                    Text="&#xE721;" />
@@ -104,40 +209,40 @@
                             VerticalAlignment="Bottom"
                             Content="清空搜索"
                             Command="{Binding ClearSearchCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
+                            Style="{StaticResource LibraryToolbarButtonStyle}" />
                     <Button Grid.Column="6"
                             VerticalAlignment="Bottom"
                             Content="清除筛选"
                             Command="{Binding ClearFiltersCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
+                            Style="{StaticResource LibraryToolbarButtonStyle}" />
                 </Grid>
 
                 <WrapPanel Grid.Row="2">
-                    <StackPanel Width="132" Margin="0,0,12,12">
-                        <TextBlock Text="排序" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="118" Margin="0,0,6,4">
+                        <TextBlock Text="排序" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <ComboBox SelectedItem="{Binding SelectedSortOption}"
                                   ItemsSource="{Binding SortOptions}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
+                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
                     </StackPanel>
 
-                    <StackPanel Width="112" Margin="0,0,12,12">
-                        <TextBlock Text="顺序" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="96" Margin="0,0,6,4">
+                        <TextBlock Text="顺序" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <ComboBox SelectedItem="{Binding SelectedSortDirection}"
                                   ItemsSource="{Binding SortDirectionOptions}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
+                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
                     </StackPanel>
 
-                    <StackPanel Width="132" Margin="0,0,12,12">
-                        <TextBlock Text="内容" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="108" Margin="0,0,6,4">
+                        <TextBlock Text="内容" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <ComboBox SelectedItem="{Binding SelectedContentTypeFilter}"
                                   ItemsSource="{Binding ContentTypeOptions}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
+                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
                     </StackPanel>
 
-                    <StackPanel Width="190" Margin="0,0,12,12">
-                        <TextBlock Text="范围" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="176" Margin="0,0,6,4">
+                        <TextBlock Text="范围" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <Menu>
-                            <MenuItem Header="{Binding LibraryScopeMenuHeader}">
+                            <MenuItem Header="{Binding LibraryScopeMenuHeader}" Style="{StaticResource LibraryFilterMenuItemStyle}">
                                 <MenuItem Header="播放源状态">
                                     <MenuItem Header="全部"
                                               Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
@@ -165,10 +270,10 @@
                         </Menu>
                     </StackPanel>
 
-                    <StackPanel Width="210" Margin="0,0,12,12">
-                        <TextBlock Text="标签" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="194" Margin="0,0,6,4">
+                        <TextBlock Text="标签" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <Menu>
-                            <MenuItem Header="{Binding TagFilterMenuHeader}">
+                            <MenuItem Header="{Binding TagFilterMenuHeader}" Style="{StaticResource LibraryFilterMenuItemStyle}">
                                 <MenuItem Header="清除标签"
                                           Command="{Binding DataContext.ClearTagFilterCommand, ElementName=Root}" />
                                 <Separator />
@@ -246,17 +351,17 @@
                         </Menu>
                     </StackPanel>
 
-                    <StackPanel Width="116" Margin="0,0,12,12">
-                        <TextBlock Text="年代" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="100" Margin="0,0,6,4">
+                        <TextBlock Text="年代" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <ComboBox SelectedItem="{Binding SelectedDecadeFilter}"
                                   ItemsSource="{Binding DecadeFilterOptions}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
+                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
                     </StackPanel>
 
-                    <StackPanel Width="150" Margin="0,0,12,12">
-                        <TextBlock Text="收藏状态" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="138" Margin="0,0,6,4">
+                        <TextBlock Text="收藏状态" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <Menu>
-                            <MenuItem Header="{Binding CollectionStatusMenuHeader}">
+                            <MenuItem Header="{Binding CollectionStatusMenuHeader}" Style="{StaticResource LibraryFilterMenuItemStyle}">
                                 <MenuItem Header="全部"
                                           Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
                                           CommandParameter="全部" />
@@ -273,11 +378,11 @@
                         </Menu>
                     </StackPanel>
 
-                    <StackPanel Width="132" Margin="0,0,12,12">
-                        <TextBlock Text="观看状态" Style="{StaticResource BodyMutedTextStyle}" />
+                    <StackPanel Width="118" Margin="0,0,6,4">
+                        <TextBlock Text="观看状态" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <ComboBox SelectedItem="{Binding SelectedWatchedFilter}"
                                   ItemsSource="{Binding WatchedFilterOptions}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
+                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
                     </StackPanel>
                 </WrapPanel>
 
@@ -357,23 +462,62 @@
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right"
                                     Orientation="Horizontal"
-                                    VerticalAlignment="Top">
-                            <Button Content="切换布局"
-                                    Command="{Binding ShowLayoutSwitchPlaceholderCommand}"
-                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                    VerticalAlignment="Center">
+                            <Button Content="已移出媒体库"
+                                    Command="{Binding OpenRemovedLibraryCommand}"
+                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
+                            <Border Margin="8,0,0,0"
+                                    Padding="2"
+                                    Background="{DynamicResource BrushSurfaceAlt}"
+                                    BorderBrush="{DynamicResource BrushBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="海报"
+                                            Command="{Binding SwitchToPosterViewCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPosterView}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <Button Margin="2,0,0,0"
+                                            Content="列表"
+                                            Command="{Binding SwitchToListViewCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsListView}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
                             <Button Margin="10,0,0,0"
                                     Content="{Binding BatchSelectionButtonText}"
                                     Command="{Binding ToggleBatchSelectionModeCommand}"
-                                    Style="{StaticResource SecondaryButtonStyle}" />
-                            <Button Margin="10,0,0,0"
-                                    Content="已移出媒体库"
-                                    Command="{Binding OpenRemovedLibraryCommand}"
-                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
                         </StackPanel>
 
-                        <StackPanel>
-                            <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
-                            <TextBlock Margin="0,8,0,0"
+                        <StackPanel Margin="20,0,0,0"
+                                    VerticalAlignment="Center">
+                            <TextBlock FontSize="12" Text="{Binding StatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
+                            <TextBlock Margin="0,4,0,0"
                                        Text="{Binding BatchResultSummary}"
                                        TextWrapping="Wrap">
                                 <TextBlock.Style>
@@ -432,93 +576,154 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <controls:VirtualizingWrapPanel ItemWidth="236"
-                                                                ItemHeight="560"
-                                                                OverscanRows="1" />
+                                <controls:VirtualizingWrapPanel>
+                                    <controls:VirtualizingWrapPanel.Style>
+                                        <Style TargetType="{x:Type controls:VirtualizingWrapPanel}">
+                                            <Setter Property="ItemWidth" Value="192" />
+                                            <Setter Property="ItemHeight" Value="282" />
+                                            <Setter Property="OverscanRows" Value="1" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                    <Setter Property="ItemWidth" Value="199" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </controls:VirtualizingWrapPanel.Style>
+                                </controls:VirtualizingWrapPanel>
                             </ItemsPanelTemplate>
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Width="218"
-                                            Margin="0,0,18,18"
-                                            Style="{StaticResource BatchSelectableCardStyle}">
+                                    <Border Width="180"
+                                            Height="270"
+                                            Margin="0,0,12,12"
+                                            Background="{StaticResource LibraryMediaCardBackgroundBrush}"
+                                            BorderBrush="{DynamicResource BrushBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="18"
+                                            ClipToBounds="True">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Cursor" Value="Arrow" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
+                                                        <Setter Property="Cursor" Value="Hand" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
                                         <Border.InputBindings>
                                             <MouseBinding MouseAction="LeftClick"
                                                           Command="{Binding DataContext.OpenOrToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           CommandParameter="{Binding}" />
                                         </Border.InputBindings>
-                                        <StackPanel>
-                                            <Grid Height="286">
-                                                <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
-                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
-                                                           helpers:PosterCacheImageBehavior.DecodePixelWidth="436"
-                                                           Stretch="UniformToFill" />
-                                                </Border>
-                                                <Border HorizontalAlignment="Left"
-                                                        VerticalAlignment="Top"
-                                                        Margin="10"
-                                                        Padding="9,5"
-                                                        CornerRadius="999"
-                                                        Background="{DynamicResource BrushAccent}">
-                                                    <TextBlock Foreground="{DynamicResource BrushOnAccent}"
-                                                               FontWeight="SemiBold"
-                                                               Text="{Binding IdentificationStatus}" />
-                                                </Border>
-                                                <Border HorizontalAlignment="Right"
-                                                        VerticalAlignment="Top"
-                                                        Margin="10,48,10,0"
-                                                        Padding="9,5"
-                                                        CornerRadius="999"
-                                                        Background="{DynamicResource BrushSurfaceAlt}">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding HasActiveSource}" Value="False">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <TextBlock Foreground="{DynamicResource BrushForegroundPrimary}"
-                                                               FontWeight="SemiBold"
-                                                               Text="暂无播放源" />
-                                                </Border>
-                                                <Button HorizontalAlignment="Right"
-                                                        VerticalAlignment="Top"
-                                                        Margin="10"
-                                                        Command="{Binding DataContext.ToggleItemSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{StaticResource SelectionDotButtonStyle}" />
+                                        <Grid>
+                                            <Border Background="{StaticResource LibraryMediaCardSurfaceBrush}" />
+                                            <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="240"
+                                                   helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                   Stretch="UniformToFill">
+                                                <Image.Style>
+                                                    <Style TargetType="Image">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasPoster}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                            <Grid>
+                                                <Grid.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                        <GradientStop Color="#00000000" Offset="0" />
+                                                        <GradientStop Color="#16000000" Offset="0.45" />
+                                                        <GradientStop Color="#A6000000" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Grid.Background>
                                             </Grid>
-
-                                            <TextBlock Margin="0,14,0,0"
-                                                       Text="{Binding Title}"
-                                                       TextWrapping="Wrap"
-                                                       Style="{StaticResource SectionTitleTextStyle}" />
-                                            <TextBlock Margin="0,4,0,0"
-                                                       Text="{Binding MediaKindText}"
-                                                       Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Margin="0,4,0,0" Text="{Binding ReleaseYear}" Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Margin="0,6,0,0"
-                                                       Text="{Binding GenresText}"
-                                                       TextWrapping="Wrap"
-                                                       Style="{StaticResource BodyTextStyle}" />
-                                            <DockPanel Margin="0,12,0,0">
-                                                <TextBlock Text="{Binding PrimaryRatingValue, StringFormat={}{0:0.0}}" FontWeight="SemiBold" />
-                                                <TextBlock DockPanel.Dock="Right"
-                                                           Text="{Binding SourceCount, StringFormat={}{0} 个播放源}"
-                                                           Style="{StaticResource BodyMutedTextStyle}" />
-                                            </DockPanel>
-                                            <TextBlock Margin="0,5,0,0"
-                                                       Text="{Binding ProgressSummary}"
-                                                       Style="{StaticResource BodyMutedTextStyle}" />
-                                            <Button Margin="0,14,0,0"
-                                                    Content="查看详情"
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Text="无海报">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource LibraryMediaMutedTextStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasPoster}" Value="False">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <Border HorizontalAlignment="Left"
+                                                    VerticalAlignment="Top"
+                                                    Margin="8"
+                                                    MaxWidth="88"
+                                                    Style="{StaticResource LibraryMediaChipStyle}">
+                                                <TextBlock Text="{Binding CategoryTagText}"
+                                                           Style="{StaticResource LibraryMediaChipTextStyle}" />
+                                            </Border>
+                                            <Border HorizontalAlignment="Right"
+                                                    VerticalAlignment="Top"
+                                                    Margin="8"
+                                                    MaxWidth="88"
+                                                    Style="{StaticResource LibraryMediaChipStyle}">
+                                                <TextBlock Text="{Binding SourceBadgeText}"
+                                                           Style="{StaticResource LibraryMediaChipTextStyle}" />
+                                            </Border>
+                                            <Button HorizontalAlignment="Center"
+                                                    VerticalAlignment="Top"
+                                                    Margin="0,8,0,0"
+                                                    Command="{Binding DataContext.ToggleItemSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource SelectionDotButtonStyle}" />
+                                            <StackPanel VerticalAlignment="Bottom" Margin="10">
+                                                <TextBlock Text="{Binding Title}"
+                                                           MaxHeight="36"
+                                                           Style="{StaticResource LibraryMediaTitleTextStyle}" />
+                                                <TextBlock Margin="0,3,0,0"
+                                                           Text="{Binding ReleaseDateText}"
+                                                           Style="{StaticResource LibraryMediaMutedTextStyle}" />
+                                                <Border Margin="0,5,0,0"
+                                                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
+                                                        helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
+                                                        Style="{StaticResource LibraryTagLineContainerStyle}">
+                                                    <TextBlock Style="{StaticResource LibraryMediaMutedTextStyle}">
+                                                        <Run Text="{Binding PosterTagGroupOneText, Mode=OneWay}" />
+                                                        <Run Text="{Binding PosterTagSeparatorAfterOneText, Mode=OneWay}"
+                                                             Foreground="{StaticResource LibraryTagDividerBrush}" />
+                                                        <Run Text="{Binding PosterTagGroupTwoText, Mode=OneWay}" />
+                                                        <Run Text="{Binding PosterTagSeparatorAfterTwoText, Mode=OneWay}"
+                                                             Foreground="{StaticResource LibraryTagDividerBrush}" />
+                                                        <Run Text="{Binding PosterTagGroupThreeText, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Border>
+                                                <Grid Margin="0,7,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="8" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <ProgressBar VerticalAlignment="Center"
+                                                                 Value="{Binding ProgressValue, Mode=OneWay}"
+                                                                 Style="{StaticResource LibraryMediaProgressBarStyle}" />
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding ProgressLabel}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource LibraryMediaCardTextBrush}" />
+                                                </Grid>
+                                            </StackPanel>
+                                            <Button HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Bottom"
+                                                    Height="30"
+                                                    Margin="10,0,10,10"
+                                                    Opacity="0"
+                                                    IsHitTestVisible="False"
                                                     Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}">
                                                 <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                    <Style TargetType="Button">
                                                         <Setter Property="Visibility" Value="Visible" />
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
@@ -528,7 +733,7 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                        </StackPanel>
+                                        </Grid>
                                     </Border>
                                 </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -536,9 +741,16 @@
 
                     <ListBox Grid.Row="1"
                              Margin="0,18,0,0"
-                             ItemsSource="{Binding Movies}">
+                             ItemsSource="{Binding Movies}"
+                             ScrollViewer.CanContentScroll="True"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling">
                         <ListBox.Style>
-                            <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                            <Style TargetType="ListBox">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsListView}" Value="True">
@@ -547,84 +759,144 @@
                                 </Style.Triggers>
                             </Style>
                         </ListBox.Style>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,0,0,9" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Focusable" Value="False" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid Style="{StaticResource BatchSelectableListItemContentStyle}">
-                                    <Grid.InputBindings>
-                                        <MouseBinding MouseAction="LeftClick"
-                                                      Command="{Binding DataContext.OpenOrToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                      CommandParameter="{Binding}" />
-                                    </Grid.InputBindings>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="160" />
-                                        <ColumnDefinition Width="130" />
-                                        <ColumnDefinition Width="120" />
-                                    </Grid.ColumnDefinitions>
+                                <Border MinHeight="74"
+                                        Margin="0,0,18,0"
+                                        Padding="7"
+                                        Background="{StaticResource LibraryMediaCardBackgroundBrush}"
+                                        BorderBrush="{DynamicResource BrushBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="14">
+                                    <Grid Style="{StaticResource BatchSelectableListItemContentStyle}">
+                                        <Grid.InputBindings>
+                                            <MouseBinding MouseAction="LeftClick"
+                                                          Command="{Binding DataContext.OpenOrToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          CommandParameter="{Binding}" />
+                                        </Grid.InputBindings>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="54" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <Button Grid.Column="0"
-                                            Margin="0,0,14,0"
-                                            VerticalAlignment="Center"
-                                            Command="{Binding DataContext.ToggleItemSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            Style="{StaticResource SelectionDotButtonStyle}" />
+                                        <Button Grid.Column="0"
+                                                Margin="0,0,8,0"
+                                                VerticalAlignment="Center"
+                                                Command="{Binding DataContext.ToggleItemSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource SelectionDotButtonStyle}" />
 
-                                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                                        <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,4,0,0"
-                                                   Text="暂无播放源">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasActiveSource}" Value="False">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                        <TextBlock Margin="0,4,0,0" Text="{Binding OriginalTitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,6,0,0"
-                                                   Text="{Binding GenresText}"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource BodyTextStyle}" />
-                                    </StackPanel>
+                                        <Border Grid.Column="1"
+                                                Width="42"
+                                                Height="46"
+                                                VerticalAlignment="Center"
+                                                Background="{StaticResource LibraryMediaCardAccentBrush}"
+                                                CornerRadius="9">
+                                            <StackPanel HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding RatingDisplayText}"
+                                                           HorizontalAlignment="Center"
+                                                           FontSize="15"
+                                                           FontWeight="SemiBold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource LibraryMediaCardAccentTextBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsHighRating}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource LibraryRatingGoldBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
 
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="{Binding IdentificationStatus}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,6,0,0" Text="{Binding ReleaseYear}" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBlock Margin="0,4,0,0"
-                                                   Text="{Binding SourceCount, StringFormat={}{0} 个播放源}"
-                                                   Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,4,0,0"
-                                                   Text="{Binding SourceSummary}"
-                                                   Style="{StaticResource BodyMutedTextStyle}" />
-                                    </StackPanel>
+                                        <StackPanel Grid.Column="2" Margin="8,0,6,0" VerticalAlignment="Center">
+                                            <TextBlock ToolTip="{Binding ListTitleLineText}"
+                                                       TextWrapping="NoWrap"
+                                                       Style="{StaticResource LibraryMediaTitleTextStyle}">
+                                                <Run Text="{Binding Title, Mode=OneWay}" />
+                                                <Run Text="{Binding OriginalTitleSeparatorText, Mode=OneWay}" />
+                                                <Run Text="{Binding OriginalTitle, Mode=OneWay}" />
+                                                <Run Text="{Binding ListTitleMetaSpacingText, Mode=OneWay}" />
+                                                <Run Text="{Binding ListTitleMetaText, Mode=OneWay}"
+                                                     FontSize="10.5"
+                                                     FontWeight="Normal"
+                                                     Foreground="{StaticResource LibraryMediaCardMutedTextBrush}" />
+                                            </TextBlock>
+                                            <Border Margin="0,5,0,0"
+                                                    helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListTagToolTipText}"
+                                                    helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding ListTagLine}"
+                                                    Style="{StaticResource LibraryTagLineContainerStyle}">
+                                                <TextBlock Style="{StaticResource LibraryMediaMutedTextStyle}">
+                                                    <Run Text="{Binding ListDateRuntimeText, Mode=OneWay}" />
+                                                    <Run Text="{Binding ListDateAndTagSpacingText, Mode=OneWay}" />
+                                                    <Run Text="{Binding ListTagGroupOneText, Mode=OneWay}" />
+                                                    <Run Text="{Binding ListTagSeparatorAfterOneText, Mode=OneWay}"
+                                                         Foreground="{StaticResource LibraryTagDividerBrush}" />
+                                                    <Run Text="{Binding ListTagGroupTwoText, Mode=OneWay}" />
+                                                    <Run Text="{Binding ListTagSeparatorAfterTwoText, Mode=OneWay}"
+                                                         Foreground="{StaticResource LibraryTagDividerBrush}" />
+                                                    <Run Text="{Binding ListTagGroupThreeText, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </Border>
+                                            <Grid Margin="0,7,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <ProgressBar VerticalAlignment="Center"
+                                                             Value="{Binding ProgressValue, Mode=OneWay}"
+                                                             Style="{StaticResource LibraryMediaProgressBarStyle}" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding ProgressLabel}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource LibraryMediaCardTextBrush}" />
+                                            </Grid>
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="3">
-                                        <TextBlock Text="{Binding PrimaryRatingValue, StringFormat={}{0:0.0}}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,6,0,0" Text="{Binding PrimaryRatingSourceName}" Style="{StaticResource BodyMutedTextStyle}" />
-                                    </StackPanel>
-
-                                    <Button Grid.Column="4"
-                                            VerticalAlignment="Center"
-                                            Content="查看详情"
-                                            Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                </Grid>
+                                        <StackPanel Grid.Column="3"
+                                                    Width="82"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Center">
+                                            <Border Margin="0,0,0,7"
+                                                    HorizontalAlignment="Right"
+                                                    MaxWidth="80"
+                                                    Style="{StaticResource LibraryMediaChipStyle}">
+                                                <TextBlock Text="{Binding SourceBadgeText}"
+                                                           Style="{StaticResource LibraryMediaChipTextStyle}" />
+                                            </Border>
+                                            <Border HorizontalAlignment="Right"
+                                                    MaxWidth="80"
+                                                    Style="{StaticResource LibraryMediaChipStyle}">
+                                                <TextBlock Text="{Binding DetailHintText}"
+                                                           Style="{StaticResource LibraryMediaChipTextStyle}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

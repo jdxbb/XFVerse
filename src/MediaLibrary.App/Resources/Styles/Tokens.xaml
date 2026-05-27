@@ -55,7 +55,7 @@
     <sys:Double x:Key="IconButtonSize">42</sys:Double>
     <sys:Double x:Key="SmallIconButtonSize">34</sys:Double>
     <sys:Double x:Key="WindowCaptionHeight">44</sys:Double>
-    <sys:Double x:Key="NavigationWidthExpanded">248</sys:Double>
+    <sys:Double x:Key="NavigationWidthExpanded">220</sys:Double>
     <sys:Double x:Key="NavigationWidthCollapsed">64</sys:Double>
     <sys:Double x:Key="ToolbarHeight">48</sys:Double>
     <sys:Double x:Key="InputHeight">40</sys:Double>

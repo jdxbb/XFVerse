@@ -11,17 +11,49 @@
             <Setter Property="MinHeight" Value="40" />
         </Style>
 
-        <Style x:Key="HomePosterButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+        <Style x:Key="HomePosterButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.55" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
-        <Style x:Key="HomeTextButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+        <Style x:Key="HomeTextButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="MinHeight" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="HomeAiTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource HomeTwoLineTitleStyle}">
@@ -29,29 +61,166 @@
             <Setter Property="MaxHeight" Value="36" />
             <Setter Property="MinHeight" Value="36" />
         </Style>
+
+        <Style x:Key="HomeCompactActionButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Width" Value="66" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="HomeWantButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="HomeAiTagTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="LineHeight" Value="14" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Style.Triggers>
+                <Trigger Property="Text" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="HomeAiRatingBadgeStyle" TargetType="Border">
+            <Setter Property="MinWidth" Value="42" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="HomeMetricValueTextStyle" TargetType="TextBlock" BasedOn="{StaticResource MetricTextStyle}">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="LineHeight" Value="28" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+        </Style>
+
+        <Style x:Key="HomeSectionArrowButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="58" />
+            <Setter Property="MinWidth" Value="38" />
+            <Setter Property="MinHeight" Value="58" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+        </Style>
+
+        <Style x:Key="HomeRecentTitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="13" />
+            <Setter Property="MaxHeight" Value="26" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+        </Style>
+
+        <Style x:Key="HomeAiExpandedTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="18" />
+            <Setter Property="MaxHeight" Value="36" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+        </Style>
+
+        <Style x:Key="HomeAiCollapsedTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+        </Style>
+
+        <Style x:Key="HomeRecentDateTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+            <Setter Property="Margin" Value="0,3,0,0" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="LineHeight" Value="12" />
+        </Style>
+
+        <ItemsPanelTemplate x:Key="HomeRecentFiveColumnsPanel">
+            <UniformGrid Columns="5" />
+        </ItemsPanelTemplate>
+
+        <ItemsPanelTemplate x:Key="HomeRecentSixColumnsPanel">
+            <UniformGrid Columns="6" />
+        </ItemsPanelTemplate>
+
+        <DataTemplate x:Key="HomeRecentItemTemplate">
+            <StackPanel Width="90"
+                        Margin="0,0,8,0"
+                        HorizontalAlignment="Center">
+                <Button Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}"
+                        Style="{StaticResource HomePosterButtonStyle}">
+                    <Border Width="82"
+                            Height="123"
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource HomeMediaPosterChromeStyle}">
+                        <Grid>
+                            <TextBlock HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="无海报"
+                                       Style="{StaticResource CaptionTextStyle}" />
+                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                        </Grid>
+                    </Border>
+                </Button>
+                <Button Margin="0,6,0,0"
+                        Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}"
+                        Style="{StaticResource HomeTextButtonStyle}">
+                    <TextBlock Text="{Binding Title}"
+                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}"
+                               Style="{StaticResource HomeRecentTitleTextStyle}" />
+                </Button>
+                <TextBlock Text="{Binding ReleaseYear}"
+                           Style="{StaticResource HomeRecentDateTextStyle}" />
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="660" />
+            <ColumnDefinition x:Name="MainContentColumn" Width="*" MinWidth="660" />
             <ColumnDefinition Width="24" />
-            <ColumnDefinition Width="360" />
+            <ColumnDefinition x:Name="AiPanelColumn" Width="360" />
         </Grid.ColumnDefinitions>
 
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="1.1*" MinHeight="122" />
-                <RowDefinition Height="2.6*" MinHeight="218" />
-                <RowDefinition Height="1.8*" MinHeight="170" />
+                <RowDefinition Height="1.25*" MinHeight="150" />
+                <RowDefinition Height="2.75*" MinHeight="250" />
+                <RowDefinition Height="1.85*" MinHeight="190" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
-                    Margin="0,0,0,18"
+                    Margin="0,0,0,14"
+                    Padding="16"
                     Style="{StaticResource PageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="10" />
+                        <RowDefinition Height="8" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel>
@@ -72,7 +241,7 @@
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
@@ -96,15 +265,16 @@
                                                    Style="{StaticResource BodyMutedTextStyle}" />
                                         <StackPanel Grid.Row="1"
                                                     Grid.ColumnSpan="2"
-                                                    Margin="0,8,0,2"
+                                                    Margin="0,6,0,0"
                                                     Orientation="Horizontal">
-                                            <TextBlock Text="{Binding ValueText}" Style="{StaticResource MetricTextStyle}" />
-                                            <TextBlock Margin="6,10,0,0"
+                                            <TextBlock Text="{Binding ValueText}" Style="{StaticResource HomeMetricValueTextStyle}" />
+                                            <TextBlock Margin="6,8,0,0"
                                                        Text="{Binding UnitText}"
                                                        Style="{StaticResource BodyMutedTextStyle}" />
                                         </StackPanel>
                                         <TextBlock Grid.Row="2"
                                                    Grid.ColumnSpan="2"
+                                                   Margin="0,2,0,0"
                                                    Text="{Binding TrendText}"
                                                    Style="{StaticResource CaptionTextStyle}" />
                                     </Grid>
@@ -116,7 +286,7 @@
             </Border>
 
             <Border Grid.Row="1"
-                    Margin="0,0,0,18"
+                    Margin="0,0,0,14"
                     Style="{StaticResource PageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -128,14 +298,6 @@
                         <StackPanel>
                             <TextBlock Text="继续观看" Style="{StaticResource CardTitleTextStyle}" />
                         </StackPanel>
-                        <Button DockPanel.Dock="Right"
-                                Width="42"
-                                Height="42"
-                                Padding="0"
-                                Content="›"
-                                ToolTip="进入观影历史"
-                                Command="{Binding NavigateToWatchHistoryCommand}"
-                                Style="{StaticResource IconButtonStyle}" />
                     </DockPanel>
 
                     <Border Grid.Row="2">
@@ -157,7 +319,9 @@
                         </StackPanel>
                     </Border>
 
-                    <ItemsControl Grid.Row="2" ItemsSource="{Binding RecentlyPlayedPreview}">
+                    <ItemsControl Grid.Row="2"
+                                  Margin="0,0,48,0"
+                                  ItemsSource="{Binding RecentlyPlayedPreview}">
                         <ItemsControl.Style>
                             <Style TargetType="ItemsControl">
                                 <Setter Property="Visibility" Value="Visible" />
@@ -175,84 +339,71 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="0,0,12,0" Style="{StaticResource HomeMediaCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="78" />
-                                            <ColumnDefinition Width="12" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Button Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource HomePosterButtonStyle}">
-                                            <Border Height="112" Style="{StaticResource HomeMediaPosterChromeStyle}">
-                                                <Grid>
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Text="无海报"
-                                                               Style="{StaticResource CaptionTextStyle}" />
-                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
-                                                </Grid>
-                                            </Border>
-                                        </Button>
-
-                                        <StackPanel Grid.Column="2">
-                                            <Button Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource HomeTextButtonStyle}">
-                                                <TextBlock Text="{Binding Title}"
-                                                           ToolTip="{Binding Title}"
-                                                           Style="{StaticResource HomeTwoLineTitleStyle}" />
-                                            </Button>
-                                            <TextBlock Margin="0,6,0,0"
-                                                       Text="{Binding WatchPositionText}"
-                                                       Style="{StaticResource MetadataTextStyle}" />
-                                            <TextBlock Margin="0,2,0,0"
-                                                       Text="{Binding ProgressPercentText}"
+                                <Button Margin="0,0,12,0"
+                                        Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        Style="{StaticResource HomePosterButtonStyle}">
+                                    <Border Width="158"
+                                            Height="237"
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource HomeMediaPosterChromeStyle}">
+                                        <Grid>
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Text="无海报"
                                                        Style="{StaticResource CaptionTextStyle}" />
-                                            <ProgressBar Margin="0,8,0,0"
-                                                         Maximum="100"
-                                                         Value="{Binding ProgressValue}"
-                                                         Style="{StaticResource ThinProgressBarStyle}" />
-                                            <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
-                                                <Border>
-                                                    <Border.Style>
-                                                        <Style TargetType="Border" BasedOn="{StaticResource SuccessBadgeStyle}">
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding CanContinuePlayback}" Value="False">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <TextBlock Text="播放源可用" Style="{StaticResource BadgeTextStyle}" />
-                                                </Border>
-                                                <Border>
-                                                    <Border.Style>
-                                                        <Style TargetType="Border" BasedOn="{StaticResource NoSourceBadgeStyle}">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding CanContinuePlayback}" Value="False">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <TextBlock Text="暂无播放源" Style="{StaticResource BadgeTextStyle}" />
-                                                </Border>
-                                                <Button Margin="8,0,0,0"
-                                                        MinWidth="78"
-                                                        Content="{Binding ContinueButtonText}"
-                                                        Command="{Binding DataContext.ContinuePlaybackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{StaticResource SmallButtonStyle}" />
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
+                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                            <Border VerticalAlignment="Bottom"
+                                                    Padding="12,52,12,12">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                        <GradientStop Color="#00000000" Offset="0" />
+                                                        <GradientStop Color="#E6000000" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}"
+                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}"
+                                                               FontSize="14"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="White"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <Grid Margin="0,6,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding WatchPositionText}"
+                                                                   Foreground="#DDFFFFFF"
+                                                                   FontSize="10.5" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Margin="8,0,0,0"
+                                                                   Text="{Binding ProgressValue, StringFormat={}{0:0}%}"
+                                                                   Foreground="#DDFFFFFF"
+                                                                   FontSize="10.5" />
+                                                    </Grid>
+                                                    <ProgressBar Margin="0,6,0,0"
+                                                                 Maximum="100"
+                                                                 Value="{Binding ProgressValue}"
+                                                                 Style="{StaticResource ThinProgressBarStyle}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <Button Grid.Row="2"
+                            Width="40"
+                            Height="58"
+                            Padding="0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Content="›"
+                            ToolTip="进入观影历史"
+                            Command="{Binding NavigateToWatchHistoryCommand}"
+                            Style="{StaticResource HomeSectionArrowButtonStyle}" />
                 </Grid>
             </Border>
 
@@ -267,14 +418,6 @@
                         <StackPanel>
                             <TextBlock Text="最近新增" Style="{StaticResource CardTitleTextStyle}" />
                         </StackPanel>
-                        <Button DockPanel.Dock="Right"
-                                Width="42"
-                                Height="42"
-                                Padding="0"
-                                Content="›"
-                                ToolTip="进入媒体库"
-                                Command="{Binding OpenLibraryCommand}"
-                                Style="{StaticResource IconButtonStyle}" />
                     </DockPanel>
 
                     <Border Grid.Row="2">
@@ -296,7 +439,11 @@
                         </StackPanel>
                     </Border>
 
-                    <ItemsControl Grid.Row="2" ItemsSource="{Binding RecentlyAddedPreview}">
+                    <ItemsControl Grid.Row="2"
+                                  Margin="0,0,46,0"
+                                  ItemsSource="{Binding RecentlyAddedPreview}"
+                                  ItemsPanel="{StaticResource HomeRecentFiveColumnsPanel}"
+                                  ItemTemplate="{StaticResource HomeRecentItemTemplate}">
                         <ItemsControl.Style>
                             <Style TargetType="ItemsControl">
                                 <Setter Property="Visibility" Value="Visible" />
@@ -304,46 +451,42 @@
                                     <DataTrigger Binding="{Binding RecentlyAdded.Count}" Value="0">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </ItemsControl.Style>
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Columns="4" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,0,12,0" Style="{StaticResource HomeMediaCardStyle}">
-                                    <StackPanel>
-                                        <Button Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource HomePosterButtonStyle}">
-                                            <Border Height="88" Style="{StaticResource HomeMediaPosterChromeStyle}">
-                                                <Grid>
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Text="无海报"
-                                                               Style="{StaticResource CaptionTextStyle}" />
-                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
-                                                </Grid>
-                                            </Border>
-                                        </Button>
-                                        <Button Margin="0,8,0,0"
-                                                Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource HomeTextButtonStyle}">
-                                            <TextBlock Text="{Binding Title}"
-                                                       ToolTip="{Binding Title}"
-                                                       Style="{StaticResource HomeTwoLineTitleStyle}" />
-                                        </Button>
-                                        <TextBlock Text="{Binding ReleaseYear}"
-                                                   Style="{StaticResource CaptionTextStyle}" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <ItemsControl Grid.Row="2"
+                                  Margin="0,0,46,0"
+                                  ItemsSource="{Binding RecentlyAddedCollapsedPreview}"
+                                  ItemsPanel="{StaticResource HomeRecentSixColumnsPanel}"
+                                  ItemTemplate="{StaticResource HomeRecentItemTemplate}">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding RecentlyAdded.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
+                    </ItemsControl>
+                    <Button Grid.Row="2"
+                            Width="40"
+                            Height="58"
+                            Padding="0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Content="›"
+                            ToolTip="进入媒体库"
+                            Command="{Binding OpenLibraryCommand}"
+                            Style="{StaticResource HomeSectionArrowButtonStyle}" />
                 </Grid>
             </Border>
         </Grid>
@@ -356,27 +499,25 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <DockPanel>
-                    <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="66" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
                         <TextBlock Text="AI 推荐" Style="{StaticResource CardTitleTextStyle}" />
                         <TextBlock Margin="0,6,0,0"
                                    Text="默认推荐库外 + 未看影片"
                                    Style="{StaticResource BodyMutedTextStyle}" />
                     </StackPanel>
-                    <Button DockPanel.Dock="Right"
+                    <Button Grid.Column="1"
                             Content="{Binding AiRecommendationViewModel.RefreshBatchButtonText}"
                             Command="{Binding AiRecommendationViewModel.RefreshBatchCommand}"
-                            Style="{StaticResource SmallButtonStyle}" />
-                </DockPanel>
+                            Style="{StaticResource HomeCompactActionButtonStyle}" />
+                </Grid>
 
-                <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                    <TextBlock Text="{Binding AiRecommendationViewModel.StatusMessage}"
-                               TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis"
-                               MaxHeight="40"
-                               Style="{StaticResource MetadataTextStyle}" />
-
-                    <Border Margin="0,14,0,0">
+                <Grid Grid.Row="1" Margin="0,16,0,0">
+                    <Border VerticalAlignment="Center">
                         <Border.Style>
                             <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -395,7 +536,7 @@
                         </StackPanel>
                     </Border>
 
-                    <ItemsControl Margin="0,14,0,0" ItemsSource="{Binding AiRecommendationViewModel.Recommendations}">
+                    <ItemsControl ItemsSource="{Binding AiRecommendationPreview}">
                         <ItemsControl.Style>
                             <Style TargetType="ItemsControl">
                                 <Setter Property="Visibility" Value="Visible" />
@@ -403,23 +544,36 @@
                                     <DataTrigger Binding="{Binding AiRecommendationViewModel.Recommendations.Count}" Value="0">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </ItemsControl.Style>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="3" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="0,0,0,8" Style="{StaticResource HomeAiCardStyle}">
+                                <Border Padding="0,8"
+                                        BorderBrush="{DynamicResource BrushDivider}"
+                                        BorderThickness="0,0,0,1">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="56" />
-                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="12" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="66" />
                                         </Grid.ColumnDefinitions>
 
                                         <Button Command="{Binding DataContext.AiRecommendationViewModel.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HomePosterButtonStyle}">
-                                            <Border Height="74" Style="{StaticResource HomeMediaPosterChromeStyle}">
+                                            <Border Width="112"
+                                                    Height="168"
+                                                    Style="{StaticResource HomeMediaPosterChromeStyle}">
                                                 <Grid>
                                                     <TextBlock HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"
@@ -430,10 +584,16 @@
                                             </Border>
                                         </Button>
 
-                                        <Grid Grid.Column="2">
+                                        <Grid Grid.Column="2"
+                                              Height="152"
+                                              Margin="0,8,8,0"
+                                              VerticalAlignment="Top">
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="*" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
 
@@ -441,122 +601,194 @@
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource HomeTextButtonStyle}">
                                                 <TextBlock Text="{Binding Title}"
-                                                           ToolTip="{Binding Title}"
-                                                           Style="{StaticResource HomeAiTitleStyle}" />
+                                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}"
+                                                           Style="{StaticResource HomeAiExpandedTitleTextStyle}" />
                                             </Button>
+                                            <TextBlock Grid.Row="1"
+                                                       Margin="0,5,0,0"
+                                                       Text="{Binding ReleaseDateText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding ReleaseDateText}"
+                                                       Style="{StaticResource CaptionTextStyle}" />
+                                            <TextBlock Grid.Row="3"
+                                                       Margin="0,0,0,0"
+                                                       Text="{Binding Tags}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding Tags}"
+                                                       Style="{StaticResource HomeAiTagTextStyle}" />
+                                            <TextBlock Grid.Row="4"
+                                                       Margin="0,3,0,0"
+                                                       Text="{Binding EmotionTagsText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding EmotionTagsText}"
+                                                       Style="{StaticResource HomeAiTagTextStyle}" />
+                                            <TextBlock Grid.Row="5"
+                                                       Margin="0,3,0,0"
+                                                       Text="{Binding SceneTagsText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding SceneTagsText}"
+                                                       Style="{StaticResource HomeAiTagTextStyle}" />
+                                        </Grid>
 
-                                            <StackPanel Grid.Row="1" Margin="0,2,0,4">
-                                                <StackPanel>
-                                                    <StackPanel.Style>
-                                                        <Style TargetType="StackPanel">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </StackPanel.Style>
-                                                    <TextBlock Text="{Binding ReleaseYear, StringFormat=年份 {0}, TargetNullValue=年份 -}"
-                                                               Style="{StaticResource CaptionTextStyle}" />
-                                                    <WrapPanel Margin="0,2,0,0">
-                                                        <Border Margin="0,0,4,4">
-                                                            <Border.Style>
-                                                                <Style TargetType="Border" BasedOn="{StaticResource TagStyle}">
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding Tags}" Value="">
-                                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <TextBlock Text="{Binding Tags}" MaxWidth="86" Style="{StaticResource BadgeTextStyle}" />
-                                                        </Border>
-                                                        <Border Margin="0,0,4,4">
-                                                            <Border.Style>
-                                                                <Style TargetType="Border" BasedOn="{StaticResource InfoBadgeStyle}">
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding EmotionTagsText}" Value="">
-                                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <TextBlock Text="{Binding EmotionTagsText}" MaxWidth="76" Style="{StaticResource BadgeTextStyle}" />
-                                                        </Border>
-                                                        <Border Margin="0,0,4,4">
-                                                            <Border.Style>
-                                                                <Style TargetType="Border" BasedOn="{StaticResource BadgeStyle}">
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding SceneTagsText}" Value="">
-                                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <TextBlock Text="{Binding SceneTagsText}" MaxWidth="76" Style="{StaticResource BadgeTextStyle}" />
-                                                        </Border>
-                                                    </WrapPanel>
-                                                    <TextBlock Text="{Binding TmdbRating, StringFormat=平均评分 {0:0.0}, TargetNullValue=平均评分 -}"
-                                                               Style="{StaticResource MetadataTextStyle}" />
-                                                </StackPanel>
-
-                                                <StackPanel>
-                                                    <StackPanel.Style>
-                                                        <Style TargetType="StackPanel">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </StackPanel.Style>
-                                                    <DockPanel>
-                                                        <TextBlock Text="{Binding ReleaseYear, StringFormat=年份 {0}, TargetNullValue=年份 -}"
-                                                                   Style="{StaticResource CaptionTextStyle}" />
-                                                        <TextBlock DockPanel.Dock="Right"
-                                                                   Text="{Binding TmdbRating, StringFormat=评分 {0:0.0}, TargetNullValue=评分 -}"
-                                                                   Style="{StaticResource CaptionTextStyle}" />
-                                                    </DockPanel>
-                                                    <Border Margin="0,6,0,0"
-                                                            HorizontalAlignment="Left">
-                                                        <Border.Style>
-                                                            <Style TargetType="Border" BasedOn="{StaticResource TagStyle}">
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Tags}" Value="">
-                                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Border.Style>
-                                                        <TextBlock Text="{Binding Tags}" MaxWidth="126" Style="{StaticResource BadgeTextStyle}" />
-                                                    </Border>
-                                                    <TextBlock Margin="0,8,0,0"
-                                                               Text="{Binding Reason}"
-                                                               TextWrapping="Wrap"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               LineHeight="18"
-                                                               MaxHeight="42"
-                                                               Style="{StaticResource MetadataTextStyle}" />
-                                                </StackPanel>
-                                            </StackPanel>
-
-                                            <Button Grid.Row="2"
-                                                    HorizontalAlignment="Right"
-                                                    MinHeight="26"
-                                                    Padding="10,4"
+                                        <Grid Grid.Column="3"
+                                              Height="152"
+                                              Margin="0,8,0,0"
+                                              VerticalAlignment="Top">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <Border Style="{StaticResource HomeAiRatingBadgeStyle}">
+                                                <TextBlock Text="{Binding WeightedAverageRatingText}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="13.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource BrushForegroundPrimary}" />
+                                            </Border>
+                                            <Button Grid.Row="1"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
                                                     Content="{Binding WantToWatchButtonText}"
                                                     Command="{Binding DataContext.AiRecommendationViewModel.AddWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
-                                                    Style="{StaticResource SmallButtonStyle}" />
+                                                    Style="{StaticResource HomeWantButtonStyle}" />
                                         </Grid>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </StackPanel>
+                    <ItemsControl ItemsSource="{Binding AiRecommendationPreview}">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding AiRecommendationViewModel.Recommendations.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="3" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="0,8"
+                                        BorderBrush="{DynamicResource BrushDivider}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="66" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Button Command="{Binding DataContext.AiRecommendationViewModel.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource HomePosterButtonStyle}">
+                                            <Border Width="112"
+                                                    Height="168"
+                                                    Style="{StaticResource HomeMediaPosterChromeStyle}">
+                                                <Grid>
+                                                    <TextBlock HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Text="无海报"
+                                                               Style="{StaticResource CaptionTextStyle}" />
+                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                </Grid>
+                                            </Border>
+                                        </Button>
+
+                                        <Grid Grid.Column="2"
+                                              Height="152"
+                                              Margin="0,8,8,0"
+                                              VerticalAlignment="Top">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+
+                                            <Button Command="{Binding DataContext.AiRecommendationViewModel.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource HomeTextButtonStyle}">
+                                                <TextBlock Text="{Binding Title}"
+                                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}"
+                                                           Style="{StaticResource HomeAiCollapsedTitleTextStyle}" />
+                                            </Button>
+                                            <TextBlock Grid.Row="1"
+                                                       Margin="0,5,0,0"
+                                                       Text="{Binding ReleaseDateText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding ReleaseDateText}"
+                                                       Style="{StaticResource HomeAiTagTextStyle}" />
+                                            <TextBlock Grid.Row="2"
+                                                       Margin="0,3,0,0"
+                                                       Text="{Binding Tags}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding Tags}"
+                                                       Style="{StaticResource HomeAiTagTextStyle}" />
+                                            <TextBlock Grid.Row="3"
+                                                       Margin="0,3,0,0"
+                                                       Text="{Binding EmotionTagsText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding EmotionTagsText}"
+                                                       Style="{StaticResource HomeAiTagTextStyle}" />
+                                            <TextBlock Grid.Row="4"
+                                                       Margin="0,3,0,0"
+                                                       Text="{Binding SceneTagsText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding SceneTagsText}"
+                                                       Style="{StaticResource HomeAiTagTextStyle}" />
+                                            <Border Grid.Row="5"
+                                                    Height="56"
+                                                    Margin="0,4,0,0"
+                                                    VerticalAlignment="Bottom"
+                                                    ClipToBounds="True">
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                              HorizontalScrollBarVisibility="Disabled">
+                                                    <TextBlock Text="{Binding Reason}"
+                                                               TextWrapping="Wrap"
+                                                               FontSize="11"
+                                                               LineHeight="14"
+                                                               Foreground="{DynamicResource BrushForegroundSecondary}" />
+                                                </ScrollViewer>
+                                            </Border>
+                                        </Grid>
+
+                                        <Grid Grid.Column="3"
+                                              Height="152"
+                                              Margin="0,8,0,0"
+                                              VerticalAlignment="Top">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <Border Style="{StaticResource HomeAiRatingBadgeStyle}">
+                                                <TextBlock Text="{Binding WeightedAverageRatingText}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="13.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource BrushForegroundPrimary}" />
+                                            </Border>
+                                            <Button Grid.Row="1"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Content="{Binding WantToWatchButtonText}"
+                                                    Command="{Binding DataContext.AiRecommendationViewModel.AddWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource HomeWantButtonStyle}" />
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
 
                 <Button Grid.Row="2"
                         Margin="0,14,0,0"

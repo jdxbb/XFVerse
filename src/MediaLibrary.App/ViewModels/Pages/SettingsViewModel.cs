@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Caches;
 using MediaLibrary.App.Services;
 using MediaLibrary.App.Services.Interfaces;
@@ -1025,6 +1026,11 @@ public sealed class SettingsViewModel : PageViewModelBase
         try
         {
             var result = await _softwareCacheManagementService.ClearAsync(SoftwareCacheCategoryKind.PosterCache);
+            if (result.Succeeded)
+            {
+                PosterCacheImageBehavior.ClearMemoryCache();
+            }
+
             ApplySoftwareCacheOverview(await _softwareCacheManagementService.GetOverviewAsync());
             PosterCacheStatusMessage = result.Succeeded
                 ? $"已清理海报缓存，删除 {result.DeletedItemCount} 个文件，释放 {FormatFileSize(result.FreedBytes)}。"

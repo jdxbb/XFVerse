@@ -12,6 +12,8 @@ public sealed class Movie
 
     public int? ReleaseYear { get; set; }
 
+    public DateTime? ReleaseDate { get; set; }
+
     public string? Overview { get; set; }
 
     public string? PosterLocalPath { get; set; }

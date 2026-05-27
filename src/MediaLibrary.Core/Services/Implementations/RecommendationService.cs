@@ -945,6 +945,7 @@ public sealed class RecommendationService : IRecommendationService
                     Title = x.Title,
                     OriginalTitle = x.OriginalTitle ?? string.Empty,
                     ReleaseYear = x.ReleaseYear,
+                    ReleaseDate = x.ReleaseDate,
                     IdentificationStatus = x.IdentificationStatus,
                     PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
                     Overview = x.Overview ?? string.Empty,
@@ -2075,6 +2076,7 @@ public sealed class RecommendationService : IRecommendationService
             Title = tmdbResult.Title,
             OriginalTitle = tmdbResult.OriginalTitle,
             ReleaseYear = tmdbResult.ReleaseYear,
+            ReleaseDate = tmdbResult.ReleaseDate,
             PosterRemoteUrl = tmdbResult.PosterRemoteUrl,
             Overview = tmdbResult.Overview,
             Country = tmdbResult.Country,
@@ -2112,6 +2114,7 @@ public sealed class RecommendationService : IRecommendationService
             Title = movie.Title,
             OriginalTitle = movie.OriginalTitle,
             ReleaseYear = movie.ReleaseYear,
+            ReleaseDate = movie.ReleaseDate,
             PosterRemoteUrl = movie.PosterRemoteUrl,
             Overview = movie.Overview,
             Tags = BuildTags(movie),
@@ -2139,6 +2142,7 @@ public sealed class RecommendationService : IRecommendationService
             Title = source.Title,
             OriginalTitle = source.OriginalTitle,
             ReleaseYear = source.ReleaseYear,
+            ReleaseDate = source.ReleaseDate,
             PosterRemoteUrl = source.PosterRemoteUrl,
             Overview = source.Overview,
             Tags = string.IsNullOrWhiteSpace(source.Tags)
@@ -2357,6 +2361,7 @@ public sealed class RecommendationService : IRecommendationService
                     Title = x.Title,
                     OriginalTitle = x.OriginalTitle,
                     ReleaseYear = x.ReleaseYear,
+                    ReleaseDate = x.ReleaseDate,
                     PosterRemoteUrl = x.PosterRemoteUrl,
                     Overview = x.Overview,
                     GenresText = x.GenresText,
@@ -5093,6 +5098,8 @@ public sealed class RecommendationService : IRecommendationService
 
         public int? ReleaseYear { get; set; }
 
+        public DateTime? ReleaseDate { get; set; }
+
         public string PosterRemoteUrl { get; set; } = string.Empty;
 
         public string Overview { get; set; } = string.Empty;
@@ -5133,6 +5140,8 @@ public sealed class RecommendationService : IRecommendationService
         public string OriginalTitle { get; set; } = string.Empty;
 
         public int? ReleaseYear { get; set; }
+
+        public DateTime? ReleaseDate { get; set; }
 
         public string PosterRemoteUrl { get; set; } = string.Empty;
 
@@ -5182,6 +5191,7 @@ public sealed class RecommendationService : IRecommendationService
                 Title = movie.Title,
                 OriginalTitle = movie.OriginalTitle,
                 ReleaseYear = movie.ReleaseYear,
+                ReleaseDate = movie.ReleaseDate,
                 PosterRemoteUrl = movie.PosterRemoteUrl,
                 Overview = movie.Overview,
                 GenresText = movie.GenresText,
@@ -5207,6 +5217,7 @@ public sealed class RecommendationService : IRecommendationService
                 Title = state.Title,
                 OriginalTitle = state.OriginalTitle,
                 ReleaseYear = state.ReleaseYear,
+                ReleaseDate = state.ReleaseDate,
                 PosterRemoteUrl = state.PosterRemoteUrl,
                 Overview = state.Overview,
                 GenresText = state.GenresText,
@@ -5531,6 +5542,8 @@ public sealed class RecommendationService : IRecommendationService
         public string OriginalTitle { get; set; } = string.Empty;
 
         public int? ReleaseYear { get; set; }
+
+        public DateTime? ReleaseDate { get; set; }
 
         public IdentificationStatus IdentificationStatus { get; set; }
 

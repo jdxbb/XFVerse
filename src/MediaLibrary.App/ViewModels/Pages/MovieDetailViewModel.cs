@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
-using System.Collections.Concurrent;
 using System.Net.Http;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
@@ -19,8 +19,6 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private const string CorrectionTargetTvEpisodeText = "修正为电视剧集";
     private const string CorrectionTargetUnknownSeasonText = "加入已有未识别季";
     private static readonly TimeSpan CorrectionApplyTimeout = TimeSpan.FromSeconds(45);
-
-    private static readonly ConcurrentDictionary<int, AiMovieTags> ExternalAiTagCache = new();
 
     private readonly INavigationStateService _navigationStateService;
     private readonly IPlayerWindowService _playerWindowService;
@@ -794,6 +792,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                     EmotionTagsText = string.IsNullOrWhiteSpace(classified.EmotionTagsText) ? EmotionTagsText : classified.EmotionTagsText;
                     SceneTagsText = string.IsNullOrWhiteSpace(classified.SceneTagsText) ? SceneTagsText : classified.SceneTagsText;
                     StatusMessage = "详情已加载，AI 分类已自动更新。";
+                    _dataRefreshService.NotifyMetadataChanged();
                 }
             }
         }
@@ -1100,6 +1099,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             recommendation.SceneTagsText = string.IsNullOrWhiteSpace(tags.SceneTagsText) ? recommendation.SceneTagsText : tags.SceneTagsText;
             CacheExternalTags(recommendation);
             ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
+            _dataRefreshService.NotifyMetadataChanged();
             StatusMessage = "无播放源候选 AI 标签已自动生成。";
         }
         catch (OperationCanceledException)
@@ -2555,8 +2555,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private static void ApplyCachedExternalTags(AiRecommendationItem recommendation)
     {
-        if (recommendation.TmdbId is not > 0
-            || !ExternalAiTagCache.TryGetValue(recommendation.TmdbId.Value, out var cachedTags))
+        if (!ExternalMovieTagCache.TryGet(
+                recommendation.TmdbId,
+                recommendation.ImdbId,
+                recommendation.Title,
+                recommendation.ReleaseYear,
+                out var cachedTags))
         {
             return;
         }
@@ -2572,17 +2576,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private static void CacheExternalTags(AiRecommendationItem recommendation)
     {
-        if (recommendation.TmdbId is not > 0 || NeedsExternalAutoClassification(recommendation))
+        if (NeedsExternalAutoClassification(recommendation))
         {
             return;
         }
 
-        ExternalAiTagCache[recommendation.TmdbId.Value] = new AiMovieTags
-        {
-            AiTagsText = recommendation.Tags,
-            EmotionTagsText = recommendation.EmotionTagsText,
-            SceneTagsText = recommendation.SceneTagsText
-        };
+        ExternalMovieTagCache.Set(recommendation);
     }
 
     private static bool NeedsExternalAutoClassification(AiRecommendationItem recommendation)

@@ -483,6 +483,7 @@ public sealed class MovieManagementService : IMovieManagementService
         entity.Title = movie.Title;
         entity.OriginalTitle = movie.OriginalTitle ?? string.Empty;
         entity.ReleaseYear = movie.ReleaseYear;
+        entity.ReleaseDate = movie.ReleaseDate;
         entity.PosterRemoteUrl = movie.PosterRemoteUrl ?? string.Empty;
         entity.Overview = movie.Overview ?? string.Empty;
         entity.GenresText = movie.GenresText ?? string.Empty;

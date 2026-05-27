@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
+using MediaLibrary.App.Models.Library;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
@@ -48,6 +50,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string RefreshReasonManualAggregation = "operation-manual-aggregation";
     private const string RefreshReasonBatchAiExitBatchMode = "operation-batch-ai-exit-batch-mode";
     private const string RefreshReasonBatchAiResult = "operation-batch-ai-result";
+    private const string LibraryLayoutPoster = "poster";
+    private const string LibraryLayoutList = "list";
     private static readonly TimeSpan RefreshDebounceDelay = TimeSpan.FromMilliseconds(200);
     private static readonly string[] TypeTagLabels =
     [
@@ -79,6 +83,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IManualUnknownSeasonAggregationService _manualUnknownSeasonAggregationService;
     private readonly IConfirmationDialogService _confirmationDialogService;
+    private readonly ILibraryPreferencesService _libraryPreferencesService;
     private readonly List<LibraryMovieListItem> _allMovies = [];
     private readonly HashSet<string> _selectedItemKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _refreshGate = new();
@@ -107,6 +112,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     private string _selectedDecadeFilter = DecadeAll;
     private bool _isUpdatingTagSelection;
     private bool _isPosterView = true;
+    private bool _isApplyingLayoutPreference;
+    private bool _hasUserChangedLayoutThisSession;
     private bool _isBatchSelectionMode;
     private bool _isBatchOperationRunning;
     private bool _isRemovedLibraryPanelOpen;
@@ -131,8 +138,9 @@ public sealed class LibraryViewModel : PageViewModelBase
         IUserCollectionService userCollectionService,
         ITvSeasonCollectionService tvSeasonCollectionService,
         IManualUnknownSeasonAggregationService manualUnknownSeasonAggregationService,
+        ILibraryPreferencesService libraryPreferencesService,
         IConfirmationDialogService confirmationDialogService)
-        : base("媒体库", "浏览真实影片数据，支持搜索、排序、筛选和批量操作。")
+        : base("媒体库", "查看你的影片资源")
     {
         _libraryQueryService = libraryQueryService;
         _navigationStateService = navigationStateService;
@@ -143,6 +151,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         _userCollectionService = userCollectionService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _manualUnknownSeasonAggregationService = manualUnknownSeasonAggregationService;
+        _libraryPreferencesService = libraryPreferencesService;
         _confirmationDialogService = confirmationDialogService;
         _dataRefreshService.DataChanged += OnDataChanged;
 
@@ -155,14 +164,13 @@ public sealed class LibraryViewModel : PageViewModelBase
         SourceFilterOptions = [SourceFilterAll, SourceFilterLocal, SourceFilterWebDav];
         CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested];
         ContentTypeOptions = ["全部", "电影", "电视剧", "其他"];
-        SwitchToPosterViewCommand = new RelayCommand(() => IsPosterView = true);
-        SwitchToListViewCommand = new RelayCommand(() => IsPosterView = false);
+        SwitchToPosterViewCommand = new RelayCommand(() => SetLibraryLayout(isPosterView: true));
+        SwitchToListViewCommand = new RelayCommand(() => SetLibraryLayout(isPosterView: false));
         SelectLibraryScopeCommand = new RelayCommand(SelectLibraryScope);
         SelectSourceFilterCommand = new RelayCommand(SelectSourceFilter);
         SelectContentTypeCommand = new RelayCommand(SelectContentType);
         ClearTagFilterCommand = new RelayCommand(ClearTagFilter);
         SelectCollectionStatusCommand = new RelayCommand(SelectCollectionStatus);
-        ShowLayoutSwitchPlaceholderCommand = new RelayCommand(ShowLayoutSwitchPlaceholder);
         OpenMovieCommand = new RelayCommand(OpenMovie);
         OpenOrToggleSelectionCommand = new RelayCommand(OpenOrToggleSelection);
         ToggleItemSelectionCommand = new RelayCommand(ToggleItemSelection);
@@ -191,6 +199,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         ClearSearchCommand = new RelayCommand(ClearSearch);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
         RefreshTagOptions();
+        _ = LoadLibraryPreferencesAsync();
     }
 
     public BulkObservableCollection<LibraryMovieItemViewModel> Movies { get; } = [];
@@ -238,8 +247,6 @@ public sealed class LibraryViewModel : PageViewModelBase
     public RelayCommand ClearTagFilterCommand { get; }
 
     public RelayCommand SelectCollectionStatusCommand { get; }
-
-    public RelayCommand ShowLayoutSwitchPlaceholderCommand { get; }
 
     public RelayCommand OpenMovieCommand { get; }
 
@@ -459,6 +466,10 @@ public sealed class LibraryViewModel : PageViewModelBase
             if (SetProperty(ref _isPosterView, value))
             {
                 OnPropertyChanged(nameof(IsListView));
+                if (!_isApplyingLayoutPreference)
+                {
+                    _ = SaveLibraryPreferencesAsync();
+                }
             }
         }
     }
@@ -746,6 +757,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             queryElapsedMs = queryStopwatch.ElapsedMilliseconds;
             _allMovies.Clear();
             _allMovies.AddRange(movies);
+            ApplyExternalTagCache(_allMovies);
 
             var tagDecadeStopwatch = Stopwatch.StartNew();
             RefreshTagOptions();
@@ -1426,9 +1438,71 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
-    private void ShowLayoutSwitchPlaceholder()
+    private void SetLibraryLayout(bool isPosterView)
     {
-        BatchResultSummary = "布局切换将在后续阶段接入。";
+        _hasUserChangedLayoutThisSession = true;
+        IsPosterView = isPosterView;
+    }
+
+    private async Task LoadLibraryPreferencesAsync()
+    {
+        try
+        {
+            var preferences = await _libraryPreferencesService.LoadAsync();
+            if (_hasUserChangedLayoutThisSession)
+            {
+                return;
+            }
+
+            _isApplyingLayoutPreference = true;
+            try
+            {
+                IsPosterView = !string.Equals(
+                    preferences.LayoutMode,
+                    LibraryLayoutList,
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                _isApplyingLayoutPreference = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            WriteLibraryRefreshEvent(
+                "library-preferences-restore-failed",
+                $"errorType={exception.GetType().Name}");
+        }
+    }
+
+    private async Task SaveLibraryPreferencesAsync()
+    {
+        try
+        {
+            await _libraryPreferencesService.SaveAsync(CreateLibraryPreferencesSnapshot());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            WriteLibraryRefreshEvent(
+                "library-preferences-save-failed",
+                $"errorType={exception.GetType().Name}");
+        }
+    }
+
+    private LibraryPreferencesModel CreateLibraryPreferencesSnapshot()
+    {
+        return new LibraryPreferencesModel
+        {
+            LayoutMode = IsPosterView ? LibraryLayoutPoster : LibraryLayoutList
+        };
     }
 
     private void RefreshTagOptions()
@@ -1691,6 +1765,21 @@ public sealed class LibraryViewModel : PageViewModelBase
         };
 
         return tags.Any(tag => string.Equals(tag, selectedTag, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void ApplyExternalTagCache(IEnumerable<LibraryMovieListItem> items)
+    {
+        foreach (var item in items.Where(item => !item.HasActiveSource))
+        {
+            if (!ExternalMovieTagCache.TryGet(item.TmdbId, item.ImdbId, item.Title, item.ReleaseYear, out var tags))
+            {
+                continue;
+            }
+
+            item.AiTagsText = string.IsNullOrWhiteSpace(tags.AiTagsText) ? item.AiTagsText : tags.AiTagsText;
+            item.EmotionTagsText = string.IsNullOrWhiteSpace(tags.EmotionTagsText) ? item.EmotionTagsText : tags.EmotionTagsText;
+            item.SceneTagsText = string.IsNullOrWhiteSpace(tags.SceneTagsText) ? item.SceneTagsText : tags.SceneTagsText;
+        }
     }
 
     private static bool TryParseDecadeFilter(string value, out int decadeStart)
@@ -3030,9 +3119,9 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
-        if (IsGroupedPlaceholder(movie))
+        if (IsGroupedPlaceholder(movie) && movie.SeriesId <= 0 && movie.SeasonId <= 0)
         {
-            StatusMessage = "该项目是未识别剧集候选，后续可通过批量修正或人工聚合为季处理。";
+            StatusMessage = "该项目是未识别剧集候选，当前无法定位可打开的剧或季详情。";
             return;
         }
 
@@ -3088,6 +3177,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             Title = movie.Title,
             OriginalTitle = movie.OriginalTitle,
             ReleaseYear = movie.ReleaseYear,
+            ReleaseDate = movie.ReleaseDate,
             PosterRemoteUrl = movie.PosterRemoteUrl,
             Overview = movie.Overview,
             Country = movie.Country,
