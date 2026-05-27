@@ -35,8 +35,8 @@
     </Style>
 
     <Style x:Key="HomeMetricCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
-        <Setter Property="MinHeight" Value="106" />
-        <Setter Property="Padding" Value="14" />
+        <Setter Property="MinHeight" Value="82" />
+        <Setter Property="Padding" Value="10" />
     </Style>
 
     <Style x:Key="HomeMediaCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
@@ -51,11 +51,11 @@
     </Style>
 
     <Style x:Key="HomeAiPanelStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
-        <Setter Property="Padding" Value="18" />
+        <Setter Property="Padding" Value="16" />
     </Style>
 
     <Style x:Key="HomeAiCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
-        <Setter Property="Padding" Value="10" />
-        <Setter Property="MinHeight" Value="116" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="MinHeight" Value="94" />
     </Style>
 </ResourceDictionary>

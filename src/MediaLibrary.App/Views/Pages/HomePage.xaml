@@ -23,6 +23,12 @@
             <Setter Property="MinHeight" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
         </Style>
+
+        <Style x:Key="HomeAiTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource HomeTwoLineTitleStyle}">
+            <Setter Property="LineHeight" Value="18" />
+            <Setter Property="MaxHeight" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -34,9 +40,9 @@
 
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" MinHeight="174" />
-                <RowDefinition Height="*" MinHeight="164" />
+                <RowDefinition Height="1.1*" MinHeight="122" />
+                <RowDefinition Height="2.6*" MinHeight="218" />
+                <RowDefinition Height="1.8*" MinHeight="170" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
@@ -45,21 +51,13 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="14" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel>
                         <StackPanel>
                             <TextBlock Text="片库预览" Style="{StaticResource CardTitleTextStyle}" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="全部片库状态 · 趋势相比上个月"
-                                       Style="{StaticResource BodyMutedTextStyle}" />
                         </StackPanel>
-                        <Button DockPanel.Dock="Right"
-                                MinWidth="98"
-                                Content="进入媒体库"
-                                Command="{Binding OpenLibraryCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
                     </DockPanel>
 
                     <ItemsControl Grid.Row="2" ItemsSource="{Binding LibraryStatusOverview}">
@@ -98,10 +96,10 @@
                                                    Style="{StaticResource BodyMutedTextStyle}" />
                                         <StackPanel Grid.Row="1"
                                                     Grid.ColumnSpan="2"
-                                                    Margin="0,12,0,6"
+                                                    Margin="0,8,0,2"
                                                     Orientation="Horizontal">
                                             <TextBlock Text="{Binding ValueText}" Style="{StaticResource MetricTextStyle}" />
-                                            <TextBlock Margin="6,13,0,0"
+                                            <TextBlock Margin="6,10,0,0"
                                                        Text="{Binding UnitText}"
                                                        Style="{StaticResource BodyMutedTextStyle}" />
                                         </StackPanel>
@@ -123,15 +121,12 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="14" />
+                        <RowDefinition Height="12" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel>
                         <StackPanel>
                             <TextBlock Text="继续观看" Style="{StaticResource CardTitleTextStyle}" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="从上次停下的位置继续，也可以进入详情处理播放源。"
-                                       Style="{StaticResource BodyMutedTextStyle}" />
                         </StackPanel>
                         <Button DockPanel.Dock="Right"
                                 Width="42"
@@ -265,21 +260,21 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="14" />
+                        <RowDefinition Height="12" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel>
                         <StackPanel>
                             <TextBlock Text="最近新增" Style="{StaticResource CardTitleTextStyle}" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="按入库时间倒序展示最近加入媒体库的影片。"
-                                       Style="{StaticResource BodyMutedTextStyle}" />
                         </StackPanel>
                         <Button DockPanel.Dock="Right"
-                                MinWidth="88"
-                                Content="查看全部"
+                                Width="42"
+                                Height="42"
+                                Padding="0"
+                                Content="›"
+                                ToolTip="进入媒体库"
                                 Command="{Binding OpenLibraryCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
+                                Style="{StaticResource IconButtonStyle}" />
                     </DockPanel>
 
                     <Border Grid.Row="2">
@@ -413,18 +408,18 @@
                         </ItemsControl.Style>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="0,0,0,12" Style="{StaticResource HomeAiCardStyle}">
+                                <Border Margin="0,0,0,8" Style="{StaticResource HomeAiCardStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="62" />
-                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="8" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
 
                                         <Button Command="{Binding DataContext.AiRecommendationViewModel.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HomePosterButtonStyle}">
-                                            <Border Height="86" Style="{StaticResource HomeMediaPosterChromeStyle}">
+                                            <Border Height="74" Style="{StaticResource HomeMediaPosterChromeStyle}">
                                                 <Grid>
                                                     <TextBlock HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"
@@ -447,10 +442,10 @@
                                                     Style="{StaticResource HomeTextButtonStyle}">
                                                 <TextBlock Text="{Binding Title}"
                                                            ToolTip="{Binding Title}"
-                                                           Style="{StaticResource HomeTwoLineTitleStyle}" />
+                                                           Style="{StaticResource HomeAiTitleStyle}" />
                                             </Button>
 
-                                            <StackPanel Grid.Row="1" Margin="0,4,0,6">
+                                            <StackPanel Grid.Row="1" Margin="0,2,0,4">
                                                 <StackPanel>
                                                     <StackPanel.Style>
                                                         <Style TargetType="StackPanel">
@@ -464,8 +459,8 @@
                                                     </StackPanel.Style>
                                                     <TextBlock Text="{Binding ReleaseYear, StringFormat=年份 {0}, TargetNullValue=年份 -}"
                                                                Style="{StaticResource CaptionTextStyle}" />
-                                                    <WrapPanel Margin="0,4,0,0">
-                                                        <Border Margin="0,0,6,6">
+                                                    <WrapPanel Margin="0,2,0,0">
+                                                        <Border Margin="0,0,4,4">
                                                             <Border.Style>
                                                                 <Style TargetType="Border" BasedOn="{StaticResource TagStyle}">
                                                                     <Style.Triggers>
@@ -477,7 +472,7 @@
                                                             </Border.Style>
                                                             <TextBlock Text="{Binding Tags}" MaxWidth="86" Style="{StaticResource BadgeTextStyle}" />
                                                         </Border>
-                                                        <Border Margin="0,0,6,6">
+                                                        <Border Margin="0,0,4,4">
                                                             <Border.Style>
                                                                 <Style TargetType="Border" BasedOn="{StaticResource InfoBadgeStyle}">
                                                                     <Style.Triggers>
@@ -489,7 +484,7 @@
                                                             </Border.Style>
                                                             <TextBlock Text="{Binding EmotionTagsText}" MaxWidth="76" Style="{StaticResource BadgeTextStyle}" />
                                                         </Border>
-                                                        <Border Margin="0,0,6,6">
+                                                        <Border Margin="0,0,4,4">
                                                             <Border.Style>
                                                                 <Style TargetType="Border" BasedOn="{StaticResource BadgeStyle}">
                                                                     <Style.Triggers>
@@ -549,6 +544,8 @@
 
                                             <Button Grid.Row="2"
                                                     HorizontalAlignment="Right"
+                                                    MinHeight="26"
+                                                    Padding="10,4"
                                                     Content="{Binding WantToWatchButtonText}"
                                                     Command="{Binding DataContext.AiRecommendationViewModel.AddWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"

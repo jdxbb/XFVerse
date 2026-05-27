@@ -30,6 +30,8 @@
     </Style>
 
     <Style x:Key="DialogCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
     </Style>
 

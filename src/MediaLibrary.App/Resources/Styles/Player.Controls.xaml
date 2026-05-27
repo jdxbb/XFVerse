@@ -73,6 +73,8 @@
         <Setter Property="Height" Value="{StaticResource WindowCaptionHeight}" />
         <Setter Property="MinWidth" Value="{StaticResource WindowCaptionHeight}" />
         <Setter Property="MinHeight" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextSecondary}" />
     </Style>
 

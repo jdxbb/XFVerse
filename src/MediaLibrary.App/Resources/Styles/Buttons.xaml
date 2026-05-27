@@ -194,6 +194,8 @@
         <Setter Property="Height" Value="{StaticResource WindowCaptionHeight}" />
         <Setter Property="MinHeight" Value="{StaticResource WindowCaptionHeight}" />
         <Setter Property="Width" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
     </Style>
 
