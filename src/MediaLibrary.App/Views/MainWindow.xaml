@@ -375,17 +375,20 @@
                                 Background="{DynamicResource BrushDivider}" />
 
                         <Button x:Name="MinimizeButton"
-                                Content="－"
+                                Margin="0,-14,0,0"
+                                Content="&#xE921;"
                                 ToolTip="最小化"
                                 Click="MinimizeButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="MaximizeRestoreButton"
-                                Content="□"
+                                Margin="0,-14,0,0"
+                                Content="&#xE922;"
                                 ToolTip="最大化"
                                 Click="MaximizeRestoreButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="CloseButton"
-                                Content="×"
+                                Margin="0,-14,-14,0"
+                                Content="&#xE8BB;"
                                 ToolTip="关闭"
                                 Click="CloseButton_Click"
                                 Style="{StaticResource WindowCaptionCloseButtonStyle}" />

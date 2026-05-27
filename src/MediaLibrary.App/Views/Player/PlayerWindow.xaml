@@ -37,7 +37,7 @@
                 Grid.Row="0"
                 Style="{StaticResource PlayerWindowCaptionStyle}"
                 MouseLeftButtonDown="PlayerTitleBar_MouseLeftButtonDown">
-            <Grid Margin="14,0,8,0">
+            <Grid Margin="14,0,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -50,17 +50,17 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <Button x:Name="PlayerMinimizeButton"
-                            Content="－"
+                            Content="&#xE921;"
                             ToolTip="最小化"
                             Click="PlayerMinimizeButton_Click"
                             Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
                     <Button x:Name="PlayerMaximizeRestoreButton"
-                            Content="□"
+                            Content="&#xE922;"
                             ToolTip="最大化"
                             Click="PlayerMaximizeRestoreButton_Click"
                             Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
                     <Button x:Name="PlayerCloseButton"
-                            Content="×"
+                            Content="&#xE8BB;"
                             ToolTip="关闭"
                             Click="PlayerCloseButton_Click"
                             Style="{StaticResource PlayerWindowCaptionCloseButtonStyle}" />
@@ -103,7 +103,7 @@
                     MouseMove="Window_MouseMove"
                     PreviewMouseMove="Window_MouseMove"
                     MouseLeftButtonDown="PlayerTitleBar_MouseLeftButtonDown">
-                <Grid Margin="14,0,8,0">
+                <Grid Margin="14,0,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -116,17 +116,17 @@
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
                         <Button x:Name="FullscreenPlayerMinimizeButton"
-                                Content="－"
+                                Content="&#xE921;"
                                 ToolTip="最小化"
                                 Click="PlayerMinimizeButton_Click"
                                 Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
                         <Button x:Name="FullscreenPlayerMaximizeRestoreButton"
-                                Content="□"
+                                Content="&#xE922;"
                                 ToolTip="最大化"
                                 Click="PlayerMaximizeRestoreButton_Click"
                                 Style="{StaticResource PlayerWindowCaptionButtonStyle}" />
                         <Button x:Name="FullscreenPlayerCloseButton"
-                                Content="×"
+                                Content="&#xE8BB;"
                                 ToolTip="关闭"
                                 Click="PlayerCloseButton_Click"
                                 Style="{StaticResource PlayerWindowCaptionCloseButtonStyle}" />

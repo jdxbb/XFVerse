@@ -94,6 +94,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private bool _suppressLibraryRefreshFromBatchNotification;
     private long _refreshSequence;
     private string _searchText = string.Empty;
+    private string _submittedSearchText = string.Empty;
     private string _genreFilterText = string.Empty;
     private string _selectedSortOption = "最近更新";
     private string _selectedSortDirection = "降序";
@@ -186,7 +187,8 @@ public sealed class LibraryViewModel : PageViewModelBase
         DeleteRemovedLibraryGroupCommand = new AsyncRelayCommand(DeleteRemovedLibraryGroupAsync, parameter => !IsRemovedLibraryLoading && parameter is RemovedLibraryGroupViewModel { IsTvGroup: true });
         OpenRemovedLibraryDetailCommand = new RelayCommand(OpenMovie);
         RefreshCommand = new AsyncRelayCommand(() => RequestLibraryRefreshAsync(RefreshReasonManual, debounce: false, allowWhenInactive: true));
-        ApplySearchCommand = new RelayCommand(ApplyFilters);
+        ApplySearchCommand = new RelayCommand(SubmitSearch);
+        ClearSearchCommand = new RelayCommand(ClearSearch);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
         RefreshTagOptions();
     }
@@ -289,6 +291,8 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public RelayCommand ApplySearchCommand { get; }
 
+    public RelayCommand ClearSearchCommand { get; }
+
     public RelayCommand ClearFiltersCommand { get; }
 
     public string SearchText
@@ -296,10 +300,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         get => _searchText;
         set
         {
-            if (SetProperty(ref _searchText, value))
-            {
-                ApplyFilters();
-            }
+            SetProperty(ref _searchText, value);
         }
     }
 
@@ -515,6 +516,28 @@ public sealed class LibraryViewModel : PageViewModelBase
     public bool HasBatchResultSummary => !string.IsNullOrWhiteSpace(BatchResultSummary);
 
     public bool HasMovies => Movies.Count > 0;
+
+    public string EmptyStateTitle => _allMovies.Count == 0
+        ? "媒体库暂无内容"
+        : "没有匹配结果";
+
+    public string EmptyStateMessage
+    {
+        get
+        {
+            if (_allMovies.Count == 0)
+            {
+                return "请先到扫描任务页执行扫描，或检查媒体源配置。";
+            }
+
+            if (SelectedLibraryScope == LibraryScopeWithoutSource)
+            {
+                return "没有找到无播放源项目。";
+            }
+
+            return "没有找到符合当前条件的媒体。";
+        }
+    }
 
     public int SelectedCount => _selectedItemKeys.Count;
 
@@ -1311,6 +1334,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private void ClearFilters()
     {
         SearchText = string.Empty;
+        SetSubmittedSearchText(string.Empty);
         GenreFilterText = string.Empty;
         SelectedDecadeFilter = DecadeAll;
         SelectedStatusFilter = FilterAll;
@@ -1323,6 +1347,24 @@ public sealed class LibraryViewModel : PageViewModelBase
         SelectedSortOption = "最近更新";
         SelectedSortDirection = "降序";
         ApplyFilters();
+    }
+
+    private void SubmitSearch()
+    {
+        SetSubmittedSearchText(SearchText);
+        ApplyFilters();
+    }
+
+    private void ClearSearch()
+    {
+        var hadSearch = !string.IsNullOrWhiteSpace(SearchText)
+                        || !string.IsNullOrWhiteSpace(_submittedSearchText);
+        SearchText = string.Empty;
+        SetSubmittedSearchText(string.Empty);
+        if (hadSearch)
+        {
+            ApplyFilters();
+        }
     }
 
     private void SelectLibraryScope(object? parameter)
@@ -1476,9 +1518,9 @@ public sealed class LibraryViewModel : PageViewModelBase
         var filterSortStopwatch = Stopwatch.StartNew();
         var query = _allMovies.AsEnumerable();
 
-        if (!string.IsNullOrWhiteSpace(SearchText))
+        if (!string.IsNullOrWhiteSpace(_submittedSearchText))
         {
-            var keyword = SearchText.Trim();
+            var keyword = _submittedSearchText;
             query = query.Where(
                 item => item.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase)
                         || item.OriginalTitle.Contains(keyword, StringComparison.OrdinalIgnoreCase));
@@ -1579,10 +1621,12 @@ public sealed class LibraryViewModel : PageViewModelBase
         Movies.ReplaceAll(viewModels);
 
         OnPropertyChanged(nameof(HasMovies));
+        OnPropertyChanged(nameof(EmptyStateTitle));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         RefreshBatchCommandState();
         StatusMessage = _allMovies.Count == 0
             ? "当前还没有可展示的影片数据。请先到扫描任务页执行扫描。"
-            : BuildResultStatusMessage(filtered.Count);
+            : BuildResultStatusMessage(filtered);
         uiApplyStopwatch.Stop();
 
         return new LibraryFilterApplyMetrics(
@@ -1600,20 +1644,37 @@ public sealed class LibraryViewModel : PageViewModelBase
             "range-reset");
     }
 
-    private string BuildResultStatusMessage(int filteredCount)
+    private string BuildResultStatusMessage(IReadOnlyCollection<LibraryMovieListItem> filteredItems)
     {
-        var message = $"找到 {filteredCount} 部影片";
-        if (SelectedSourceFilter != SourceFilterAll)
-        {
-            message += $"；来源筛选「{SelectedSourceFilter}」";
-        }
+        var totalCount = filteredItems.Count;
+        var watchedCount = filteredItems.Count(item => item.IsWatched);
+        var unwatchedCount = filteredItems.Count(item => !item.IsWatched);
+        var sourceCount = filteredItems.Count(item => item.HasActiveSource);
+        var noSourceCount = filteredItems.Count(item => !item.HasActiveSource);
+        var message = $"共找到 {totalCount} 项媒体 · 已看 {watchedCount} · 未看 {unwatchedCount} · 有播放源 {sourceCount} · 无播放源 {noSourceCount}";
 
         if (IsBatchSelectionMode)
         {
-            message += $"；已选择 {SelectedCount} 部";
+            message += $" · 已选 {SelectedCount} 项";
         }
 
         return message;
+    }
+
+    private void SetSubmittedSearchText(string value)
+    {
+        var normalized = NormalizeSearchText(value);
+        if (string.Equals(_submittedSearchText, normalized, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _submittedSearchText = normalized;
+    }
+
+    private static string NormalizeSearchText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
     }
 
     private static bool HasSelectedTag(
@@ -2879,7 +2940,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(BatchSelectionButtonText));
         if (_allMovies.Count > 0)
         {
-            StatusMessage = BuildResultStatusMessage(Movies.Count);
+            StatusMessage = BuildResultStatusMessage(Movies.Select(item => item.Movie).ToArray());
         }
 
         ToggleBatchSelectionModeCommand.RaiseCanExecuteChanged();

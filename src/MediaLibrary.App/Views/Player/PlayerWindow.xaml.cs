@@ -359,12 +359,12 @@ public partial class PlayerWindow : Window
 
         if (_isFullScreen || WindowState == WindowState.Maximized)
         {
-            button.Content = "\u2750";
+            button.Content = "\uE923";
             button.ToolTip = "\u8fd8\u539f";
             return;
         }
 
-        button.Content = "\u25a1";
+        button.Content = "\uE922";
         button.ToolTip = "\u6700\u5927\u5316";
     }
 

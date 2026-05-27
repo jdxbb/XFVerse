@@ -124,12 +124,12 @@ public partial class MainWindow : Window
 
         if (WindowState == WindowState.Maximized)
         {
-            MaximizeRestoreButton.Content = "❐";
+            MaximizeRestoreButton.Content = "\uE923";
             MaximizeRestoreButton.ToolTip = "还原";
             return;
         }
 
-        MaximizeRestoreButton.Content = "□";
+        MaximizeRestoreButton.Content = "\uE922";
         MaximizeRestoreButton.ToolTip = "最大化";
     }
 

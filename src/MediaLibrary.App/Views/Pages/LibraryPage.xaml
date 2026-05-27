@@ -75,17 +75,37 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="12" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="搜索" Style="{StaticResource BodyMutedTextStyle}" />
+                        <TextBlock Text="搜索媒体" Style="{StaticResource BodyMutedTextStyle}" />
                         <TextBox MinWidth="320"
-                                 Style="{StaticResource FormTextBoxStyle}"
-                                 ToolTip="按片名或原名搜索"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                 Style="{StaticResource SearchBoxStyle}"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
                     </StackPanel>
 
                     <Button Grid.Column="2"
+                            VerticalAlignment="Bottom"
+                            Command="{Binding ApplySearchCommand}"
+                            Style="{StaticResource IconButtonStyle}">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Text="&#xE721;" />
+                    </Button>
+                    <Button Grid.Column="4"
+                            VerticalAlignment="Bottom"
+                            Content="清空搜索"
+                            Command="{Binding ClearSearchCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Grid.Column="6"
                             VerticalAlignment="Bottom"
                             Content="清除筛选"
                             Command="{Binding ClearFiltersCommand}"
@@ -608,6 +628,29 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+
+                    <Border Grid.Row="1"
+                            Margin="0,18,0,0"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Top">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasMovies}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <TextBlock Text="{Binding EmptyStateTitle}"
+                                       Style="{StaticResource EmptyStateTitleStyle}" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Text="{Binding EmptyStateMessage}"
+                                       Style="{StaticResource EmptyStateDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

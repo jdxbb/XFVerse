@@ -55,7 +55,7 @@
         <Border Grid.Row="0"
                 Style="{StaticResource PlayerWindowCaptionStyle}"
                 MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-            <Grid Margin="14,0,8,0">
+            <Grid Margin="14,0,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -63,7 +63,7 @@
                 <TextBlock Text="{Binding WindowTitle}"
                            Style="{StaticResource PlayerWindowCaptionTextStyle}" />
                 <Button Grid.Column="1"
-                        Content="×"
+                        Content="&#xE8BB;"
                         ToolTip="关闭"
                         Click="CloseButton_Click"
                         Style="{StaticResource PlayerWindowCaptionCloseButtonStyle}" />
