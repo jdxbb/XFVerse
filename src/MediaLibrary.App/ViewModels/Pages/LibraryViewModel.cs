@@ -1197,7 +1197,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             "确认删除记录？",
             "删除记录会清除软件内记录、metadata 和状态，但不会删除本地文件或 WebDAV 文件。",
             "删除记录",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Danger);
         if (!confirmed)
         {
             return;
@@ -1238,7 +1239,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             "确认删除记录？",
             $"将删除该剧下已移出媒体库的 {items.Length} 个 Season 记录。删除记录不会删除本地文件或 WebDAV 文件。",
             "删除记录",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Danger);
         if (!confirmed)
         {
             return;
@@ -2030,7 +2032,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             "确认移出媒体库？",
             "移出后所选项目将从媒体库列表隐藏，但不会删除或禁用播放源、状态、metadata、播放历史、本地文件或 WebDAV 文件。",
             "移出",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Warning);
 
         if (!confirmed)
         {
@@ -2124,7 +2127,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             "确认删除记录？",
             "删除后将移除所选电影或电视剧季在软件中的信息、播放历史、收藏状态和播放源记录，但不会删除本地文件或 WebDAV 文件。后续扫描可能重新发现。",
             "删除记录",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Danger);
 
         if (!confirmed)
         {

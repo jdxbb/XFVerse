@@ -201,6 +201,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool _canGoToNextTvRankingPage;
     private int _tvSeriesOpenRequestVersion;
     private bool _isTvSeriesNavigating;
+    private bool _openAiRecommendationsOnNextActivation;
 
     public MovieDiscoveryViewModel(
         RecommendationsViewModel aiRecommendationViewModel,
@@ -1089,8 +1090,20 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public string ActiveRankingPageStatusText => IsTvRankingSelected ? TvRankingPageStatusText : RankingPageStatusText;
 
+    public void OpenAiRecommendationsOnNextActivation()
+    {
+        _openAiRecommendationsOnNextActivation = true;
+    }
+
     public override Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        if (_openAiRecommendationsOnNextActivation)
+        {
+            _openAiRecommendationsOnNextActivation = false;
+            SelectedTabIndex = AiRecommendationTabIndex;
+            return Task.CompletedTask;
+        }
+
         SelectedTabIndex = SearchTabIndex;
         return Task.CompletedTask;
     }

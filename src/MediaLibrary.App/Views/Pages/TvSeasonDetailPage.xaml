@@ -215,37 +215,36 @@
                     </StackPanel>
                 </Border>
 
-                <ScrollViewer x:Name="EpisodeScrollViewer"
-                              Grid.Row="2"
-                              HorizontalScrollBarVisibility="Disabled"
-                              VerticalScrollBarVisibility="Auto">
-                    <ListBox x:Name="EpisodeListBox"
-                             ItemsSource="{Binding Episodes}"
-                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                             Style="{StaticResource SectionListBoxStyle}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="10"
-                                        BorderThickness="1"
-                                        CornerRadius="12">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Background" Value="Transparent" />
-                                            <Setter Property="BorderBrush" Value="Transparent" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsTargetEpisode}" Value="True">
-                                                    <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="70" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="170" />
-                                        </Grid.ColumnDefinitions>
+                <ListBox x:Name="EpisodeListBox"
+                         Grid.Row="2"
+                         ItemsSource="{Binding Episodes}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         Style="{StaticResource SectionListBoxStyle}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="10"
+                                    BorderThickness="1"
+                                    CornerRadius="12">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderBrush" Value="Transparent" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsTargetEpisode}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="170" />
+                                    </Grid.ColumnDefinitions>
 
                                     <Border Width="52"
                                             Height="52"
@@ -337,12 +336,11 @@
                                                         Style="{StaticResource SecondaryButtonStyle}" />
                                             </WrapPanel>
                                         </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
                 <Border Grid.Row="2"
                         Padding="16"

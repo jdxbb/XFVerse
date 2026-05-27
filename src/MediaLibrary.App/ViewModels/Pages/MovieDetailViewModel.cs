@@ -2404,6 +2404,18 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "确认拆分此播放源？",
+            $"拆分后，该播放源将不再归属于当前电影，可能需要在未识别项目中继续修正。该操作不会删除本地文件或 WebDAV 文件。\n\n播放源：{source.FileName}",
+            "拆分来源",
+            "取消",
+            ConfirmationDialogVariant.Warning);
+        if (!confirmed)
+        {
+            StatusMessage = "已取消拆分播放源。";
+            return;
+        }
+
         try
         {
             var result = await _movieManagementService.ResetMediaFileToUnidentifiedAsync(_movieId.Value, source.MediaFileId);

@@ -33,4 +33,29 @@
         <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
         <Setter Property="Padding" Value="{StaticResource CompactCardPadding}" />
     </Style>
+
+    <Style x:Key="HomeMetricCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+        <Setter Property="MinHeight" Value="106" />
+        <Setter Property="Padding" Value="14" />
+    </Style>
+
+    <Style x:Key="HomeMediaCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <Style x:Key="HomeMediaPosterChromeStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+
+    <Style x:Key="HomeAiPanelStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style x:Key="HomeAiCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+        <Setter Property="Padding" Value="10" />
+        <Setter Property="MinHeight" Value="116" />
+    </Style>
 </ResourceDictionary>

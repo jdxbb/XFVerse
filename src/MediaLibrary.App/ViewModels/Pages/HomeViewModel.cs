@@ -11,11 +11,15 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class HomeViewModel : PageViewModelBase
 {
+    private const string DefaultUserDisplayName = "James";
+    private const string HomeWelcomeSubtitle = "享受你的私人 AI 影音库";
+
     private readonly IHomeDashboardQueryService _dashboardQueryService;
     private readonly IWatchStatisticsService _watchStatisticsService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IPlayerWindowService _playerWindowService;
+    private readonly MovieDiscoveryViewModel _movieDiscoveryViewModel;
     private string _statusMessage = "正在加载首页概览。";
     private int _movieCount;
     private int _sourceCount;
@@ -33,14 +37,16 @@ public sealed class HomeViewModel : PageViewModelBase
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
         IPlayerWindowService playerWindowService,
+        MovieDiscoveryViewModel movieDiscoveryViewModel,
         RecommendationsViewModel aiRecommendationViewModel)
-        : base("首页", "片库预览、继续观看、最近新增与推荐发现。")
+        : base($"欢迎回来，{DefaultUserDisplayName} 👋", HomeWelcomeSubtitle)
     {
         _dashboardQueryService = dashboardQueryService;
         _watchStatisticsService = watchStatisticsService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _playerWindowService = playerWindowService;
+        _movieDiscoveryViewModel = movieDiscoveryViewModel;
         AiRecommendationViewModel = aiRecommendationViewModel;
         _dataRefreshService.DataChanged += OnDataChanged;
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
@@ -51,7 +57,7 @@ public sealed class HomeViewModel : PageViewModelBase
         OpenFavoritesCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.Favorites));
         OpenScanTasksCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.ScanTasks));
         NavigateToWatchHistoryCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.WatchHistory));
-        NavigateToMovieDiscoveryCommand = new RelayCommand(() => _navigationStateService.RequestNavigation(NavigationPageKey.MovieDiscovery));
+        NavigateToMovieDiscoveryCommand = new RelayCommand(NavigateToMovieDiscoveryAiTab);
     }
 
     public ObservableCollection<HomeStatusMetricItem> LibraryStatusOverview { get; } = [];
@@ -59,6 +65,10 @@ public sealed class HomeViewModel : PageViewModelBase
     public ObservableCollection<HomeMovieItem> RecentlyAdded { get; } = [];
 
     public ObservableCollection<HomeMovieItem> RecentlyPlayed { get; } = [];
+
+    public IEnumerable<HomeMovieItem> RecentlyPlayedPreview => RecentlyPlayed.Take(3);
+
+    public IEnumerable<HomeMovieItem> RecentlyAddedPreview => RecentlyAdded.Take(4);
 
     public ObservableCollection<HomeMovieItem> Favorites { get; } = [];
 
@@ -89,6 +99,12 @@ public sealed class HomeViewModel : PageViewModelBase
     public RelayCommand NavigateToMovieDiscoveryCommand { get; }
 
     public RecommendationsViewModel AiRecommendationViewModel { get; }
+
+    public string UserDisplayName => DefaultUserDisplayName;
+
+    public string WelcomeTitle => $"欢迎回来，{UserDisplayName} 👋";
+
+    public string WelcomeSubtitle => HomeWelcomeSubtitle;
 
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
 
@@ -226,6 +242,7 @@ public sealed class HomeViewModel : PageViewModelBase
         FavoriteCount = dashboard.FavoriteCount;
         LastScanStatus = dashboard.LastScanStatus;
         Replace(RecentlyAdded, dashboard.RecentlyAdded);
+        OnPropertyChanged(nameof(RecentlyAddedPreview));
         Replace(Favorites, dashboard.Favorites);
         Replace(GenreDistribution, dashboard.GenreDistribution);
         Replace(YearDistribution, dashboard.YearDistribution);
@@ -243,6 +260,7 @@ public sealed class HomeViewModel : PageViewModelBase
         FavoriteCount = dashboard.FavoriteCount;
         LastScanStatus = dashboard.LastScanStatus;
         Replace(RecentlyAdded, dashboard.RecentlyAdded);
+        OnPropertyChanged(nameof(RecentlyAddedPreview));
         await RefreshLibraryStatusOverviewAsync(cancellationToken);
     }
 
@@ -250,6 +268,7 @@ public sealed class HomeViewModel : PageViewModelBase
     {
         Replace(RecentlyPlayed, await _dashboardQueryService.GetRecentlyPlayedAsync(cancellationToken));
         ApplyActivePlaybackState();
+        OnPropertyChanged(nameof(RecentlyPlayedPreview));
         ContinuePlaybackCommand.RaiseCanExecuteChanged();
     }
 
@@ -274,15 +293,24 @@ public sealed class HomeViewModel : PageViewModelBase
                 calendarMonth: null,
                 forceRefresh: false,
                 cancellationToken);
+            var monthSnapshot = await _watchStatisticsService.GetStatisticsAsync(
+                WatchStatisticsTimeRange.Month,
+                calendarMonth: null,
+                forceRefresh: false,
+                cancellationToken);
             ReplaceLibraryStatusOverview(
                 snapshot.WatchedCount,
                 snapshot.FavoriteCount,
                 snapshot.WantToWatchCount,
-                snapshot.NotInterestedCount);
+                snapshot.NotInterestedCount,
+                monthSnapshot.WatchedDeltaFromLastWeek,
+                monthSnapshot.FavoriteDeltaFromLastWeek,
+                monthSnapshot.WantToWatchDeltaFromLastWeek,
+                monthSnapshot.NotInterestedDeltaFromLastWeek);
         }
         catch
         {
-            ReplaceLibraryStatusOverview(WatchedCount, FavoriteCount, 0, 0);
+            ReplaceLibraryStatusOverview(WatchedCount, FavoriteCount, 0, 0, null, null, null, null);
         }
     }
 
@@ -290,16 +318,48 @@ public sealed class HomeViewModel : PageViewModelBase
         int watchedCount,
         int favoriteCount,
         int wantToWatchCount,
-        int notInterestedCount)
+        int notInterestedCount,
+        int? watchedDelta,
+        int? favoriteDelta,
+        int? wantToWatchDelta,
+        int? notInterestedDelta)
     {
         Replace(
             LibraryStatusOverview,
             [
-                new HomeStatusMetricItem("已看", watchedCount.ToString(), "部"),
-                new HomeStatusMetricItem("喜爱", favoriteCount.ToString(), "部"),
-                new HomeStatusMetricItem("想看", wantToWatchCount.ToString(), "部"),
-                new HomeStatusMetricItem("不想看", notInterestedCount.ToString(), "部")
+                BuildStatusMetric("已看", watchedCount, watchedDelta, "✓"),
+                BuildStatusMetric("喜爱", favoriteCount, favoriteDelta, "♡"),
+                BuildStatusMetric("想看", wantToWatchCount, wantToWatchDelta, "+"),
+                BuildStatusMetric("不想看", notInterestedCount, notInterestedDelta, "!")
             ]);
+    }
+
+    private static HomeStatusMetricItem BuildStatusMetric(string title, int value, int? delta, string iconGlyph)
+    {
+        return new HomeStatusMetricItem(title, value.ToString(), "部", FormatMonthlyTrend(delta), iconGlyph);
+    }
+
+    private static string FormatMonthlyTrend(int? delta)
+    {
+        if (!delta.HasValue)
+        {
+            return "相比上个月 暂无对比";
+        }
+
+        var arrow = delta.Value switch
+        {
+            > 0 => "↑",
+            < 0 => "↓",
+            _ => "→"
+        };
+        var sign = delta.Value > 0 ? "+" : string.Empty;
+        return $"相比上个月 {sign}{delta.Value} {arrow}";
+    }
+
+    private void NavigateToMovieDiscoveryAiTab()
+    {
+        _movieDiscoveryViewModel.OpenAiRecommendationsOnNextActivation();
+        _navigationStateService.RequestNavigation(NavigationPageKey.MovieDiscovery);
     }
 
     private void OpenMovie(object? parameter)
@@ -495,4 +555,4 @@ public sealed class HomeViewModel : PageViewModelBase
     }
 }
 
-public sealed record HomeStatusMetricItem(string Title, string ValueText, string UnitText);
+public sealed record HomeStatusMetricItem(string Title, string ValueText, string UnitText, string TrendText, string IconGlyph);

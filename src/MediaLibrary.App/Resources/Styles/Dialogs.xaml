@@ -29,6 +29,43 @@
         <Setter Property="Margin" Value="0,22,0,0" />
     </Style>
 
+    <Style x:Key="DialogCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+    </Style>
+
+    <Style x:Key="DialogLogoMarkStyle" TargetType="Border">
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+        <Setter Property="CornerRadius" Value="13" />
+    </Style>
+
+    <Style x:Key="DialogAvatarStyle" TargetType="Border">
+        <Setter Property="Width" Value="70" />
+        <Setter Property="Height" Value="70" />
+        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+        <Setter Property="CornerRadius" Value="35" />
+    </Style>
+
+    <Style x:Key="DialogFieldLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+
+    <Style x:Key="DialogFieldValueTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="MinHeight" Value="22" />
+    </Style>
+
+    <Style x:Key="ConfirmationVariantIconStyle" TargetType="Border">
+        <Setter Property="Width" Value="46" />
+        <Setter Property="Height" Value="46" />
+        <Setter Property="CornerRadius" Value="23" />
+        <Setter Property="Background" Value="{DynamicResource BrushInfoBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushInfoBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
     <Style x:Key="PopoverSurfaceStyle" TargetType="Border" BasedOn="{StaticResource PopupSurfaceStyle}" />
 
     <Style x:Key="LightweightConfirmPopoverStyle" TargetType="Border" BasedOn="{StaticResource PopupSurfaceStyle}">

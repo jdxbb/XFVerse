@@ -76,6 +76,9 @@ public partial class TvSeasonDetailPage : UserControl
             return;
         }
 
-        EpisodeScrollViewer.ScrollToTop();
+        if (EpisodeListBox.Items.Count > 0)
+        {
+            EpisodeListBox.ScrollIntoView(EpisodeListBox.Items[0]);
+        }
     }
 }

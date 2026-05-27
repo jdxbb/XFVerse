@@ -754,7 +754,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             "确认从当前集拆分？",
             $"会将该播放源从当前剧集中拆出，并回到 Other / 未识别项承接；不会删除本地或网盘中的真实文件，也不会清空剧集 metadata、已看状态或进度。\n\n播放源：{source.DisplayFileName}",
             "从当前集拆分",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Warning);
         if (!confirmed)
         {
             StatusMessage = "已取消拆分播放源。";

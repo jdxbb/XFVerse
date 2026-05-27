@@ -10,9 +10,10 @@ public sealed class ConfirmationDialogService : IConfirmationDialogService
         string title,
         string message,
         string confirmButtonText,
-        string cancelButtonText)
+        string cancelButtonText,
+        ConfirmationDialogVariant variant = ConfirmationDialogVariant.Normal)
     {
-        var dialog = new ConfirmationDialogWindow(title, message, confirmButtonText, cancelButtonText)
+        var dialog = new ConfirmationDialogWindow(title, message, confirmButtonText, cancelButtonText, variant)
         {
             Owner = ResolveOwner()
         };

@@ -1013,7 +1013,8 @@ public sealed class SettingsViewModel : PageViewModelBase
             "清理海报缓存？",
             "将删除本机海报缓存文件。不会删除影片、用户数据、视频缓存或人格海报；后续打开页面时会重新生成海报缓存。",
             "清理",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Danger);
 
         if (!confirmed)
         {
@@ -1042,7 +1043,8 @@ public sealed class SettingsViewModel : PageViewModelBase
             "清理其他缓存？",
             "将只清理可再生成的 TMDB / OMDb 外部元数据缓存。不会删除影片、收藏、播放进度、观影历史、用户配置或推荐偏好。",
             "清理",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Danger);
 
         if (!confirmed)
         {
@@ -1071,7 +1073,8 @@ public sealed class SettingsViewModel : PageViewModelBase
             "清理孤立在线字幕缓存？",
             "只会删除在线字幕缓存目录中没有被 Movie、Episode 或当前播放源绑定引用的字幕文件。不会删除仍在绑定中的字幕缓存、本地媒体、WebDAV 文件或扫描发现的外挂字幕。",
             "清理孤立缓存",
-            "取消");
+            "取消",
+            ConfirmationDialogVariant.Danger);
 
         if (!confirmed)
         {
