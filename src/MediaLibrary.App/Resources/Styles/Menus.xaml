@@ -28,6 +28,19 @@
         <Setter Property="Margin" Value="12,6,12,4" />
     </Style>
 
+    <Style x:Key="ShellMenuButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+    </Style>
+
+    <Style x:Key="ShellMenuIconTextStyle" TargetType="TextBlock" BasedOn="{StaticResource ShellIconGlyphTextStyle}">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+    </Style>
+
     <Style x:Key="PopupSurfaceStyle" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource BrushPopupBackground}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />

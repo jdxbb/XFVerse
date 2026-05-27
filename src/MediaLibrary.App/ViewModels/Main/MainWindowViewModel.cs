@@ -12,6 +12,9 @@ namespace MediaLibrary.App.ViewModels.Main;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {
+    private const double SidebarExpandedWidth = 248;
+    private const double SidebarCollapsedWidth = 64;
+
     private readonly Dictionary<NavigationPageKey, NavigationItemViewModel> _routeMap;
     private readonly Dictionary<NavigationPageKey, NavigationItemViewModel> _visibleNavigationMap;
     private readonly ISettingsService _settingsService;
@@ -23,6 +26,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _isSidebarExpanded = true;
     private bool _isUserMenuOpen;
     private string _userMenuStatusMessage = string.Empty;
+    private string _themeToggleIcon = "☀";
+    private string _themeToggleToolTip = "当前浅色主题，切换到深色主题";
 
     public MainWindowViewModel(
         INavigationStateService navigationStateService,
@@ -48,12 +53,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         VisibleNavigationItems =
         [
-            new NavigationItemViewModel(NavigationPageKey.Home, "首页", homeViewModel),
-            new NavigationItemViewModel(NavigationPageKey.Library, "媒体库", libraryViewModel),
-            new NavigationItemViewModel(NavigationPageKey.MovieDiscovery, "影片发现", movieDiscoveryViewModel),
-            new NavigationItemViewModel(NavigationPageKey.WatchHistory, "观影历史", watchHistoryViewModel),
-            new NavigationItemViewModel(NavigationPageKey.Favorites, "收藏夹", favoritesViewModel),
-            new NavigationItemViewModel(NavigationPageKey.WatchInsights, "观影洞察", watchInsightsViewModel)
+            new NavigationItemViewModel(NavigationPageKey.Home, "首页", homeViewModel, "⌂"),
+            new NavigationItemViewModel(NavigationPageKey.Library, "媒体库", libraryViewModel, "▦"),
+            new NavigationItemViewModel(NavigationPageKey.MovieDiscovery, "影片发现", movieDiscoveryViewModel, "✦"),
+            new NavigationItemViewModel(NavigationPageKey.WatchHistory, "观影历史", watchHistoryViewModel, "◷"),
+            new NavigationItemViewModel(NavigationPageKey.Favorites, "收藏夹", favoritesViewModel, "♡"),
+            new NavigationItemViewModel(NavigationPageKey.WatchInsights, "观影洞察", watchInsightsViewModel, "◎")
         ];
 
         var hiddenRouteItems = new[]
@@ -78,6 +83,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         LogoutCommand = new RelayCommand(ShowLogoutPlaceholder);
 
         NavigationStateService.NavigationRequested += OnNavigationRequested;
+        _ = InitializeThemePresentationAsync();
         SelectedNavigationItem = VisibleNavigationItems.First();
     }
 
@@ -103,7 +109,21 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public string UserAvatarInitial => "J";
 
-    public GridLength SidebarColumnWidth => IsSidebarExpanded ? new GridLength(248) : new GridLength(0);
+    public string ThemeToggleIcon
+    {
+        get => _themeToggleIcon;
+        private set => SetProperty(ref _themeToggleIcon, value);
+    }
+
+    public string ThemeToggleToolTip
+    {
+        get => _themeToggleToolTip;
+        private set => SetProperty(ref _themeToggleToolTip, value);
+    }
+
+    public GridLength SidebarColumnWidth => IsSidebarExpanded
+        ? new GridLength(SidebarExpandedWidth)
+        : new GridLength(SidebarCollapsedWidth);
 
     public bool IsSidebarCollapsed => !IsSidebarExpanded;
 
@@ -258,5 +278,32 @@ public sealed class MainWindowViewModel : ViewModelBase
         var settings = await _settingsService.GetApplicationSettingAsync();
         var nextTheme = string.Equals(settings.ThemeMode, "Dark", StringComparison.OrdinalIgnoreCase) ? "Light" : "Dark";
         await _themeService.ApplyAndSaveAsync(nextTheme);
+        UpdateThemePresentation(nextTheme);
+    }
+
+    private async Task InitializeThemePresentationAsync()
+    {
+        try
+        {
+            var settings = await _settingsService.GetApplicationSettingAsync();
+            UpdateThemePresentation(settings.ThemeMode);
+        }
+        catch
+        {
+            UpdateThemePresentation("Light");
+        }
+    }
+
+    private void UpdateThemePresentation(string? themeMode)
+    {
+        if (string.Equals(themeMode, "Dark", StringComparison.OrdinalIgnoreCase))
+        {
+            ThemeToggleIcon = "☾";
+            ThemeToggleToolTip = "当前深色主题，切换到浅色主题";
+            return;
+        }
+
+        ThemeToggleIcon = "☀";
+        ThemeToggleToolTip = "当前浅色主题，切换到深色主题";
     }
 }
