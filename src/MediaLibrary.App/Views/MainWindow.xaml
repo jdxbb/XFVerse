@@ -6,8 +6,8 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="XFVerse"
-        Width="1440"
-        Height="920"
+        Width="1280"
+        Height="820"
         MinWidth="1180"
         MinHeight="760"
         WindowStartupLocation="CenterScreen"
@@ -43,60 +43,71 @@
                 <Grid>
                     <Grid.Style>
                         <Style TargetType="Grid">
-                            <Setter Property="Margin" Value="20,30,14,24" />
+                            <Setter Property="Margin" Value="20,8,14,24" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
-                                    <Setter Property="Margin" Value="11,30,11,24" />
+                                    <Setter Property="Margin" Value="11,8,11,24" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </Grid.Style>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Border Style="{StaticResource ShellBrandIconStyle}"
-                            ToolTip="XFVerse">
-                        <TextBlock Text="XF"
-                                   FontFamily="{StaticResource FontFamilyBase}"
-                                   FontSize="13"
-                                   FontWeight="Black"
-                                   Foreground="{DynamicResource BrushOnAccent}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Grid.Column="1"
-                               Margin="12,0,0,0"
-                               Text="XFVerse"
-                               VerticalAlignment="Center">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource SidebarBrandTextStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                    <Button Grid.Column="2"
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="42" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Button Grid.Row="0"
                             Width="36"
                             Height="36"
                             Padding="0"
-                            Content="‹"
-                            ToolTip="收起侧边栏"
+                            VerticalAlignment="Center"
                             Command="{Binding ToggleSidebarCommand}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ShellSidebarIconButtonStyle}">
+                                <Setter Property="Content" Value="‹" />
+                                <Setter Property="HorizontalAlignment" Value="Right" />
+                                <Setter Property="ToolTip" Value="收起侧边栏" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
-                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Setter Property="Content" Value="›" />
+                                        <Setter Property="HorizontalAlignment" Value="Center" />
+                                        <Setter Property="ToolTip" Value="{x:Null}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                     </Button>
+
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource ShellBrandIconStyle}"
+                                ToolTip="XFVerse">
+                            <TextBlock Text="XF"
+                                       FontFamily="{StaticResource FontFamilyBase}"
+                                       FontSize="13"
+                                       FontWeight="Black"
+                                       Foreground="{DynamicResource BrushOnAccent}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="12,0,0,0"
+                                   Text="XFVerse"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SidebarBrandTextStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
                 </Grid>
 
                 <ListBox Grid.Row="1"
@@ -115,6 +126,17 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                <Setter Property="Width" Value="24" />
+                                                <Setter Property="HorizontalAlignment" Value="Center" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
@@ -159,11 +181,24 @@
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
                                         <Setter Property="Padding" Value="5" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                        <Setter Property="ToolTip" Value="{x:Null}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                         <Grid>
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                            <Setter Property="Width" Value="38" />
+                                            <Setter Property="HorizontalAlignment" Value="Center" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -330,33 +365,11 @@
                 <Grid Height="44"
                       Margin="30,6,2,6">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <Button Width="42"
-                            Height="42"
-                            Padding="0"
-                            Margin="0,0,16,0"
-                            Command="{Binding ToggleSidebarCommand}"
-                            ToolTip="展开侧边栏">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                        <TextBlock Text="☰"
-                                   Style="{StaticResource ShellIconGlyphTextStyle}"
-                                   Foreground="{DynamicResource BrushForegroundSecondary}" />
-                    </Button>
-
-                    <StackPanel Grid.Column="1"
+                    <StackPanel Grid.Column="0"
                                 Height="36"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
@@ -383,11 +396,11 @@
                         </TextBlock>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2"
+                    <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
-                                Margin="0">
+                                Margin="0,0,30,0">
                         <Button Command="{Binding ToggleThemeCommand}"
                                 Width="36"
                                 Height="36"

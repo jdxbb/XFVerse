@@ -76,6 +76,7 @@
                     <Setter Property="BorderBrush" Value="Transparent" />
                     <Setter Property="Foreground" Value="{DynamicResource BrushSidebarMuted}" />
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
                     <Setter Property="ToolTip" Value="{Binding ToolTip}" />
                     <Setter Property="ToolTipService.InitialShowDelay" Value="350" />
                     <Setter Property="Template">
@@ -86,9 +87,18 @@
                                         BorderBrush="{TemplateBinding BorderBrush}"
                                         BorderThickness="{TemplateBinding BorderThickness}"
                                         CornerRadius="{StaticResource RadiusButton}">
-                                    <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                                    <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                                 </Border>
                                 <ControlTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Width" Value="42" />
+                                        <Setter Property="Height" Value="42" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                        <Setter Property="ToolTip" Value="{x:Null}" />
+                                    </DataTrigger>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
                                         <Setter Property="Foreground" Value="{DynamicResource BrushSidebarForeground}" />

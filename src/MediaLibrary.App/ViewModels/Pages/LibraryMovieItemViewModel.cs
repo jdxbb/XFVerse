@@ -246,6 +246,21 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public string DetailHintText => IsGroupedPlaceholder ? "未识别剧集候选" : MediaKindText;
 
+    public string BatchModeHintText
+    {
+        get
+        {
+            if (IsGroupedPlaceholder)
+            {
+                return "未识别剧集候选";
+            }
+
+            return Movie.IsOther ? DetailHintText : string.Empty;
+        }
+    }
+
+    public bool HasBatchModeHint => IsBatchSelectionMode && !string.IsNullOrWhiteSpace(BatchModeHintText);
+
     public string PrimaryMetadataText
     {
         get
@@ -352,6 +367,7 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
             if (SetProperty(ref _isBatchSelectionMode, value))
             {
                 OnPropertyChanged(nameof(SelectionDotVisible));
+                OnPropertyChanged(nameof(HasBatchModeHint));
             }
         }
     }

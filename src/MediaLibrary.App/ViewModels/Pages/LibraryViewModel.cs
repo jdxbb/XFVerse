@@ -166,9 +166,14 @@ public sealed class LibraryViewModel : PageViewModelBase
         ContentTypeOptions = ["全部", "电影", "电视剧", "其他"];
         SwitchToPosterViewCommand = new RelayCommand(() => SetLibraryLayout(isPosterView: true));
         SwitchToListViewCommand = new RelayCommand(() => SetLibraryLayout(isPosterView: false));
+        SelectSortOptionCommand = new RelayCommand(SelectSortOption);
+        SelectSortDirectionCommand = new RelayCommand(SelectSortDirection);
+        ToggleSortDirectionCommand = new RelayCommand(ToggleSortDirection);
         SelectLibraryScopeCommand = new RelayCommand(SelectLibraryScope);
         SelectSourceFilterCommand = new RelayCommand(SelectSourceFilter);
         SelectContentTypeCommand = new RelayCommand(SelectContentType);
+        SelectDecadeFilterCommand = new RelayCommand(SelectDecadeFilter);
+        SelectWatchedFilterCommand = new RelayCommand(SelectWatchedFilter);
         ClearTagFilterCommand = new RelayCommand(ClearTagFilter);
         SelectCollectionStatusCommand = new RelayCommand(SelectCollectionStatus);
         OpenMovieCommand = new RelayCommand(OpenMovie);
@@ -238,11 +243,21 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public RelayCommand SwitchToListViewCommand { get; }
 
+    public RelayCommand SelectSortOptionCommand { get; }
+
+    public RelayCommand SelectSortDirectionCommand { get; }
+
+    public RelayCommand ToggleSortDirectionCommand { get; }
+
     public RelayCommand SelectLibraryScopeCommand { get; }
 
     public RelayCommand SelectSourceFilterCommand { get; }
 
     public RelayCommand SelectContentTypeCommand { get; }
+
+    public RelayCommand SelectDecadeFilterCommand { get; }
+
+    public RelayCommand SelectWatchedFilterCommand { get; }
 
     public RelayCommand ClearTagFilterCommand { get; }
 
@@ -330,6 +345,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedSortOption, value))
             {
+                OnPropertyChanged(nameof(SortButtonText));
                 ApplyFilters();
             }
         }
@@ -342,6 +358,9 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedSortDirection, value))
             {
+                OnPropertyChanged(nameof(SortDirectionIcon));
+                OnPropertyChanged(nameof(SortDirectionIconData));
+                OnPropertyChanged(nameof(SortDirectionButtonToolTip));
                 ApplyFilters();
             }
         }
@@ -366,6 +385,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedWatchedFilter, value))
             {
+                OnPropertyChanged(nameof(WatchedFilterButtonText));
                 ApplyFilters();
             }
         }
@@ -379,6 +399,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             if (SetProperty(ref _selectedLibraryScope, value))
             {
                 OnPropertyChanged(nameof(LibraryScopeMenuHeader));
+                OnPropertyChanged(nameof(PlaybackSourceButtonText));
                 ApplyFilters();
             }
         }
@@ -392,6 +413,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             if (SetProperty(ref _selectedSourceFilter, value))
             {
                 OnPropertyChanged(nameof(LibraryScopeMenuHeader));
+                OnPropertyChanged(nameof(MediaSourceButtonText));
                 ApplyFilters();
             }
         }
@@ -405,6 +427,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             if (SetProperty(ref _selectedCollectionStatusFilter, value))
             {
                 OnPropertyChanged(nameof(CollectionStatusMenuHeader));
+                OnPropertyChanged(nameof(CollectionStatusButtonText));
                 ApplyFilters();
             }
         }
@@ -422,6 +445,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
             if (SetProperty(ref _selectedContentTypeFilter, value))
             {
+                OnPropertyChanged(nameof(ContentTypeButtonText));
                 ApplyFilters();
             }
         }
@@ -434,6 +458,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedDecadeFilter, value))
             {
+                OnPropertyChanged(nameof(DecadeButtonText));
                 ApplyFilters();
             }
         }
@@ -442,6 +467,24 @@ public sealed class LibraryViewModel : PageViewModelBase
     public string LibraryScopeMenuHeader => SelectedSourceFilter == SourceFilterAll
         ? $"播放源状态：{SelectedLibraryScope}"
         : $"播放源状态：{SelectedLibraryScope} / {SelectedSourceFilter}";
+
+    public string SortButtonText => $"排序：{SelectedSortOption}";
+
+    public string SortDirectionIcon => string.Equals(SelectedSortDirection, "升序", StringComparison.Ordinal)
+        ? "↑"
+        : "↓";
+
+    public string SortDirectionIconData => string.Equals(SelectedSortDirection, "升序", StringComparison.Ordinal)
+        ? "M 8 18 L 8 6 M 4 10 L 8 6 L 12 10 M 15 7 H 23 M 15 12 H 21 M 15 17 H 19"
+        : "M 8 6 L 8 18 M 4 14 L 8 18 L 12 14 M 15 7 H 19 M 15 12 H 21 M 15 17 H 23";
+
+    public string SortDirectionButtonToolTip => $"顺序：{SelectedSortDirection}";
+
+    public string PlaybackSourceButtonText => $"播放源：{SelectedLibraryScope}";
+
+    public string MediaSourceButtonText => $"来源：{FormatSourceFilterForButton(SelectedSourceFilter)}";
+
+    public string ContentTypeButtonText => $"影视：{SelectedContentTypeFilter}";
 
     public string TagFilterMenuHeader
     {
@@ -457,6 +500,31 @@ public sealed class LibraryViewModel : PageViewModelBase
     }
 
     public string CollectionStatusMenuHeader => $"收藏状态：{SelectedCollectionStatusFilter}";
+
+    public string TagFilterButtonText
+    {
+        get
+        {
+            var count = AllTagOptions().Count(option => option.IsSelected);
+            return count == 0 ? "标签：全部" : $"标签：{count} 项";
+        }
+    }
+
+    public string CollectionStatusButtonText => $"收藏状态：{SelectedCollectionStatusFilter}";
+
+    public string DecadeButtonText => $"年代：{FormatDecadeFilterForButton(SelectedDecadeFilter)}";
+
+    public string WatchedFilterButtonText => $"观看状态：{SelectedWatchedFilter}";
+
+    private static string FormatSourceFilterForButton(string value)
+    {
+        return string.Equals(value, SourceFilterAll, StringComparison.Ordinal) ? FilterAll : value;
+    }
+
+    private static string FormatDecadeFilterForButton(string value)
+    {
+        return string.Equals(value, DecadeAll, StringComparison.Ordinal) ? FilterAll : value;
+    }
 
     public bool IsPosterView
     {
@@ -1379,6 +1447,29 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
+    private void SelectSortOption(object? parameter)
+    {
+        if (parameter is string sortOption && SortOptions.Contains(sortOption))
+        {
+            SelectedSortOption = sortOption;
+        }
+    }
+
+    private void SelectSortDirection(object? parameter)
+    {
+        if (parameter is string sortDirection && SortDirectionOptions.Contains(sortDirection))
+        {
+            SelectedSortDirection = sortDirection;
+        }
+    }
+
+    private void ToggleSortDirection()
+    {
+        SelectedSortDirection = string.Equals(SelectedSortDirection, "降序", StringComparison.Ordinal)
+            ? "升序"
+            : "降序";
+    }
+
     private void SelectLibraryScope(object? parameter)
     {
         if (parameter is string scope && LibraryScopeOptions.Contains(scope))
@@ -1400,6 +1491,22 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (parameter is string contentType && ContentTypeOptions.Contains(contentType))
         {
             SelectedContentTypeFilter = contentType;
+        }
+    }
+
+    private void SelectDecadeFilter(object? parameter)
+    {
+        if (parameter is string decade && DecadeFilterOptions.Contains(decade))
+        {
+            SelectedDecadeFilter = decade;
+        }
+    }
+
+    private void SelectWatchedFilter(object? parameter)
+    {
+        if (parameter is string watchedFilter && WatchedFilterOptions.Contains(watchedFilter))
+        {
+            SelectedWatchedFilter = watchedFilter;
         }
     }
 
@@ -1432,6 +1539,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         OnPropertyChanged(nameof(TagFilterMenuHeader));
+        OnPropertyChanged(nameof(TagFilterButtonText));
         if (applyFilters)
         {
             ApplyFilters();
@@ -1545,6 +1653,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         OnPropertyChanged(nameof(TagFilterMenuHeader));
+        OnPropertyChanged(nameof(TagFilterButtonText));
         ApplyFilters();
     }
 
@@ -1726,11 +1835,6 @@ public sealed class LibraryViewModel : PageViewModelBase
         var sourceCount = filteredItems.Count(item => item.HasActiveSource);
         var noSourceCount = filteredItems.Count(item => !item.HasActiveSource);
         var message = $"共找到 {totalCount} 项媒体 · 已看 {watchedCount} · 未看 {unwatchedCount} · 有播放源 {sourceCount} · 无播放源 {noSourceCount}";
-
-        if (IsBatchSelectionMode)
-        {
-            message += $" · 已选 {SelectedCount} 项";
-        }
 
         return message;
     }

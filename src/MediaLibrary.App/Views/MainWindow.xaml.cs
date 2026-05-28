@@ -12,6 +12,9 @@ namespace MediaLibrary.App.Views;
 
 public partial class MainWindow : Window
 {
+    private const double DefaultNormalWidth = 1280;
+    private const double DefaultNormalHeight = 820;
+    private const double DefaultWindowMargin = 48;
     private const int WmGetMinMaxInfo = 0x0024;
     private const int MonitorDefaultToNearest = 0x00000002;
 
@@ -23,6 +26,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = AppServiceProvider.GetRequiredService<MainWindowViewModel>();
         SourceInitialized += OnSourceInitialized;
+        Loaded += OnLoaded;
         StateChanged += OnWindowStateChanged;
         UpdateMaximizeRestoreButton();
     }
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
     {
         _hwndSource?.RemoveHook(WindowProc);
         SourceInitialized -= OnSourceInitialized;
+        Loaded -= OnLoaded;
         StateChanged -= OnWindowStateChanged;
         base.OnClosed(e);
     }
@@ -39,6 +44,14 @@ public partial class MainWindow : Window
     {
         _hwndSource = (HwndSource?)PresentationSource.FromVisual(this);
         _hwndSource?.AddHook(WindowProc);
+    }
+
+    private void OnLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Normal)
+        {
+            CenterNormalWindowOnCurrentMonitor();
+        }
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -162,7 +175,28 @@ public partial class MainWindow : Window
 
     private void ToggleMaximizeRestore()
     {
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        if (WindowState == WindowState.Maximized)
+        {
+            RestoreToDefaultNormalSize();
+            return;
+        }
+
+        WindowState = WindowState.Maximized;
+    }
+
+    private void RestoreToDefaultNormalSize()
+    {
+        WindowState = WindowState.Normal;
+        CenterNormalWindowOnCurrentMonitor();
+    }
+
+    private void CenterNormalWindowOnCurrentMonitor()
+    {
+        var workArea = GetCurrentMonitorWorkAreaInDips() ?? SystemParameters.WorkArea;
+        Width = Math.Max(MinWidth, Math.Min(DefaultNormalWidth, Math.Max(MinWidth, workArea.Width - DefaultWindowMargin)));
+        Height = Math.Max(MinHeight, Math.Min(DefaultNormalHeight, Math.Max(MinHeight, workArea.Height - DefaultWindowMargin)));
+        Left = workArea.Left + Math.Max(0, (workArea.Width - Width) * 0.5);
+        Top = workArea.Top + Math.Max(0, (workArea.Height - Height) * 0.5);
     }
 
     private void UpdateMaximizeRestoreButton()
@@ -248,6 +282,42 @@ public partial class MainWindow : Window
         minMaxInfo.MinTrackSize.Y = (int)Math.Ceiling(MinHeight * dpi.DpiScaleY);
 
         Marshal.StructureToPtr(minMaxInfo, lParam, true);
+    }
+
+    private Rect? GetCurrentMonitorWorkAreaInDips()
+    {
+        if (_hwndSource?.Handle is not { } hwnd || hwnd == nint.Zero)
+        {
+            return null;
+        }
+
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == nint.Zero)
+        {
+            return null;
+        }
+
+        var monitorInfo = new MonitorInfo
+        {
+            Size = Marshal.SizeOf<MonitorInfo>()
+        };
+
+        if (!GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            return null;
+        }
+
+        var workArea = monitorInfo.WorkArea;
+        var topLeft = new Point(workArea.Left, workArea.Top);
+        var bottomRight = new Point(workArea.Right, workArea.Bottom);
+
+        if (_hwndSource.CompositionTarget is not null)
+        {
+            topLeft = _hwndSource.CompositionTarget.TransformFromDevice.Transform(topLeft);
+            bottomRight = _hwndSource.CompositionTarget.TransformFromDevice.Transform(bottomRight);
+        }
+
+        return new Rect(topLeft, bottomRight);
     }
 
     [DllImport("user32.dll")]

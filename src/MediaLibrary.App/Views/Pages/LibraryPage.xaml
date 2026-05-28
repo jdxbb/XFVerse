@@ -41,6 +41,67 @@
             </Setter>
         </Style>
 
+        <Style x:Key="LibraryModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border Width="6"
+                                Margin="0"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="3"
+                                Opacity="0.58" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LibraryModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LibraryModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="MinWidth" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Width="{TemplateBinding Width}"
+                              Background="Transparent">
+                            <Track x:Name="PART_Track"
+                                   IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Style="{StaticResource LibraryModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource LibraryModernScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Style="{StaticResource LibraryModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="LibraryMediaChipStyle" TargetType="Border">
             <Setter Property="Padding" Value="7,4" />
             <Setter Property="CornerRadius" Value="6" />
@@ -88,18 +149,85 @@
             <Setter Property="Padding" Value="8,3" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
 
         <Style x:Key="LibraryFilterMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource MenuItemStyle}">
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="9,4" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="LibraryToolbarMenuStyle" TargetType="Menu">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
         </Style>
 
         <Style x:Key="LibraryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallButtonStyle}">
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="10,4" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="LibraryFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="10,4" />
+        </Style>
+
+        <Style x:Key="LibraryPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="LibrarySecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="LibrarySearchClearButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="MinWidth" Value="22" />
+            <Setter Property="MinHeight" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SearchText}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LibraryBatchToggleButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="LibraryToolbarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
@@ -108,6 +236,8 @@
             <Setter Property="MinWidth" Value="30" />
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         </Style>
 
         <Style x:Key="SelectionDotButtonStyle" TargetType="Button">
@@ -119,6 +249,8 @@
             <Setter Property="BorderThickness" Value="1.5" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -156,9 +288,49 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="LibraryBatchToolbarStyle" TargetType="Border">
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LibraryBatchStatusPillStyle" TargetType="Border">
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+
+        <Style x:Key="LibraryBatchInfoButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource BrushInfo}" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushInfo}" />
+        </Style>
+
+        <Style x:Key="LibraryBatchWarningButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource BrushWarning}" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushWarning}" />
+        </Style>
+
+        <Style x:Key="LibraryBatchDangerButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource BrushDanger}" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushDanger}" />
+        </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Background="Transparent" PreviewMouseDown="OnRootPreviewMouseDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="18" />
@@ -177,277 +349,293 @@
 
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition x:Name="ToolbarSearchColumn" Width="816" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel>
+                    <StackPanel Grid.Column="0" Margin="16,0,0,0">
                         <TextBlock Text="搜索媒体" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBox MinWidth="320"
-                                 Style="{StaticResource LibrarySearchBoxStyle}"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
-                            <TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}" />
-                            </TextBox.InputBindings>
-                        </TextBox>
+                        <Grid>
+                            <TextBox x:Name="SearchTextBox"
+                                     KeyDown="SearchTextBox_KeyDown"
+                                     Style="{StaticResource LibrarySearchBoxStyle}"
+                                     Padding="10,3,30,3"
+                                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,4,0"
+                                    Command="{Binding ClearSearchCommand}"
+                                    Style="{StaticResource LibrarySearchClearButtonStyle}">
+                                <TextBlock FontFamily="Segoe MDL2 Assets"
+                                           FontSize="10"
+                                           Text="&#xE711;" />
+                            </Button>
+                        </Grid>
                     </StackPanel>
 
                     <Button Grid.Column="2"
                             VerticalAlignment="Bottom"
                             Command="{Binding ApplySearchCommand}"
+                            Click="SearchButton_Click"
                             Style="{StaticResource LibraryToolbarIconButtonStyle}">
                         <TextBlock FontFamily="Segoe MDL2 Assets"
                                    FontSize="16"
-                                   Text="&#xE721;" />
+                                   RenderTransformOrigin="0.5,0.5"
+                                   Text="&#xE721;">
+                            <TextBlock.RenderTransform>
+                                <ScaleTransform ScaleX="-1" />
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
                     </Button>
-                    <Button Grid.Column="4"
-                            VerticalAlignment="Bottom"
-                            Content="清空搜索"
-                            Command="{Binding ClearSearchCommand}"
-                            Style="{StaticResource LibraryToolbarButtonStyle}" />
-                    <Button Grid.Column="6"
-                            VerticalAlignment="Bottom"
-                            Content="清除筛选"
-                            Command="{Binding ClearFiltersCommand}"
-                            Style="{StaticResource LibraryToolbarButtonStyle}" />
+                    <UniformGrid Grid.Column="4"
+                                 Rows="1"
+                                 Columns="3">
+                        <Button Content="{Binding SortButtonText}"
+                                Click="OpenButtonContextMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="最近更新" Command="{Binding SelectSortOptionCommand}" CommandParameter="最近更新" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="标题" Command="{Binding SelectSortOptionCommand}" CommandParameter="标题" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="年份" Command="{Binding SelectSortOptionCommand}" CommandParameter="年份" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="评分" Command="{Binding SelectSortOptionCommand}" CommandParameter="评分" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <Button Command="{Binding ToggleSortDirectionCommand}"
+                                Style="{StaticResource LibraryFilterButtonStyle}"
+                                ToolTip="{Binding SortDirectionButtonToolTip}">
+                            <Viewbox Width="18" Height="18">
+                                <Canvas Width="26" Height="24">
+                                    <Path Data="{Binding SortDirectionIconData}"
+                                          Stroke="{DynamicResource BrushForegroundSecondary}"
+                                          StrokeThickness="2"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" />
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
+                        <Button Content="清除筛选"
+                                Command="{Binding ClearFiltersCommand}"
+                                Style="{StaticResource LibraryFilterButtonStyle}" />
+                    </UniformGrid>
                 </Grid>
 
-                <WrapPanel Grid.Row="2">
-                    <StackPanel Width="118" Margin="0,0,6,4">
-                        <TextBlock Text="排序" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedSortOption}"
-                                  ItemsSource="{Binding SortOptions}"
-                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
-                    </StackPanel>
+                <DockPanel Grid.Row="2" LastChildFill="True">
+                    <Button DockPanel.Dock="Right"
+                            Margin="8,0,0,0"
+                            Content="{Binding BatchSelectionButtonText}"
+                            Command="{Binding ToggleBatchSelectionModeCommand}"
+                            Style="{StaticResource LibraryBatchToggleButtonStyle}" />
+                    <UniformGrid Rows="1" Columns="7">
+                        <Button Content="{Binding PlaybackSourceButtonText}"
+                                Click="OpenButtonContextMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="全部" Command="{Binding SelectLibraryScopeCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="有播放源" Command="{Binding SelectLibraryScopeCommand}" CommandParameter="有播放源" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="无播放源" Command="{Binding SelectLibraryScopeCommand}" CommandParameter="无播放源" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <Button Content="{Binding MediaSourceButtonText}"
+                                Click="OpenButtonContextMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="全部" Command="{Binding SelectSourceFilterCommand}" CommandParameter="全部来源" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="本地" Command="{Binding SelectSourceFilterCommand}" CommandParameter="本地" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="网盘" Command="{Binding SelectSourceFilterCommand}" CommandParameter="网盘" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <Button Content="{Binding ContentTypeButtonText}"
+                                Click="OpenButtonContextMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="全部" Command="{Binding SelectContentTypeCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="电影" Command="{Binding SelectContentTypeCommand}" CommandParameter="电影" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="电视剧" Command="{Binding SelectContentTypeCommand}" CommandParameter="电视剧" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="其他" Command="{Binding SelectContentTypeCommand}" CommandParameter="其他" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <Button Content="{Binding TagFilterButtonText}"
+                                Click="OpenButtonContextMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="清除标签" Command="{Binding ClearTagFilterCommand}" />
+                                    <Separator />
+                                    <MenuItem StaysOpenOnClick="True">
+                                        <MenuItem.Header>
+                                            <ScrollViewer Width="660" MaxHeight="420" VerticalScrollBarVisibility="Auto">
+                                                <Grid Margin="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="220" />
+                                                        <ColumnDefinition Width="220" />
+                                                        <ColumnDefinition Width="220" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                                        <TextBlock Text="类型标签" Style="{StaticResource BodyMutedTextStyle}" />
+                                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding TypeTagOptions}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <CheckBox MinWidth="82"
+                                                                              Margin="0,0,8,8"
+                                                                              Content="{Binding Label}"
+                                                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                                                        <TextBlock Text="情绪标签" Style="{StaticResource BodyMutedTextStyle}" />
+                                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding EmotionTagOptions}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <CheckBox MinWidth="82"
+                                                                              Margin="0,0,8,8"
+                                                                              Content="{Binding Label}"
+                                                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="场景标签" Style="{StaticResource BodyMutedTextStyle}" />
+                                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding SceneTagOptions}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <CheckBox MinWidth="82"
+                                                                              Margin="0,0,8,8"
+                                                                              Content="{Binding Label}"
+                                                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </ScrollViewer>
+                                        </MenuItem.Header>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <Button x:Name="DecadeFilterButton"
+                                Content="{Binding DecadeButtonText}"
+                                Click="OpenDecadeFilterMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}" />
+                        <Button Content="{Binding CollectionStatusButtonText}"
+                                Click="OpenButtonContextMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="全部" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="喜爱" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="喜爱" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="想看" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="不想看" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="不想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <Button Content="{Binding WatchedFilterButtonText}"
+                                Click="OpenButtonContextMenu"
+                                Style="{StaticResource LibraryFilterButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="全部" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="已看" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="已看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="未看" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="未看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                    <MenuItem Header="不想看" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="不想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </UniformGrid>
+                </DockPanel>
 
-                    <StackPanel Width="96" Margin="0,0,6,4">
-                        <TextBlock Text="顺序" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedSortDirection}"
-                                  ItemsSource="{Binding SortDirectionOptions}"
-                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
-                    </StackPanel>
+                <Border Grid.Row="4" Style="{StaticResource LibraryBatchToolbarStyle}">
+                    <DockPanel LastChildFill="True">
+                        <WrapPanel DockPanel.Dock="Right"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center">
+                            <Button Margin="0,0,6,0"
+                                    Content="全选当前列表"
+                                    Command="{Binding SelectVisibleItemsCommand}"
+                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
+                            <Button Margin="0,0,6,0"
+                                    Content="清空选择"
+                                    Command="{Binding ClearBatchSelectionCommand}"
+                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
+                            <Button Margin="0,0,6,0"
+                                    Content="标记已看"
+                                    Command="{Binding BatchMarkWatchedCommand}"
+                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
+                            <Button Margin="0,0,6,0"
+                                    Content="标记未看"
+                                    Command="{Binding BatchMarkUnwatchedCommand}"
+                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
+                            <Button Margin="0,0,6,0"
+                                    Content="AI 辅助识别"
+                                    Command="{Binding BatchAutoIdentifyCommand}"
+                                    Style="{StaticResource LibraryBatchInfoButtonStyle}" />
+                            <Button Margin="0,0,6,0"
+                                    Content="取消"
+                                    Command="{Binding CancelBatchOperationCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CanCancelBatchOperation}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Margin="0,0,6,0"
+                                    Content="移出媒体库"
+                                    Command="{Binding BatchRemoveFromLibraryCommand}"
+                                    Style="{StaticResource LibraryBatchWarningButtonStyle}" />
+                            <Button Margin="0,0,6,0"
+                                    Content="删除记录"
+                                    Command="{Binding BatchDeleteMovieRecordsCommand}"
+                                    Style="{StaticResource LibraryBatchDangerButtonStyle}" />
+                            <Button Content="人工聚合为季"
+                                    Command="{Binding OpenManualAggregationCommand}"
+                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
+                        </WrapPanel>
 
-                    <StackPanel Width="108" Margin="0,0,6,4">
-                        <TextBlock Text="内容" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedContentTypeFilter}"
-                                  ItemsSource="{Binding ContentTypeOptions}"
-                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
-                    </StackPanel>
-
-                    <StackPanel Width="176" Margin="0,0,6,4">
-                        <TextBlock Text="范围" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <Menu>
-                            <MenuItem Header="{Binding LibraryScopeMenuHeader}" Style="{StaticResource LibraryFilterMenuItemStyle}">
-                                <MenuItem Header="播放源状态">
-                                    <MenuItem Header="全部"
-                                              Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
-                                              CommandParameter="全部" />
-                                    <MenuItem Header="有播放源"
-                                              Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
-                                              CommandParameter="有播放源" />
-                                    <MenuItem Header="无播放源"
-                                              Command="{Binding DataContext.SelectLibraryScopeCommand, ElementName=Root}"
-                                              CommandParameter="无播放源" />
-                                </MenuItem>
-                                <Separator />
-                                <MenuItem Header="影片来源">
-                                    <MenuItem Header="全部来源"
-                                              Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
-                                              CommandParameter="全部来源" />
-                                    <MenuItem Header="本地"
-                                              Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
-                                              CommandParameter="本地" />
-                                    <MenuItem Header="网盘"
-                                              Command="{Binding DataContext.SelectSourceFilterCommand, ElementName=Root}"
-                                              CommandParameter="网盘" />
-                                </MenuItem>
-                            </MenuItem>
-                        </Menu>
-                    </StackPanel>
-
-                    <StackPanel Width="194" Margin="0,0,6,4">
-                        <TextBlock Text="标签" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <Menu>
-                            <MenuItem Header="{Binding TagFilterMenuHeader}" Style="{StaticResource LibraryFilterMenuItemStyle}">
-                                <MenuItem Header="清除标签"
-                                          Command="{Binding DataContext.ClearTagFilterCommand, ElementName=Root}" />
-                                <Separator />
-                                <MenuItem StaysOpenOnClick="True">
-                                    <MenuItem.Header>
-                                        <ScrollViewer Width="660" MaxHeight="420" VerticalScrollBarVisibility="Auto">
-                                            <Grid Margin="8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="220" />
-                                                    <ColumnDefinition Width="220" />
-                                                    <ColumnDefinition Width="220" />
-                                                </Grid.ColumnDefinitions>
-
-                                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                                                    <TextBlock Text="类型标签" Style="{StaticResource BodyMutedTextStyle}" />
-                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding TypeTagOptions}">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <WrapPanel />
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <CheckBox MinWidth="82"
-                                                                          Margin="0,0,8,8"
-                                                                          Content="{Binding Label}"
-                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                                                    <TextBlock Text="情绪标签" Style="{StaticResource BodyMutedTextStyle}" />
-                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding EmotionTagOptions}">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <WrapPanel />
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <CheckBox MinWidth="82"
-                                                                          Margin="0,0,8,8"
-                                                                          Content="{Binding Label}"
-                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Column="2">
-                                                    <TextBlock Text="场景标签" Style="{StaticResource BodyMutedTextStyle}" />
-                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding SceneTagOptions}">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <WrapPanel />
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <CheckBox MinWidth="82"
-                                                                          Margin="0,0,8,8"
-                                                                          Content="{Binding Label}"
-                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-                                            </Grid>
-                                        </ScrollViewer>
-                                    </MenuItem.Header>
-                                </MenuItem>
-                            </MenuItem>
-                        </Menu>
-                    </StackPanel>
-
-                    <StackPanel Width="100" Margin="0,0,6,4">
-                        <TextBlock Text="年代" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedDecadeFilter}"
-                                  ItemsSource="{Binding DecadeFilterOptions}"
-                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
-                    </StackPanel>
-
-                    <StackPanel Width="138" Margin="0,0,6,4">
-                        <TextBlock Text="收藏状态" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <Menu>
-                            <MenuItem Header="{Binding CollectionStatusMenuHeader}" Style="{StaticResource LibraryFilterMenuItemStyle}">
-                                <MenuItem Header="全部"
-                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
-                                          CommandParameter="全部" />
-                                <MenuItem Header="喜爱"
-                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
-                                          CommandParameter="喜爱" />
-                                <MenuItem Header="想看"
-                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
-                                          CommandParameter="想看" />
-                                <MenuItem Header="不想看"
-                                          Command="{Binding DataContext.SelectCollectionStatusCommand, ElementName=Root}"
-                                          CommandParameter="不想看" />
-                            </MenuItem>
-                        </Menu>
-                    </StackPanel>
-
-                    <StackPanel Width="118" Margin="0,0,6,4">
-                        <TextBlock Text="观看状态" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox SelectedItem="{Binding SelectedWatchedFilter}"
-                                  ItemsSource="{Binding WatchedFilterOptions}"
-                                  Style="{StaticResource LibraryCompactComboBoxStyle}" />
-                    </StackPanel>
-                </WrapPanel>
-
-                <WrapPanel Grid.Row="4" VerticalAlignment="Center">
-                    <WrapPanel.Style>
-                        <Style TargetType="WrapPanel">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </WrapPanel.Style>
-                    <TextBlock Margin="0,0,18,0"
-                               VerticalAlignment="Center"
-                               Text="{Binding SelectedCount, StringFormat=已选 {0} 项}"
-                               Style="{StaticResource BodyTextStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="&#x5168;&#x9009;&#x5F53;&#x524D;&#x5217;&#x8868;"
-                            Command="{Binding SelectVisibleItemsCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="&#x6E05;&#x7A7A;&#x9009;&#x62E9;"
-                            Command="{Binding ClearBatchSelectionCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="标记为已看"
-                            Command="{Binding BatchMarkWatchedCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="标记为未看"
-                            Command="{Binding BatchMarkUnwatchedCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="AI &#x8F85;&#x52A9;&#x8BC6;&#x522B;"
-                            Command="{Binding BatchAutoIdentifyCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="取消"
-                            Command="{Binding CancelBatchOperationCommand}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding CanCancelBatchOperation}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Margin="0,0,10,10"
-                            Content="移出媒体库"
-                            Command="{Binding BatchRemoveFromLibraryCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="删除记录"
-                            Command="{Binding BatchDeleteMovieRecordsCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Margin="0,0,10,10"
-                            Content="人工聚合为季"
-                            Command="{Binding OpenManualAggregationCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" />
-                </WrapPanel>
+                        <StackPanel Margin="0,0,16,0"
+                                    VerticalAlignment="Center">
+                            <Border Style="{StaticResource LibraryBatchStatusPillStyle}">
+                                <TextBlock Text="{Binding SelectedCount, StringFormat=已选 {0} 项}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource BrushTextPrimary}" />
+                            </Border>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
             </Grid>
         </Border>
 
@@ -508,10 +696,6 @@
                                     </Button>
                                 </StackPanel>
                             </Border>
-                            <Button Margin="10,0,0,0"
-                                    Content="{Binding BatchSelectionButtonText}"
-                                    Command="{Binding ToggleBatchSelectionModeCommand}"
-                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
                         </StackPanel>
 
                         <StackPanel Margin="20,0,0,0"
@@ -540,10 +724,14 @@
                              BorderThickness="0"
                              ItemsSource="{Binding Movies}"
                              ScrollViewer.CanContentScroll="True"
+                             ScrollViewer.ScrollChanged="OnLibraryListScrollChanged"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              VirtualizingPanel.IsVirtualizing="True"
                              VirtualizingPanel.VirtualizationMode="Recycling">
+                        <ListBox.Resources>
+                            <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource LibraryModernScrollBarStyle}" />
+                        </ListBox.Resources>
                         <ListBox.Style>
                             <Style TargetType="ListBox">
                                 <Setter Property="Visibility" Value="Visible" />
@@ -579,12 +767,12 @@
                                 <controls:VirtualizingWrapPanel>
                                     <controls:VirtualizingWrapPanel.Style>
                                         <Style TargetType="{x:Type controls:VirtualizingWrapPanel}">
-                                            <Setter Property="ItemWidth" Value="192" />
-                                            <Setter Property="ItemHeight" Value="282" />
+                                            <Setter Property="ItemWidth" Value="194" />
+                                            <Setter Property="ItemHeight" Value="288" />
                                             <Setter Property="OverscanRows" Value="1" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                                    <Setter Property="ItemWidth" Value="199" />
+                                                    <Setter Property="ItemWidth" Value="201" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -594,33 +782,79 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Width="180"
-                                            Height="270"
-                                            Margin="0,0,12,12"
-                                            Background="{StaticResource LibraryMediaCardBackgroundBrush}"
-                                            BorderBrush="{DynamicResource BrushBorder}"
-                                            BorderThickness="1"
-                                            CornerRadius="18"
-                                            ClipToBounds="True">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
+                                    <Grid Width="180"
+                                          Height="270"
+                                          Margin="0,3,14,15"
+                                          SnapsToDevicePixels="True"
+                                          UseLayoutRounding="True">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
                                                 <Setter Property="Cursor" Value="Arrow" />
+                                                <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+                                                <Setter Property="RenderTransform">
+                                                    <Setter.Value>
+                                                        <TranslateTransform />
+                                                    </Setter.Value>
+                                                </Setter>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
                                                         <Setter Property="Cursor" Value="Hand" />
                                                     </DataTrigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="RenderTransform">
+                                                            <Setter.Value>
+                                                                <TranslateTransform Y="-2" />
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Trigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </Border.Style>
-                                        <Border.InputBindings>
+                                        </Grid.Style>
+                                        <Grid.InputBindings>
                                             <MouseBinding MouseAction="LeftClick"
                                                           Command="{Binding DataContext.OpenOrToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           CommandParameter="{Binding}" />
-                                        </Border.InputBindings>
+                                        </Grid.InputBindings>
+                                        <Border x:Name="PosterCardClipMask"
+                                                Background="White"
+                                                CornerRadius="12"
+                                                IsHitTestVisible="False" />
+                                        <Border x:Name="PosterPaletteShadowHost"
+                                                Margin="0,3,0,0"
+                                                Background="{StaticResource LibraryMediaCardBackgroundBrush}"
+                                                CornerRadius="12"
+                                                IsHitTestVisible="False">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="28"
+                                                                  Direction="270"
+                                                                  Opacity="0.42"
+                                                                  ShadowDepth="7"
+                                                                  Color="#192230" />
+                                            </Border.Effect>
+                                        </Border>
+                                        <Border Background="{StaticResource LibraryMediaCardBackgroundBrush}"
+                                                CornerRadius="12"
+                                                IsHitTestVisible="False">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="14"
+                                                                  Direction="270"
+                                                                  Opacity="0.28"
+                                                                  ShadowDepth="3"
+                                                                  Color="#000000" />
+                                            </Border.Effect>
+                                        </Border>
                                         <Grid>
+                                            <Grid.OpacityMask>
+                                                <VisualBrush Visual="{Binding ElementName=PosterCardClipMask}" />
+                                            </Grid.OpacityMask>
                                             <Border Background="{StaticResource LibraryMediaCardSurfaceBrush}" />
-                                            <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="240"
+                                            <Image x:Name="PosterImage"
+                                                   helpers:PosterCacheImageBehavior.DecodePixelWidth="320"
                                                    helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                   helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=PosterPaletteShadowHost}"
+                                                   helpers:PosterPaletteShadowBehavior.TargetName="PosterPaletteShadowHost"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   SnapsToDevicePixels="True"
                                                    Stretch="UniformToFill">
                                                 <Image.Style>
                                                     <Style TargetType="Image">
@@ -637,11 +871,24 @@
                                                 <Grid.Background>
                                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                         <GradientStop Color="#00000000" Offset="0" />
-                                                        <GradientStop Color="#16000000" Offset="0.45" />
-                                                        <GradientStop Color="#A6000000" Offset="1" />
+                                                        <GradientStop Color="#0A111827" Offset="0.42" />
+                                                        <GradientStop Color="#78111824" Offset="0.78" />
+                                                        <GradientStop Color="#B8111824" Offset="1" />
                                                     </LinearGradientBrush>
                                                 </Grid.Background>
                                             </Grid>
+                                            <Border Height="86"
+                                                    VerticalAlignment="Top"
+                                                    IsHitTestVisible="False">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                        <GradientStop Color="#38FFFFFF" Offset="0" />
+                                                        <GradientStop Color="#20FFFFFF" Offset="0.22" />
+                                                        <GradientStop Color="#08FFFFFF" Offset="0.62" />
+                                                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                            </Border>
                                             <TextBlock HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
                                                        Text="无海报">
@@ -670,6 +917,23 @@
                                                     MaxWidth="88"
                                                     Style="{StaticResource LibraryMediaChipStyle}">
                                                 <TextBlock Text="{Binding SourceBadgeText}"
+                                                           Style="{StaticResource LibraryMediaChipTextStyle}" />
+                                            </Border>
+                                            <Border HorizontalAlignment="Left"
+                                                    VerticalAlignment="Top"
+                                                    Margin="8,38,8,0"
+                                                    MaxWidth="130">
+                                                <Border.Style>
+                                                    <Style TargetType="Border" BasedOn="{StaticResource LibraryMediaChipStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasBatchModeHint}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding BatchModeHintText}"
                                                            Style="{StaticResource LibraryMediaChipTextStyle}" />
                                             </Border>
                                             <Button HorizontalAlignment="Center"
@@ -734,7 +998,16 @@
                                                 </Button.Style>
                                             </Button>
                                         </Grid>
-                                    </Border>
+                                        <Border BorderBrush="#14FFFFFF"
+                                                BorderThickness="1"
+                                                CornerRadius="12"
+                                                IsHitTestVisible="False" />
+                                        <Border Margin="1"
+                                                BorderBrush="#0A000000"
+                                                BorderThickness="1"
+                                                CornerRadius="11"
+                                                IsHitTestVisible="False" />
+                                    </Grid>
                                 </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -743,10 +1016,14 @@
                              Margin="0,18,0,0"
                              ItemsSource="{Binding Movies}"
                              ScrollViewer.CanContentScroll="True"
+                             ScrollViewer.ScrollChanged="OnLibraryListScrollChanged"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              VirtualizingPanel.IsVirtualizing="True"
                              VirtualizingPanel.VirtualizationMode="Recycling">
+                        <ListBox.Resources>
+                            <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource LibraryModernScrollBarStyle}" />
+                        </ListBox.Resources>
                         <ListBox.Style>
                             <Style TargetType="ListBox">
                                 <Setter Property="Background" Value="Transparent" />
@@ -762,7 +1039,7 @@
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Padding" Value="0" />
-                                <Setter Property="Margin" Value="0,0,0,9" />
+                                <Setter Property="Margin" Value="0,0,0,14" />
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="BorderThickness" Value="0" />
                                 <Setter Property="Focusable" Value="False" />
@@ -1110,14 +1387,14 @@
                             <Button Margin="0,0,10,0"
                                     Content="取消"
                                     Command="{Binding CancelManualAggregationCommand}"
-                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                    Style="{StaticResource LibrarySecondaryButtonStyle}" />
                             <Button Margin="0,0,10,0"
                                     Content="聚合后识别"
                                     Command="{Binding ApplyManualAggregationAndIdentifyCommand}"
-                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                    Style="{StaticResource LibrarySecondaryButtonStyle}" />
                             <Button Content="聚合"
                                     Command="{Binding ApplyManualAggregationCommand}"
-                                    Style="{StaticResource PrimaryButtonStyle}" />
+                                    Style="{StaticResource LibraryPrimaryButtonStyle}" />
                         </StackPanel>
                         <TextBlock Margin="0,0,18,0"
                                    VerticalAlignment="Center"
@@ -1157,7 +1434,7 @@
                         <Button DockPanel.Dock="Right"
                                 Content="关闭"
                                 Command="{Binding CloseRemovedLibraryCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
+                                Style="{StaticResource LibrarySecondaryButtonStyle}" />
                         <StackPanel>
                             <TextBlock Text="已移出媒体库" Style="{StaticResource SectionTitleTextStyle}" />
                             <TextBlock Margin="0,6,18,0"
@@ -1242,7 +1519,7 @@
                                                             Command="{Binding DataContext.RestoreRemovedLibraryGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}">
                                                         <Button.Style>
-                                                            <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                            <Style TargetType="Button" BasedOn="{StaticResource LibraryPrimaryButtonStyle}">
                                                                 <Setter Property="Visibility" Value="Visible" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsTvGroup}" Value="False">
@@ -1257,7 +1534,7 @@
                                                             Command="{Binding DataContext.DeleteRemovedLibraryGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}">
                                                         <Button.Style>
-                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                            <Style TargetType="Button" BasedOn="{StaticResource LibrarySecondaryButtonStyle}">
                                                                 <Setter Property="Visibility" Value="Visible" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsTvGroup}" Value="False">
@@ -1301,19 +1578,19 @@
                                                                     Content="恢复"
                                                                     Command="{Binding DataContext.RestoreRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding}"
-                                                                    Style="{StaticResource PrimaryButtonStyle}" />
+                                                                    Style="{StaticResource LibraryPrimaryButtonStyle}" />
                                                             <Button Grid.Column="3"
                                                                     Margin="0,10,8,10"
                                                                     Content="详情"
                                                                     Command="{Binding DataContext.OpenRemovedLibraryDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding}"
-                                                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                                                    Style="{StaticResource LibrarySecondaryButtonStyle}" />
                                                             <Button Grid.Column="4"
                                                                     Margin="0,10,12,10"
                                                                     Content="删除记录"
                                                                     Command="{Binding DataContext.DeleteRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding}"
-                                                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                                                    Style="{StaticResource LibrarySecondaryButtonStyle}" />
                                                         </Grid>
                                                     </Border>
                                                 </DataTemplate>
@@ -1360,19 +1637,19 @@
                                                                 Content="恢复"
                                                                 Command="{Binding DataContext.RestoreRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
-                                                                Style="{StaticResource PrimaryButtonStyle}" />
+                                                                Style="{StaticResource LibraryPrimaryButtonStyle}" />
                                                         <Button Grid.Column="3"
                                                                 Margin="0,10,8,10"
                                                                 Content="详情"
                                                                 Command="{Binding DataContext.OpenRemovedLibraryDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
-                                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                                                Style="{StaticResource LibrarySecondaryButtonStyle}" />
                                                         <Button Grid.Column="4"
                                                                 Margin="0,10,12,10"
                                                                 Content="删除记录"
                                                                 Command="{Binding DataContext.DeleteRemovedLibraryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
-                                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                                                Style="{StaticResource LibrarySecondaryButtonStyle}" />
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
