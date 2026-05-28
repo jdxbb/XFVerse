@@ -363,6 +363,7 @@ public sealed class MovieManagementService : IMovieManagementService
         entity.IsInLibrary = hasActiveSource;
         entity.LibraryVisibilityState = restoredVisibilityState;
         entity.UpdatedAt = now;
+        movie.UpdatedAt = now;
         CleanupCollectionEntityIfEmpty(dbContext, entity);
 
         foreach (var item in collectionItems.Where(x => x.Id != entity.Id && x.LibraryVisibilityState == LibraryVisibilityState.Hidden))

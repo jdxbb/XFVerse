@@ -383,11 +383,13 @@
                                     Width="260"
                                     Margin="0,0,12,0"
                                     Click="SourceMenuButton_Click"
+                                    PreviewMouseLeftButtonDown="MenuButton_PreviewMouseLeftButtonDown"
                                     Content="{Binding SourceButtonText}" />
                             <Button x:Name="SubtitleMenuButton"
                                     Width="170"
                                     Margin="0,0,12,0"
                                     Click="SubtitleMenuButton_Click"
+                                    PreviewMouseLeftButtonDown="MenuButton_PreviewMouseLeftButtonDown"
                                     Content="{Binding SubtitleButtonText}"
                                     ToolTip="{Binding SubtitleButtonToolTip}">
                                 <Button.ContentTemplate>
@@ -401,6 +403,7 @@
                                     Width="140"
                                     Margin="0,0,12,0"
                                     Click="AudioTrackMenuButton_Click"
+                                    PreviewMouseLeftButtonDown="MenuButton_PreviewMouseLeftButtonDown"
                                     Content="{Binding AudioTrackButtonText}"
                                     ToolTip="{Binding AudioTrackButtonToolTip}">
                                 <Button.ContentTemplate>

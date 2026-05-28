@@ -175,7 +175,8 @@
                     </Grid.Style>
                     <Button x:Name="UserMenuButton"
                             Command="{Binding ToggleUserMenuCommand}"
-                            ToolTip="打开账号菜单">
+                            PreviewMouseLeftButtonDown="UserMenuButton_PreviewMouseLeftButtonDown"
+                            ToolTip="{x:Null}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ShellAccountButtonStyle}">
                                 <Style.Triggers>
@@ -251,7 +252,9 @@
                         </Grid>
                     </Button>
 
-                    <Popup AllowsTransparency="True"
+                    <Popup x:Name="UserMenuPopup"
+                           AllowsTransparency="True"
+                           Closed="UserMenuPopup_Closed"
                            DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
                            IsOpen="{Binding IsUserMenuOpen, Mode=TwoWay}"
                            Placement="Top"

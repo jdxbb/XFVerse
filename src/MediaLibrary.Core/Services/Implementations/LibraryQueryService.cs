@@ -215,6 +215,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var matchingStates = collectionStates
                         .Where(state => MatchesCollectionIdentity(state, x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear))
                         .ToList();
+                    var collectionUpdatedAt = matchingStates.Count == 0
+                        ? DateTime.MinValue
+                        : matchingStates.Max(state => state.UpdatedAt);
                     var visibilityState = ResolveLibraryVisibilityState(matchingStates);
                     var isWatched = x.IsWatched || watchedIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear);
                     var isWantToWatch = wantToWatchIndex.Contains(x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear);
@@ -284,7 +287,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasUserState = hasUserState,
                         HasWatchHistory = x.HasWatchHistory,
                         ProgressPercent = progressPercent,
-                        UpdatedAt = x.UpdatedAt
+                        UpdatedAt = collectionUpdatedAt > x.UpdatedAt ? collectionUpdatedAt : x.UpdatedAt
                     };
             })
             .Where(x => x.IsVisibleInLibrary)

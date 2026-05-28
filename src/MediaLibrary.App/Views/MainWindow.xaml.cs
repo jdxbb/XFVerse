@@ -17,9 +17,11 @@ public partial class MainWindow : Window
     private const double DefaultWindowMargin = 48;
     private const int WmGetMinMaxInfo = 0x0024;
     private const int MonitorDefaultToNearest = 0x00000002;
+    private static readonly TimeSpan PopupReopenSuppressionDelay = TimeSpan.FromMilliseconds(350);
 
     private HwndSource? _hwndSource;
     private Point? _pendingMaximizedDragStart;
+    private DateTime _userMenuClosedAtUtc = DateTime.MinValue;
 
     public MainWindow()
     {
@@ -72,6 +74,32 @@ public partial class MainWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void UserMenuButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel { IsUserMenuOpen: true } viewModel)
+        {
+            if (DateTime.UtcNow - _userMenuClosedAtUtc > PopupReopenSuppressionDelay)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        viewModel.IsUserMenuOpen = false;
+        e.Handled = true;
+    }
+
+    private void UserMenuPopup_Closed(object sender, EventArgs e)
+    {
+        _userMenuClosedAtUtc = DateTime.UtcNow;
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.SuppressNextUserMenuToggle(PopupReopenSuppressionDelay);
+        }
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

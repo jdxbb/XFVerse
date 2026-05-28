@@ -44,6 +44,7 @@ public partial class PlayerWindow : Window
     private const long DoubleClickSuppressMilliseconds = 250;
     private const long ControlBarAutoHideMilliseconds = 2500;
     private const double ResizeHitTestThickness = 6d;
+    private static readonly TimeSpan MenuReopenSuppressionDelay = TimeSpan.FromMilliseconds(350);
     private readonly DispatcherTimer _controlBarTimer;
     private readonly DispatcherTimer _cursorPollTimer;
     private readonly DispatcherTimer _interactionFeedbackTimer;
@@ -71,6 +72,10 @@ public partial class PlayerWindow : Window
     private LowLevelMouseProc? _mouseHookProc;
     private bool _threadFilterMessageInstalled;
     private bool _closeLifecycleStarted;
+    private Button? _recentlyClosedMenuButton;
+    private DateTime _recentlyClosedMenuAtUtc = DateTime.MinValue;
+    private Button? _openMenuButton;
+    private ContextMenu? _openContextMenu;
 
     public event EventHandler? CloseLifecycleStarted;
 
@@ -408,6 +413,28 @@ public partial class PlayerWindow : Window
         e.Handled = true;
     }
 
+    private void MenuButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Button button)
+        {
+            return;
+        }
+
+        if (IsOpenMenuButton(button))
+        {
+            CloseOpenMenu();
+            e.Handled = true;
+            return;
+        }
+
+        if (!ShouldSuppressMenuOpen(button))
+        {
+            return;
+        }
+
+        e.Handled = true;
+    }
+
     private void SourceMenuButton_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel is null || sender is not Button button)
@@ -415,9 +442,24 @@ public partial class PlayerWindow : Window
             return;
         }
 
+        if (IsOpenMenuButton(button))
+        {
+            CloseOpenMenu();
+            e.Handled = true;
+            return;
+        }
+
+        if (ShouldSuppressMenuOpen(button))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        CloseOpenMenu();
         var menu = BuildSourceMenu(_viewModel);
         menu.PlacementTarget = button;
         menu.Placement = PlacementMode.Top;
+        menu.Closed += ContextMenu_Closed;
         menu.Closed += (_, _) =>
         {
             _isSourceMenuOpen = false;
@@ -426,6 +468,8 @@ public partial class PlayerWindow : Window
         };
         _isSourceMenuOpen = true;
         button.ContextMenu = menu;
+        _openMenuButton = button;
+        _openContextMenu = menu;
         menu.IsOpen = true;
     }
 
@@ -436,9 +480,24 @@ public partial class PlayerWindow : Window
             return;
         }
 
+        if (IsOpenMenuButton(button))
+        {
+            CloseOpenMenu();
+            e.Handled = true;
+            return;
+        }
+
+        if (ShouldSuppressMenuOpen(button))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        CloseOpenMenu();
         var menu = BuildSubtitleMenu(_viewModel);
         menu.PlacementTarget = button;
         menu.Placement = PlacementMode.Top;
+        menu.Closed += ContextMenu_Closed;
         menu.Closed += (_, _) =>
         {
             _isSubtitleMenuOpen = false;
@@ -447,6 +506,8 @@ public partial class PlayerWindow : Window
         };
         _isSubtitleMenuOpen = true;
         button.ContextMenu = menu;
+        _openMenuButton = button;
+        _openContextMenu = menu;
         menu.IsOpen = true;
     }
 
@@ -457,9 +518,24 @@ public partial class PlayerWindow : Window
             return;
         }
 
+        if (IsOpenMenuButton(button))
+        {
+            CloseOpenMenu();
+            e.Handled = true;
+            return;
+        }
+
+        if (ShouldSuppressMenuOpen(button))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        CloseOpenMenu();
         var menu = BuildAudioTrackMenu(_viewModel);
         menu.PlacementTarget = button;
         menu.Placement = PlacementMode.Top;
+        menu.Closed += ContextMenu_Closed;
         menu.Closed += (_, _) =>
         {
             _isAudioTrackMenuOpen = false;
@@ -468,7 +544,59 @@ public partial class PlayerWindow : Window
         };
         _isAudioTrackMenuOpen = true;
         button.ContextMenu = menu;
+        _openMenuButton = button;
+        _openContextMenu = menu;
         menu.IsOpen = true;
+    }
+
+    private void ContextMenu_Closed(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu { PlacementTarget: Button button })
+        {
+            return;
+        }
+
+        _recentlyClosedMenuButton = button;
+        _recentlyClosedMenuAtUtc = DateTime.UtcNow;
+        if (ReferenceEquals(_openContextMenu, sender))
+        {
+            _openMenuButton = null;
+            _openContextMenu = null;
+        }
+    }
+
+    private bool ShouldSuppressMenuOpen(Button button)
+    {
+        if (!ReferenceEquals(_recentlyClosedMenuButton, button))
+        {
+            return false;
+        }
+
+        if (DateTime.UtcNow - _recentlyClosedMenuAtUtc > MenuReopenSuppressionDelay)
+        {
+            _recentlyClosedMenuButton = null;
+            return false;
+        }
+
+        _recentlyClosedMenuButton = null;
+        return true;
+    }
+
+    private bool IsOpenMenuButton(Button button)
+    {
+        return ReferenceEquals(_openMenuButton, button)
+               && _openContextMenu is not null;
+    }
+
+    private void CloseOpenMenu()
+    {
+        if (_openContextMenu is not null)
+        {
+            _openContextMenu.IsOpen = false;
+        }
+
+        _openMenuButton = null;
+        _openContextMenu = null;
     }
 
     private void Window_MouseMove(object sender, MouseEventArgs e)

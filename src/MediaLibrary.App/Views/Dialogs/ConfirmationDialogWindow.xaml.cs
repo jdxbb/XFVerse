@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MediaLibrary.App.Services.Interfaces;
 
 namespace MediaLibrary.App.Views.Dialogs;
@@ -67,7 +68,26 @@ public partial class ConfirmationDialogWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        BringDialogToFront();
         CancelButton.Focus();
+    }
+
+    private void BringDialogToFront()
+    {
+        if (Owner is { WindowState: WindowState.Minimized } owner)
+        {
+            owner.WindowState = WindowState.Normal;
+        }
+
+        Topmost = true;
+        Activate();
+        Dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                Topmost = false;
+                Activate();
+            }),
+            DispatcherPriority.ApplicationIdle);
     }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

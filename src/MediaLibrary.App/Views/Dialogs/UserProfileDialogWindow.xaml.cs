@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace MediaLibrary.App.Views.Dialogs;
 
@@ -26,7 +27,26 @@ public partial class UserProfileDialogWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        BringDialogToFront();
         EditSaveButton.Focus();
+    }
+
+    private void BringDialogToFront()
+    {
+        if (Owner is { WindowState: WindowState.Minimized } owner)
+        {
+            owner.WindowState = WindowState.Normal;
+        }
+
+        Topmost = true;
+        Activate();
+        Dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                Topmost = false;
+                Activate();
+            }),
+            DispatcherPriority.ApplicationIdle);
     }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -13,9 +13,19 @@ public sealed class ConfirmationDialogService : IConfirmationDialogService
         string cancelButtonText,
         ConfirmationDialogVariant variant = ConfirmationDialogVariant.Normal)
     {
+        var owner = ResolveOwner();
+        if (owner is not null)
+        {
+            if (owner.WindowState == WindowState.Minimized)
+            {
+                owner.WindowState = WindowState.Normal;
+            }
+        }
+
         var dialog = new ConfirmationDialogWindow(title, message, confirmButtonText, cancelButtonText, variant)
         {
-            Owner = ResolveOwner()
+            Owner = owner,
+            ShowActivated = true
         };
 
         return Task.FromResult(dialog.ShowDialog() == true);
@@ -29,9 +39,18 @@ public sealed class ConfirmationDialogService : IConfirmationDialogService
             return null;
         }
 
-        return application.Windows
-                   .OfType<Window>()
-                   .FirstOrDefault(window => window.IsActive)
-               ?? application.MainWindow;
+        var activeWindow = application.Windows
+            .OfType<Window>()
+            .FirstOrDefault(window => window.IsVisible
+                                      && window.IsActive
+                                      && window is not ConfirmationDialogWindow);
+        if (activeWindow is not null)
+        {
+            return activeWindow;
+        }
+
+        return application.MainWindow is { IsVisible: true } mainWindow
+            ? mainWindow
+            : application.Windows.OfType<Window>().FirstOrDefault(window => window.IsVisible);
     }
 }

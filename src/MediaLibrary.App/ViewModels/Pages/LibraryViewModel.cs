@@ -50,6 +50,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string RefreshReasonManualAggregation = "operation-manual-aggregation";
     private const string RefreshReasonBatchAiExitBatchMode = "operation-batch-ai-exit-batch-mode";
     private const string RefreshReasonBatchAiResult = "operation-batch-ai-result";
+    private const int TagFilterColumnCount = 4;
     private const string LibraryLayoutPoster = "poster";
     private const string LibraryLayoutList = "list";
     private static readonly TimeSpan RefreshDebounceDelay = TimeSpan.FromMilliseconds(200);
@@ -220,6 +221,12 @@ public sealed class LibraryViewModel : PageViewModelBase
     public ObservableCollection<TagFilterOption> EmotionTagOptions { get; } = [];
 
     public ObservableCollection<TagFilterOption> SceneTagOptions { get; } = [];
+
+    public ObservableCollection<TagFilterOptionRow> TypeTagOptionRows { get; } = [];
+
+    public ObservableCollection<TagFilterOptionRow> EmotionTagOptionRows { get; } = [];
+
+    public ObservableCollection<TagFilterOptionRow> SceneTagOptionRows { get; } = [];
 
     public ObservableCollection<string> DecadeFilterOptions { get; } = [];
 
@@ -795,6 +802,11 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public override void Deactivate()
     {
+        if (IsRemovedLibraryPanelOpen)
+        {
+            CloseRemovedLibrary();
+        }
+
         lock (_refreshGate)
         {
             _isActive = false;
@@ -1206,20 +1218,30 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "恢复到媒体库？",
+            $"将重新显示“{item.Title}”。此操作不会重新扫描，也不会改写媒体文件。",
+            "恢复",
+            "取消");
+        if (!confirmed)
+        {
+            return;
+        }
+
         try
         {
-                    if (IsGroupedPlaceholder(item.Movie))
-                    {
-                        await _movieManagementService.RestoreGroupedPlaceholderRangeToLibraryAsync(item.Movie.GroupedRangeMediaFileIds);
-                    }
-                    else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
-                    {
-                        await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(item.SeasonId);
-                    }
-                    else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
-                    {
-                        await _movieManagementService.RestoreToLibraryAsync(item.MovieId);
-                    }
+            if (IsGroupedPlaceholder(item.Movie))
+            {
+                await _movieManagementService.RestoreGroupedPlaceholderRangeToLibraryAsync(item.Movie.GroupedRangeMediaFileIds);
+            }
+            else if ((item.IsSeason || item.Movie.IsOther) && item.SeasonId > 0)
+            {
+                await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(item.SeasonId);
+            }
+            else if ((item.IsMovie || item.Movie.IsOther) && item.MovieId > 0)
+            {
+                await _movieManagementService.RestoreToLibraryAsync(item.MovieId);
+            }
             else if (item.IsMovie)
             {
                 await _userCollectionService.RestoreToLibraryAsync(BuildRecommendationItem(item.Movie), changeSource: "RemovedLibrary");
@@ -1251,6 +1273,16 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         var items = group.Items.ToArray();
         if (items.Length == 0)
+        {
+            return;
+        }
+
+        var confirmed = await _confirmationDialogService.ConfirmAsync(
+            "恢复到媒体库？",
+            $"将重新显示该剧下已移出的 {items.Length} 个 Season。此操作不会重新扫描，也不会改写媒体文件。",
+            "恢复",
+            "取消");
+        if (!confirmed)
         {
             return;
         }
@@ -1618,16 +1650,19 @@ public sealed class LibraryViewModel : PageViewModelBase
         if (TypeTagOptions.Count == 0)
         {
             ReplaceTagOptions(TypeTagOptions, BuildStaticTagOptions(TagCategoryType, TypeTagLabels));
+            ReplaceTagOptionRows(TypeTagOptionRows, TypeTagOptions);
         }
 
         if (EmotionTagOptions.Count == 0)
         {
             ReplaceTagOptions(EmotionTagOptions, BuildStaticTagOptions(TagCategoryEmotion, EmotionTagLabels));
+            ReplaceTagOptionRows(EmotionTagOptionRows, EmotionTagOptions);
         }
 
         if (SceneTagOptions.Count == 0)
         {
             ReplaceTagOptions(SceneTagOptions, BuildStaticTagOptions(TagCategoryScene, SceneTagLabels));
+            ReplaceTagOptionRows(SceneTagOptionRows, SceneTagOptions);
         }
     }
 
@@ -1688,6 +1723,21 @@ public sealed class LibraryViewModel : PageViewModelBase
         foreach (var option in source)
         {
             target.Add(option);
+        }
+    }
+
+    private static void ReplaceTagOptionRows(
+        ObservableCollection<TagFilterOptionRow> target,
+        IReadOnlyList<TagFilterOption> options)
+    {
+        target.Clear();
+        for (var index = 0; index < options.Count; index += TagFilterColumnCount)
+        {
+            var rowOptions = options
+                .Skip(index)
+                .Take(TagFilterColumnCount)
+                .ToArray();
+            target.Add(new TagFilterOptionRow(rowOptions, index + TagFilterColumnCount < options.Count));
         }
     }
 
@@ -3205,6 +3255,21 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private async Task OpenMovieAsync(object? parameter)
     {
+        if (parameter is RemovedLibraryGroupViewModel { IsTvGroup: true } removedGroup)
+        {
+            var seriesId = removedGroup.Items
+                .Select(item => item.SeriesId)
+                .FirstOrDefault(id => id > 0);
+            if (seriesId > 0)
+            {
+                _navigationStateService.RequestTvSeriesOverview(seriesId);
+                return;
+            }
+
+            StatusMessage = "该已移出电视剧分组当前没有可打开的剧详情。";
+            return;
+        }
+
         var movie = parameter switch
         {
             LibraryMovieItemViewModel item => item.Movie,
@@ -3583,6 +3648,19 @@ public sealed class LibraryViewModel : PageViewModelBase
                 }
             }
         }
+    }
+
+    public sealed class TagFilterOptionRow
+    {
+        public TagFilterOptionRow(IReadOnlyList<TagFilterOption> options, bool hasDivider)
+        {
+            Options = options;
+            HasDivider = hasDivider;
+        }
+
+        public IReadOnlyList<TagFilterOption> Options { get; }
+
+        public bool HasDivider { get; }
     }
 
     private sealed record BatchItemError(string SelectionKey, string Title, string Message);

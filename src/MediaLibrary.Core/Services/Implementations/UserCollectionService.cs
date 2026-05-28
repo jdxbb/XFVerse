@@ -612,6 +612,7 @@ public sealed class UserCollectionService : IUserCollectionService
         if (movie is not null)
         {
             ApplyMovieSnapshot(entity, movie);
+            movie.UpdatedAt = now;
         }
         else
         {

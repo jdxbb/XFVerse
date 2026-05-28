@@ -77,8 +77,7 @@
                     <Setter Property="Foreground" Value="{DynamicResource BrushSidebarMuted}" />
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                     <Setter Property="VerticalContentAlignment" Value="Center" />
-                    <Setter Property="ToolTip" Value="{Binding ToolTip}" />
-                    <Setter Property="ToolTipService.InitialShowDelay" Value="350" />
+                    <Setter Property="ToolTip" Value="{x:Null}" />
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ListBoxItem">

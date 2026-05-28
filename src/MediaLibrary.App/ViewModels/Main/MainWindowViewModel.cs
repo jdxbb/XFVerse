@@ -29,6 +29,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _userMenuStatusMessage = string.Empty;
     private string _themeToggleIcon = "☀";
     private string _themeToggleToolTip = "当前浅色主题，切换到深色主题";
+    private DateTime _suppressUserMenuToggleUntilUtc = DateTime.MinValue;
 
     public MainWindowViewModel(
         INavigationStateService navigationStateService,
@@ -162,6 +163,11 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public bool HasUserMenuStatusMessage => !string.IsNullOrWhiteSpace(UserMenuStatusMessage);
 
+    public void SuppressNextUserMenuToggle(TimeSpan duration)
+    {
+        _suppressUserMenuToggleUntilUtc = DateTime.UtcNow.Add(duration);
+    }
+
     public NavigationItemViewModel? SelectedNavigationItem
     {
         get => _selectedNavigationItem;
@@ -270,6 +276,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void ToggleUserMenu()
     {
+        if (DateTime.UtcNow <= _suppressUserMenuToggleUntilUtc)
+        {
+            _suppressUserMenuToggleUntilUtc = DateTime.MinValue;
+            return;
+        }
+
         UserMenuStatusMessage = string.Empty;
         IsUserMenuOpen = !IsUserMenuOpen;
     }
