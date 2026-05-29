@@ -103,6 +103,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         _confirmationDialogService = confirmationDialogService;
         _dataRefreshService = dataRefreshService;
         NavigateBackToSeasonCommand = new RelayCommand(NavigateBackToSeason, () => _seasonId.HasValue);
+        NavigateBackCommand = new RelayCommand(NavigateBackFromDetail);
         OpenPlayerCommand = new AsyncRelayCommand(OpenPlayerAsync, _ => CanOpenPlayer);
         PlaySourceCommand = new AsyncRelayCommand(PlaySourceAsync, _ => CanOpenPlayer);
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
@@ -147,6 +148,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     ];
 
     public RelayCommand NavigateBackToSeasonCommand { get; }
+
+    public RelayCommand NavigateBackCommand { get; }
 
     public AsyncRelayCommand OpenPlayerCommand { get; }
 
@@ -923,10 +926,18 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     private void NavigateBackToSeason()
     {
+        NavigateBackFromDetail();
+    }
+
+    private void NavigateBackFromDetail()
+    {
         if (_seasonId.HasValue)
         {
-            _navigationStateService.RequestTvSeasonDetail(_seasonId.Value, _episodeId);
+            _navigationStateService.RequestDetailBackToSeason(_seasonId.Value, _episodeId);
+            return;
         }
+
+        _navigationStateService.RequestDetailBackToLibrary();
     }
 
     private async Task ToggleWatchedAsync()

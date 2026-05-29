@@ -30,6 +30,11 @@
 
             <Border Grid.Column="2" Style="{StaticResource HeroCardStyle}">
                 <StackPanel>
+                    <Button Margin="0,0,0,16"
+                            HorizontalAlignment="Left"
+                            Command="{Binding NavigateBackCommand}"
+                            Content="&#xE72B;"
+                            Style="{StaticResource DetailBackButtonStyle}" />
                     <TextBlock FontSize="32"
                                FontWeight="Bold"
                                Foreground="{DynamicResource BrushForegroundPrimary}"

@@ -2,6 +2,26 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
+    <UserControl.Resources>
+        <helpers:RatingStarsConverter x:Key="RatingStarsConverter" />
+
+        <Style x:Key="MovieDetailPillStyle" TargetType="Border">
+            <Setter Property="Margin" Value="0,0,10,10" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurface}" />
+            <Setter Property="CornerRadius" Value="999" />
+        </Style>
+
+        <Style x:Key="MovieDetailMetaLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        </Style>
+
+        <Style x:Key="MovieDetailSourceMetaTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="Margin" Value="0,0,14,6" />
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -18,11 +38,13 @@
 
             <Border Style="{StaticResource PageCardStyle}">
                 <Grid Height="360">
-                    <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="20">
+                    <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="20" ClipToBounds="True">
                         <Grid>
                             <Control IsHitTestVisible="False"
                                      Template="{StaticResource PosterPlaceholderTemplate}" />
-                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Stretch="UniformToFill" />
                         </Grid>
                     </Border>
                 </Grid>
@@ -32,85 +54,166 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="260" />
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="300" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel>
-                        <TextBlock FontSize="34"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource BrushForegroundPrimary}"
-                                   Text="{Binding TitleText}" />
-                        <TextBlock Margin="0,8,0,0"
-                                   Style="{StaticResource BodyMutedTextStyle}"
-                                   Text="{Binding OriginalTitle}" />
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                        <WrapPanel Margin="0,18,0,0">
-                            <Border Margin="0,0,10,10"
-                                    Padding="10,6"
-                                    Background="{DynamicResource BrushAccent}"
-                                    CornerRadius="999">
-                                <TextBlock FontWeight="SemiBold"
-                                           Foreground="{DynamicResource BrushOnAccent}"
-                                           Text="{Binding IdentificationStatusText}" />
-                            </Border>
-                            <Border Margin="0,0,10,10"
-                                    Padding="10,6"
-                                    Background="{DynamicResource BrushSurface}"
-                                    CornerRadius="999">
-                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding ReleaseYearText}" />
-                            </Border>
-                            <Border Margin="0,0,10,10"
-                                    Padding="10,6"
-                                    Background="{DynamicResource BrushSurface}"
-                                    CornerRadius="999">
-                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding RuntimeText}" />
-                            </Border>
-                            <Border Margin="0,0,10,10"
-                                    Padding="10,6"
-                                    Background="{DynamicResource BrushSurface}"
-                                    CornerRadius="999">
-                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding ConfidenceText}" />
-                            </Border>
-                        </WrapPanel>
+                        <Button HorizontalAlignment="Left"
+                                Command="{Binding NavigateBackCommand}"
+                                Content="&#xE72B;"
+                                Style="{StaticResource DetailBackButtonStyle}" />
 
-                        <TextBlock Margin="0,6,0,0"
-                                   Style="{StaticResource BodyTextStyle}"
-                                   Text="{Binding GenresText}" />
-                        <TextBlock Margin="0,14,0,0"
-                                   MaxHeight="100"
-                                   Style="{StaticResource BodyTextStyle}"
-                                   Text="{Binding Overview}"
-                                   TextWrapping="Wrap" />
-                        <TextBlock Margin="0,14,0,0"
-                                   Style="{StaticResource BodyMutedTextStyle}"
-                                   Text="{Binding StatusMessage}"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
+                        <StackPanel Grid.Row="1" Margin="0,16,0,0">
+                            <TextBlock FontSize="34"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource BrushForegroundPrimary}"
+                                       Text="{Binding TitleText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Style="{StaticResource BodyMutedTextStyle}"
+                                       Text="{Binding OriginalTitle}"
+                                       TextTrimming="CharacterEllipsis" />
 
-                    <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                            <WrapPanel Margin="0,18,0,0">
+                                <Border Style="{StaticResource MovieDetailPillStyle}"
+                                        Background="{DynamicResource BrushAccent}">
+                                    <TextBlock FontWeight="SemiBold"
+                                               Foreground="{DynamicResource BrushOnAccent}"
+                                               Text="{Binding IdentificationStatusText}" />
+                                </Border>
+                                <Border Style="{StaticResource MovieDetailPillStyle}">
+                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding ReleaseYearText, StringFormat=年份 {0}}" />
+                                </Border>
+                                <Border Style="{StaticResource MovieDetailPillStyle}">
+                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding RuntimeText}" />
+                                </Border>
+                                <Border Style="{StaticResource MovieDetailPillStyle}">
+                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding ConfidenceText, StringFormat=置信度 {0}}" />
+                                </Border>
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <Grid Grid.Row="2" Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Padding="14"
+                                    Background="{DynamicResource BrushSurfaceAlt}"
+                                    BorderBrush="{DynamicResource BrushBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="14">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="简介" />
+                                    <ScrollViewer Margin="0,8,0,0"
+                                                  MaxHeight="104"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <TextBlock Style="{StaticResource BodyTextStyle}"
+                                                   Text="{Binding Overview}"
+                                                   TextWrapping="Wrap" />
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2"
+                                    Padding="14"
+                                    Background="{DynamicResource BrushSurfaceAlt}"
+                                    BorderBrush="{DynamicResource BrushBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="14">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="基础信息" />
+                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="国家 / 地区" />
+                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding Country}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="语言" />
+                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding Language}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="TMDB / IMDb" />
+                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding TmdbIdText, StringFormat=TMDB {0}}" />
+                                    <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding ImdbIdText, StringFormat=IMDb {0}}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
+
+                    <StackPanel Grid.Column="2">
                         <Button Command="{Binding OpenPlayerCommand}"
                                 Content="{Binding PlayButtonText}"
                                 IsEnabled="{Binding CanOpenPlayer}"
                                 Style="{StaticResource PrimaryButtonStyle}" />
 
-                        <Button Margin="0,12,0,0"
-                                Command="{Binding ToggleWantToWatchCommand}"
-                                Content="{Binding WantToWatchButtonText}"
-                                IsEnabled="{Binding CanToggleWantToWatch}">
-                            <Button.Style>
-                                <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowExternalWantToWatchAction}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        <UniformGrid Margin="0,12,0,0" Columns="2">
+                            <Button Margin="0,0,6,8"
+                                    Command="{Binding ToggleFavoriteCommand}"
+                                    Content="{Binding FavoriteButtonText}">
+                                <Button.Style>
+                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowCollectionActions}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Margin="6,0,0,8"
+                                    Command="{Binding ToggleWatchedCommand}"
+                                    Content="{Binding WatchedButtonText}"
+                                    IsEnabled="{Binding CanToggleWatched}">
+                                <Button.Style>
+                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowWatchedAction}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Margin="0,0,6,8"
+                                    Command="{Binding ToggleWantToWatchCommand}"
+                                    Content="{Binding WantToWatchButtonText}"
+                                    IsEnabled="{Binding CanToggleWantToWatch}">
+                                <Button.Style>
+                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowExternalWantToWatchAction}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Margin="6,0,0,8"
+                                    Command="{Binding ToggleNotInterestedCommand}"
+                                    Content="{Binding NotInterestedButtonText}"
+                                    IsEnabled="{Binding CanToggleNotInterested}">
+                                <Button.Style>
+                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowNotInterestedAction}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </UniformGrid>
 
-                        <Button Margin="0,12,0,0"
-                                Command="{Binding AddToLibraryCommand}"
+                        <Button Command="{Binding AddToLibraryCommand}"
                                 Content="{Binding AddToLibraryButtonText}"
                                 IsEnabled="{Binding CanAddToLibrary}">
                             <Button.Style>
@@ -125,62 +228,34 @@
                             </Button.Style>
                         </Button>
 
-                        <Button Margin="0,12,0,0"
-                                Command="{Binding ToggleNotInterestedCommand}"
-                                Content="{Binding NotInterestedButtonText}"
-                                IsEnabled="{Binding CanToggleNotInterested}">
+                        <Button Margin="0,10,0,0"
+                                Command="{Binding OpenCorrectionDialogCommand}"
+                                Content="影片识别修正">
                             <Button.Style>
                                 <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowNotInterestedAction}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        <DataTrigger Binding="{Binding CanUseIdentificationCorrection}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
                         </Button>
 
-                        <Button Margin="0,12,0,0"
-                                Command="{Binding ToggleFavoriteCommand}"
-                                Content="{Binding FavoriteButtonText}">
-                            <Button.Style>
-                                <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowCollectionActions}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-
-                        <Button Margin="0,12,0,0"
-                                Command="{Binding ToggleWatchedCommand}"
-                                Content="{Binding WatchedButtonText}"
-                                IsEnabled="{Binding CanToggleWatched}">
-                            <Button.Style>
-                                <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowWatchedAction}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-
-                        <Border Margin="0,18,0,0" Style="{StaticResource CompactCardStyle}">
+                        <Border Margin="0,14,0,0" Style="{StaticResource CompactCardStyle}">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding AvailabilityText}" />
                                 <TextBlock Margin="0,12,0,0"
                                            Style="{StaticResource BodyMutedTextStyle}"
                                            Text="默认播放源" />
-                                <TextBlock Margin="0,8,0,0"
-                                           Style="{StaticResource BodyMutedTextStyle}"
+                                <TextBlock Margin="0,6,0,0"
+                                           Style="{StaticResource BodyTextStyle}"
                                            Text="{Binding DefaultSourceDisplay}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Margin="0,12,0,0"
+                                           Style="{StaticResource BodyMutedTextStyle}"
+                                           Text="{Binding StatusMessage}"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
@@ -189,574 +264,598 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="2" Style="{StaticResource PageCardStyle}">
-            <Grid>
-                <TabControl ItemContainerStyle="{StaticResource ModernTabItemStyle}"
-                            SelectedIndex="{Binding SelectedDetailTabIndex}">
-                    <TabControl.Style>
-                        <Style TargetType="TabControl" BasedOn="{StaticResource ModernTabControlStyle}">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ShowLibrarySections}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TabControl.Style>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="360" />
+            </Grid.ColumnDefinitions>
 
-                    <TabItem Header="播放源">
-                        <ScrollViewer Margin="0,18,0,0"
-                                      CanContentScroll="False"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
-                                <Border Padding="18"
-                                        Background="{DynamicResource BrushSurfaceAlt}"
-                                        CornerRadius="14">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsNoSourceDetail}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="暂无播放源" />
-                                        <TextBlock Margin="0,8,0,0"
-                                                   Style="{StaticResource BodyMutedTextStyle}"
-                                                   Text="当前电影没有可用播放源，可通过扫描、修正或添加播放源补充。"
-                                                   TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
+            <Border Style="{StaticResource PageCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="14" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                                <ListBox ItemsSource="{Binding Sources}"
-                                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                         Style="{StaticResource SectionListBoxStyle}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="220" />
-                                            </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="播放源" />
+                            <TextBlock Margin="0,6,0,0"
+                                       Style="{StaticResource BodyMutedTextStyle}"
+                                       Text="播放、默认源、探测、拆分和修正都沿用现有播放源业务语义。" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource BodyMutedTextStyle}"
+                                   Text="{Binding DefaultSourceDisplay}" />
+                    </Grid>
 
-                                            <StackPanel Margin="0,0,18,0">
-                                                <WrapPanel>
-                                                    <TextBlock VerticalAlignment="Center"
-                                                               Style="{StaticResource SectionTitleTextStyle}"
-                                                               Text="{Binding FileName}" />
-                                                    <Border Margin="10,0,0,0"
-                                                            Padding="8,4"
-                                                            Background="{DynamicResource BrushSurface}"
-                                                            CornerRadius="999">
-                                                        <TextBlock Style="{StaticResource BodyMutedTextStyle}"
-                                                                   Text="{Binding SourceTypeText}" />
-                                                    </Border>
-                                                </WrapPanel>
-                                                <TextBlock Margin="0,6,0,0"
-                                                           Style="{StaticResource BodyMutedTextStyle}"
-                                                           Text="{Binding FilePath}"
-                                                           TextWrapping="Wrap" />
-                                                <WrapPanel Margin="0,8,0,0">
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyTextStyle}"
-                                                               Text="{Binding Extension}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyTextStyle}"
-                                                               Text="{Binding FormattedFileSize, StringFormat=大小：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyTextStyle}"
-                                                               Text="{Binding SourceTypeText, StringFormat=来源：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyTextStyle}"
-                                                               Text="{Binding DefaultSourceText}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding DurationText, StringFormat=时长：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding ResolutionText, StringFormat=分辨率：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding VideoCodecText, StringFormat=视频：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding AudioText, StringFormat=音频：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding BitrateText, StringFormat=码率：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding ProbeStatusText, StringFormat=探测：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding ProbeErrorText}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding LastPlayedText, StringFormat=最近播放：{0}}" />
-                                                    <TextBlock Margin="0,0,14,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding LastPlayPositionText, StringFormat=位置：{0}}" />
-                                                </WrapPanel>
-                                            </StackPanel>
-
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <Button Command="{Binding DataContext.OpenPlayerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="播放此源"
-                                                        Style="{StaticResource PrimaryButtonStyle}" />
-                                                <Button Margin="0,10,0,0"
-                                                        Command="{Binding DataContext.ManualProbeSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="立即探测"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
-                                                <Button Margin="0,10,0,0"
-                                                        Command="{Binding DataContext.SetDefaultSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}">
-                                                    <Button.Style>
-                                                        <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                                            <Setter Property="Content" Value="设为默认" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsDefault}" Value="True">
-                                                                    <Setter Property="Content" Value="当前默认" />
-                                                                    <Setter Property="IsEnabled" Value="False" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Button.Style>
-                                                </Button>
-                                                <Button Margin="0,10,0,0"
-                                                        Command="{Binding DataContext.ResetSourceRecognitionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="从当前电影拆分"
-                                                        IsEnabled="{Binding DataContext.CanResetSourcesToUnidentified, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
-                                                <Button Margin="0,10,0,0"
-                                                        Command="{Binding DataContext.BeginSourceCorrectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="修正信息"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
-                                            </StackPanel>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                                </ListBox>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <TabItem Header="字幕">
-                        <ScrollViewer Margin="0,18,0,0"
-                                      CanContentScroll="False"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto">
-                            <ListBox ItemsSource="{Binding Sources}"
-                                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                     Style="{StaticResource SectionListBoxStyle}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel>
-                                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding FileName}" />
-                                            <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding SubtitleBindings}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Border Margin="0,0,0,10"
-                                                                Padding="12"
-                                                                Background="{DynamicResource BrushSurface}"
-                                                                CornerRadius="14">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="160" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel>
-                                                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding FileName}" />
-                                                                    <TextBlock Margin="0,5,0,0"
-                                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                                               Text="{Binding FilePath}"
-                                                                               TextWrapping="Wrap" />
-                                                                </StackPanel>
-                                                                <StackPanel Grid.Column="1">
-                                                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding MatchType}" />
-                                                                    <TextBlock Margin="0,5,0,0"
-                                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                                               Text="{Binding IsAutoLoaded, StringFormat=自动加载：{0}}" />
-                                                                </StackPanel>
-                                                            </Grid>
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <TabItem Header="评分与标签">
-                        <TabItem.Style>
-                            <Style BasedOn="{StaticResource ModernTabItemStyle}" TargetType="TabItem">
+                    <Border Grid.Row="2"
+                            Padding="18"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            Background="{DynamicResource BrushSurfaceAlt}"
+                            CornerRadius="14">
+                        <Border.Style>
+                            <Style TargetType="Border">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ShowRatingsAndTagsTab}" Value="True">
+                                    <DataTrigger Binding="{Binding HasNoSources}" Value="True">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </TabItem.Style>
-                        <ScrollViewer Margin="0,18,0,0"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="22" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
+                        </Border.Style>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock HorizontalAlignment="Center"
+                                       Style="{StaticResource SectionTitleTextStyle}"
+                                       Text="暂无播放源" />
+                            <TextBlock Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Style="{StaticResource BodyMutedTextStyle}"
+                                       Text="已有影片资料，但当前不可播放。"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
 
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="评分信息" />
-                                    <ItemsControl Margin="0,14,0,0" ItemsSource="{Binding Ratings}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Margin="0,0,0,10"
-                                                        Padding="14"
-                                                        Background="{DynamicResource BrushSurfaceAlt}"
-                                                        CornerRadius="16">
-                                                    <DockPanel>
-                                                        <StackPanel>
-                                                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding SourceName}" />
-                                                            <TextBlock Margin="0,4,0,0"
-                                                                       Style="{StaticResource BodyMutedTextStyle}"
-                                                                    Text="{Binding VoteCount, StringFormat=票数：{0}}" />
-                                                        </StackPanel>
-                                                        <TextBlock DockPanel.Dock="Right"
-                                                                   FontSize="26"
-                                                                   FontWeight="Bold"
-                                                                   Text="{Binding ScoreValue, StringFormat={}{0:0.0}}" />
-                                                    </DockPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="AI 标签" />
-                                    <TextBlock Margin="0,14,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="类型标签" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding AiTagsText}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,14,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="情绪标签" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding EmotionTagsText}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,14,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="观看场景" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding SceneTagsText}" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <TabItem Header="识别修正">
-                        <TabItem.Style>
-                            <Style BasedOn="{StaticResource ModernTabItemStyle}" TargetType="TabItem">
-                                <Setter Property="Visibility" Value="Visible" />
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding Sources}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.Style>
+                            <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding CanUseIdentificationCorrection}" Value="False">
-                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    <DataTrigger Binding="{Binding HasSources}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </TabItem.Style>
-                        <ScrollViewer Margin="0,18,0,0"
-                                      CanContentScroll="False"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="360" />
-                                    <ColumnDefinition Width="22" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
+                        </ListBox.Style>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="200" />
+                                    </Grid.ColumnDefinitions>
 
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="单源修正" />
+                                    <StackPanel Margin="0,0,18,0">
+                                        <WrapPanel>
+                                            <TextBlock VerticalAlignment="Center"
+                                                       Style="{StaticResource SectionTitleTextStyle}"
+                                                       Text="{Binding FileName}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <Border Margin="10,0,0,0"
+                                                    Padding="8,4"
+                                                    Background="{DynamicResource BrushAccentSoft}"
+                                                    CornerRadius="999">
+                                                <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding DefaultSourceText}" />
+                                            </Border>
+                                            <Border Margin="8,0,0,0"
+                                                    Padding="8,4"
+                                                    Background="{DynamicResource BrushSurface}"
+                                                    CornerRadius="999">
+                                                <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SourceTypeText}" />
+                                            </Border>
+                                        </WrapPanel>
+
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Style="{StaticResource MonospacePathTextStyle}"
+                                                   Text="{Binding FilePath}"
+                                                   ToolTip="{Binding FilePath}" />
+
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding Extension, StringFormat=格式 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding ResolutionText, StringFormat=分辨率 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding DurationText, StringFormat=时长 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding BitrateText, StringFormat=码率 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding VideoCodecText, StringFormat=视频 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding AudioText, StringFormat=音频 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding FormattedFileSize, StringFormat=大小 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding ProbeStatusText, StringFormat=识别状态 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding LastPlayedText, StringFormat=最近播放 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding LastPlayPositionText, StringFormat=上次播放位置 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding ProbeErrorText}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+
+                                    <UniformGrid Grid.Column="1"
+                                                 Columns="2"
+                                                 VerticalAlignment="Center">
+                                        <Button Margin="0,0,8,8"
+                                                Command="{Binding DataContext.OpenPlayerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Content="播放"
+                                                Style="{StaticResource PrimaryButtonStyle}" />
+                                        <Button Margin="0,0,0,8"
+                                                Command="{Binding DataContext.SetDefaultSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}">
+                                            <Button.Style>
+                                                <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                                                    <Setter Property="Content" Value="设为默认" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsDefault}" Value="True">
+                                                            <Setter Property="Content" Value="已为默认" />
+                                                            <Setter Property="IsEnabled" Value="False" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Margin="0,0,8,0"
+                                                Command="{Binding DataContext.ManualProbeSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Content="探测"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                        <Button Command="{Binding DataContext.BeginSourceCorrectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Content="修正"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                        <Button Grid.ColumnSpan="2"
+                                                Margin="0,8,0,0"
+                                                Command="{Binding DataContext.ResetSourceRecognitionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Content="从当前电影拆分"
+                                                IsEnabled="{Binding DataContext.CanResetSourcesToUnidentified, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                    </UniformGrid>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Column="2">
+                <Border Style="{StaticResource PageCardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="评分" />
+                        <TextBlock Margin="0,10,0,0"
+                                   Text="暂无评分">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRatings}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Ratings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,10"
+                                            Padding="12"
+                                            Background="{DynamicResource BrushSurfaceAlt}"
+                                            BorderBrush="{DynamicResource BrushBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="14">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding SourceName}" />
+                                                <TextBlock Margin="0,6,0,0"
+                                                           Foreground="{DynamicResource BrushAccent}"
+                                                           Text="{Binding ScoreValue, Converter={StaticResource RatingStarsConverter}}" />
+                                                <TextBlock Margin="0,4,0,0"
+                                                           Style="{StaticResource BodyMutedTextStyle}"
+                                                           Text="{Binding VoteCount, StringFormat=票数 {0}}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="24"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource BrushForegroundPrimary}"
+                                                       Text="{Binding ScoreValue, StringFormat={}{0:0.0} / 10}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="标签" />
+                        <TextBlock Margin="0,12,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="类型" />
+                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
+                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding GenresText}" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="AI 标签" />
+                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
+                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding AiTagsText}" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="情绪" />
+                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
+                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding EmotionTagsText}" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="场景" />
+                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
+                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding SceneTagsText}" TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.RowSpan="3" Background="#99000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsCorrectionPanelVisible}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border Width="980"
+                    MaxHeight="720"
+                    Padding="22"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PageCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="16" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="16" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="影片识别修正" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Style="{StaticResource BodyMutedTextStyle}"
+                                       Text="{Binding CorrectionSourceDisplay}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Width="38"
+                                Command="{Binding CancelCorrectionCommand}"
+                                Content="&#xE711;"
+                                Style="{StaticResource DetailBackButtonStyle}"
+                                ToolTip="关闭" />
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="2"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="350" />
+                                <ColumnDefinition Width="22" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="目标类型" />
+                                <ComboBox Margin="0,8,0,0"
+                                          ItemsSource="{Binding CorrectionTargetOptions}"
+                                          PreviewMouseWheel="CorrectionTargetComboBox_PreviewMouseWheel"
+                                          SelectedItem="{Binding SelectedCorrectionTarget}"
+                                          Style="{StaticResource FormComboBoxStyle}" />
+
+                                <StackPanel Margin="0,16,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="电影候选" />
+                                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyTextStyle}" Text="电影名" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource BodyTextStyle}" Text="年份（可选）" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding ManualSearchYear, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,16,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="电视剧集候选" />
+                                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyTextStyle}" Text="电视剧名" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding TvCorrectionQuery, UpdateSourceTrigger=PropertyChanged}" />
+                                    <UniformGrid Margin="0,10,0,0" Columns="2">
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="季号" />
+                                            <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                                     Text="{Binding CorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                        <StackPanel Margin="8,0,0,0">
+                                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="集号" />
+                                            <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                                     Text="{Binding CorrectionEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                    </UniformGrid>
                                     <TextBlock Margin="0,10,0,0"
                                                Style="{StaticResource BodyMutedTextStyle}"
-                                               Text="{Binding CorrectionSourceDisplay}"
+                                               Text="{Binding SelectedTvCorrectionTargetDisplay}"
                                                TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,12,0,0" Style="{StaticResource BodyTextStyle}" Text="目标类型" />
-                                    <ComboBox ItemsSource="{Binding CorrectionTargetOptions}"
-                                              PreviewMouseWheel="CorrectionTargetComboBox_PreviewMouseWheel"
-                                              SelectedItem="{Binding SelectedCorrectionTarget}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-
-                                    <StackPanel Margin="0,16,0,0">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-                                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="电影候选" />
-                                        <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyTextStyle}" Text="电影名" />
-                                        <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
-                                        <TextBlock Margin="0,10,0,0" Style="{StaticResource BodyTextStyle}" Text="年份（可选）" />
-                                        <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding ManualSearchYear, UpdateSourceTrigger=PropertyChanged}" />
-                                    </StackPanel>
-
-                                    <StackPanel Margin="0,16,0,0">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-                                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="电视剧集候选" />
-                                        <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyTextStyle}" Text="电视剧名" />
-                                        <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding TvCorrectionQuery, UpdateSourceTrigger=PropertyChanged}" />
-                                        <UniformGrid Margin="0,10,0,0" Columns="2">
-                                            <StackPanel Margin="0,0,8,0">
-                                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="季号" />
-                                                <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                                         Text="{Binding CorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-                                            <StackPanel Margin="8,0,0,0">
-                                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="集号" />
-                                                <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                                         Text="{Binding CorrectionEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-                                        </UniformGrid>
-                                        <TextBlock Margin="0,10,0,0"
-                                                   Style="{StaticResource BodyMutedTextStyle}"
-                                                   Text="{Binding SelectedTvCorrectionTargetDisplay}"
-                                                   TextWrapping="Wrap" />
-                                        <Button Margin="0,10,0,0"
-                                                Command="{Binding PreviewTvEpisodeCorrectionCommand}"
-                                                Content="确认修正为电视剧集"
-                                                Style="{StaticResource PrimaryButtonStyle}" />
-                                    </StackPanel>
-
-                                    <StackPanel Margin="0,16,0,0">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetUnknownSeason}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-                                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="已有未识别季" />
-                                        <TextBlock Margin="0,8,0,0"
-                                                   Style="{StaticResource BodyMutedTextStyle}"
-                                                   Text="{Binding SelectedUnknownSeasonTargetDisplay}"
-                                                   TextWrapping="Wrap" />
-                                        <Button Margin="0,10,0,0"
-                                                Command="{Binding OpenUnknownSeasonPickerCommand}"
-                                                Content="选择未识别季..."
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                        <TextBlock Margin="0,14,0,0" Style="{StaticResource BodyTextStyle}" Text="目标集号" />
-                                        <TextBox Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding UnknownSeasonEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
-                                        <TextBlock Margin="0,8,0,0"
-                                                   Style="{StaticResource BodyMutedTextStyle}"
-                                                   Text="仅允许正整数；不会补空集。" />
-                                        <Button Margin="0,14,0,0"
-                                                Command="{Binding ApplyUnknownSeasonCorrectionCommand}"
-                                                Content="加入到该集"
-                                                Style="{StaticResource PrimaryButtonStyle}" />
-                                    </StackPanel>
-
-                                    <Button Margin="0,16,0,0"
-                                            Command="{Binding SearchCandidatesCommand}"
-                                            Content="搜索 TMDB">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetUnknownSeason}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
                                     <Button Margin="0,10,0,0"
-                                            Command="{Binding AiSuggestSearchCommand}"
-                                            Content="AI 辅助电影搜索">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
+                                            Command="{Binding PreviewTvEpisodeCorrectionCommand}"
+                                            Content="确认修正为电视剧集"
+                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,16,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetUnknownSeason}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="已有未识别季" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Style="{StaticResource BodyMutedTextStyle}"
+                                               Text="{Binding SelectedUnknownSeasonTargetDisplay}"
+                                               TextWrapping="Wrap" />
+                                    <Button Margin="0,10,0,0"
+                                            Command="{Binding OpenUnknownSeasonPickerCommand}"
+                                            Content="选择未识别季..."
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                    <TextBlock Margin="0,14,0,0" Style="{StaticResource BodyTextStyle}" Text="目标集号" />
+                                    <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding UnknownSeasonEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Style="{StaticResource BodyMutedTextStyle}"
+                                               Text="仅允许正整数；不会补空集。" />
+                                    <Button Margin="0,14,0,0"
+                                            Command="{Binding ApplyUnknownSeasonCorrectionCommand}"
+                                            Content="加入到该集"
+                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                </StackPanel>
+
+                                <Button Margin="0,16,0,0"
+                                        Command="{Binding SearchCandidatesCommand}"
+                                        Content="搜索 TMDB">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetUnknownSeason}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
                                 </Button>
-                                    <Button Margin="0,10,0,0"
-                                            Command="{Binding AiSuggestSearchCommand}"
-                                            Content="AI 辅助电视剧搜索">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                </StackPanel>
+                                <Button Margin="0,10,0,0"
+                                        Command="{Binding AiSuggestSearchCommand}"
+                                        Content="AI 辅助电影搜索">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button Margin="0,10,0,0"
+                                        Command="{Binding AiSuggestSearchCommand}"
+                                        Content="AI 辅助电视剧搜索">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
 
-                                <StackPanel Grid.Column="2">
-                                    <ListBox Margin="0,14,0,0"
-                                             ItemsSource="{Binding SearchCandidates}"
-                                             ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                        <ListBox.Style>
-                                            <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ListBox.Style>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="120" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Margin="0,0,16,0">
-                                                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding Title}" />
-                                                        <TextBlock Margin="0,5,0,0"
-                                                                   Style="{StaticResource BodyMutedTextStyle}"
-                                                                   Text="{Binding ReleaseYear}" />
-                                                        <TextBlock Margin="0,7,0,0"
-                                                                   Style="{StaticResource BodyTextStyle}"
+                            <StackPanel Grid.Column="2">
+                                <ListBox Margin="0,0,0,0"
+                                         ItemsSource="{Binding SearchCandidates}"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                    <ListBox.Style>
+                                        <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ListBox.Style>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="120" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding Title}" />
+                                                    <TextBlock Margin="0,5,0,0"
+                                                               Style="{StaticResource BodyMutedTextStyle}"
+                                                               Text="{Binding ReleaseYear}" />
+                                                    <ScrollViewer Margin="0,7,0,0"
+                                                                  MaxHeight="92"
+                                                                  HorizontalScrollBarVisibility="Disabled"
+                                                                  VerticalScrollBarVisibility="Auto">
+                                                        <TextBlock Style="{StaticResource BodyTextStyle}"
                                                                    Text="{Binding Overview}"
                                                                    TextWrapping="Wrap" />
-                                                    </StackPanel>
-                                                    <Button Grid.Column="1"
-                                                            VerticalAlignment="Center"
-                                                            Command="{Binding DataContext.ApplyManualMatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                            CommandParameter="{Binding}"
-                                                            Content="修正"
-                                                            Style="{StaticResource PrimaryButtonStyle}" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                                    </ScrollViewer>
+                                                </StackPanel>
+                                                <Button Grid.Column="1"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding DataContext.ApplyManualMatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="选择影片"
+                                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
 
-                                    <ListBox Margin="0,14,0,0"
-                                             ItemsSource="{Binding TvSeriesCandidateGroups}"
-                                             ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                        <ListBox.Style>
-                                            <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ListBox.Style>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Expander IsExpanded="False">
-                                                    <Expander.Header>
-                                                        <Border Padding="12"
-                                                                Background="{DynamicResource BrushAccentSoft}"
-                                                                BorderBrush="{DynamicResource BrushBorder}"
-                                                                BorderThickness="1"
-                                                                CornerRadius="10">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="132" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel Margin="0,0,12,0">
-                                                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding DisplayTitle}" />
-                                                                    <TextBlock Margin="0,5,0,0"
-                                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                                               Text="{Binding HeaderSubtitle}"
-                                                                               TextWrapping="Wrap" />
-                                                                </StackPanel>
-                                                                <Button Grid.Column="1"
-                                                                        VerticalAlignment="Center"
-                                                                        Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Content="修正到剧"
-                                                                        Style="{StaticResource PrimaryButtonStyle}" />
-                                                            </Grid>
-                                                        </Border>
-                                                    </Expander.Header>
-                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Seasons}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Border Margin="20,0,0,8"
-                                                                        Padding="0"
-                                                                        Background="{DynamicResource BrushSurfaceAlt}"
-                                                                        BorderBrush="{DynamicResource BrushBorder}"
-                                                                        BorderThickness="1"
-                                                                        CornerRadius="10">
-                                                                    <Grid>
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="4" />
-                                                                            <ColumnDefinition Width="*" />
-                                                                            <ColumnDefinition Width="132" />
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <Border Background="{DynamicResource BrushAccent}" CornerRadius="10,0,0,10" />
-                                                                        <StackPanel Grid.Column="1" Margin="12">
-                                                                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding DisplayTitle}" />
-                                                                            <TextBlock Margin="0,5,0,0"
-                                                                                       Style="{StaticResource BodyMutedTextStyle}"
-                                                                                       Text="{Binding DisplaySubtitle}"
-                                                                                       TextWrapping="Wrap" />
-                                                                        </StackPanel>
-                                                                        <Button Grid.Column="2"
-                                                                                Margin="0,12,12,12"
-                                                                                VerticalAlignment="Center"
-                                                                                Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                                CommandParameter="{Binding}"
-                                                                                Content="修正到季"
-                                                                                Style="{StaticResource PrimaryButtonStyle}" />
-                                                                    </Grid>
-                                                                </Border>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </Expander>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                <ListBox Margin="0,0,0,0"
+                                         ItemsSource="{Binding TvSeriesCandidateGroups}"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                    <ListBox.Style>
+                                        <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ListBox.Style>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Expander IsExpanded="False">
+                                                <Expander.Header>
+                                                    <Border Padding="12"
+                                                            Background="{DynamicResource BrushAccentSoft}"
+                                                            BorderBrush="{DynamicResource BrushBorder}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="132" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Margin="0,0,12,0">
+                                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding DisplayTitle}" />
+                                                                <TextBlock Margin="0,5,0,0"
+                                                                           Style="{StaticResource BodyMutedTextStyle}"
+                                                                           Text="{Binding HeaderSubtitle}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="1"
+                                                                    VerticalAlignment="Center"
+                                                                    Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Content="修正到剧"
+                                                                    Style="{StaticResource PrimaryButtonStyle}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </Expander.Header>
+                                                <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Seasons}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Margin="20,0,0,8"
+                                                                    Padding="0"
+                                                                    Background="{DynamicResource BrushSurfaceAlt}"
+                                                                    BorderBrush="{DynamicResource BrushBorder}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="10">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="4" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="132" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <Border Background="{DynamicResource BrushAccent}" CornerRadius="10,0,0,10" />
+                                                                    <StackPanel Grid.Column="1" Margin="12">
+                                                                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding DisplayTitle}" />
+                                                                        <TextBlock Margin="0,5,0,0"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}"
+                                                                                   Text="{Binding DisplaySubtitle}"
+                                                                                   TextWrapping="Wrap" />
+                                                                    </StackPanel>
+                                                                    <Button Grid.Column="2"
+                                                                            Margin="0,12,12,12"
+                                                                            VerticalAlignment="Center"
+                                                                            Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Content="修正到季"
+                                                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Expander>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
 
-                                </StackPanel>
-                            </Grid>
-                        </ScrollViewer>
-                    </TabItem>
-                </TabControl>
-
-            </Grid>
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="120" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource BodyMutedTextStyle}"
+                                   Text="{Binding StatusMessage}"
+                                   TextWrapping="Wrap" />
+                        <Button Grid.Column="1"
+                                Command="{Binding CancelCorrectionCommand}"
+                                Content="取消"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                    </Grid>
+                </Grid>
+            </Border>
         </Border>
 
         <Border Grid.RowSpan="3"

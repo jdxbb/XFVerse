@@ -36,6 +36,11 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
+                        <Button Margin="0,0,0,16"
+                                HorizontalAlignment="Left"
+                                Command="{Binding NavigateBackCommand}"
+                                Content="&#xE72B;"
+                                Style="{StaticResource DetailBackButtonStyle}" />
                         <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeriesName}" />
                         <TextBlock Margin="0,6,0,0"
                                    FontSize="32"
@@ -87,10 +92,7 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Margin="20,0,0,0">
-                        <Button Command="{Binding NavigateBackToSeriesCommand}"
-                                Content="返回剧页"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                        <WrapPanel Margin="0,12,0,0">
+                        <WrapPanel>
                             <Button Margin="0,0,8,8"
                                     Command="{Binding ToggleFavoriteCommand}"
                                     Content="{Binding FavoriteButtonText}"

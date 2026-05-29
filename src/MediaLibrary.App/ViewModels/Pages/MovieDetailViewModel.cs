@@ -113,7 +113,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         IUserCollectionService userCollectionService,
         IMediaProbeService mediaProbeService,
         IConfirmationDialogService confirmationDialogService)
-        : base("详情", "查看影片信息、播放源、字幕、评分、识别修正和观看记录。")
+        : base("详情", "查看影片信息、播放源、评分、识别修正和观看记录。")
     {
         _navigationStateService = navigationStateService;
         _playerWindowService = playerWindowService;
@@ -139,6 +139,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         SelectUnknownSeasonTargetCommand = new RelayCommand(SelectUnknownSeasonTarget, CanSelectUnknownSeasonTarget);
         ApplyUnknownSeasonCorrectionCommand = new AsyncRelayCommand(ApplyUnknownSeasonCorrectionAsync, CanApplyUnknownSeasonCorrection);
         CancelCorrectionCommand = new RelayCommand(CancelCorrection, () => IsCorrectionPanelVisible);
+        OpenCorrectionDialogCommand = new RelayCommand(OpenDefaultSourceCorrection, () => CanUseIdentificationCorrection);
         SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync);
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
@@ -150,6 +151,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         AddToLibraryCommand = new AsyncRelayCommand(AddToLibraryAsync, () => CanAddToLibrary);
         AiSuggestSearchCommand = new AsyncRelayCommand(AiSuggestSearchAsync, CanAiSuggestSearch);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
+        NavigateBackCommand = new RelayCommand(_navigationStateService.RequestDetailBackToLibrary);
 
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
         _mediaProbeService.ProbeStatusChanged += OnProbeStatusChanged;
@@ -168,6 +170,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public ObservableCollection<UnknownTvSeasonCorrectionTargetItem> UnknownSeasonTargets { get; } = [];
 
     public ObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
+
+    public RelayCommand NavigateBackCommand { get; }
 
     public IReadOnlyList<string> CorrectionTargetOptions { get; } =
     [
@@ -197,6 +201,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public AsyncRelayCommand ApplyUnknownSeasonCorrectionCommand { get; }
 
     public RelayCommand CancelCorrectionCommand { get; }
+
+    public RelayCommand OpenCorrectionDialogCommand { get; }
 
     public AsyncRelayCommand SetDefaultSourceCommand { get; }
 
@@ -424,6 +430,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(CanUseIdentificationCorrection));
                 OnPropertyChanged(nameof(ShowLibrarySections));
                 OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
+                OnPropertyChanged(nameof(HasNoSources));
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
                 OnPropertyChanged(nameof(ShowNotInterestedAction));
                 OnPropertyChanged(nameof(ShowWatchedAction));
@@ -433,6 +440,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 RefreshWatchedCommandState();
                 RefreshAddToLibraryCommandState();
                 RefreshResetSourceRecognitionCommandState();
+                OpenCorrectionDialogCommand?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -457,6 +465,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 RefreshWatchedCommandState();
                 RefreshAddToLibraryCommandState();
                 RefreshResetSourceRecognitionCommandState();
+                OpenCorrectionDialogCommand?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -537,6 +546,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public bool HasSearchCandidates => SearchCandidates.Count > 0;
 
     public bool HasTvSearchCandidates => TvSeriesCandidateGroups.Count > 0;
+
+    public bool HasRatings => Ratings.Count > 0;
+
+    public bool HasSources => Sources.Count > 0;
+
+    public bool HasNoSources => HasMovie && Sources.Count == 0;
 
     public bool HasSelectedTvCorrectionTarget => _selectedTvCorrectionSeriesTmdbId.HasValue;
 
@@ -696,12 +711,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             {
                 Ratings.Add(ToDisplayRating(rating));
             }
+            NotifyRatingStateChanged();
 
             Sources.Clear();
             foreach (var source in detail.Sources)
             {
                 Sources.Add(source);
             }
+            NotifySourceStateChanged();
             RefreshResetSourceRecognitionCommandState();
 
             var hasSources = Sources.Count > 0;
@@ -1070,9 +1087,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             Ratings.Add(ToDisplayRating(recommendation.OmdbRating));
         }
+        NotifyRatingStateChanged();
 
         Sources.Clear();
-        OnPropertyChanged(nameof(CanUseIdentificationCorrection));
+        NotifySourceStateChanged();
         SearchCandidates.Clear();
         OnPropertyChanged(nameof(HasSearchCandidates));
         await RefreshExternalWantToWatchStateAsync(cancellationToken);
@@ -1203,6 +1221,22 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(CanResetSourcesToUnidentified));
         ResetSourceRecognitionCommand?.RaiseCanExecuteChanged();
+    }
+
+    private void NotifyRatingStateChanged()
+    {
+        OnPropertyChanged(nameof(HasRatings));
+    }
+
+    private void NotifySourceStateChanged()
+    {
+        OnPropertyChanged(nameof(HasSources));
+        OnPropertyChanged(nameof(HasNoSources));
+        OnPropertyChanged(nameof(CanUseIdentificationCorrection));
+        OpenCorrectionDialogCommand?.RaiseCanExecuteChanged();
+        AiSuggestSearchCommand?.RaiseCanExecuteChanged();
+        SearchUnknownSeasonTargetsCommand?.RaiseCanExecuteChanged();
+        ApplyUnknownSeasonCorrectionCommand?.RaiseCanExecuteChanged();
     }
 
     private void RefreshWantToWatchCommandState()
@@ -1737,6 +1771,18 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         return CanUseIdentificationCorrection
                && parameter is MovieSourceItem source
                && Sources.Any(item => item.MediaFileId == source.MediaFileId);
+    }
+
+    private void OpenDefaultSourceCorrection()
+    {
+        var source = Sources.FirstOrDefault(item => item.IsDefault) ?? Sources.FirstOrDefault();
+        if (source is null)
+        {
+            StatusMessage = "当前电影没有可修正的播放源。";
+            return;
+        }
+
+        BeginSourceCorrection(source);
     }
 
     private void BeginSourceCorrection(object? parameter)
@@ -2476,7 +2522,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ManualSearchYear = string.Empty;
         Ratings.Clear();
         Sources.Clear();
-        OnPropertyChanged(nameof(CanUseIdentificationCorrection));
+        NotifyRatingStateChanged();
+        NotifySourceStateChanged();
         SearchCandidates.Clear();
         TvSearchCandidates.Clear();
         TvSeriesCandidateGroups.Clear();

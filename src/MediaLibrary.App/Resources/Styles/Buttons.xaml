@@ -109,6 +109,30 @@
         <Setter Property="Padding" Value="0" />
     </Style>
 
+    <Style x:Key="DetailBackButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+        <Setter Property="Width" Value="38" />
+        <Setter Property="Height" Value="38" />
+        <Setter Property="MinWidth" Value="38" />
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="Background" Value="{DynamicResource BrushSurface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="ToolTip" Value="返回上一页" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentSoft}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BrushPressedBackground}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushPressedBackground}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushDanger}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />

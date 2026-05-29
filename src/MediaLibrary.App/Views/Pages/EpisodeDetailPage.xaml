@@ -16,6 +16,11 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
+                    <Button Margin="0,0,0,16"
+                            HorizontalAlignment="Left"
+                            Command="{Binding NavigateBackCommand}"
+                            Content="&#xE72B;"
+                            Style="{StaticResource DetailBackButtonStyle}" />
                     <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeriesName}" />
                     <TextBlock Margin="0,6,0,0"
                                FontSize="32"
@@ -76,10 +81,6 @@
                             Margin="0,10,0,0"
                             Content="{Binding WatchedButtonText}"
                             IsEnabled="{Binding CanToggleWatched}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-                    <Button Command="{Binding NavigateBackToSeasonCommand}"
-                            Margin="0,10,0,0"
-                            Content="返回季详情"
                             Style="{StaticResource SecondaryButtonStyle}" />
                     <Button Margin="0,10,0,0"
                             Command="{Binding CorrectionPlaceholderCommand}"

@@ -97,7 +97,12 @@ Design drafts are old visual references. They are useful for atmosphere, spacing
 
 ### 7.3 Details
 
-Recommended first step: Plan / Audit.
+Status: 7.3a and 7.3b completed. Detailed phase plan lives in `DesignDraft/PHASE_7_3_DETAILS_PLAN.md`.
+
+Completed implementation slices:
+
+- 7.3a shared detail foundation;
+- 7.3b Movie detail visual baseline.
 
 Scope:
 - MovieDetail, SeriesOverview, TvSeasonDetail and EpisodeDetail visual rebuild;
@@ -110,6 +115,10 @@ Not in scope:
 - online subtitle UX beyond detail-entry compatibility;
 - broad `NavigationStateService` rewrite without a scoped plan;
 - new database fields unless separately approved.
+
+7.3a explicitly owns only the shared detail back affordance and minimal in-memory origin/fallback behavior. It did not change detail page data fields, source business operations, correction services, player menus, scan rules, recommendation logic, database schema or migrations.
+
+7.3b owns only the Movie detail page visual baseline and existing Movie correction entry presentation. It does not rebuild Series / Season / Episode details, does not add subtitle management to details, and does not change source, scan, player, recommendation, Core service, database schema or migration semantics.
 
 ### 7.4 Discovery
 

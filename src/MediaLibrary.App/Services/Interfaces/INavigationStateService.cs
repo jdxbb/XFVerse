@@ -20,6 +20,8 @@ public interface INavigationStateService
 
     event EventHandler<NavigationRequest>? NavigationRequested;
 
+    void NotifyPageActivated(NavigationRequest request);
+
     void RequestNavigation(NavigationPageKey pageKey, int? movieId = null, DateTime? targetDate = null);
 
     void RequestTvSeriesOverview(int tvSeriesId);
@@ -29,6 +31,12 @@ public interface INavigationStateService
     void RequestEpisodeDetail(int tvEpisodeId);
 
     void RequestExternalMovieDetail(AiRecommendationItem recommendation);
+
+    void RequestDetailBackToLibrary();
+
+    void RequestDetailBackToSeries(int tvSeriesId);
+
+    void RequestDetailBackToSeason(int tvSeasonId, int? tvEpisodeId = null);
 
     DateTime? ConsumeWatchHistoryTargetDate();
 }

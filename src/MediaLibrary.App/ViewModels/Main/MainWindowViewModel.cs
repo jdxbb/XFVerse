@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Threading;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
@@ -21,6 +22,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IThemeService _themeService;
     private NavigationItemViewModel? _selectedNavigationItem;
     private PageViewModelBase? _currentPageViewModel;
+    private CancellationTokenSource? _pageActivationCancellation;
+    private int _pageActivationVersion;
     private string _currentPageTitle = string.Empty;
     private string _currentPageSubtitle = string.Empty;
     private bool _isHomePageActive;
@@ -172,7 +175,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            _ = NavigateToAsync(value.PageKey, syncVisibleSelection: false);
+            _ = NavigateToAsync(new NavigationRequest(value.PageKey), syncVisibleSelection: false);
         }
     }
 
@@ -226,14 +229,15 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async void OnNavigationRequested(object? sender, NavigationRequest request)
     {
-        await NavigateToAsync(request.PageKey, syncVisibleSelection: true);
+        await NavigateToAsync(request, syncVisibleSelection: true);
     }
 
-    private async Task NavigateToAsync(NavigationPageKey pageKey, bool syncVisibleSelection)
+    private Task NavigateToAsync(NavigationRequest request, bool syncVisibleSelection)
     {
+        var pageKey = request.PageKey;
         if (!_routeMap.TryGetValue(pageKey, out var navigationItem))
         {
-            return;
+            return Task.CompletedTask;
         }
 
         if (syncVisibleSelection)
@@ -242,21 +246,51 @@ public sealed class MainWindowViewModel : ViewModelBase
             SetProperty(ref _selectedNavigationItem, nextSelectedItem, nameof(SelectedNavigationItem));
         }
 
-        await ActivatePageAsync(navigationItem.PageViewModel);
+        NavigationStateService.NotifyPageActivated(request);
+        ActivatePage(navigationItem.PageViewModel);
+        return Task.CompletedTask;
     }
 
-    private async Task ActivatePageAsync(PageViewModelBase pageViewModel)
+    private void ActivatePage(PageViewModelBase pageViewModel)
     {
         if (!ReferenceEquals(CurrentPageViewModel, pageViewModel))
         {
             CurrentPageViewModel?.Deactivate();
         }
 
+        _pageActivationCancellation?.Cancel();
+        _pageActivationCancellation?.Dispose();
+        _pageActivationCancellation = new CancellationTokenSource();
+        var activationToken = _pageActivationCancellation.Token;
+        var activationVersion = ++_pageActivationVersion;
+
         CurrentPageViewModel = pageViewModel;
         IsHomePageActive = pageViewModel is HomeViewModel;
         CurrentPageTitle = pageViewModel.Title;
         CurrentPageSubtitle = pageViewModel.Subtitle;
-        await pageViewModel.ActivateAsync();
+        _ = ActivatePageContentAsync(pageViewModel, activationVersion, activationToken);
+    }
+
+    private async Task ActivatePageContentAsync(
+        PageViewModelBase pageViewModel,
+        int activationVersion,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            if (cancellationToken.IsCancellationRequested ||
+                activationVersion != _pageActivationVersion ||
+                !ReferenceEquals(CurrentPageViewModel, pageViewModel))
+            {
+                return;
+            }
+
+            await pageViewModel.ActivateAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
     }
 
     private void ToggleSidebar()
@@ -290,7 +324,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void NavigateFromUserMenu(NavigationPageKey pageKey)
     {
         IsUserMenuOpen = false;
-        _ = NavigateToAsync(pageKey, syncVisibleSelection: true);
+        _ = NavigateToAsync(new NavigationRequest(pageKey), syncVisibleSelection: true);
     }
 
     private void ShowLogoutPlaceholder()

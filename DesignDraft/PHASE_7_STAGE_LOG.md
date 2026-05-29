@@ -295,6 +295,81 @@ At the end of every future Phase 7 substage, update:
 
 Codex must not require commit / push in these docs. User manages Git operations unless explicitly requested.
 
+## Phase 7.3 - Details
+
+### 7.3 Plan - Details Chain
+
+Completed:
+
+- Added `DesignDraft/PHASE_7_3_DETAILS_PLAN.md` as the dedicated 7.3 handoff plan.
+- Confirmed 7.3 scope as Movie / Series / Season / Episode details, unified detail return, special-state detail experiences and unified correction-dialog alignment.
+- Confirmed old design drafts are visual references only; current page specs and Phase 7 maintenance docs define the stage boundary.
+
+Explicit non-goals:
+
+- no player menu work;
+- no P61-01 local cache menu removal;
+- no scan / AI recognition threshold changes;
+- no recommendation algorithm changes;
+- no database schema, migration or database update.
+
+Suggested commit message:
+
+- `Plan Phase 7.3 detail pages`
+
+### 7.3a - Shared Detail Foundation
+
+Completed:
+
+- Added a unified content-area icon back affordance for Movie, Series, Season and Episode detail pages.
+- Added minimal App-layer in-memory detail origin tracking in `NavigationStateService`.
+- `MainWindowViewModel` records accepted navigation requests before page activation finishes, so slow Home / Library activation cannot leave a stale detail origin on the stack.
+- Page activation now displays the destination page first, then starts content loading on the Dispatcher background queue with a navigation-version / cancellation guard. This keeps the first detail back button responsive and prevents stale detail loads after a quick return.
+- Detail fallback remains deterministic: Movie / Series to Library, Season to Series when possible, Episode to Season when possible.
+- Existing Season / Episode text-return commands were preserved internally but now route through the shared detail-back behavior.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors before the running app locked the normal output exe.
+- Follow-up compile checks used `dotnet build MediaLibrary.sln -p:UseAppHost=false`; the final check passed with 0 warnings and 0 errors while the desktop app was running.
+
+Explicit non-goals:
+
+- no detail page field/content rebuild yet;
+- no source action semantic changes;
+- no correction-flow service changes;
+- no player, scan, recommendation, Core query, database schema, migration, database update, commit or push.
+
+Suggested commit message:
+
+- `Phase 7.3a shared detail navigation`
+
+### 7.3b - Movie Detail
+
+Completed:
+
+- Rebuilt `MovieDetailPage` into the Phase 7 detail-page layout: poster hero, title/original title, status chips, overview, base metadata, action area, rating cards, tag cards and source list.
+- Removed the old persistent detail `TabControl` presentation from Movie detail and kept subtitles out of the Movie detail surface.
+- Moved Movie source correction from the old permanent correction tab into an in-page overlay entry. The overlay reuses the existing Movie / TV episode / unknown-season correction commands and services.
+- Added lightweight Movie detail state helpers for ratings and source presence so empty rating and no-source states render without changing query or source semantics.
+- Added a small rating-star converter for the Movie detail rating card display.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no Series / Season / Episode detail visual rebuild in this slice;
+- no player menu, subtitle-management or P61-01 local cache work;
+- no scan / AI recognition threshold changes;
+- no source operation semantic changes;
+- no Core service, recommendation algorithm, database schema, migration, database update, commit or push.
+
+Suggested commit message:
+
+- `Phase 7.3b movie detail baseline`
+
 ### 7.2-post-closeout follow-up - Poster Edges, Home AI, TV Coverage, Stable Library Sort
 
 Completed:

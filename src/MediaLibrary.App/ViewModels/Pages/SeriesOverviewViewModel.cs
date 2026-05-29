@@ -41,6 +41,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _dataRefreshService = dataRefreshService;
         NavigateToSeasonCommand = new RelayCommand(NavigateToSeason);
+        NavigateBackCommand = new RelayCommand(_navigationStateService.RequestDetailBackToLibrary);
         AddSeriesToLibraryCommand = new AsyncRelayCommand(AddSeriesToLibraryAsync, () => CanAddSeriesToLibrary);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
     }
@@ -48,6 +49,8 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     public ObservableCollection<TvSeriesSeasonListItem> Seasons { get; } = [];
 
     public RelayCommand NavigateToSeasonCommand { get; }
+
+    public RelayCommand NavigateBackCommand { get; }
 
     public AsyncRelayCommand AddSeriesToLibraryCommand { get; }
 

@@ -92,6 +92,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         _singleSourceCorrectionService = singleSourceCorrectionService;
         _aiClassificationService = aiClassificationService;
         NavigateBackToSeriesCommand = new RelayCommand(NavigateBackToSeries, () => _seriesId.HasValue);
+        NavigateBackCommand = new RelayCommand(NavigateBackFromDetail);
         OpenEpisodeDetailCommand = new RelayCommand(OpenEpisodeDetail);
         PlayEpisodeCommand = new AsyncRelayCommand(PlayEpisodeAsync, CanPlayEpisode);
         ToggleFavoriteCommand = new AsyncRelayCommand(() => ToggleFavoriteAsync(), () => HasSeason && (IsFavorite || IsSeasonWatched));
@@ -135,6 +136,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public ObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
 
     public RelayCommand NavigateBackToSeriesCommand { get; }
+
+    public RelayCommand NavigateBackCommand { get; }
 
     public RelayCommand OpenEpisodeDetailCommand { get; }
 
@@ -750,10 +753,18 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     private void NavigateBackToSeries()
     {
+        NavigateBackFromDetail();
+    }
+
+    private void NavigateBackFromDetail()
+    {
         if (_seriesId.HasValue)
         {
-            _navigationStateService.RequestTvSeriesOverview(_seriesId.Value);
+            _navigationStateService.RequestDetailBackToSeries(_seriesId.Value);
+            return;
         }
+
+        _navigationStateService.RequestDetailBackToLibrary();
     }
 
     private void OpenEpisodeDetail(object? parameter)
