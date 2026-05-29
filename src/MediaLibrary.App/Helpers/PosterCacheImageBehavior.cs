@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -206,6 +207,8 @@ public static class PosterCacheImageBehavior
         int generation)
     {
         string displaySource;
+        var resolveStartedAt = Stopwatch.GetTimestamp();
+        var resolveElapsed = TimeSpan.Zero;
         try
         {
             var posterCacheService = AppServiceProvider.GetRequiredService<IPosterCacheService>();
@@ -213,12 +216,14 @@ public static class PosterCacheImageBehavior
                     () => posterCacheService.GetCachedOrFallbackAsync(requestedSource, CancellationToken.None),
                     CancellationToken.None)
                 .ConfigureAwait(false);
+            resolveElapsed = Stopwatch.GetElapsedTime(resolveStartedAt);
         }
         catch (Exception exception)
         {
+            resolveElapsed = Stopwatch.GetElapsedTime(resolveStartedAt);
             PosterCacheDiagnostics.Write(
                 "resolve-error",
-                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} width={decodePixelWidth} error={exception.GetType().Name}");
+                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} width={decodePixelWidth} resolveMs={resolveElapsed.TotalMilliseconds:0} error={exception.GetType().Name}");
             displaySource = requestedSource;
         }
 
@@ -226,7 +231,7 @@ public static class PosterCacheImageBehavior
         {
             PosterCacheDiagnostics.Write(
                 "resolve-empty",
-                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} width={decodePixelWidth}");
+                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} width={decodePixelWidth} resolveMs={resolveElapsed.TotalMilliseconds:0}");
             return PosterImageLoadResult.Empty;
         }
 
@@ -235,25 +240,27 @@ public static class PosterCacheImageBehavior
         {
             PosterCacheDiagnostics.Write(
                 "remote-fallback",
-                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth}");
+                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth} resolveMs={resolveElapsed.TotalMilliseconds:0}");
             return PosterImageLoadResult.FromRemoteFallback(displaySource);
         }
 
         try
         {
+            var decodeStartedAt = Stopwatch.GetTimestamp();
             var imageSource = await Task.Run(() => LoadLocalBitmap(uri, decodePixelWidth), CancellationToken.None)
                 .ConfigureAwait(false);
+            var decodeElapsed = Stopwatch.GetElapsedTime(decodeStartedAt);
             TryAddMemoryCachedSource(requestedSource, decodePixelWidth, imageSource, generation);
             PosterCacheDiagnostics.Write(
                 "local-decode-success",
-                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth}");
+                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth} resolveMs={resolveElapsed.TotalMilliseconds:0} decodeMs={decodeElapsed.TotalMilliseconds:0}");
             return PosterImageLoadResult.FromImage(imageSource);
         }
         catch (Exception exception)
         {
             PosterCacheDiagnostics.Write(
                 "local-decode-error",
-                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth} error={exception.GetType().Name}");
+                $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth} resolveMs={resolveElapsed.TotalMilliseconds:0} error={exception.GetType().Name}");
             return PosterImageLoadResult.FromRemoteFallback(requestedSource);
         }
     }

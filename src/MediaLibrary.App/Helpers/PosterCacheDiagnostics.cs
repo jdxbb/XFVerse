@@ -7,6 +7,11 @@ namespace MediaLibrary.App.Helpers;
 
 public static class PosterCacheDiagnostics
 {
+    private static readonly bool IsEnabled =
+        string.Equals(
+            Environment.GetEnvironmentVariable("XFVERSE_POSTER_CACHE_DIAGNOSTICS"),
+            "1",
+            StringComparison.Ordinal);
     private static readonly object SyncRoot = new();
     private static string? _logPath;
 
@@ -14,6 +19,11 @@ public static class PosterCacheDiagnostics
 
     public static void Write(string eventName, string message)
     {
+        if (!IsEnabled)
+        {
+            return;
+        }
+
         try
         {
             var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [POSTER-CACHE] event={eventName} {message}";
@@ -39,6 +49,11 @@ public static class PosterCacheDiagnostics
 
     public static string SourceId(string? source)
     {
+        if (!IsEnabled)
+        {
+            return "disabled";
+        }
+
         if (string.IsNullOrWhiteSpace(source))
         {
             return "empty";

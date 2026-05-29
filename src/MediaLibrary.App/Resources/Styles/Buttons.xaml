@@ -22,7 +22,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonFocusVisualStyle}" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeButton}" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -47,9 +47,6 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="ButtonChrome" Property="Opacity" Value="0.82" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushFocusRing}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />

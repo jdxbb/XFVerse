@@ -127,30 +127,42 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
     {
         get
         {
-            var ratings = new List<(double Score, int Votes)>();
-            if (TmdbRating.HasValue)
-            {
-                ratings.Add((TmdbRating.Value, Math.Max(TmdbVoteCount ?? 0, 0)));
-            }
-
-            if (OmdbRating is { ScoreValue: > 0, ScoreScale: > 0 } omdbRating)
-            {
-                var normalizedScore = omdbRating.ScoreValue / omdbRating.ScoreScale * 10d;
-                ratings.Add((normalizedScore, Math.Max(omdbRating.VoteCount ?? 0, 0)));
-            }
-
-            if (ratings.Count == 0)
+            if (!TryGetWeightedAverageRating(out var score))
             {
                 return "-";
             }
 
-            var totalVotes = ratings.Sum(x => x.Votes);
-            var score = totalVotes > 0
-                ? ratings.Sum(x => x.Score * x.Votes) / totalVotes
-                : ratings.Average(x => x.Score);
-
             return $"{score:0.0}";
         }
+    }
+
+    public bool IsHighWeightedAverageRating => TryGetWeightedAverageRating(out var score) && score >= 8d;
+
+    private bool TryGetWeightedAverageRating(out double score)
+    {
+        var ratings = new List<(double Score, int Votes)>();
+        if (TmdbRating.HasValue)
+        {
+            ratings.Add((TmdbRating.Value, Math.Max(TmdbVoteCount ?? 0, 0)));
+        }
+
+        if (OmdbRating is { ScoreValue: > 0, ScoreScale: > 0 } omdbRating)
+        {
+            var normalizedScore = omdbRating.ScoreValue / omdbRating.ScoreScale * 10d;
+            ratings.Add((normalizedScore, Math.Max(omdbRating.VoteCount ?? 0, 0)));
+        }
+
+        if (ratings.Count == 0)
+        {
+            score = 0d;
+            return false;
+        }
+
+        var totalVotes = ratings.Sum(x => x.Votes);
+        score = totalVotes > 0
+            ? ratings.Sum(x => x.Score * x.Votes) / totalVotes
+            : ratings.Average(x => x.Score);
+        return true;
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

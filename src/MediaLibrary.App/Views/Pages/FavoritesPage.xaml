@@ -7,7 +7,11 @@
             <Border Width="230" Margin="0,0,18,18" Style="{StaticResource CompactCardStyle}">
                 <StackPanel>
                     <Border Height="300" CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
-                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                        <Grid>
+                            <Control IsHitTestVisible="False"
+                                     Template="{StaticResource PosterPlaceholderTemplate}" />
+                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                        </Grid>
                     </Border>
                     <TextBlock Margin="0,14,0,0"
                                Text="{Binding Title}"

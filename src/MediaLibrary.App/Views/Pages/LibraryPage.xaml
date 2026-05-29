@@ -158,10 +158,10 @@
             <Setter Property="Margin" Value="0,1" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
@@ -182,6 +182,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
                                 <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                                 <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
@@ -841,9 +846,10 @@
                             </Button.ContextMenu>
                         </Button>
                         <Button Grid.Column="4"
+                                HorizontalAlignment="Right"
                                 Content="清除筛选"
                                 Command="{Binding ClearFiltersCommand}"
-                                Style="{StaticResource LibraryFilterButtonStyle}" />
+                                Style="{StaticResource LibraryToolbarButtonStyle}" />
                     </Grid>
                 </Grid>
 
@@ -904,10 +910,10 @@
                         <Button.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
                                          Style="{StaticResource LibraryFilterContextMenuStyle}">
-                                <MenuItem Header="全部" Command="{Binding SelectContentTypeCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <MenuItem Header="电影" Command="{Binding SelectContentTypeCommand}" CommandParameter="电影" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <MenuItem Header="电视剧" Command="{Binding SelectContentTypeCommand}" CommandParameter="电视剧" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <MenuItem Header="其他" Command="{Binding SelectContentTypeCommand}" CommandParameter="其他" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="全部" IsCheckable="True" IsChecked="{Binding IsContentTypeAllSelected, Mode=OneWay}" Command="{Binding SelectContentTypeCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="电影" IsCheckable="True" IsChecked="{Binding IsContentTypeMovieSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectContentTypeCommand}" CommandParameter="电影" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="电视剧" IsCheckable="True" IsChecked="{Binding IsContentTypeTvSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectContentTypeCommand}" CommandParameter="电视剧" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="其他" IsCheckable="True" IsChecked="{Binding IsContentTypeOtherSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectContentTypeCommand}" CommandParameter="其他" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
@@ -967,10 +973,10 @@
                         <Button.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
                                          Style="{StaticResource LibraryFilterContextMenuStyle}">
-                                <MenuItem Header="全部" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <MenuItem Header="喜爱" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="喜爱" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <MenuItem Header="想看" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <MenuItem Header="不想看" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="不想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="全部" IsCheckable="True" IsChecked="{Binding IsCollectionStatusAllSelected, Mode=OneWay}" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="喜爱" IsCheckable="True" IsChecked="{Binding IsCollectionStatusFavoriteSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="喜爱" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="想看" IsCheckable="True" IsChecked="{Binding IsCollectionStatusWantToWatchSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="不想看" IsCheckable="True" IsChecked="{Binding IsCollectionStatusNotInterestedSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="不想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
@@ -985,7 +991,6 @@
                                 <MenuItem Header="全部" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="全部" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                                 <MenuItem Header="已看" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="已看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                                 <MenuItem Header="未看" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="未看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <MenuItem Header="不想看" Command="{Binding SelectWatchedFilterCommand}" CommandParameter="不想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
@@ -1170,6 +1175,7 @@
                                 <Setter Property="Margin" Value="0" />
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="ClipToBounds" Value="False" />
                                 <Setter Property="Focusable" Value="False" />
                                 <Setter Property="HorizontalContentAlignment" Value="Left" />
                                 <Setter Property="VerticalContentAlignment" Value="Top" />
@@ -1178,6 +1184,7 @@
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                              ClipToBounds="False"
                                                               SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                                         </ControlTemplate>
                                     </Setter.Value>
@@ -1190,8 +1197,10 @@
                                     <controls:VirtualizingWrapPanel.Style>
                                         <Style TargetType="{x:Type controls:VirtualizingWrapPanel}">
                                             <Setter Property="ItemWidth" Value="194" />
+                                            <Setter Property="ItemContentWidth" Value="180" />
                                             <Setter Property="ItemHeight" Value="288" />
                                             <Setter Property="OverscanRows" Value="1" />
+                                            <Setter Property="ViewportPadding" Value="0,10,0,30" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                                     <Setter Property="ItemWidth" Value="201" />
@@ -1206,6 +1215,7 @@
                                 <DataTemplate>
                                     <Grid Width="180"
                                           Height="270"
+                                          ClipToBounds="False"
                                           Margin="0,3,14,15"
                                           SnapsToDevicePixels="True"
                                           UseLayoutRounding="True">
@@ -1241,45 +1251,63 @@
                                                 Background="White"
                                                 CornerRadius="12"
                                                 IsHitTestVisible="False" />
-                                        <Border x:Name="PosterPaletteShadowHost"
-                                                Margin="0,3,0,0"
-                                                Background="{StaticResource LibraryMediaCardBackgroundBrush}"
-                                                CornerRadius="12"
+                                        <Canvas ClipToBounds="False"
                                                 IsHitTestVisible="False">
-                                            <Border.Effect>
-                                                <DropShadowEffect BlurRadius="28"
-                                                                  Direction="270"
-                                                                  Opacity="0.42"
-                                                                  ShadowDepth="7"
-                                                                  Color="#192230" />
-                                            </Border.Effect>
-                                        </Border>
-                                        <Border Background="{StaticResource LibraryMediaCardBackgroundBrush}"
-                                                CornerRadius="12"
-                                                IsHitTestVisible="False">
-                                            <Border.Effect>
-                                                <DropShadowEffect BlurRadius="14"
-                                                                  Direction="270"
-                                                                  Opacity="0.28"
-                                                                  ShadowDepth="3"
-                                                                  Color="#000000" />
-                                            </Border.Effect>
-                                        </Border>
+                                            <Image x:Name="PosterPaletteShadowHost"
+                                                   Width="348"
+                                                   Height="438"
+                                                   Canvas.Left="-84"
+                                                   Canvas.Top="-84"
+                                                   helpers:PosterCachedShadowBehavior.BlurRadius="28"
+                                                   helpers:PosterCachedShadowBehavior.CardHeight="270"
+                                                   helpers:PosterCachedShadowBehavior.CardWidth="180"
+                                                   helpers:PosterCachedShadowBehavior.CornerRadius="12"
+                                                   helpers:PosterCachedShadowBehavior.Direction="270"
+                                                   helpers:PosterCachedShadowBehavior.InnerMargin="0,3,0,0"
+                                                   helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                                                   helpers:PosterCachedShadowBehavior.Opacity="0.42"
+                                                   helpers:PosterCachedShadowBehavior.Padding="84"
+                                                   helpers:PosterCachedShadowBehavior.QuantizeColor="True"
+                                                   helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
+                                                   helpers:PosterCachedShadowBehavior.ShadowDepth="7"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   SnapsToDevicePixels="True"
+                                                   Stretch="Fill" />
+                                            <Image Width="348"
+                                                   Height="438"
+                                                   Canvas.Left="-84"
+                                                   Canvas.Top="-84"
+                                                   helpers:PosterCachedShadowBehavior.BlurRadius="14"
+                                                   helpers:PosterCachedShadowBehavior.CardHeight="270"
+                                                   helpers:PosterCachedShadowBehavior.CardWidth="180"
+                                                   helpers:PosterCachedShadowBehavior.CornerRadius="12"
+                                                   helpers:PosterCachedShadowBehavior.Direction="270"
+                                                   helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                                                   helpers:PosterCachedShadowBehavior.Opacity="0.28"
+                                                   helpers:PosterCachedShadowBehavior.Padding="84"
+                                                   helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
+                                                   helpers:PosterCachedShadowBehavior.ShadowDepth="3"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   SnapsToDevicePixels="True"
+                                                   Stretch="Fill" />
+                                        </Canvas>
                                         <Grid>
                                             <Grid.OpacityMask>
                                                 <VisualBrush Visual="{Binding ElementName=PosterCardClipMask}" />
                                             </Grid.OpacityMask>
                                             <Border Background="{StaticResource LibraryMediaCardSurfaceBrush}" />
+                                            <Control IsHitTestVisible="False"
+                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
                                             <Image x:Name="PosterImage"
                                                    helpers:PosterCacheImageBehavior.DecodePixelWidth="320"
                                                    helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
                                                    helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=PosterPaletteShadowHost}"
                                                    helpers:PosterPaletteShadowBehavior.TargetName="PosterPaletteShadowHost"
-                                                   RenderOptions.BitmapScalingMode="HighQuality"
                                                    SnapsToDevicePixels="True"
                                                    Stretch="UniformToFill">
                                                 <Image.Style>
                                                     <Style TargetType="Image">
+                                                        <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
                                                         <Setter Property="Visibility" Value="Visible" />
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding HasPoster}" Value="False">
@@ -1311,20 +1339,6 @@
                                                     </LinearGradientBrush>
                                                 </Border.Background>
                                             </Border>
-                                            <TextBlock HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       Text="无海报">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource LibraryMediaMutedTextStyle}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding HasPoster}" Value="False">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
                                             <Border HorizontalAlignment="Left"
                                                     VerticalAlignment="Top"
                                                     Margin="8"

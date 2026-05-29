@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
+        <SolidColorBrush x:Key="HomePosterCardBackgroundBrush" Color="#121821" />
+        <SolidColorBrush x:Key="HomePosterCardSurfaceBrush" Color="#202938" />
+
         <Style x:Key="HomeTwoLineTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -74,13 +77,20 @@
         </Style>
 
         <Style x:Key="HomeWantButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-            <Setter Property="Width" Value="56" />
+            <Setter Property="Width" Value="52" />
             <Setter Property="Height" Value="26" />
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="MinHeight" Value="26" />
-            <Setter Property="Padding" Value="6,2" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="2,2" />
+            <Setter Property="FontSize" Value="10.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="HomeAiStatusLineStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="MinHeight" Value="16" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
         </Style>
 
         <Style x:Key="HomeAiTagTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
@@ -105,33 +115,94 @@
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="HomeAiRatingTextStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
+                    <Setter Property="Foreground" Value="#F5C84B" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="HomeMetricValueTextStyle" TargetType="TextBlock" BasedOn="{StaticResource MetricTextStyle}">
             <Setter Property="FontSize" Value="24" />
             <Setter Property="LineHeight" Value="28" />
             <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="TextAlignment" Value="Center" />
         </Style>
 
-        <Style x:Key="HomeSectionArrowButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-            <Setter Property="Width" Value="38" />
-            <Setter Property="Height" Value="58" />
-            <Setter Property="MinWidth" Value="38" />
-            <Setter Property="MinHeight" Value="58" />
+        <Style x:Key="HomeSectionArrowButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="54" />
+            <Setter Property="MinWidth" Value="32" />
+            <Setter Property="MinHeight" Value="54" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="FontSize" Value="24" />
-            <Setter Property="FontWeight" Value="Normal" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="HomeRecentTitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
             <Setter Property="FontSize" Value="10.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="LineHeight" Value="13" />
-            <Setter Property="MaxHeight" Value="26" />
-            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Width" Value="90" />
+            <Setter Property="MaxHeight" Value="13" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+        </Style>
+
+        <Style x:Key="HomeReasonScrollBarStyle" TargetType="ScrollBar">
+            <Setter Property="Width" Value="4" />
+            <Setter Property="MinWidth" Value="4" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track"
+                                   IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  IsTabStop="False"
+                                                  Opacity="0" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Width="4"
+                                                        CornerRadius="2"
+                                                        Background="{DynamicResource BrushForegroundMuted}"
+                                                        Opacity="0.55" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  IsTabStop="False"
+                                                  Opacity="0" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="HomeAiExpandedTitleTextStyle" TargetType="TextBlock">
@@ -155,6 +226,62 @@
             <Setter Property="Margin" Value="0,3,0,0" />
             <Setter Property="FontSize" Value="10" />
             <Setter Property="LineHeight" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="HomePosterClipMaskStyle" TargetType="Border">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+
+        <Style x:Key="HomePosterPaletteShadowStyle" TargetType="Border">
+            <Setter Property="Margin" Value="0,3,0,0" />
+            <Setter Property="Background" Value="{StaticResource HomePosterCardBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="28"
+                                      Direction="270"
+                                      Opacity="0.42"
+                                      ShadowDepth="7"
+                                      Color="#192230" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="HomePosterBaseShadowStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource HomePosterCardBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="14"
+                                      Direction="270"
+                                      Opacity="0.28"
+                                      ShadowDepth="3"
+                                      Color="#000000" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="HomePosterLiftGridStyle" TargetType="Grid">
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="0" />
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="RenderTransform">
+                        <Setter.Value>
+                            <TranslateTransform Y="-2" />
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <ItemsPanelTemplate x:Key="HomeRecentFiveColumnsPanel">
@@ -166,26 +293,63 @@
         </ItemsPanelTemplate>
 
         <DataTemplate x:Key="HomeRecentItemTemplate">
-            <StackPanel Width="90"
-                        Margin="0,0,8,0"
+            <StackPanel Width="98"
+                        Margin="0,0,4,0"
                         HorizontalAlignment="Center">
                 <Button Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}"
                         Style="{StaticResource HomePosterButtonStyle}">
-                    <Border Width="82"
-                            Height="123"
-                            HorizontalAlignment="Center"
-                            Style="{StaticResource HomeMediaPosterChromeStyle}">
+                    <Grid Width="82"
+                          Height="123"
+                          Margin="8,9,8,0"
+                          HorizontalAlignment="Center"
+                          Style="{StaticResource HomePosterLiftGridStyle}">
+                        <Border x:Name="HomeRecentPosterClipMask"
+                                Style="{StaticResource HomePosterClipMaskStyle}" />
+                        <Border x:Name="HomeRecentPosterPaletteShadowHost"
+                                Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                        <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
                         <Grid>
-                            <TextBlock HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Text="无海报"
-                                       Style="{StaticResource CaptionTextStyle}" />
-                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                            <Grid.OpacityMask>
+                                <VisualBrush Visual="{Binding ElementName=HomeRecentPosterClipMask}" />
+                            </Grid.OpacityMask>
+                            <Border Background="{StaticResource HomePosterCardSurfaceBrush}" />
+                            <Control IsHitTestVisible="False"
+                                     Template="{StaticResource PosterPlaceholderTemplate}" />
+                            <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="180"
+                                   helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                   helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=HomeRecentPosterPaletteShadowHost}"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   SnapsToDevicePixels="True"
+                                   Stretch="UniformToFill" />
+                            <Grid IsHitTestVisible="False">
+                                <Grid.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#00000000" Offset="0" />
+                                        <GradientStop Color="#0A111827" Offset="0.42" />
+                                        <GradientStop Color="#78111824" Offset="0.78" />
+                                        <GradientStop Color="#B8111824" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Grid.Background>
+                            </Grid>
+                            <Border Height="48"
+                                    VerticalAlignment="Top"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#38FFFFFF" Offset="0" />
+                                        <GradientStop Color="#20FFFFFF" Offset="0.22" />
+                                        <GradientStop Color="#08FFFFFF" Offset="0.62" />
+                                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
                         </Grid>
-                    </Border>
+                    </Grid>
                 </Button>
-                <Button Margin="0,6,0,0"
+                <Button Width="92"
+                        Margin="0,6,0,0"
+                        HorizontalAlignment="Center"
                         Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}"
                         Style="{StaticResource HomeTextButtonStyle}">
@@ -208,14 +372,14 @@
 
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="1.25*" MinHeight="150" />
-                <RowDefinition Height="2.75*" MinHeight="250" />
-                <RowDefinition Height="1.85*" MinHeight="190" />
+                <RowDefinition Height="1.34*" MinHeight="156" />
+                <RowDefinition Height="2.73*" MinHeight="261" />
+                <RowDefinition Height="1.78*" MinHeight="185" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
                     Margin="0,0,0,14"
-                    Padding="16"
+                    Padding="22,22,22,11"
                     Style="{StaticResource PageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -229,7 +393,9 @@
                         </StackPanel>
                     </DockPanel>
 
-                    <ItemsControl Grid.Row="2" ItemsSource="{Binding LibraryStatusOverview}">
+                    <ItemsControl Grid.Row="2"
+                                  Margin="0,0,-12,0"
+                                  ItemsSource="{Binding LibraryStatusOverview}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Columns="4" />
@@ -242,7 +408,6 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
@@ -253,28 +418,39 @@
                                                 CornerRadius="17"
                                                 Background="{DynamicResource BrushAccentSoft}">
                                             <TextBlock Text="{Binding IconGlyph}"
+                                                       FontSize="18"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource BrushAccent}"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center" />
                                         </Border>
-                                        <TextBlock Grid.Column="1"
-                                                   Margin="10,0,0,0"
-                                                   Text="{Binding Title}"
-                                                   VerticalAlignment="Center"
-                                                   Style="{StaticResource BodyMutedTextStyle}" />
-                                        <StackPanel Grid.Row="1"
-                                                    Grid.ColumnSpan="2"
-                                                    Margin="0,6,0,0"
-                                                    Orientation="Horizontal">
-                                            <TextBlock Text="{Binding ValueText}" Style="{StaticResource HomeMetricValueTextStyle}" />
-                                            <TextBlock Margin="6,8,0,0"
+                                        <Grid Grid.Column="1"
+                                              Margin="10,0,0,0"
+                                              VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Title}"
+                                                       VerticalAlignment="Center"
+                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Grid.Column="1"
+                                                       MinWidth="34"
+                                                       Margin="8,0,4,0"
+                                                       HorizontalAlignment="Center"
+                                                       Text="{Binding ValueText}"
+                                                       Style="{StaticResource HomeMetricValueTextStyle}" />
+                                            <TextBlock Grid.Column="2"
+                                                       Margin="0,8,8,0"
                                                        Text="{Binding UnitText}"
                                                        Style="{StaticResource BodyMutedTextStyle}" />
-                                        </StackPanel>
-                                        <TextBlock Grid.Row="2"
+                                        </Grid>
+                                        <TextBlock Grid.Row="1"
                                                    Grid.ColumnSpan="2"
-                                                   Margin="0,2,0,0"
+                                                   Margin="0,8,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   TextAlignment="Center"
                                                    Text="{Binding TrendText}"
                                                    Style="{StaticResource CaptionTextStyle}" />
                                     </Grid>
@@ -287,11 +463,12 @@
 
             <Border Grid.Row="1"
                     Margin="0,0,0,14"
+                    Padding="22,22,22,6"
                     Style="{StaticResource PageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="12" />
+                        <RowDefinition Height="3" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel>
@@ -343,24 +520,52 @@
                                         Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"
                                         Style="{StaticResource HomePosterButtonStyle}">
-                                    <Border Width="158"
-                                            Height="237"
-                                            HorizontalAlignment="Center"
-                                            Style="{StaticResource HomeMediaPosterChromeStyle}">
+                                    <Grid Width="158"
+                                          Height="237"
+                                          HorizontalAlignment="Center"
+                                          Style="{StaticResource HomePosterLiftGridStyle}">
+                                        <Border x:Name="HomeContinuePosterClipMask"
+                                                Style="{StaticResource HomePosterClipMaskStyle}" />
+                                        <Border x:Name="HomeContinuePosterPaletteShadowHost"
+                                                Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                                        <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
                                         <Grid>
-                                            <TextBlock HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       Text="无海报"
-                                                       Style="{StaticResource CaptionTextStyle}" />
-                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
-                                            <Border VerticalAlignment="Bottom"
-                                                    Padding="12,52,12,12">
-                                                <Border.Background>
+                                            <Grid.OpacityMask>
+                                                <VisualBrush Visual="{Binding ElementName=HomeContinuePosterClipMask}" />
+                                            </Grid.OpacityMask>
+                                            <Border Background="{StaticResource HomePosterCardSurfaceBrush}" />
+                                            <Control IsHitTestVisible="False"
+                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
+                                            <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="320"
+                                                   helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                   helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=HomeContinuePosterPaletteShadowHost}"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   SnapsToDevicePixels="True"
+                                                   Stretch="UniformToFill" />
+                                            <Grid IsHitTestVisible="False">
+                                                <Grid.Background>
                                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                         <GradientStop Color="#00000000" Offset="0" />
-                                                        <GradientStop Color="#E6000000" Offset="1" />
+                                                        <GradientStop Color="#0A111827" Offset="0.42" />
+                                                        <GradientStop Color="#78111824" Offset="0.78" />
+                                                        <GradientStop Color="#B8111824" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Grid.Background>
+                                            </Grid>
+                                            <Border Height="86"
+                                                    VerticalAlignment="Top"
+                                                    IsHitTestVisible="False">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                        <GradientStop Color="#38FFFFFF" Offset="0" />
+                                                        <GradientStop Color="#20FFFFFF" Offset="0.22" />
+                                                        <GradientStop Color="#08FFFFFF" Offset="0.62" />
+                                                        <GradientStop Color="#00FFFFFF" Offset="1" />
                                                     </LinearGradientBrush>
                                                 </Border.Background>
+                                            </Border>
+                                            <Border VerticalAlignment="Bottom"
+                                                    Padding="12,52,12,12">
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Title}"
                                                                helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}"
@@ -389,21 +594,32 @@
                                                 </StackPanel>
                                             </Border>
                                         </Grid>
-                                    </Border>
+                                    </Grid>
                                 </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Button Grid.Row="2"
-                            Width="40"
-                            Height="58"
+                    <Button Grid.Row="0"
+                            Grid.RowSpan="3"
+                            Width="32"
+                            Height="54"
                             Padding="0"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Content="›"
                             ToolTip="进入观影历史"
                             Command="{Binding NavigateToWatchHistoryCommand}"
-                            Style="{StaticResource HomeSectionArrowButtonStyle}" />
+                            Style="{StaticResource HomeSectionArrowButtonStyle}">
+                        <Viewbox Width="16"
+                                 Height="16"
+                                 Stretch="Uniform">
+                            <Path Data="M6,3 L12,9 L6,15"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Viewbox>
+                    </Button>
                 </Grid>
             </Border>
 
@@ -411,7 +627,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="12" />
+                        <RowDefinition Height="0.75" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel>
@@ -477,16 +693,27 @@
                             </Style>
                         </ItemsControl.Style>
                     </ItemsControl>
-                    <Button Grid.Row="2"
-                            Width="40"
-                            Height="58"
+                    <Button Grid.Row="0"
+                            Grid.RowSpan="3"
+                            Width="32"
+                            Height="54"
                             Padding="0"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Content="›"
                             ToolTip="进入媒体库"
                             Command="{Binding OpenLibraryCommand}"
-                            Style="{StaticResource HomeSectionArrowButtonStyle}" />
+                            Style="{StaticResource HomeSectionArrowButtonStyle}">
+                        <Viewbox Width="16"
+                                 Height="16"
+                                 Stretch="Uniform">
+                            <Path Data="M6,3 L12,9 L6,15"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Viewbox>
+                    </Button>
                 </Grid>
             </Border>
         </Grid>
@@ -506,9 +733,42 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="AI 推荐" Style="{StaticResource CardTitleTextStyle}" />
-                        <TextBlock Margin="0,6,0,0"
-                                   Text="默认推荐库外 + 未看影片"
-                                   Style="{StaticResource BodyMutedTextStyle}" />
+                        <Grid Margin="0,6,0,0"
+                              HorizontalAlignment="Left"
+                              ToolTip="{Binding AiRecommendationStatusText}">
+                            <StackPanel Width="250">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding AiRecommendationStatusExpandedLine1}"
+                                           Style="{StaticResource HomeAiStatusLineStyle}" />
+                                <TextBlock Text="{Binding AiRecommendationStatusExpandedLine2}"
+                                           Style="{StaticResource HomeAiStatusLineStyle}" />
+                            </StackPanel>
+                            <StackPanel Width="292">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding AiRecommendationStatusCollapsedLine1}"
+                                           Style="{StaticResource HomeAiStatusLineStyle}" />
+                                <TextBlock Text="{Binding AiRecommendationStatusCollapsedLine2}"
+                                           Style="{StaticResource HomeAiStatusLineStyle}" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                     <Button Grid.Column="1"
                             Content="{Binding AiRecommendationViewModel.RefreshBatchButtonText}"
@@ -516,7 +776,7 @@
                             Style="{StaticResource HomeCompactActionButtonStyle}" />
                 </Grid>
 
-                <Grid Grid.Row="1" Margin="0,16,0,0">
+                <Grid Grid.Row="1" Margin="0,10,0,0">
                     <Border VerticalAlignment="Center">
                         <Border.Style>
                             <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
@@ -565,23 +825,57 @@
                                             <ColumnDefinition Width="112" />
                                             <ColumnDefinition Width="12" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="66" />
+                                            <ColumnDefinition Width="60" />
                                         </Grid.ColumnDefinitions>
 
                                         <Button Command="{Binding DataContext.AiRecommendationViewModel.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HomePosterButtonStyle}">
-                                            <Border Width="112"
-                                                    Height="168"
-                                                    Style="{StaticResource HomeMediaPosterChromeStyle}">
+                                            <Grid Width="112"
+                                                  Height="168"
+                                                  Style="{StaticResource HomePosterLiftGridStyle}">
+                                                <Border x:Name="HomeAiPosterClipMask"
+                                                        Style="{StaticResource HomePosterClipMaskStyle}" />
+                                                <Border x:Name="HomeAiPosterPaletteShadowHost"
+                                                        Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                                                <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
                                                 <Grid>
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Text="无海报"
-                                                               Style="{StaticResource CaptionTextStyle}" />
-                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                    <Grid.OpacityMask>
+                                                        <VisualBrush Visual="{Binding ElementName=HomeAiPosterClipMask}" />
+                                                    </Grid.OpacityMask>
+                                                    <Border Background="{StaticResource HomePosterCardSurfaceBrush}" />
+                                                    <Control IsHitTestVisible="False"
+                                                             Template="{StaticResource PosterPlaceholderTemplate}" />
+                                                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="240"
+                                                           helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                           helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=HomeAiPosterPaletteShadowHost}"
+                                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                                           SnapsToDevicePixels="True"
+                                                           Stretch="UniformToFill" />
+                                                    <Grid IsHitTestVisible="False">
+                                                        <Grid.Background>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                <GradientStop Color="#00000000" Offset="0" />
+                                                                <GradientStop Color="#0A111827" Offset="0.42" />
+                                                                <GradientStop Color="#78111824" Offset="0.78" />
+                                                                <GradientStop Color="#B8111824" Offset="1" />
+                                                            </LinearGradientBrush>
+                                                        </Grid.Background>
+                                                    </Grid>
+                                                    <Border Height="64"
+                                                            VerticalAlignment="Top"
+                                                            IsHitTestVisible="False">
+                                                        <Border.Background>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                <GradientStop Color="#38FFFFFF" Offset="0" />
+                                                                <GradientStop Color="#20FFFFFF" Offset="0.22" />
+                                                                <GradientStop Color="#08FFFFFF" Offset="0.62" />
+                                                                <GradientStop Color="#00FFFFFF" Offset="1" />
+                                                            </LinearGradientBrush>
+                                                        </Border.Background>
+                                                    </Border>
                                                 </Grid>
-                                            </Border>
+                                            </Grid>
                                         </Button>
 
                                         <Grid Grid.Column="2"
@@ -632,21 +926,28 @@
                                               VerticalAlignment="Top">
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="24" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="6" />
+                                                <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="*" />
                                             </Grid.RowDefinitions>
                                             <Border Style="{StaticResource HomeAiRatingBadgeStyle}">
                                                 <TextBlock Text="{Binding WeightedAverageRatingText}"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="13.5"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource BrushForegroundPrimary}" />
+                                                           Style="{StaticResource HomeAiRatingTextStyle}" />
                                             </Border>
-                                            <Button Grid.Row="1"
+                                            <Button Grid.Row="2"
                                                     HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
+                                                    VerticalAlignment="Top"
                                                     Content="{Binding WantToWatchButtonText}"
                                                     Command="{Binding DataContext.AiRecommendationViewModel.AddWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource HomeWantButtonStyle}" />
+                                            <Button Grid.Row="4"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Top"
+                                                    Content="{Binding NotInterestedButtonText}"
+                                                    Command="{Binding DataContext.AiRecommendationViewModel.ToggleNotInterestedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource HomeWantButtonStyle}" />
                                         </Grid>
@@ -684,23 +985,57 @@
                                             <ColumnDefinition Width="112" />
                                             <ColumnDefinition Width="12" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="66" />
+                                            <ColumnDefinition Width="60" />
                                         </Grid.ColumnDefinitions>
 
                                         <Button Command="{Binding DataContext.AiRecommendationViewModel.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HomePosterButtonStyle}">
-                                            <Border Width="112"
-                                                    Height="168"
-                                                    Style="{StaticResource HomeMediaPosterChromeStyle}">
+                                            <Grid Width="112"
+                                                  Height="168"
+                                                  Style="{StaticResource HomePosterLiftGridStyle}">
+                                                <Border x:Name="HomeAiCollapsedPosterClipMask"
+                                                        Style="{StaticResource HomePosterClipMaskStyle}" />
+                                                <Border x:Name="HomeAiCollapsedPosterPaletteShadowHost"
+                                                        Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                                                <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
                                                 <Grid>
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Text="无海报"
-                                                               Style="{StaticResource CaptionTextStyle}" />
-                                                    <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                                                    <Grid.OpacityMask>
+                                                        <VisualBrush Visual="{Binding ElementName=HomeAiCollapsedPosterClipMask}" />
+                                                    </Grid.OpacityMask>
+                                                    <Border Background="{StaticResource HomePosterCardSurfaceBrush}" />
+                                                    <Control IsHitTestVisible="False"
+                                                             Template="{StaticResource PosterPlaceholderTemplate}" />
+                                                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="240"
+                                                           helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                           helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=HomeAiCollapsedPosterPaletteShadowHost}"
+                                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                                           SnapsToDevicePixels="True"
+                                                           Stretch="UniformToFill" />
+                                                    <Grid IsHitTestVisible="False">
+                                                        <Grid.Background>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                <GradientStop Color="#00000000" Offset="0" />
+                                                                <GradientStop Color="#0A111827" Offset="0.42" />
+                                                                <GradientStop Color="#78111824" Offset="0.78" />
+                                                                <GradientStop Color="#B8111824" Offset="1" />
+                                                            </LinearGradientBrush>
+                                                        </Grid.Background>
+                                                    </Grid>
+                                                    <Border Height="64"
+                                                            VerticalAlignment="Top"
+                                                            IsHitTestVisible="False">
+                                                        <Border.Background>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                <GradientStop Color="#38FFFFFF" Offset="0" />
+                                                                <GradientStop Color="#20FFFFFF" Offset="0.22" />
+                                                                <GradientStop Color="#08FFFFFF" Offset="0.62" />
+                                                                <GradientStop Color="#00FFFFFF" Offset="1" />
+                                                            </LinearGradientBrush>
+                                                        </Border.Background>
+                                                    </Border>
                                                 </Grid>
-                                            </Border>
+                                            </Grid>
                                         </Button>
 
                                         <Grid Grid.Column="2"
@@ -749,7 +1084,13 @@
                                                     VerticalAlignment="Bottom"
                                                     ClipToBounds="True">
                                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                                              HorizontalScrollBarVisibility="Disabled">
+                                                              HorizontalScrollBarVisibility="Disabled"
+                                                              Loaded="ReasonScrollViewer_Loaded"
+                                                              Unloaded="ReasonScrollViewer_Unloaded"
+                                                              ScrollChanged="ReasonScrollViewer_ScrollChanged">
+                                                    <ScrollViewer.Resources>
+                                                        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource HomeReasonScrollBarStyle}" />
+                                                    </ScrollViewer.Resources>
                                                     <TextBlock Text="{Binding Reason}"
                                                                TextWrapping="Wrap"
                                                                FontSize="11"
@@ -765,21 +1106,28 @@
                                               VerticalAlignment="Top">
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="24" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="6" />
+                                                <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="*" />
                                             </Grid.RowDefinitions>
                                             <Border Style="{StaticResource HomeAiRatingBadgeStyle}">
                                                 <TextBlock Text="{Binding WeightedAverageRatingText}"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="13.5"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource BrushForegroundPrimary}" />
+                                                           Style="{StaticResource HomeAiRatingTextStyle}" />
                                             </Border>
-                                            <Button Grid.Row="1"
+                                            <Button Grid.Row="2"
                                                     HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
+                                                    VerticalAlignment="Top"
                                                     Content="{Binding WantToWatchButtonText}"
                                                     Command="{Binding DataContext.AiRecommendationViewModel.AddWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource HomeWantButtonStyle}" />
+                                            <Button Grid.Row="4"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Top"
+                                                    Content="{Binding NotInterestedButtonText}"
+                                                    Command="{Binding DataContext.AiRecommendationViewModel.ToggleNotInterestedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource HomeWantButtonStyle}" />
                                         </Grid>
@@ -791,7 +1139,9 @@
                 </Grid>
 
                 <Button Grid.Row="2"
-                        Margin="0,14,0,0"
+                        Margin="0,11,0,0"
+                        Width="220"
+                        HorizontalAlignment="Center"
                         Content="发现更多影片 »"
                         Command="{Binding NavigateToMovieDiscoveryCommand}"
                         Style="{StaticResource PrimaryButtonStyle}" />

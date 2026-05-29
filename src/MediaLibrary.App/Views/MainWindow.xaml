@@ -11,6 +11,7 @@
         MinWidth="1180"
         MinHeight="760"
         WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
         WindowStyle="None"
         ResizeMode="CanResize"
         AllowsTransparency="False"
@@ -64,18 +65,57 @@
                             Command="{Binding ToggleSidebarCommand}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ShellSidebarIconButtonStyle}">
-                                <Setter Property="Content" Value="‹" />
+                                <Setter Property="ToolTip" Value="{x:Null}" />
                                 <Setter Property="HorizontalAlignment" Value="Right" />
-                                <Setter Property="ToolTip" Value="收起侧边栏" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
-                                        <Setter Property="Content" Value="›" />
                                         <Setter Property="HorizontalAlignment" Value="Center" />
-                                        <Setter Property="ToolTip" Value="{x:Null}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
+                        <Grid Width="18"
+                              Height="18"
+                              IsHitTestVisible="False">
+                            <Border Margin="2.5,3.5"
+                                    BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                    BorderThickness="1.6"
+                                    CornerRadius="3" />
+                            <Border Width="1.6"
+                                    Height="11"
+                                    Margin="0,0,5.9,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                            <Border Width="1.6"
+                                    Height="11"
+                                    Margin="5.9,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                        </Grid>
                     </Button>
 
                     <Grid Grid.Row="1" Margin="0,12,0,0">
@@ -85,13 +125,70 @@
                         </Grid.ColumnDefinitions>
                         <Border Style="{StaticResource ShellBrandIconStyle}"
                                 ToolTip="XFVerse">
-                            <TextBlock Text="XF"
-                                       FontFamily="{StaticResource FontFamilyBase}"
-                                       FontSize="13"
-                                       FontWeight="Black"
-                                       Foreground="{DynamicResource BrushOnAccent}"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
+                            <Viewbox Stretch="Uniform">
+                                <Canvas Width="1024" Height="1024">
+                                    <Rectangle Canvas.Left="88"
+                                               Canvas.Top="88"
+                                               Width="848"
+                                               Height="848"
+                                               RadiusX="196"
+                                               RadiusY="196"
+                                               Fill="#0B0B0D" />
+                                    <Rectangle Canvas.Left="88"
+                                               Canvas.Top="88"
+                                               Width="848"
+                                               Height="848"
+                                               RadiusX="196"
+                                               RadiusY="196"
+                                               Stroke="#F7F7F5"
+                                               StrokeThickness="16" />
+                                    <Line X1="258"
+                                          Y1="350"
+                                          X2="605"
+                                          Y2="732"
+                                          Stroke="#F7F7F5"
+                                          StrokeThickness="84"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" />
+                                    <Line X1="605"
+                                          Y1="292"
+                                          X2="258"
+                                          Y2="682"
+                                          Stroke="#F7F7F5"
+                                          StrokeThickness="84"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" />
+                                    <Line X1="612"
+                                          Y1="292"
+                                          X2="612"
+                                          Y2="732"
+                                          Stroke="#F7F7F5"
+                                          StrokeThickness="84"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" />
+                                    <Line X1="612"
+                                          Y1="292"
+                                          X2="804"
+                                          Y2="292"
+                                          Stroke="#F7F7F5"
+                                          StrokeThickness="84"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" />
+                                    <Line X1="612"
+                                          Y1="512"
+                                          X2="804"
+                                          Y2="512"
+                                          Stroke="#F7F7F5"
+                                          StrokeThickness="84"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" />
+                                </Canvas>
+                            </Viewbox>
                         </Border>
                         <TextBlock Grid.Column="1"
                                    Margin="12,0,0,0"
@@ -174,7 +271,7 @@
                         </Style>
                     </Grid.Style>
                     <Button x:Name="UserMenuButton"
-                            Command="{Binding ToggleUserMenuCommand}"
+                            Click="UserMenuButton_Click"
                             PreviewMouseLeftButtonDown="UserMenuButton_PreviewMouseLeftButtonDown"
                             ToolTip="{x:Null}">
                         <Button.Style>
@@ -194,7 +291,7 @@
                                     <Setter Property="HorizontalAlignment" Value="Stretch" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
-                                            <Setter Property="Width" Value="38" />
+                                            <Setter Property="Width" Value="34" />
                                             <Setter Property="HorizontalAlignment" Value="Center" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -205,13 +302,14 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Border Width="38"
-                                    Height="38"
-                                    CornerRadius="19"
+                            <Border Width="32"
+                                    Height="32"
+                                    CornerRadius="16"
                                     Background="{DynamicResource BrushAccent}">
                                 <TextBlock HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            Text="{Binding UserAvatarInitial}"
+                                           FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource BrushOnAccent}" />
                             </Border>
@@ -253,10 +351,10 @@
                     </Button>
 
                     <Popup x:Name="UserMenuPopup"
-                           AllowsTransparency="True"
-                           Closed="UserMenuPopup_Closed"
-                           DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
-                           IsOpen="{Binding IsUserMenuOpen, Mode=TwoWay}"
+                            AllowsTransparency="True"
+                            Closed="UserMenuPopup_Closed"
+                            DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                            IsOpen="{Binding IsUserMenuOpen, Mode=TwoWay}"
                            Placement="Top"
                            PlacementTarget="{Binding ElementName=UserMenuButton}"
                            StaysOpen="False"

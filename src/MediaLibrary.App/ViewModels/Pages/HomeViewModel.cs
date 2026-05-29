@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
@@ -13,6 +14,8 @@ public sealed class HomeViewModel : PageViewModelBase
 {
     private const string DefaultUserDisplayName = "James";
     private const string HomeWelcomeSubtitle = "享受你的私人 AI 影音库";
+    private const int ExpandedAiStatusLineLength = 20;
+    private const int CollapsedAiStatusLineLength = 25;
 
     private readonly IHomeDashboardQueryService _dashboardQueryService;
     private readonly IWatchStatisticsService _watchStatisticsService;
@@ -49,6 +52,7 @@ public sealed class HomeViewModel : PageViewModelBase
         _movieDiscoveryViewModel = movieDiscoveryViewModel;
         AiRecommendationViewModel = aiRecommendationViewModel;
         AiRecommendationViewModel.Recommendations.CollectionChanged += (_, _) => OnPropertyChanged(nameof(AiRecommendationPreview));
+        AiRecommendationViewModel.PropertyChanged += OnAiRecommendationViewModelPropertyChanged;
         _dataRefreshService.DataChanged += OnDataChanged;
         _playerWindowService.PlayerWindowClosed += OnPlayerWindowClosed;
 
@@ -74,6 +78,16 @@ public sealed class HomeViewModel : PageViewModelBase
     public IEnumerable<HomeMovieItem> RecentlyAddedCollapsedPreview => RecentlyAdded.Take(6);
 
     public IEnumerable<AiRecommendationItem> AiRecommendationPreview => AiRecommendationViewModel.Recommendations.Take(3);
+
+    public string AiRecommendationStatusText => AiRecommendationViewModel.StatusMessage;
+
+    public string AiRecommendationStatusExpandedLine1 => SplitTwoLineStatus(AiRecommendationStatusText, ExpandedAiStatusLineLength).Line1;
+
+    public string AiRecommendationStatusExpandedLine2 => SplitTwoLineStatus(AiRecommendationStatusText, ExpandedAiStatusLineLength).Line2;
+
+    public string AiRecommendationStatusCollapsedLine1 => SplitTwoLineStatus(AiRecommendationStatusText, CollapsedAiStatusLineLength).Line1;
+
+    public string AiRecommendationStatusCollapsedLine2 => SplitTwoLineStatus(AiRecommendationStatusText, CollapsedAiStatusLineLength).Line2;
 
     public ObservableCollection<HomeMovieItem> Favorites { get; } = [];
 
@@ -133,6 +147,13 @@ public sealed class HomeViewModel : PageViewModelBase
             return;
         }
 
+        if (_hasLoadedDashboard)
+        {
+            ApplyActivePlaybackState();
+            ContinuePlaybackCommand.RaiseCanExecuteChanged();
+            return;
+        }
+
         SetIsRefreshing(true);
         try
         {
@@ -155,6 +176,19 @@ public sealed class HomeViewModel : PageViewModelBase
     {
         var reason = e.Reason;
         _ = Application.Current.Dispatcher.InvokeAsync(() => _ = SafeRefreshByReasonAsync(reason));
+    }
+
+    private void OnAiRecommendationViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.PropertyName)
+            || string.Equals(e.PropertyName, nameof(RecommendationsViewModel.StatusMessage), StringComparison.Ordinal))
+        {
+            OnPropertyChanged(nameof(AiRecommendationStatusText));
+            OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine1));
+            OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine2));
+            OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine1));
+            OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine2));
+        }
     }
 
     private async Task SafeRefreshByReasonAsync(AppDataChangeReason reason)
@@ -290,6 +324,11 @@ public sealed class HomeViewModel : PageViewModelBase
     {
         await AiRecommendationViewModel.ActivateAsync(cancellationToken);
         OnPropertyChanged(nameof(AiRecommendationPreview));
+        OnPropertyChanged(nameof(AiRecommendationStatusText));
+        OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine1));
+        OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine2));
+        OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine1));
+        OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine2));
     }
 
     private async Task RefreshLibraryStatusOverviewAsync(CancellationToken cancellationToken = default)
@@ -364,6 +403,41 @@ public sealed class HomeViewModel : PageViewModelBase
         return $"相比上个月 {sign}{delta.Value} {arrow}";
     }
 
+    private static (string Line1, string Line2) SplitTwoLineStatus(string? value, int maxLineLength)
+    {
+        var text = string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+        if (text.Length <= maxLineLength)
+        {
+            return (text, string.Empty);
+        }
+
+        var line1 = TakeStatusLine(text, maxLineLength);
+        var remaining = text[line1.Length..].TrimStart(' ', '，', '、', '/', '|');
+        if (remaining.Length <= maxLineLength)
+        {
+            return (line1, remaining);
+        }
+
+        var line2 = TakeStatusLine(remaining, Math.Max(1, maxLineLength - 1)).TrimEnd(' ', '，', '、', '/', '|') + "…";
+        return (line1, line2);
+    }
+
+    private static string TakeStatusLine(string text, int maxLineLength)
+    {
+        if (text.Length <= maxLineLength)
+        {
+            return text;
+        }
+
+        var boundary = text.LastIndexOfAny([' ', '，', '、', '/', '|'], Math.Min(text.Length - 1, maxLineLength));
+        if (boundary >= Math.Max(4, maxLineLength / 2))
+        {
+            return text[..boundary].TrimEnd(' ', '，', '、', '/', '|');
+        }
+
+        return text[..maxLineLength].TrimEnd(' ', '，', '、', '/', '|');
+    }
+
     private void NavigateToMovieDiscoveryAiTab()
     {
         _movieDiscoveryViewModel.OpenAiRecommendationsOnNextActivation();
@@ -375,7 +449,7 @@ public sealed class HomeViewModel : PageViewModelBase
         switch (parameter)
         {
             case HomeMovieItem movie:
-                if (movie.EpisodeId.HasValue && movie.TvSeasonId.HasValue)
+                if (movie.TvSeasonId.HasValue)
                 {
                     _navigationStateService.RequestTvSeasonDetail(movie.TvSeasonId.Value, movie.EpisodeId);
                 }

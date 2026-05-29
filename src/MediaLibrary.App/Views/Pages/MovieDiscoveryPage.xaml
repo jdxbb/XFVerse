@@ -18,10 +18,8 @@
                     <Grid Height="300">
                         <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
                             <Grid>
-                                <TextBlock HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Text="无海报"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                <Control IsHitTestVisible="False"
+                                         Template="{StaticResource PosterPlaceholderTemplate}" />
                                 <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                             </Grid>
                         </Border>
@@ -469,10 +467,8 @@
                                                                 <Grid Height="300">
                                                                     <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
                                                                         <Grid>
-                                                                            <TextBlock HorizontalAlignment="Center"
-                                                                                       VerticalAlignment="Center"
-                                                                                       Text="无海报"
-                                                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                                                            <Control IsHitTestVisible="False"
+                                                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
                                                                             <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                         </Grid>
                                                                     </Border>
@@ -850,10 +846,8 @@
                                                 <Grid Height="340">
                                                     <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
                                                         <Grid>
-                                                            <TextBlock HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center"
-                                                                       Text="无海报"
-                                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                                            <Control IsHitTestVisible="False"
+                                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
                                                             <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                         </Grid>
                                                     </Border>
@@ -964,10 +958,8 @@
                                                             <Grid Height="196">
                                                                 <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
                                                                     <Grid>
-                                                                        <TextBlock HorizontalAlignment="Center"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Text="无海报"
-                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Control IsHitTestVisible="False"
+                                                                                 Template="{StaticResource PosterPlaceholderTemplate}" />
                                                                         <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                     </Grid>
                                                                 </Border>
@@ -1063,10 +1055,8 @@
                                                             <Grid Height="196">
                                                                 <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
                                                                     <Grid>
-                                                                        <TextBlock HorizontalAlignment="Center"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Text="无海报"
-                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Control IsHitTestVisible="False"
+                                                                                 Template="{StaticResource PosterPlaceholderTemplate}" />
                                                                         <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                     </Grid>
                                                                 </Border>
@@ -1186,10 +1176,8 @@
                                                 <Grid Height="340">
                                                     <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
                                                         <Grid>
-                                                            <TextBlock HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center"
-                                                                       Text="无海报"
-                                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                                            <Control IsHitTestVisible="False"
+                                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
                                                             <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                         </Grid>
                                                     </Border>
@@ -1275,10 +1263,8 @@
                                                             <Grid Height="196">
                                                                 <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
                                                                     <Grid>
-                                                                        <TextBlock HorizontalAlignment="Center"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Text="无海报"
-                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Control IsHitTestVisible="False"
+                                                                                 Template="{StaticResource PosterPlaceholderTemplate}" />
                                                                         <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                     </Grid>
                                                                 </Border>
@@ -1353,10 +1339,8 @@
                                                             <Grid Height="196">
                                                                 <Border CornerRadius="14" Background="{DynamicResource BrushSurfaceAlt}">
                                                                     <Grid>
-                                                                        <TextBlock HorizontalAlignment="Center"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Text="无海报"
-                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <Control IsHitTestVisible="False"
+                                                                                 Template="{StaticResource PosterPlaceholderTemplate}" />
                                                                         <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
                                                                     </Grid>
                                                                 </Border>

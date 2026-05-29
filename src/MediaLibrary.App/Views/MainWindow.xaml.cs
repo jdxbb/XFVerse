@@ -17,11 +17,10 @@ public partial class MainWindow : Window
     private const double DefaultWindowMargin = 48;
     private const int WmGetMinMaxInfo = 0x0024;
     private const int MonitorDefaultToNearest = 0x00000002;
-    private static readonly TimeSpan PopupReopenSuppressionDelay = TimeSpan.FromMilliseconds(350);
 
     private HwndSource? _hwndSource;
     private Point? _pendingMaximizedDragStart;
-    private DateTime _userMenuClosedAtUtc = DateTime.MinValue;
+    private bool _ignoreNextUserMenuButtonClick;
 
     public MainWindow()
     {
@@ -80,26 +79,33 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel { IsUserMenuOpen: true } viewModel)
         {
-            if (DateTime.UtcNow - _userMenuClosedAtUtc > PopupReopenSuppressionDelay)
-            {
-                return;
-            }
-
-            e.Handled = true;
             return;
         }
 
+        _ignoreNextUserMenuButtonClick = true;
         viewModel.IsUserMenuOpen = false;
         e.Handled = true;
     }
 
-    private void UserMenuPopup_Closed(object sender, EventArgs e)
+    private void UserMenuButton_Click(object sender, RoutedEventArgs e)
     {
-        _userMenuClosedAtUtc = DateTime.UtcNow;
+        if (_ignoreNextUserMenuButtonClick)
+        {
+            _ignoreNextUserMenuButtonClick = false;
+            e.Handled = true;
+            return;
+        }
+
         if (DataContext is MainWindowViewModel viewModel)
         {
-            viewModel.SuppressNextUserMenuToggle(PopupReopenSuppressionDelay);
+            viewModel.ToggleUserMenuCommand.Execute(null);
+            e.Handled = true;
         }
+    }
+
+    private void UserMenuPopup_Closed(object sender, EventArgs e)
+    {
+        _ignoreNextUserMenuButtonClick = UserMenuButton.IsMouseOver;
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

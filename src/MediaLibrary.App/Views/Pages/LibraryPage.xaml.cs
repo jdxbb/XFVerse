@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -8,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MediaLibrary.App.ViewModels.Main;
 using MediaLibrary.App.ViewModels.Pages;
+using MediaLibrary.Core.Diagnostics;
 
 namespace MediaLibrary.App.Views.Pages;
 
@@ -15,15 +17,24 @@ public partial class LibraryPage : UserControl
 {
     private const double CollapsedSearchColumnWidth = 816;
     private const double ExpandedSearchColumnWidth = 660;
+    private static readonly bool ScrollDiagnosticsEnabled =
+        string.Equals(
+            Environment.GetEnvironmentVariable("XFVERSE_LIBRARY_SCROLL_DIAGNOSTICS"),
+            "1",
+            StringComparison.Ordinal);
+    private const int ScrollDiagnosticsSampleInterval = 40;
     private static readonly TimeSpan ScrollBarAutoHideDelay = TimeSpan.FromMilliseconds(900);
-    private static readonly TimeSpan MenuReopenSuppressionDelay = TimeSpan.FromMilliseconds(350);
+    private static readonly TimeSpan ScrollDiagnosticsMinimumInterval = TimeSpan.FromMilliseconds(900);
     private readonly Dictionary<ScrollBar, DispatcherTimer> _scrollBarHideTimers = [];
-    private Button? _recentlyClosedMenuButton;
-    private DateTime _recentlyClosedMenuAtUtc = DateTime.MinValue;
+    private readonly Dictionary<DependencyObject, ScrollBar> _verticalScrollBarsByScrollSource = [];
     private Button? _openMenuButton;
     private ContextMenu? _openContextMenu;
     private INotifyPropertyChanged? _shellPropertyChangedSource;
     private INotifyPropertyChanged? _libraryPropertyChangedSource;
+    private int _scrollDiagnosticsEventCount;
+    private long _scrollDiagnosticsTotalTicks;
+    private long _scrollDiagnosticsMaxTicks;
+    private long _lastScrollDiagnosticsTimestamp;
 
     public LibraryPage()
     {
@@ -52,6 +63,7 @@ public partial class LibraryPage : UserControl
         }
 
         _scrollBarHideTimers.Clear();
+        _verticalScrollBarsByScrollSource.Clear();
     }
 
     private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -88,15 +100,7 @@ public partial class LibraryPage : UserControl
         {
             CloseOpenMenu();
             e.Handled = true;
-            return;
         }
-
-        if (!ShouldSuppressMenuOpen(button))
-        {
-            return;
-        }
-
-        e.Handled = true;
     }
 
     private void OpenButtonContextMenu(object sender, RoutedEventArgs e)
@@ -109,12 +113,6 @@ public partial class LibraryPage : UserControl
         if (IsOpenMenuButton(button))
         {
             CloseOpenMenu();
-            e.Handled = true;
-            return;
-        }
-
-        if (ShouldSuppressMenuOpen(button))
-        {
             e.Handled = true;
             return;
         }
@@ -145,12 +143,6 @@ public partial class LibraryPage : UserControl
             return;
         }
 
-        if (ShouldSuppressMenuOpen(button))
-        {
-            e.Handled = true;
-            return;
-        }
-
         CloseOpenMenu();
         var contextMenu = new ContextMenu
         {
@@ -158,13 +150,23 @@ public partial class LibraryPage : UserControl
         };
         foreach (var option in viewModel.DecadeFilterOptions)
         {
-            contextMenu.Items.Add(new MenuItem
+            var menuItem = new MenuItem
             {
                 Header = option,
+                IsCheckable = true,
+                IsChecked = viewModel.IsDecadeFilterSelected(option),
+                StaysOpenOnClick = !string.Equals(option, "全部年代", StringComparison.Ordinal),
                 Command = viewModel.SelectDecadeFilterCommand,
                 CommandParameter = option,
                 Style = (Style)FindResource("LibraryFilterMenuItemStyle")
-            });
+            };
+            menuItem.Click += (_, _) =>
+            {
+                _ = Dispatcher.BeginInvoke(
+                    () => UpdateDecadeFilterMenuChecks(contextMenu, viewModel),
+                    DispatcherPriority.Background);
+            };
+            contextMenu.Items.Add(menuItem);
         }
 
         button.ContextMenu = contextMenu;
@@ -181,35 +183,16 @@ public partial class LibraryPage : UserControl
 
     private void ContextMenu_Closed(object? sender, RoutedEventArgs e)
     {
-        if (sender is not ContextMenu { PlacementTarget: Button button })
+        if (sender is not System.Windows.Controls.ContextMenu contextMenu)
         {
             return;
         }
 
-        _recentlyClosedMenuButton = button;
-        _recentlyClosedMenuAtUtc = DateTime.UtcNow;
-        if (ReferenceEquals(_openContextMenu, sender))
+        if (ReferenceEquals(_openContextMenu, contextMenu))
         {
             _openMenuButton = null;
             _openContextMenu = null;
         }
-    }
-
-    private bool ShouldSuppressMenuOpen(Button button)
-    {
-        if (!ReferenceEquals(_recentlyClosedMenuButton, button))
-        {
-            return false;
-        }
-
-        if (DateTime.UtcNow - _recentlyClosedMenuAtUtc > MenuReopenSuppressionDelay)
-        {
-            _recentlyClosedMenuButton = null;
-            return false;
-        }
-
-        _recentlyClosedMenuButton = null;
-        return true;
     }
 
     private bool IsOpenMenuButton(Button button)
@@ -269,16 +252,18 @@ public partial class LibraryPage : UserControl
 
     private void OnLibraryListScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (sender is not DependencyObject source)
+        var startedAt = ScrollDiagnosticsEnabled ? Stopwatch.GetTimestamp() : 0L;
+        try
         {
-            return;
-        }
-
-        foreach (var scrollBar in FindVisualChildren<ScrollBar>(source))
-        {
-            if (scrollBar.Orientation != Orientation.Vertical)
+            if (sender is not DependencyObject source)
             {
-                continue;
+                return;
+            }
+
+            var scrollBar = GetOrCacheVerticalScrollBar(source);
+            if (scrollBar is null)
+            {
+                return;
             }
 
             scrollBar.SetCurrentValue(OpacityProperty, 1d);
@@ -299,6 +284,90 @@ public partial class LibraryPage : UserControl
             timer.Stop();
             timer.Start();
         }
+        finally
+        {
+            if (ScrollDiagnosticsEnabled)
+            {
+                RecordScrollDiagnostics(sender, e, Stopwatch.GetElapsedTime(startedAt));
+            }
+        }
+    }
+
+    private static void UpdateDecadeFilterMenuChecks(ContextMenu contextMenu, LibraryViewModel viewModel)
+    {
+        if (!contextMenu.IsOpen)
+        {
+            return;
+        }
+
+        foreach (var item in contextMenu.Items.OfType<MenuItem>())
+        {
+            if (item.Header is string option)
+            {
+                item.IsChecked = viewModel.IsDecadeFilterSelected(option);
+            }
+        }
+    }
+
+    private ScrollBar? GetOrCacheVerticalScrollBar(DependencyObject source)
+    {
+        if (_verticalScrollBarsByScrollSource.TryGetValue(source, out var cachedScrollBar)
+            && cachedScrollBar.IsLoaded)
+        {
+            return cachedScrollBar;
+        }
+
+        foreach (var scrollBar in FindVisualChildren<ScrollBar>(source))
+        {
+            if (scrollBar.Orientation != Orientation.Vertical)
+            {
+                continue;
+            }
+
+            _verticalScrollBarsByScrollSource[source] = scrollBar;
+            return scrollBar;
+        }
+
+        _verticalScrollBarsByScrollSource.Remove(source);
+        return null;
+    }
+
+    private void RecordScrollDiagnostics(object sender, ScrollChangedEventArgs e, TimeSpan elapsed)
+    {
+        if (!ScrollDiagnosticsEnabled)
+        {
+            return;
+        }
+
+        _scrollDiagnosticsEventCount++;
+        _scrollDiagnosticsTotalTicks += elapsed.Ticks;
+        _scrollDiagnosticsMaxTicks = Math.Max(_scrollDiagnosticsMaxTicks, elapsed.Ticks);
+
+        var now = Stopwatch.GetTimestamp();
+        var isSlow = elapsed.TotalMilliseconds >= 8d;
+        if (!isSlow
+            && (_scrollDiagnosticsEventCount < ScrollDiagnosticsSampleInterval
+                || (_lastScrollDiagnosticsTimestamp > 0
+                    && Stopwatch.GetElapsedTime(_lastScrollDiagnosticsTimestamp, now) < ScrollDiagnosticsMinimumInterval)))
+        {
+            return;
+        }
+
+        var sampleCount = Math.Max(1, _scrollDiagnosticsEventCount);
+        var averageMs = TimeSpan.FromTicks(_scrollDiagnosticsTotalTicks / sampleCount).TotalMilliseconds;
+        var maxMs = TimeSpan.FromTicks(_scrollDiagnosticsMaxTicks).TotalMilliseconds;
+        var itemCount = sender is ListBox listBox ? listBox.Items.Count : 0;
+
+        AiPerfDiagnostics.WriteEvent(
+            "event=library-scroll-handler " +
+            $"elapsedMs={elapsed.TotalMilliseconds:0} avgMs={averageMs:0} maxMs={maxMs:0} samples={sampleCount} " +
+            $"items={itemCount} verticalOffset={e.VerticalOffset:0} verticalChange={e.VerticalChange:0} " +
+            $"viewportHeight={e.ViewportHeight:0} extentHeight={e.ExtentHeight:0} slow={isSlow.ToString().ToLowerInvariant()}");
+
+        _scrollDiagnosticsEventCount = 0;
+        _scrollDiagnosticsTotalTicks = 0;
+        _scrollDiagnosticsMaxTicks = 0;
+        _lastScrollDiagnosticsTimestamp = now;
     }
 
     private void AttachShellState()
@@ -326,6 +395,10 @@ public partial class LibraryPage : UserControl
         {
             _libraryPropertyChangedSource = source;
             source.PropertyChanged += OnLibraryPropertyChanged;
+            if (source is LibraryViewModel viewModel)
+            {
+                viewModel.RequestCloseFilterMenu += OnLibraryRequestCloseFilterMenu;
+            }
         }
     }
 
@@ -342,9 +415,19 @@ public partial class LibraryPage : UserControl
     {
         if (_libraryPropertyChangedSource is not null)
         {
+            if (_libraryPropertyChangedSource is LibraryViewModel viewModel)
+            {
+                viewModel.RequestCloseFilterMenu -= OnLibraryRequestCloseFilterMenu;
+            }
+
             _libraryPropertyChangedSource.PropertyChanged -= OnLibraryPropertyChanged;
             _libraryPropertyChangedSource = null;
         }
+    }
+
+    private void OnLibraryRequestCloseFilterMenu(object? sender, EventArgs e)
+    {
+        CloseOpenMenu();
     }
 
     private void OnShellPropertyChanged(object? sender, PropertyChangedEventArgs e)

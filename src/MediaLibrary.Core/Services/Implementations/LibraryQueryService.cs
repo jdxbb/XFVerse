@@ -139,7 +139,12 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.IsFavorite,
                     x.IsWatched,
                     x.UserRating,
+                    x.CreatedAt,
                     x.UpdatedAt,
+                    LatestSourceUpdatedAt = x.MediaFiles
+                        .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                        .Select(mediaFile => (DateTime?)mediaFile.UpdatedAt)
+                        .Max(),
                     DefaultMediaFileName = x.MediaFiles
                         .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
                         .OrderBy(mediaFile => mediaFile.FileName)
@@ -287,7 +292,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasUserState = hasUserState,
                         HasWatchHistory = x.HasWatchHistory,
                         ProgressPercent = progressPercent,
-                        UpdatedAt = collectionUpdatedAt > x.UpdatedAt ? collectionUpdatedAt : x.UpdatedAt
+                        UpdatedAt = MaxDate(collectionUpdatedAt, x.LatestSourceUpdatedAt, x.CreatedAt)
                     };
             })
             .Where(x => x.IsVisibleInLibrary)
@@ -342,7 +347,6 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 {
                     var parentPath = MoviePlaceholderGroupingHelper.GetDirectParentPath(x.FilePath);
                     var parentDisplay = MoviePlaceholderGroupingHelper.GetParentFolderDisplay(parentPath);
-                    var updatedAt = x.LastSeenAt ?? x.UpdatedAt;
                     return new LibraryMovieListItem
                     {
                         ItemKind = LibraryMediaItemKind.Other,
@@ -364,7 +368,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsVisibleInLibrary = true,
                         HasLibraryContext = true,
                         IsInLibrary = true,
-                        UpdatedAt = updatedAt == default ? x.CreatedAt : updatedAt
+                        UpdatedAt = x.UpdatedAt == default ? x.CreatedAt : x.UpdatedAt
                     };
             })
             .ToList();
@@ -908,6 +912,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.GenresText,
                     x.Country,
                     x.Language,
+                    x.CreatedAt,
                     x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
@@ -939,6 +944,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : (int?)null,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
                     IdentificationStatus = x.IdentificationStatus,
+                    CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
@@ -1034,6 +1040,19 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var knownEpisodeCount = displayMetrics.Sum(x => x.CountableEpisodeCount);
                     var watchedSeasonCount = displayMetrics.Count(x => IsAggregateWatched(x.WatchedEpisodeCount, x.CountableEpisodeCount, x.TotalEpisodeCount));
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, knownEpisodeCount, totalEpisodeCount);
+                    var stateUpdatedAt = seasons
+                        .Select(season => stateBySeason.TryGetValue(season.SeasonId, out var state) ? state.UpdatedAt : DateTime.MinValue)
+                        .DefaultIfEmpty(DateTime.MinValue)
+                        .Max();
+                    var latestSourceUpdatedAt = displayMetrics
+                        .Select(x => x.LatestSourceUpdatedAt)
+                        .Where(x => x.HasValue)
+                        .DefaultIfEmpty()
+                        .Max();
+                    var latestSeasonCreatedAt = displaySeasons
+                        .Select(x => (DateTime?)x.CreatedAt)
+                        .DefaultIfEmpty()
+                        .Max();
                     var latestSeasonPoster = displaySeasons
                         .OrderByDescending(x => x.SeasonNumber)
                         .Select(x => x.PosterRemoteUrl)
@@ -1073,7 +1092,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         WatchedEpisodeCount = watchedEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
                         ProgressPercent = ResolveEpisodeProgressPercent(watchedSeasonCount, displaySeasons.Count, isWatched),
-                        UpdatedAt = seasons.Select(x => x.UpdatedAt).Append(series.UpdatedAt).Max()
+                        UpdatedAt = MaxDate(stateUpdatedAt, latestSourceUpdatedAt, latestSeasonCreatedAt, series.CreatedAt)
                     };
                 })
             .Where(x => x.IsVisibleInLibrary)
@@ -1115,6 +1134,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
                     IdentificationStatus = x.IdentificationStatus,
+                    CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
@@ -1197,7 +1217,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         InLibraryEpisodeCount = metrics.InLibraryEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
                         ProgressPercent = ResolveEpisodeProgressPercent(watchedEpisodeCount, totalEpisodeCount, isWatched),
-                        UpdatedAt = state?.UpdatedAt > season.UpdatedAt ? state.UpdatedAt : season.UpdatedAt
+                        UpdatedAt = MaxDate(state?.UpdatedAt, metrics.LatestSourceUpdatedAt, season.CreatedAt)
                     };
                 })
             .Where(x => x.IsVisibleInLibrary)
@@ -1259,6 +1279,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     SeasonId = x.Episode!.TvSeasonId,
                     EpisodeId = x.EpisodeId!.Value,
                     IsWatched = x.Episode.IsWatched,
+                    UpdatedAt = x.UpdatedAt,
                     ProtocolType = x.SourceConnection == null ? null : x.SourceConnection.ProtocolType
                 })
             .ToListAsync(cancellationToken);
@@ -1276,6 +1297,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .Select(x => x.EpisodeId)
                         .Distinct()
                         .Count(),
+                    LatestSourceUpdatedAt = group.Max(x => x.UpdatedAt),
                     HasLocalSource = group.Any(x => x.ProtocolType == ProtocolType.Local),
                     HasWebDavSource = group.Any(x => x.ProtocolType == ProtocolType.WebDav)
                 })
@@ -1344,6 +1366,15 @@ public sealed class LibraryQueryService : ILibraryQueryService
     private static string FirstNonEmpty(params string?[] values)
     {
         return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
+    private static DateTime MaxDate(params DateTime?[] values)
+    {
+        return values
+            .Where(x => x.HasValue && x.Value != default)
+            .Select(x => x!.Value)
+            .DefaultIfEmpty(DateTime.MinValue)
+            .Max();
     }
 
     private static bool IsAggregateWatched(int watchedEpisodeCount, int knownEpisodeCount, int totalEpisodeCount)
@@ -1424,6 +1455,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
             totalEpisodeCount,
             sourceAggregate?.SourceCount ?? 0,
             sourceAggregate?.InLibraryEpisodeCount ?? 0,
+            sourceAggregate?.LatestSourceUpdatedAt,
             sourceAggregate?.HasLocalSource == true,
             sourceAggregate?.HasWebDavSource == true);
     }
@@ -1652,6 +1684,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
 
         public IdentificationStatus IdentificationStatus { get; set; }
 
+        public DateTime CreatedAt { get; set; }
+
         public DateTime UpdatedAt { get; set; }
     }
 
@@ -1674,6 +1708,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
 
         public int WatchedSourceEpisodeCount { get; set; }
 
+        public DateTime? LatestSourceUpdatedAt { get; set; }
+
         public bool HasLocalSource { get; set; }
 
         public bool HasWebDavSource { get; set; }
@@ -1687,6 +1723,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
 
         public bool IsWatched { get; set; }
 
+        public DateTime UpdatedAt { get; set; }
+
         public ProtocolType? ProtocolType { get; set; }
     }
 
@@ -1696,6 +1734,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
         int TotalEpisodeCount,
         int SourceCount,
         int InLibraryEpisodeCount,
+        DateTime? LatestSourceUpdatedAt,
         bool HasLocalSource,
         bool HasWebDavSource);
 

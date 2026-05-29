@@ -153,10 +153,23 @@ public sealed class LibraryMovieListItem
 
     public bool HasProgressPercent => true;
 
+    public bool IsTvLikeUnidentifiedItem => ItemKind == LibraryMediaItemKind.Other
+                                            && (SeasonId > 0
+                                                || (GroupedRangeStartNumber > 0
+                                                    && GroupedRangeEndNumber >= GroupedRangeStartNumber));
+
+    public bool IsTvLikeUnidentifiedSeries => ItemKind == LibraryMediaItemKind.Other
+                                              && SeriesId > 0
+                                              && SeasonId == 0
+                                              && !TmdbId.HasValue
+                                              && SeasonCount > 0;
+
     public string ProgressLabel => ItemKind switch
     {
         LibraryMediaItemKind.Series => $"已看 {WatchedSeasonCount} / {SeasonCount} 季",
         LibraryMediaItemKind.Season => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集",
+        LibraryMediaItemKind.Other when IsTvLikeUnidentifiedItem => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集",
+        LibraryMediaItemKind.Other when IsTvLikeUnidentifiedSeries => $"已看 {WatchedSeasonCount} / {SeasonCount} 季",
         _ => $"{ProgressValue:0}%"
     };
 
@@ -186,6 +199,10 @@ public sealed class LibraryMovieListItem
         LibraryMediaItemKind.Season => InLibraryEpisodeCount > 0
             ? $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 有播放源 {InLibraryEpisodeCount} 集"
             : $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} · 暂无播放源",
+        LibraryMediaItemKind.Other when IsTvLikeUnidentifiedSeries => $"已看 {WatchedSeasonCount} / {SeasonCount} 季 · 有播放源 {InLibraryEpisodeCount} 集",
+        LibraryMediaItemKind.Other when IsTvLikeUnidentifiedItem => GroupedRangeStartNumber > 0 && GroupedRangeEndNumber >= GroupedRangeStartNumber
+            ? $"未识别剧集候选 · 已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集 · {SourceCount} 个文件 · {GroupedRangeStartNumber}-{GroupedRangeEndNumber}"
+            : $"未识别剧集候选 · 已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集 · {SourceCount} 个文件",
         LibraryMediaItemKind.Other => GroupedRangeStartNumber > 0 && GroupedRangeEndNumber >= GroupedRangeStartNumber
             ? $"未识别剧集候选 · {SourceCount} 个文件 · {GroupedRangeStartNumber}-{GroupedRangeEndNumber}"
             : $"未识别 / 待修正 · {SourceCount} 个文件",

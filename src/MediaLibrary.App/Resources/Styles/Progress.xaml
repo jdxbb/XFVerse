@@ -2,10 +2,27 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Style x:Key="ProgressBarStyle" TargetType="ProgressBar">
         <Setter Property="Height" Value="8" />
-        <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
-        <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+        <Setter Property="Background" Value="#E5E7EB" />
+        <Setter Property="Foreground" Value="#67C7F2" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
         <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid x:Name="TemplateRoot"
+                          Height="{TemplateBinding Height}"
+                          SnapsToDevicePixels="True">
+                        <Border x:Name="PART_Track"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2" />
+                        <Border x:Name="PART_Indicator"
+                                HorizontalAlignment="Left"
+                                Background="{TemplateBinding Foreground}"
+                                CornerRadius="2" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="ThinProgressBarStyle" TargetType="ProgressBar" BasedOn="{StaticResource ProgressBarStyle}">

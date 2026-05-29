@@ -3615,3 +3615,42 @@ Manual acceptance matrix:
 8. Poster loading is triggered by realized image controls and keeps the existing cache / placeholder behavior.
 9. Card click, detail navigation, play command, context menu, and selection bindings remain item-VM based.
 10. Logs provide query / filter / UI apply / render-ready / realized-item evidence without logging private paths, URLs, credentials, tokens, passwords, or API keys.
+
+### TV Scan Follow-up - Existing-series continuation anchor
+
+Completed:
+
+- Added a conservative continuation anchor for newly scanned TV season candidates. When normal TV search remains unresolved, below threshold, or needs review, the scan can reuse a unique already matched / manually confirmed sibling Season context from the same source connection as the target Series anchor.
+- The anchor path is limited to strong TV context, regular positive Season numbers, at least two parsed Episode numbers, the same directory or sibling Season directory, and a single unique existing TMDB Series context.
+- The target TMDB Season detail must validate the parsed Episode numbers before binding. If the Season detail is missing or the candidate Episode numbers are not present in the target Season, the existing placeholder path remains unchanged.
+- Existing Episode bindings are still preserved. This follow-up does not migrate or replace already attached Episode rows; delete-record / manual correction remains the path for already wrong bindings.
+- Added sanitized `tv-continuation-anchor-*` diagnostics for applied, skipped, TMDB/detail error, and apply-error outcomes. Diagnostics use formatted paths and aggregate counts only.
+
+Not done:
+
+- No global TV / Movie confidence threshold was lowered.
+- No AI auto-apply rule, Movie fallback rule, correction UI, existing wrong-binding rewrite, schema migration, database update, commit, or push was added.
+- Season 0 / specials, cross-season absolute episode mapping, and complex nested / ambiguous folder layouts remain outside this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### TV / Media Library Follow-up - Continuation Sorting and Home Coverage
+
+Completed:
+
+- Home recently-added preview now includes TV season items with active episode sources, not only Movie / unidentified Movie rows.
+- Media-library unidentified TV-like rows now use season-style episode progress labels.
+- Visible media-library recent-update sort no longer depends on raw TV Series / Season metadata `UpdatedAt`, because scan metadata refresh can touch those timestamps without adding or changing actual playable sources.
+- The visible-list sort key is now based on user collection-state update, active media-source row update, and initial entity creation fallback. This keeps newly added TV seasons sortable while reducing scan metadata refresh noise for existing seasons.
+
+Not done:
+
+- No TV confidence threshold, AI auto-apply rule, correction UI, existing wrong-binding rewrite, schema migration, database update, commit or push was added.
+- Already wrong bindings are still expected to be handled by delete-record / rescan or manual correction, not by this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.

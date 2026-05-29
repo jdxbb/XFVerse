@@ -216,6 +216,16 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
             if (!hasTmdbCredential || candidate.SearchQueries.Count == 0)
             {
+                if (hasTmdbCredential
+                    && await TryApplyExistingSeriesContinuationAnchorAsync(
+                        candidate,
+                        result,
+                        "no-usable-query",
+                        cancellationToken))
+                {
+                    continue;
+                }
+
                 if (hasPartOffsetCandidates)
                 {
                     var partOffsetSkippedReason = hasTmdbCredential
@@ -358,6 +368,15 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
             var bestCandidateIsAiRefinedTop1 = IsAiRefinedTitleQuery(bestCandidate?.QuerySource);
             if (aiRefinedYearGateBlockedCandidate)
             {
+                if (await TryApplyExistingSeriesContinuationAnchorAsync(
+                        candidate,
+                        result,
+                        "ai-refined-year-conflict",
+                        cancellationToken))
+                {
+                    continue;
+                }
+
                 if (hasPartOffsetCandidates)
                 {
                     var partOffsetSkippedReason = FirstNonEmpty(aiRefinedYearGateBlockedReason, "ai-refined-series-not-safe");
@@ -380,6 +399,15 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
             if (bestCandidate is null || (!bestCandidateIsAiRefinedTop1 && bestCandidate.Confidence < MinimumAutoMatchConfidence))
             {
+                if (await TryApplyExistingSeriesContinuationAnchorAsync(
+                        candidate,
+                        result,
+                        bestCandidate is null ? "no-result" : "below-threshold",
+                        cancellationToken))
+                {
+                    continue;
+                }
+
                 if (hasPartOffsetCandidates)
                 {
                     var partOffsetSkippedReason = GetPartOffsetNotEvaluatedReason(candidate, bestCandidate);
@@ -406,6 +434,15 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
 
             if (!bestCandidateIsAiRefinedTop1 && bestCandidate.Confidence < MatchedConfidence)
             {
+                if (await TryApplyExistingSeriesContinuationAnchorAsync(
+                        candidate,
+                        result,
+                        "needs-review-not-auto-applied",
+                        cancellationToken))
+                {
+                    continue;
+                }
+
                 if (hasPartOffsetCandidates)
                 {
                     MarkPartOffsetSkipped(candidate.UnsupportedFiles.Where(IsPartOffsetCandidate), "ai-refined-series-not-safe");
@@ -795,6 +832,245 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         return value.Length >= 2 && value[0] == '"' && value[^1] == '"'
             ? value[1..^1]
             : value;
+    }
+
+    private async Task<bool> TryApplyExistingSeriesContinuationAnchorAsync(
+        TvSeasonCandidate candidate,
+        TvSeasonIdentificationRunResult result,
+        string triggerReason,
+        CancellationToken cancellationToken)
+    {
+        if (!ShouldTryExistingSeriesContinuationAnchor(candidate))
+        {
+            return false;
+        }
+
+        var anchor = await ResolveExistingSeriesContinuationAnchorAsync(candidate, cancellationToken);
+        if (anchor is null)
+        {
+            return false;
+        }
+
+        TmdbTvSeriesDetailResult? seriesDetails = null;
+        TmdbTvSeasonDetailResult? seasonDetails = null;
+        try
+        {
+            seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(
+                anchor.TmdbSeriesId,
+                cancellationToken: cancellationToken);
+            seasonDetails = await _tmdbService.GetTvSeasonDetailsAsync(
+                anchor.TmdbSeriesId,
+                candidate.SeasonNumber,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-continuation-anchor-error tmdbId={anchor.TmdbSeriesId} season={candidate.SeasonNumber} triggerReason={ScanIdentificationDiagnostics.FormatValue(triggerReason)} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
+            result.Summary.AddWarning("TV.ContinuationAnchor", TrimMessage(exception.Message));
+            return false;
+        }
+
+        var skippedReason = GetContinuationAnchorSkippedReason(candidate, seasonDetails);
+        if (!string.IsNullOrWhiteSpace(skippedReason))
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-continuation-anchor-skipped directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} tmdbId={anchor.TmdbSeriesId} title={ScanIdentificationDiagnostics.FormatValue(anchor.Name)} season={candidate.SeasonNumber} triggerReason={ScanIdentificationDiagnostics.FormatValue(triggerReason)} skippedReason={ScanIdentificationDiagnostics.FormatValue(skippedReason)} anchorSeasonCount={anchor.ExistingSeasonCount} anchorSourceCount={anchor.ExistingSourceCount}");
+            return false;
+        }
+
+        try
+        {
+            var searchItem = BuildSearchItemFromContinuationAnchor(anchor, seriesDetails);
+            await UpsertMatchedSeasonAsync(
+                candidate,
+                searchItem,
+                1d,
+                seriesDetails,
+                seasonDetails,
+                IdentificationStatus.Matched,
+                cancellationToken);
+            await _metadataHydrationService.HydrateSeriesAsync(
+                anchor.TmdbSeriesId,
+                cancellationToken: cancellationToken);
+            result.Summary.BoundCount++;
+
+            var episodeNumbers = GetCandidateEpisodeNumbers(candidate);
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-continuation-anchor-applied directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} tmdbId={anchor.TmdbSeriesId} title={ScanIdentificationDiagnostics.FormatValue(searchItem.Name)} season={candidate.SeasonNumber} files={candidate.Files.Count} episodeRange={ScanIdentificationDiagnostics.FormatValue(FormatNumberRange(episodeNumbers.FirstOrDefault(), episodeNumbers.LastOrDefault()))} triggerReason={ScanIdentificationDiagnostics.FormatValue(triggerReason)} anchorSeasonCount={anchor.ExistingSeasonCount} anchorSourceCount={anchor.ExistingSourceCount} finalDecision=tv-match-existing-series-continuation");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-continuation-anchor-apply-error tmdbId={anchor.TmdbSeriesId} title={ScanIdentificationDiagnostics.FormatValue(anchor.Name)} season={candidate.SeasonNumber} triggerReason={ScanIdentificationDiagnostics.FormatValue(triggerReason)} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
+            result.Summary.AddError("TV.ContinuationAnchor", TrimMessage(exception.Message));
+            return false;
+        }
+    }
+
+    private async Task<ExistingSeriesContinuationAnchor?> ResolveExistingSeriesContinuationAnchorAsync(
+        TvSeasonCandidate candidate,
+        CancellationToken cancellationToken)
+    {
+        var currentMediaFileIds = candidate.Files
+            .Select(x => x.MediaFileId)
+            .ToHashSet();
+
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var rows = await dbContext.MediaFiles
+            .AsNoTracking()
+            .Where(
+                x => x.SourceConnectionId == candidate.SourceConnectionId
+                     && x.MediaType == MediaType.Video
+                     && !x.IsDeleted
+                     && x.EpisodeId.HasValue
+                     && x.Episode != null
+                     && x.Episode.Season != null
+                     && (x.Episode.Season.IdentificationStatus == IdentificationStatus.Matched
+                         || x.Episode.Season.IdentificationStatus == IdentificationStatus.ManualConfirmed)
+                     && x.Episode.Season.Series != null
+                     && x.Episode.Season.Series.TmdbSeriesId.HasValue
+                     && x.Episode.Season.Series.TmdbSeriesId.Value > 0)
+            .Select(
+                x => new ExistingSeriesContinuationAnchorSource
+                {
+                    MediaFileId = x.Id,
+                    FilePath = x.FilePath,
+                    TmdbSeriesId = x.Episode!.Season!.Series!.TmdbSeriesId!.Value,
+                    SeriesName = x.Episode.Season.Series.Name,
+                    OriginalName = x.Episode.Season.Series.OriginalName ?? string.Empty,
+                    PosterRemoteUrl = x.Episode.Season.Series.PosterRemoteUrl ?? string.Empty,
+                    FirstAirDate = x.Episode.Season.Series.FirstAirDate,
+                    FirstAirYear = x.Episode.Season.Series.FirstAirYear,
+                    OriginalLanguage = x.Episode.Season.Series.Language ?? string.Empty,
+                    Country = x.Episode.Season.Series.Country ?? string.Empty,
+                    SeasonNumber = x.Episode.Season.SeasonNumber
+                })
+            .ToListAsync(cancellationToken);
+
+        var contextualRows = rows
+            .Where(x => !currentMediaFileIds.Contains(x.MediaFileId))
+            .Where(x => IsSameOrSiblingDirectory(candidate.DirectoryPath, x.FilePath))
+            .ToList();
+        if (contextualRows.Count == 0)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-continuation-anchor-skipped directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} triggerReason=context-scan skippedReason=no-existing-recognized-series-context");
+            return null;
+        }
+
+        var groups = contextualRows
+            .GroupBy(x => x.TmdbSeriesId)
+            .OrderByDescending(x => x.Select(y => y.SeasonNumber).Distinct().Count())
+            .ThenByDescending(x => x.Count())
+            .ToList();
+        if (groups.Count != 1)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-continuation-anchor-skipped directory={ScanIdentificationDiagnostics.FormatPath(candidate.DirectoryPath)} season={candidate.SeasonNumber} triggerReason=context-scan skippedReason=multiple-existing-series-contexts anchorSeriesCount={groups.Count}");
+            return null;
+        }
+
+        var selected = groups[0]
+            .OrderByDescending(x => x.SeasonNumber)
+            .ThenByDescending(x => x.MediaFileId)
+            .First();
+        return new ExistingSeriesContinuationAnchor(
+            selected.TmdbSeriesId,
+            selected.SeriesName,
+            selected.OriginalName,
+            selected.PosterRemoteUrl,
+            selected.FirstAirDate,
+            selected.FirstAirYear,
+            selected.OriginalLanguage,
+            selected.Country,
+            groups[0].Select(x => x.SeasonNumber).Distinct().Count(),
+            groups[0].Select(x => x.MediaFileId).Distinct().Count());
+    }
+
+    private static bool ShouldTryExistingSeriesContinuationAnchor(TvSeasonCandidate candidate)
+    {
+        return candidate.IsStrongTvContext
+               && candidate.SeasonNumber > 0
+               && candidate.Files.Count >= 2
+               && GetCandidateEpisodeNumbers(candidate).Length >= 2;
+    }
+
+    private static string GetContinuationAnchorSkippedReason(
+        TvSeasonCandidate candidate,
+        TmdbTvSeasonDetailResult? seasonDetails)
+    {
+        if (seasonDetails is null)
+        {
+            return "tmdb-season-detail-unavailable";
+        }
+
+        var episodeNumbers = GetCandidateEpisodeNumbers(candidate);
+        if (episodeNumbers.Length < 2)
+        {
+            return "insufficient-episode-number-evidence";
+        }
+
+        var tmdbEpisodeNumbers = GetTmdbSeasonEpisodeNumbers(seasonDetails);
+        if (tmdbEpisodeNumbers.Count > 0)
+        {
+            return episodeNumbers.Any(x => !tmdbEpisodeNumbers.Contains(x))
+                ? "episode-not-in-tmdb-season"
+                : string.Empty;
+        }
+
+        var tmdbSeasonEpisodeCount = GetTmdbSeasonEpisodeCount(seasonDetails);
+        if (!tmdbSeasonEpisodeCount.HasValue)
+        {
+            return "tmdb-season-episode-unavailable";
+        }
+
+        return episodeNumbers[^1] > tmdbSeasonEpisodeCount.Value
+            ? "episode-number-exceeds-tmdb-season"
+            : string.Empty;
+    }
+
+    private static int[] GetCandidateEpisodeNumbers(TvSeasonCandidate candidate)
+    {
+        return candidate.Files
+            .Select(x => x.ParseResult.EpisodeNumber)
+            .Where(x => x > 0)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToArray();
+    }
+
+    private static TmdbTvSeriesSearchItem BuildSearchItemFromContinuationAnchor(
+        ExistingSeriesContinuationAnchor anchor,
+        TmdbTvSeriesDetailResult? seriesDetails)
+    {
+        return new TmdbTvSeriesSearchItem
+        {
+            TmdbId = anchor.TmdbSeriesId,
+            Name = FirstNonEmpty(seriesDetails?.Name, anchor.Name, $"TV {anchor.TmdbSeriesId}"),
+            OriginalName = FirstNonEmpty(seriesDetails?.OriginalName, anchor.OriginalName),
+            Overview = seriesDetails?.Overview ?? string.Empty,
+            PosterRemoteUrl = FirstNonEmpty(seriesDetails?.PosterRemoteUrl, anchor.PosterRemoteUrl),
+            BackdropRemoteUrl = seriesDetails?.BackdropRemoteUrl ?? string.Empty,
+            FirstAirDate = FirstNonEmpty(
+                seriesDetails?.FirstAirDate,
+                anchor.FirstAirDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            FirstAirYear = seriesDetails?.FirstAirYear ?? anchor.FirstAirYear,
+            OriginalLanguage = FirstNonEmpty(seriesDetails?.OriginalLanguage, anchor.OriginalLanguage),
+            OriginCountries = seriesDetails?.OriginCountries.Count > 0
+                ? seriesDetails.OriginCountries
+                : SplitCountryList(anchor.Country),
+            TmdbRating = seriesDetails?.TmdbRating,
+            TmdbVoteCount = seriesDetails?.TmdbVoteCount
+        };
+    }
+
+    private static IReadOnlyList<string> SplitCountryList(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static IReadOnlyList<string> BuildChineseStructureHints(string folderName, IEnumerable<string> fileNames)
@@ -2996,6 +3272,43 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         int? SeriesYearHint = null,
         int? SeasonYearHint = null,
         int? SeasonNumberHint = null);
+
+    private sealed class ExistingSeriesContinuationAnchorSource
+    {
+        public int MediaFileId { get; set; }
+
+        public string FilePath { get; set; } = string.Empty;
+
+        public int TmdbSeriesId { get; set; }
+
+        public string SeriesName { get; set; } = string.Empty;
+
+        public string OriginalName { get; set; } = string.Empty;
+
+        public string PosterRemoteUrl { get; set; } = string.Empty;
+
+        public DateTime? FirstAirDate { get; set; }
+
+        public int? FirstAirYear { get; set; }
+
+        public string OriginalLanguage { get; set; } = string.Empty;
+
+        public string Country { get; set; } = string.Empty;
+
+        public int SeasonNumber { get; set; }
+    }
+
+    private sealed record ExistingSeriesContinuationAnchor(
+        int TmdbSeriesId,
+        string Name,
+        string OriginalName,
+        string PosterRemoteUrl,
+        DateTime? FirstAirDate,
+        int? FirstAirYear,
+        string OriginalLanguage,
+        string Country,
+        int ExistingSeasonCount,
+        int ExistingSourceCount);
 
     private sealed record AiRefinedYearGateResult(bool Checked, int? YearDiff, bool Blocked, string Reason)
     {

@@ -21,7 +21,6 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string FilterAll = "全部";
     private const string WatchedFilterWatched = "已看";
     private const string WatchedFilterUnwatched = "未看";
-    private const string WatchedFilterNotInterested = "不想看";
     private const string LibraryScopeAll = "全部";
     private const string SourceFilterAll = "全部来源";
     private const string SourceFilterLocal = "本地";
@@ -29,6 +28,10 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string CollectionStatusFavorite = "喜爱";
     private const string CollectionStatusWantToWatch = "想看";
     private const string CollectionStatusNotInterested = "不想看";
+    private const string ContentTypeAll = "全部";
+    private const string ContentTypeMovie = "电影";
+    private const string ContentTypeTv = "电视剧";
+    private const string ContentTypeOther = "其他";
     private const string TagCategoryType = "类型标签";
     private const string TagCategoryEmotion = "情绪标签";
     private const string TagCategoryScene = "场景标签";
@@ -87,6 +90,9 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly ILibraryPreferencesService _libraryPreferencesService;
     private readonly List<LibraryMovieListItem> _allMovies = [];
     private readonly HashSet<string> _selectedItemKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedCollectionStatusFilters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _selectedContentTypeFilters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _selectedDecadeFilters = new(StringComparer.Ordinal);
     private readonly object _refreshGate = new();
     private readonly HashSet<string> _queuedRefreshReasons = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _refreshDebounceCts;
@@ -109,7 +115,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private string _selectedLibraryScope = LibraryScopeAll;
     private string _selectedSourceFilter = SourceFilterAll;
     private string _selectedCollectionStatusFilter = FilterAll;
-    private string _selectedContentTypeFilter = "全部";
+    private string _selectedContentTypeFilter = ContentTypeAll;
     private string _selectedDecadeFilter = DecadeAll;
     private bool _isUpdatingTagSelection;
     private bool _isPosterView = true;
@@ -160,11 +166,13 @@ public sealed class LibraryViewModel : PageViewModelBase
         SortDirectionOptions = ["降序", "升序"];
         StatusOptions = [FilterAll, StatusMatched, StatusNeedsReview, StatusManualConfirmed, StatusFailed, StatusPending];
 
-        WatchedFilterOptions = [FilterAll, WatchedFilterWatched, WatchedFilterUnwatched, WatchedFilterNotInterested];
+        WatchedFilterOptions = [FilterAll, WatchedFilterWatched, WatchedFilterUnwatched];
         LibraryScopeOptions = [LibraryScopeAll, LibraryScopeWithSource, LibraryScopeWithoutSource];
         SourceFilterOptions = [SourceFilterAll, SourceFilterLocal, SourceFilterWebDav];
         CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested];
-        ContentTypeOptions = ["全部", "电影", "电视剧", "其他"];
+        ContentTypeOptions = [ContentTypeAll, ContentTypeMovie, ContentTypeTv, ContentTypeOther];
+        ResetContentTypeFilterToDefault();
+        RefreshContentTypeFilterState(applyFilters: false);
         SwitchToPosterViewCommand = new RelayCommand(() => SetLibraryLayout(isPosterView: true));
         SwitchToListViewCommand = new RelayCommand(() => SetLibraryLayout(isPosterView: false));
         SelectSortOptionCommand = new RelayCommand(SelectSortOption);
@@ -245,6 +253,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     public IReadOnlyList<string> CollectionStatusOptions { get; }
 
     public IReadOnlyList<string> ContentTypeOptions { get; }
+
+    public event EventHandler? RequestCloseFilterMenu;
 
     public RelayCommand SwitchToPosterViewCommand { get; }
 
@@ -493,6 +503,14 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public string ContentTypeButtonText => $"影视：{SelectedContentTypeFilter}";
 
+    public bool IsContentTypeAllSelected => _selectedContentTypeFilters.Count == 0;
+
+    public bool IsContentTypeMovieSelected => _selectedContentTypeFilters.Contains(ContentTypeMovie);
+
+    public bool IsContentTypeTvSelected => _selectedContentTypeFilters.Contains(ContentTypeTv);
+
+    public bool IsContentTypeOtherSelected => _selectedContentTypeFilters.Contains(ContentTypeOther);
+
     public string TagFilterMenuHeader
     {
         get
@@ -507,6 +525,14 @@ public sealed class LibraryViewModel : PageViewModelBase
     }
 
     public string CollectionStatusMenuHeader => $"收藏状态：{SelectedCollectionStatusFilter}";
+
+    public bool IsCollectionStatusAllSelected => _selectedCollectionStatusFilters.Count == 0;
+
+    public bool IsCollectionStatusFavoriteSelected => _selectedCollectionStatusFilters.Contains(CollectionStatusFavorite);
+
+    public bool IsCollectionStatusWantToWatchSelected => _selectedCollectionStatusFilters.Contains(CollectionStatusWantToWatch);
+
+    public bool IsCollectionStatusNotInterestedSelected => _selectedCollectionStatusFilters.Contains(CollectionStatusNotInterested);
 
     public string TagFilterButtonText
     {
@@ -523,6 +549,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public string WatchedFilterButtonText => $"观看状态：{SelectedWatchedFilter}";
 
+
     private static string FormatSourceFilterForButton(string value)
     {
         return string.Equals(value, SourceFilterAll, StringComparison.Ordinal) ? FilterAll : value;
@@ -531,6 +558,13 @@ public sealed class LibraryViewModel : PageViewModelBase
     private static string FormatDecadeFilterForButton(string value)
     {
         return string.Equals(value, DecadeAll, StringComparison.Ordinal) ? FilterAll : value;
+    }
+
+    public bool IsDecadeFilterSelected(string option)
+    {
+        return string.Equals(option, DecadeAll, StringComparison.Ordinal)
+            ? _selectedDecadeFilters.Count == 0
+            : _selectedDecadeFilters.Contains(option);
     }
 
     public bool IsPosterView
@@ -1448,13 +1482,16 @@ public sealed class LibraryViewModel : PageViewModelBase
         SearchText = string.Empty;
         SetSubmittedSearchText(string.Empty);
         GenreFilterText = string.Empty;
-        SelectedDecadeFilter = DecadeAll;
+        _selectedDecadeFilters.Clear();
+        RefreshDecadeFilterState(applyFilters: false);
         SelectedStatusFilter = FilterAll;
         SelectedWatchedFilter = FilterAll;
         SelectedLibraryScope = LibraryScopeAll;
         SelectedSourceFilter = SourceFilterAll;
-        SelectedCollectionStatusFilter = FilterAll;
-        SelectedContentTypeFilter = "全部";
+        _selectedCollectionStatusFilters.Clear();
+        RefreshCollectionStatusFilterState(applyFilters: false);
+        ResetContentTypeFilterToDefault();
+        RefreshContentTypeFilterState(applyFilters: false);
         ClearTagFilter(applyFilters: false);
         SelectedSortOption = "最近更新";
         SelectedSortDirection = "降序";
@@ -1520,34 +1557,171 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private void SelectContentType(object? parameter)
     {
-        if (parameter is string contentType && ContentTypeOptions.Contains(contentType))
+        if (parameter is not string contentType || !ContentTypeOptions.Contains(contentType))
         {
-            SelectedContentTypeFilter = contentType;
+            return;
         }
+
+        UpdateMultiSelectFilter(
+            contentType,
+            ContentTypeAll,
+            ContentTypeOptions,
+            _selectedContentTypeFilters,
+            RefreshContentTypeFilterState);
+    }
+
+    private void ResetContentTypeFilterToDefault()
+    {
+        _selectedContentTypeFilters.Clear();
+        _selectedContentTypeFilters.Add(ContentTypeMovie);
+        _selectedContentTypeFilters.Add(ContentTypeTv);
     }
 
     private void SelectDecadeFilter(object? parameter)
     {
-        if (parameter is string decade && DecadeFilterOptions.Contains(decade))
+        if (parameter is not string decade || !DecadeFilterOptions.Contains(decade))
         {
-            SelectedDecadeFilter = decade;
+            return;
         }
+
+        UpdateMultiSelectFilter(
+            decade,
+            DecadeAll,
+            DecadeFilterOptions,
+            _selectedDecadeFilters,
+            RefreshDecadeFilterState);
     }
 
     private void SelectWatchedFilter(object? parameter)
     {
-        if (parameter is string watchedFilter && WatchedFilterOptions.Contains(watchedFilter))
+        if (parameter is not string watchedFilter || !WatchedFilterOptions.Contains(watchedFilter))
         {
-            SelectedWatchedFilter = watchedFilter;
+            return;
         }
+
+        SelectedWatchedFilter = watchedFilter;
     }
 
     private void SelectCollectionStatus(object? parameter)
     {
-        if (parameter is string status && CollectionStatusOptions.Contains(status))
+        if (parameter is not string status || !CollectionStatusOptions.Contains(status))
         {
-            SelectedCollectionStatusFilter = status;
+            return;
         }
+
+        UpdateMultiSelectFilter(
+            status,
+            FilterAll,
+            CollectionStatusOptions,
+            _selectedCollectionStatusFilters,
+            RefreshCollectionStatusFilterState,
+            resetWhenAllNonAllSelected: false);
+    }
+
+    private void UpdateMultiSelectFilter(
+        string option,
+        string allOption,
+        IReadOnlyList<string> allOptions,
+        HashSet<string> selectedOptions,
+        Action<bool> refreshState,
+        bool resetWhenAllNonAllSelected = true)
+    {
+        var closeMenu = false;
+        if (string.Equals(option, allOption, StringComparison.Ordinal))
+        {
+            selectedOptions.Clear();
+            closeMenu = true;
+        }
+        else if (!selectedOptions.Remove(option))
+        {
+            selectedOptions.Add(option);
+        }
+
+        var nonAllCount = allOptions.Count(value => !string.Equals(value, allOption, StringComparison.Ordinal));
+        if (resetWhenAllNonAllSelected && selectedOptions.Count >= nonAllCount)
+        {
+            selectedOptions.Clear();
+            closeMenu = true;
+        }
+
+        refreshState(true);
+        if (closeMenu)
+        {
+            RequestCloseFilterMenu?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void RefreshContentTypeFilterState(bool applyFilters)
+    {
+        _selectedContentTypeFilter = FormatMultiSelectFilterForButton(
+            _selectedContentTypeFilters,
+            ContentTypeOptions,
+            ContentTypeAll);
+        OnPropertyChanged(nameof(SelectedContentTypeFilter));
+        OnPropertyChanged(nameof(ContentTypeButtonText));
+        OnPropertyChanged(nameof(IsContentTypeAllSelected));
+        OnPropertyChanged(nameof(IsContentTypeMovieSelected));
+        OnPropertyChanged(nameof(IsContentTypeTvSelected));
+        OnPropertyChanged(nameof(IsContentTypeOtherSelected));
+        if (applyFilters)
+        {
+            ApplyFilters();
+        }
+    }
+
+    private void RefreshDecadeFilterState(bool applyFilters)
+    {
+        _selectedDecadeFilter = FormatMultiSelectFilterForButton(
+            _selectedDecadeFilters,
+            DecadeFilterOptions,
+            DecadeAll);
+        OnPropertyChanged(nameof(SelectedDecadeFilter));
+        OnPropertyChanged(nameof(DecadeButtonText));
+        if (applyFilters)
+        {
+            ApplyFilters();
+        }
+    }
+
+    private void RefreshCollectionStatusFilterState(bool applyFilters)
+    {
+        _selectedCollectionStatusFilter = FormatMultiSelectFilterForButton(
+            _selectedCollectionStatusFilters,
+            CollectionStatusOptions,
+            FilterAll);
+        OnPropertyChanged(nameof(SelectedCollectionStatusFilter));
+        OnPropertyChanged(nameof(CollectionStatusMenuHeader));
+        OnPropertyChanged(nameof(CollectionStatusButtonText));
+        OnPropertyChanged(nameof(IsCollectionStatusAllSelected));
+        OnPropertyChanged(nameof(IsCollectionStatusFavoriteSelected));
+        OnPropertyChanged(nameof(IsCollectionStatusWantToWatchSelected));
+        OnPropertyChanged(nameof(IsCollectionStatusNotInterestedSelected));
+        if (applyFilters)
+        {
+            ApplyFilters();
+        }
+    }
+
+    private static string FormatMultiSelectFilterForButton(
+        IReadOnlySet<string> selectedOptions,
+        IReadOnlyList<string> optionOrder,
+        string allOption)
+    {
+        if (selectedOptions.Count == 0)
+        {
+            return string.Equals(allOption, DecadeAll, StringComparison.Ordinal) ? DecadeAll : FilterAll;
+        }
+
+        var ordered = optionOrder
+            .Where(option => !string.Equals(option, allOption, StringComparison.Ordinal)
+                             && selectedOptions.Contains(option))
+            .ToList();
+        if (ordered.Count <= 2)
+        {
+            return string.Join(" / ", ordered);
+        }
+
+        return $"{ordered.Count} 项";
     }
 
     private void ClearTagFilter()
@@ -1709,9 +1883,10 @@ public sealed class LibraryViewModel : PageViewModelBase
             DecadeFilterOptions.Add(option);
         }
 
-        if (!DecadeFilterOptions.Contains(SelectedDecadeFilter))
+        var removedCount = _selectedDecadeFilters.RemoveWhere(option => !DecadeFilterOptions.Contains(option));
+        if (removedCount > 0)
         {
-            SelectedDecadeFilter = DecadeAll;
+            RefreshDecadeFilterState(applyFilters: false);
         }
     }
 
@@ -1765,13 +1940,10 @@ public sealed class LibraryViewModel : PageViewModelBase
             query = query.Where(item => item.GenresText.Contains(genreKeyword, StringComparison.OrdinalIgnoreCase));
         }
 
-        query = SelectedContentTypeFilter switch
+        if (_selectedContentTypeFilters.Count > 0)
         {
-            "电影" => query.Where(item => item.IsMovie),
-            "电视剧" => query.Where(item => item.IsSeries || item.IsSeason),
-            "其他" => query.Where(item => item.IsOther),
-            _ => query
-        };
+            query = query.Where(item => _selectedContentTypeFilters.Any(filter => MatchesContentTypeFilter(item, filter)));
+        }
 
         foreach (var tag in TypeTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
         {
@@ -1788,9 +1960,13 @@ public sealed class LibraryViewModel : PageViewModelBase
             query = query.Where(item => HasSelectedTag(item, TagCategoryScene, tag));
         }
 
-        if (TryParseDecadeFilter(SelectedDecadeFilter, out var decadeStart))
+        if (_selectedDecadeFilters.Count > 0)
         {
-            query = query.Where(item => item.ReleaseYear >= decadeStart && item.ReleaseYear < decadeStart + 10);
+            query = query.Where(
+                item => _selectedDecadeFilters.Any(
+                    filter => TryParseDecadeFilter(filter, out var decadeStart)
+                              && item.ReleaseYear >= decadeStart
+                              && item.ReleaseYear < decadeStart + 10));
         }
 
         query = SelectedStatusFilter switch
@@ -1807,17 +1983,13 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             WatchedFilterWatched => query.Where(item => item.IsWatched),
             WatchedFilterUnwatched => query.Where(item => !item.IsWatched),
-            WatchedFilterNotInterested => query.Where(item => item.IsNotInterested),
             _ => query
         };
 
-        query = SelectedCollectionStatusFilter switch
+        if (_selectedCollectionStatusFilters.Count > 0)
         {
-            CollectionStatusFavorite => query.Where(item => item.IsFavorite),
-            CollectionStatusWantToWatch => query.Where(item => item.IsWantToWatch),
-            CollectionStatusNotInterested => query.Where(item => item.IsNotInterested),
-            _ => query
-        };
+            query = query.Where(item => _selectedCollectionStatusFilters.Any(filter => MatchesCollectionStatusFilter(item, filter)));
+        }
 
         query = SelectedLibraryScope switch
         {
@@ -1919,6 +2091,28 @@ public sealed class LibraryViewModel : PageViewModelBase
         };
 
         return tags.Any(tag => string.Equals(tag, selectedTag, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool MatchesContentTypeFilter(LibraryMovieListItem item, string filter)
+    {
+        return filter switch
+        {
+            ContentTypeMovie => item.IsMovie,
+            ContentTypeTv => item.IsSeries || item.IsSeason,
+            ContentTypeOther => item.IsOther,
+            _ => true
+        };
+    }
+
+    private static bool MatchesCollectionStatusFilter(LibraryMovieListItem item, string filter)
+    {
+        return filter switch
+        {
+            CollectionStatusFavorite => item.IsFavorite,
+            CollectionStatusWantToWatch => item.IsWantToWatch,
+            CollectionStatusNotInterested => item.IsNotInterested,
+            _ => true
+        };
     }
 
     private static void ApplyExternalTagCache(IEnumerable<LibraryMovieListItem> items)

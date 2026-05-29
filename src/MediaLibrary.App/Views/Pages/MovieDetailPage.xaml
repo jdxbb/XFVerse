@@ -19,7 +19,11 @@
             <Border Style="{StaticResource PageCardStyle}">
                 <Grid Height="360">
                     <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="20">
-                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                        <Grid>
+                            <Control IsHitTestVisible="False"
+                                     Template="{StaticResource PosterPlaceholderTemplate}" />
+                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>

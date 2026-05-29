@@ -19,7 +19,11 @@
             <Border Style="{StaticResource PageCardStyle}">
                 <Grid Height="320">
                     <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="18">
-                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}" Stretch="UniformToFill" />
+                        <Grid>
+                            <Control IsHitTestVisible="False"
+                                     Template="{StaticResource PosterPlaceholderTemplate}" />
+                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}" Stretch="UniformToFill" />
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>
@@ -131,7 +135,11 @@
                                         </Grid.ColumnDefinitions>
 
                                         <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="12">
-                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}" Stretch="UniformToFill" />
+                                            <Grid>
+                                                <Control IsHitTestVisible="False"
+                                                         Template="{StaticResource PosterPlaceholderTemplate}" />
+                                                <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}" Stretch="UniformToFill" />
+                                            </Grid>
                                         </Border>
 
                                         <StackPanel Grid.Column="2" Margin="0,0,18,0">

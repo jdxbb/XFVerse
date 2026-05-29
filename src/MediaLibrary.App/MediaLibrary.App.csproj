@@ -15,6 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Assets\poster-placeholder.png" />
+    <Resource Include="Assets\poster-placeholder.png" />
     <Content Include="Assets\WatchPersonas\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>Assets\WatchPersonas\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>

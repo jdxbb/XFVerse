@@ -48,28 +48,13 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
         var moviesQuery = dbContext.Movies.AsNoTracking();
-        var inLibraryMoviesQuery = moviesQuery
-            .Where(x => x.MediaFiles.Any(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video));
         var movieCount = await moviesQuery.CountAsync(cancellationToken);
         var sourceCount = await dbContext.MediaFiles.AsNoTracking()
             .CountAsync(x => x.MediaType == MediaType.Video && !x.IsDeleted, cancellationToken);
         var watchedCount = await moviesQuery.CountAsync(x => x.IsWatched, cancellationToken);
         var favoriteCount = await moviesQuery.CountAsync(x => x.IsFavorite, cancellationToken);
 
-        var recentlyAdded = await inLibraryMoviesQuery
-            .OrderByDescending(x => x.CreatedAt)
-            .Take(8)
-            .Select(
-                x => new HomeMovieItem
-                {
-                    MovieId = x.Id,
-                    Title = x.Title,
-                    ReleaseYear = x.ReleaseYear,
-                    PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
-                    GenresText = x.GenresText ?? string.Empty,
-                    Time = x.CreatedAt
-                })
-            .ToListAsync(cancellationToken);
+        var recentlyAdded = await GetRecentlyAddedAsync(dbContext, cancellationToken);
 
         var favorites = await moviesQuery
             .Where(x => x.IsFavorite)
@@ -129,23 +114,8 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
 
         var moviesQuery = dbContext.Movies.AsNoTracking();
-        var inLibraryMoviesQuery = moviesQuery
-            .Where(x => x.MediaFiles.Any(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video));
 
-        var recentlyAdded = await inLibraryMoviesQuery
-            .OrderByDescending(x => x.CreatedAt)
-            .Take(8)
-            .Select(
-                x => new HomeMovieItem
-                {
-                    MovieId = x.Id,
-                    Title = x.Title,
-                    ReleaseYear = x.ReleaseYear,
-                    PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
-                    GenresText = x.GenresText ?? string.Empty,
-                    Time = x.CreatedAt
-                })
-            .ToListAsync(cancellationToken);
+        var recentlyAdded = await GetRecentlyAddedAsync(dbContext, cancellationToken);
 
         var latestLog = await dbContext.ScanTaskLogs
             .AsNoTracking()
@@ -230,6 +200,77 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
             .GroupBy(x => x.EpisodeId.HasValue ? $"episode:{x.EpisodeId.Value}" : $"movie:{x.MovieId}", StringComparer.OrdinalIgnoreCase)
             .Take(6)
             .Select(BuildRecentlyPlayedItem)
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<HomeMovieItem>> GetRecentlyAddedAsync(
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var movieRows = await dbContext.Movies
+            .AsNoTracking()
+            .Where(x => x.MediaFiles.Any(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video))
+            .Select(
+                x => new RecentlyAddedRow
+                {
+                    MovieId = x.Id,
+                    Title = x.Title,
+                    ReleaseYear = x.ReleaseYear,
+                    PosterRemoteUrl = x.PosterRemoteUrl ?? string.Empty,
+                    GenresText = x.GenresText ?? string.Empty,
+                    Time = x.MediaFiles
+                        .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                        .Select(mediaFile => (DateTime?)mediaFile.CreatedAt)
+                        .Max() ?? x.CreatedAt
+                })
+            .ToListAsync(cancellationToken);
+
+        var seasonRows = await dbContext.TvSeasons
+            .AsNoTracking()
+            .Where(
+                x => x.Episodes.Any(
+                    episode => episode.MediaFiles.Any(
+                        mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)))
+            .Select(
+                x => new RecentlyAddedRow
+                {
+                    MovieId = 0,
+                    TvSeasonId = x.Id,
+                    TvSeriesId = x.TvSeriesId,
+                    SeasonNumber = x.SeasonNumber,
+                    Title = x.Series!.Name,
+                    SeasonTitle = x.Name,
+                    ReleaseYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
+                    PosterRemoteUrl = x.PosterRemoteUrl ?? x.Series.PosterRemoteUrl ?? string.Empty,
+                    GenresText = x.Series.GenresText ?? string.Empty,
+                    Time = x.Episodes
+                        .SelectMany(episode => episode.MediaFiles)
+                        .Where(mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video)
+                        .Select(mediaFile => (DateTime?)mediaFile.CreatedAt)
+                        .Max() ?? x.CreatedAt
+                })
+            .ToListAsync(cancellationToken);
+
+        return movieRows
+            .Concat(seasonRows)
+            .OrderByDescending(x => x.Time)
+            .ThenBy(x => x.Title)
+            .Take(8)
+            .Select(
+                x => new HomeMovieItem
+                {
+                    MovieId = x.MovieId,
+                    TvSeasonId = x.TvSeasonId,
+                    TvSeriesId = x.TvSeriesId,
+                    SeasonNumber = x.SeasonNumber,
+                    Title = x.TvSeasonId.HasValue
+                        ? BuildSeasonTitle(x.Title, x.SeasonTitle, x.SeasonNumber)
+                        : x.Title,
+                    ReleaseYear = x.ReleaseYear,
+                    PosterRemoteUrl = x.PosterRemoteUrl,
+                    GenresText = x.GenresText,
+                    Time = x.Time
+                })
             .ToList();
     }
 
@@ -423,6 +464,15 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
         return Math.Clamp(Math.Round(positionSeconds * 100d / durationSeconds.Value, 1), 0d, 100d);
     }
 
+    private static string BuildSeasonTitle(string seriesTitle, string seasonTitle, int seasonNumber)
+    {
+        var normalizedSeries = string.IsNullOrWhiteSpace(seriesTitle) ? "未命名电视剧" : seriesTitle.Trim();
+        var normalizedSeason = string.IsNullOrWhiteSpace(seasonTitle) ? $"S{seasonNumber:D2}" : seasonTitle.Trim();
+        return normalizedSeason.Contains(normalizedSeries, StringComparison.OrdinalIgnoreCase)
+            ? normalizedSeason
+            : $"{normalizedSeries} {normalizedSeason}";
+    }
+
     private static IReadOnlyList<ChartSliceItem> BuildGenreDistribution(IEnumerable<string?> genres)
     {
         var groups = genres
@@ -484,6 +534,29 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
         {
             item.Percent = total == 0 ? 0 : Math.Round(item.Count * 100d / total, 1);
         }
+    }
+
+    private sealed class RecentlyAddedRow
+    {
+        public int MovieId { get; set; }
+
+        public int? TvSeasonId { get; set; }
+
+        public int? TvSeriesId { get; set; }
+
+        public int SeasonNumber { get; set; }
+
+        public string Title { get; set; } = string.Empty;
+
+        public string SeasonTitle { get; set; } = string.Empty;
+
+        public int? ReleaseYear { get; set; }
+
+        public string PosterRemoteUrl { get; set; } = string.Empty;
+
+        public string GenresText { get; set; } = string.Empty;
+
+        public DateTime Time { get; set; }
     }
 
     private sealed class RecentHistoryRow

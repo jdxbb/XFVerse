@@ -255,7 +255,10 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
                 return "未识别剧集候选";
             }
 
-            return Movie.IsOther ? DetailHintText : string.Empty;
+            var hint = Movie.IsOther ? DetailHintText : string.Empty;
+            return string.Equals(hint, CategoryTagText, StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : hint;
         }
     }
 
@@ -367,6 +370,7 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
             if (SetProperty(ref _isBatchSelectionMode, value))
             {
                 OnPropertyChanged(nameof(SelectionDotVisible));
+                OnPropertyChanged(nameof(BatchModeHintText));
                 OnPropertyChanged(nameof(HasBatchModeHint));
             }
         }

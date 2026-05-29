@@ -662,3 +662,34 @@ Noise:
 - `library-poster-virtualization` events are intentionally rate-limited aggregate layout evidence. A small number of repeated entries during viewport settle or scroll is expected.
 - `library-render-ready` measures dispatcher render readiness after refresh completion; it can include normal WPF layout / composition scheduling time and is not a database query duration.
 - Current Phase 4.15 logs are aggregate count / duration diagnostics and should not be treated as item-level audit logs.
+
+## TV Scan Continuation Anchor Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- The continuation anchor only applies to new unbound TV season candidates. It deliberately does not rewrite already attached Episode bindings, including previously mis-grouped unknown Seasons; delete-record or manual correction remains the remediation path before rescan.
+- The anchor requires a unique already matched / manually confirmed sibling Season context from the same source connection. Ambiguous roots with multiple recognized Series, non-sibling layouts, Season 0 / specials, absolute episode numbering, and cross-season ranges still need dedicated correction or future mapping work.
+- The TMDB target Season detail must confirm the parsed Episode numbers. Missing TMDB Season detail or Episode-number mismatch still falls back to placeholder / review instead of auto-binding.
+
+Noise:
+
+- `tv-continuation-anchor-*` diagnostics are decision evidence only. Skipped anchor logs are expected for low-confidence TV candidates that do not have a unique recognized sibling Series context.
+
+## TV / Media Library Follow-up Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- If future scans still reshuffle unchanged TV / Movie cards in "recently updated" order, audit whether binding helpers are updating `MediaFile.UpdatedAt` for association-only or metadata-only changes. If so, split source-content recency from metadata / binding recency in a later scoped phase.
+- Home recently-added now shows TV seasons as season-level entries. Episode-level recently-added cards remain deferred unless the home page product spec explicitly asks for episode granularity.
+
+Noise:
+
+- The visible media-library sort intentionally does not use raw Movie / TV Series / TV Season metadata `UpdatedAt`, because those fields may be touched by scan metadata refresh and are not reliable evidence of a user-visible library update.

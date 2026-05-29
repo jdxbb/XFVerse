@@ -19,6 +19,33 @@
         <Setter Property="LineHeight" Value="{StaticResource LineHeightCaption}" />
     </Style>
 
+    <Style x:Key="PosterPlaceholderLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+        <Setter Property="Foreground" Value="#F7F7F5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.9" />
+    </Style>
+
+    <ControlTemplate x:Key="PosterPlaceholderTemplate" TargetType="{x:Type Control}">
+        <Grid ClipToBounds="True"
+              SnapsToDevicePixels="True">
+            <Image Source="pack://application:,,,/MediaLibrary.App;component/Assets/poster-placeholder.png"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   SnapsToDevicePixels="True"
+                   Stretch="UniformToFill" />
+            <Grid IsHitTestVisible="False">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="0.4*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="0.6*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="1"
+                           HorizontalAlignment="Center"
+                           Text="无海报"
+                           Style="{StaticResource PosterPlaceholderLabelTextStyle}" />
+            </Grid>
+        </Grid>
+    </ControlTemplate>
+
     <Style x:Key="MonospacePathTextStyle" TargetType="TextBlock" BasedOn="{StaticResource TruncatedTextBlockStyle}">
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyMono}" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeMetadata}" />

@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -11,7 +14,17 @@ namespace MediaLibrary.App.Helpers;
 public static class PosterPaletteShadowBehavior
 {
     private const int HueBucketCount = 18;
+    private const int MaxShadowColorCacheEntries = 2048;
+    private const int PaletteDiagnosticsSampleInterval = 20;
     private static readonly Color FallbackShadowColor = Color.FromRgb(25, 34, 48);
+    private static readonly TimeSpan PaletteDiagnosticsMinimumInterval = TimeSpan.FromMilliseconds(900);
+    private static readonly object DiagnosticsSync = new();
+    private static readonly ConcurrentDictionary<string, Color> ShadowColorCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentQueue<string> ShadowColorCacheOrder = new();
+    private static int _paletteDiagnosticsEventCount;
+    private static long _paletteDiagnosticsTotalTicks;
+    private static long _paletteDiagnosticsMaxTicks;
+    private static long _lastPaletteDiagnosticsTimestamp;
 
     public static readonly DependencyProperty TargetNameProperty =
         DependencyProperty.RegisterAttached(
@@ -134,18 +147,36 @@ public static class PosterPaletteShadowBehavior
 
     private static void ApplyShadowColor(Image image)
     {
-        if (ResolveTargetElement(image) is not UIElement target
-            || target.Effect is not DropShadowEffect effect)
+        var startedAt = Stopwatch.GetTimestamp();
+        var source = image.Source;
+        if (ResolveTargetElement(image) is not UIElement target)
         {
             return;
         }
 
-        var shadowColor = TryGetPosterShadowColor(image.Source, out var color)
+        var hasPaletteColor = TryGetPosterShadowColor(source, out var color);
+        var shadowColor = hasPaletteColor
             ? color
             : FallbackShadowColor;
-        var mutableEffect = effect.CloneCurrentValue();
-        mutableEffect.Color = shadowColor;
-        target.SetCurrentValue(UIElement.EffectProperty, mutableEffect);
+        var targetKind = "none";
+        if (target is Image shadowImage)
+        {
+            targetKind = "cached-image";
+            PosterCachedShadowBehavior.SetShadowColor(shadowImage, shadowColor);
+        }
+        else if (target.Effect is DropShadowEffect effect)
+        {
+            targetKind = "live-effect";
+            var mutableEffect = effect.CloneCurrentValue();
+            mutableEffect.Color = shadowColor;
+            target.SetCurrentValue(UIElement.EffectProperty, mutableEffect);
+        }
+        else
+        {
+            return;
+        }
+
+        RecordPaletteShadowDiagnostics(source, Stopwatch.GetElapsedTime(startedAt), hasPaletteColor, targetKind);
     }
 
     private static UIElement? ResolveTargetElement(Image image)
@@ -189,6 +220,12 @@ public static class PosterPaletteShadowBehavior
         if (source is not BitmapSource bitmap || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
         {
             return false;
+        }
+
+        var cacheKey = BuildShadowColorCacheKey(bitmap);
+        if (ShadowColorCache.TryGetValue(cacheKey, out color))
+        {
+            return true;
         }
 
         try
@@ -266,16 +303,19 @@ public static class PosterPaletteShadowBehavior
             var averageLuminance = visiblePixelCount <= 0 ? 0 : luminanceTotal / visiblePixelCount;
             if (TryCreateDominantHueShadowColor(hueBuckets, visiblePixelCount, chromaticWeightTotal, out color))
             {
+                TryCacheShadowColor(cacheKey, color);
                 return true;
             }
 
             if (averageLuminance < 58 && chromaticWeightTotal < visiblePixelCount * 0.9)
             {
                 color = CreateDarkNeutralShadowColor(averageLuminance);
+                TryCacheShadowColor(cacheKey, color);
                 return true;
             }
 
             color = CreateTintedShadowColor(red / weightTotal, green / weightTotal, blue / weightTotal);
+            TryCacheShadowColor(cacheKey, color);
             return true;
         }
         catch
@@ -283,6 +323,77 @@ public static class PosterPaletteShadowBehavior
             color = FallbackShadowColor;
             return false;
         }
+    }
+
+    private static string BuildShadowColorCacheKey(BitmapSource bitmap)
+    {
+        return $"{RuntimeHelpers.GetHashCode(bitmap):X}:{bitmap.PixelWidth}x{bitmap.PixelHeight}:{bitmap.Format}";
+    }
+
+    private static void TryCacheShadowColor(string cacheKey, Color color)
+    {
+        if (ShadowColorCache.TryAdd(cacheKey, color))
+        {
+            ShadowColorCacheOrder.Enqueue(cacheKey);
+            while (ShadowColorCache.Count > MaxShadowColorCacheEntries
+                   && ShadowColorCacheOrder.TryDequeue(out var oldestKey))
+            {
+                ShadowColorCache.TryRemove(oldestKey, out _);
+            }
+        }
+    }
+
+    private static void RecordPaletteShadowDiagnostics(ImageSource? source, TimeSpan elapsed, bool hasPaletteColor, string targetKind)
+    {
+        string message;
+        lock (DiagnosticsSync)
+        {
+            _paletteDiagnosticsEventCount++;
+            _paletteDiagnosticsTotalTicks += elapsed.Ticks;
+            _paletteDiagnosticsMaxTicks = Math.Max(_paletteDiagnosticsMaxTicks, elapsed.Ticks);
+
+            var now = Stopwatch.GetTimestamp();
+            var isSlow = elapsed.TotalMilliseconds >= 8d;
+            if (!isSlow
+                && (_paletteDiagnosticsEventCount < PaletteDiagnosticsSampleInterval
+                    || (_lastPaletteDiagnosticsTimestamp > 0
+                        && Stopwatch.GetElapsedTime(_lastPaletteDiagnosticsTimestamp, now) < PaletteDiagnosticsMinimumInterval)))
+            {
+                return;
+            }
+
+            var sampleCount = Math.Max(1, _paletteDiagnosticsEventCount);
+            var averageMs = TimeSpan.FromTicks(_paletteDiagnosticsTotalTicks / sampleCount).TotalMilliseconds;
+            var maxMs = TimeSpan.FromTicks(_paletteDiagnosticsMaxTicks).TotalMilliseconds;
+            message =
+                $"source={GetImageSourceId(source)} target={targetKind} pixels={GetPixelSize(source)} " +
+                $"elapsedMs={elapsed.TotalMilliseconds:0} avgMs={averageMs:0} maxMs={maxMs:0} samples={sampleCount} " +
+                $"computed={hasPaletteColor.ToString().ToLowerInvariant()} slow={isSlow.ToString().ToLowerInvariant()}";
+
+            _paletteDiagnosticsEventCount = 0;
+            _paletteDiagnosticsTotalTicks = 0;
+            _paletteDiagnosticsMaxTicks = 0;
+            _lastPaletteDiagnosticsTimestamp = now;
+        }
+
+        PosterCacheDiagnostics.Write("palette-shadow", message);
+    }
+
+    private static string GetImageSourceId(ImageSource? source)
+    {
+        return source switch
+        {
+            BitmapImage { UriSource: { } uriSource } => PosterCacheDiagnostics.SourceId(uriSource.ToString()),
+            BitmapSource bitmap => $"bitmap:{bitmap.PixelWidth}x{bitmap.PixelHeight}",
+            _ => "none"
+        };
+    }
+
+    private static string GetPixelSize(ImageSource? source)
+    {
+        return source is BitmapSource bitmap
+            ? $"{bitmap.PixelWidth}x{bitmap.PixelHeight}"
+            : "0x0";
     }
 
     private static bool TryCreateDominantHueShadowColor(
