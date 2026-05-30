@@ -370,6 +370,34 @@ Suggested commit message:
 
 - `Phase 7.3b movie detail baseline`
 
+### 7.3c - Series And Season Details
+
+Completed:
+
+- Rebuilt `SeriesOverviewPage` into the Phase 7 detail-page layout: poster hero, unified back affordance, title/original title, status chips, overview, base metadata, source summary, collection action and Season list.
+- Rebuilt `TvSeasonDetailPage` around poster hero, unified back affordance, season status chips, overview, metadata, season user-state actions, correction entry and Episode list.
+- Kept recognized, unrecognized, metadata-only, no-source and grouped-placeholder detail states on the existing TV read models; no TV query semantics were changed.
+- Kept Episode list actions wired to the existing detail, play and watched-state commands, including disabled play behavior for episodes without playable sources.
+- Kept Season correction as an in-page overlay using existing commands and services, and converted visible Season-correction status/button text to Chinese.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false` passed with 0 warnings and 0 errors during implementation.
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors at closeout.
+
+Explicit non-goals:
+
+- no Episode detail visual rebuild in this slice;
+- no player menu, subtitle-management or P61-01 local cache work;
+- no scan / AI recognition threshold changes;
+- no TV query service or correction service semantic changes;
+- no delete-record / move-out detail actions;
+- no Core service, recommendation algorithm, database schema, migration, database update, commit or push.
+
+Suggested commit message:
+
+- `Phase 7.3c series and season detail baseline`
+
 ### 7.2-post-closeout follow-up - Poster Edges, Home AI, TV Coverage, Stable Library Sort
 
 Completed:

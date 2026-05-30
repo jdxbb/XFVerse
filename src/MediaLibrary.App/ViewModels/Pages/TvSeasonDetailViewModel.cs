@@ -377,9 +377,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public bool IsSeasonCorrectionTargetUnknown => _selectedSeasonCorrectionTargetKind == SeasonCorrectionTargetUnknown;
 
-    public string SeasonCorrectionRecognizedTargetButtonText => IsSeasonCorrectionTargetRecognized ? "Selected: recognized season" : "Correct to recognized season";
+    public string SeasonCorrectionRecognizedTargetButtonText => IsSeasonCorrectionTargetRecognized ? "已选择：修正到已识别季" : "修正到已识别季";
 
-    public string SeasonCorrectionUnknownTargetButtonText => IsSeasonCorrectionTargetUnknown ? "Selected: existing unknown season" : "Correct to existing unknown season";
+    public string SeasonCorrectionUnknownTargetButtonText => IsSeasonCorrectionTargetUnknown ? "已选择：加入已有未识别季" : "加入已有未识别季";
 
     public bool HasSelectedSeasonCorrectionTarget =>
         IsSeasonCorrectionTargetRecognized
@@ -857,8 +857,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
         OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
         SeasonCorrectionStatusMessage = IsSeasonCorrectionTargetRecognized
-            ? "Target: recognized season."
-            : "Target: existing unknown season.";
+            ? "目标类型：已识别季。"
+            : "目标类型：已有未识别季。";
         UpdateSeasonCorrectionConfirmation();
         RaiseSeasonCorrectionCommandStates();
     }
@@ -1057,14 +1057,14 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     {
         if (!IsSeasonCorrectionTargetUnknown)
         {
-            SeasonCorrectionStatusMessage = "Switch to existing unknown season target first.";
+            SeasonCorrectionStatusMessage = "请先切换到加入已有未识别季。";
             return;
         }
 
         try
         {
             IsSeasonCorrectionBusy = true;
-            SeasonCorrectionStatusMessage = "Loading existing unknown seasons...";
+            SeasonCorrectionStatusMessage = "正在加载已有未识别季...";
             UnknownSeasonSeriesGroups.Clear();
             OnPropertyChanged(nameof(HasUnknownSeasonTargets));
             _selectedUnknownSeasonTarget = null;
@@ -1086,14 +1086,14 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             OnPropertyChanged(nameof(HasUnknownSeasonTargets));
             IsUnknownSeasonPickerDialogOpen = true;
             SeasonCorrectionStatusMessage = UnknownSeasonSeriesGroups.Count == 0
-                ? "No existing unknown season target is available."
-                : $"Loaded {UnknownSeasonSeriesGroups.Count} unknown series groups.";
+                ? "没有可选择的已有未识别季。"
+                : $"已加载 {UnknownSeasonSeriesGroups.Count} 个未识别剧分组。";
         }
         catch (Exception exception)
         {
             UnknownSeasonSeriesGroups.Clear();
             OnPropertyChanged(nameof(HasUnknownSeasonTargets));
-            SeasonCorrectionStatusMessage = $"Load unknown seasons failed: {DescribeException(exception)}";
+            SeasonCorrectionStatusMessage = $"加载已有未识别季失败：{DescribeException(exception)}";
         }
         finally
         {
@@ -1118,13 +1118,13 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     {
         if (parameter is not UnknownTvSeasonCorrectionTargetItem target)
         {
-            SeasonCorrectionStatusMessage = "Choose a target unknown season.";
+            SeasonCorrectionStatusMessage = "请选择目标未识别季。";
             return;
         }
 
         if (_seasonId.HasValue && target.SeasonId == _seasonId.Value)
         {
-            SeasonCorrectionStatusMessage = "Source season cannot be selected as the target.";
+            SeasonCorrectionStatusMessage = "不能选择当前源季作为目标季。";
             return;
         }
 
@@ -1140,7 +1140,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(SeasonCorrectionRecognizedTargetButtonText));
         OnPropertyChanged(nameof(SeasonCorrectionUnknownTargetButtonText));
         OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
-        SeasonCorrectionStatusMessage = $"Selected unknown season: {target.DisplayTitle}.";
+        SeasonCorrectionStatusMessage = $"已选择未识别季：{target.DisplayTitle}。";
         UpdateSeasonCorrectionConfirmation();
         LogSeasonCorrectionPreview();
     }
@@ -1149,19 +1149,19 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     {
         if (!_seasonId.HasValue)
         {
-            SeasonCorrectionStatusMessage = "Source season is not loaded.";
+            SeasonCorrectionStatusMessage = "当前源季尚未加载。";
             return;
         }
 
         if (IsSeasonCorrectionTargetRecognized && _selectedRecognizedSeriesTarget is null)
         {
-            SeasonCorrectionStatusMessage = "Choose a target recognized TV series or season.";
+            SeasonCorrectionStatusMessage = "请选择目标已识别电视剧或季。";
             return;
         }
 
         if (IsSeasonCorrectionTargetUnknown && _selectedUnknownSeasonTarget is null)
         {
-            SeasonCorrectionStatusMessage = "Choose a target unknown season.";
+            SeasonCorrectionStatusMessage = "请选择目标未识别季。";
             return;
         }
 
@@ -1176,8 +1176,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             IsSeasonCorrectionBusy = true;
             SeasonCorrectionStatusMessage = IsSeasonCorrectionTargetRecognized
-                ? "Applying recognized season correction..."
-                : "Applying unknown season correction...";
+                ? "正在修正到已识别季..."
+                : "正在加入已有未识别季...";
             UnknownSeasonCorrectionApplyResult result;
             if (IsSeasonCorrectionTargetRecognized)
             {
@@ -1207,11 +1207,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             _navigationStateService.RequestTvSeasonDetail(result.TargetSeasonId);
             ClearSeasonCorrectionState();
             await ActivateAsync();
-            StatusMessage = $"Season correction applied. Moved {result.MovedSourceCount} sources; created {result.CreatedEpisodeCount} episodes.";
+            StatusMessage = $"季级修正完成，移动 {result.MovedSourceCount} 个播放源，新增 {result.CreatedEpisodeCount} 集。";
         }
         catch (Exception exception)
         {
-            SeasonCorrectionStatusMessage = $"Season correction failed: {DescribeException(exception)}";
+            SeasonCorrectionStatusMessage = $"季级修正失败：{DescribeException(exception)}";
         }
         finally
         {

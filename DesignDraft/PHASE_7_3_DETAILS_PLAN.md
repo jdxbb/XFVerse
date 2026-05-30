@@ -83,10 +83,14 @@ Implementation note: the 7.3b Movie correction surface is an in-page overlay usi
 
 ### 7.3c - Series And Season Details
 
+Status: completed 2026-05-30.
+
 - Rebuild Series and Season detail visual layout.
 - Keep recognized, unrecognized, metadata-only, no-source and grouped-placeholder states distinguishable.
 - Keep Season and Episode lists usable without changing TV query semantics.
 - Replace old text return affordances with the unified detail return pattern.
+
+Implementation note: 7.3c keeps the existing TV query, metadata hydration, Season collection actions, episode play/detail commands and season-correction services. It only updates Series / Season detail presentation and Chinese UI copy around the current Season correction overlay.
 
 ### 7.3d - Episode Detail
 
