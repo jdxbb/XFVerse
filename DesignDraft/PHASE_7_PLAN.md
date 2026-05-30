@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Plan
 
-Last updated: 2026-05-29
+Last updated: 2026-05-30
 
 ## Purpose
 
@@ -90,20 +90,29 @@ Design drafts are old visual references. They are useful for atmosphere, spacing
 | 7.2c | Complete | Batch-entry rule, batch toolbar, selection states and special-item hints. |
 | 7.2d | Complete | Removed-library in-page overlay, Movie / TV grouping, empty state, restore / detail / delete-record actions. |
 | 7.2e | Executed | Regression audit ran; some conclusions needed correction according to user-confirmed decisions. |
-| 7.2-final-assets | Current closeout | Missing-poster placeholder and logo asset hookup are the final resource closeout items. Current working tree has resource hookup work present; treat as pending final user review if not committed. |
-| Phase 7 documentation sync | Current docs stage | Create and maintain `PHASE_7_PLAN.md`, `PHASE_7_STAGE_LOG.md`, `PHASE_7_KNOWN_ISSUES.md`. |
+| 7.2-final-assets | Complete | Missing-poster placeholder and logo asset hookup were handled before the 7.3 detail phase; later poster-card work is tracked as 7.2 post-closeout follow-up polish. |
+| Phase 7 documentation sync | Complete | Created and maintains `PHASE_7_PLAN.md`, `PHASE_7_STAGE_LOG.md`, `PHASE_7_KNOWN_ISSUES.md`. |
+| 7.3 Plan | Complete | Detail-page phase plan created before implementation. |
+| 7.3a | Complete | Shared detail back affordance and origin / fallback behavior. |
+| 7.3b | Complete | Movie detail visual baseline and in-page Movie correction overlay. |
+| 7.3c | Complete | Series / Season detail visual baseline and in-page Season correction overlay. |
+| 7.3d | Complete | Episode detail visual baseline and in-page Episode correction overlay. |
+| 7.3e | Complete | Unified cross-page correction dialog shell for Movie, Season and Episode detail correction surfaces. |
+| 7.3f | Next | Detail regression closeout and 7.2 media-library smoke regression. |
 
 ## Later Phase Plan
 
 ### 7.3 Details
 
-Status: 7.3a, 7.3b and 7.3c completed. Detailed phase plan lives in `DesignDraft/PHASE_7_3_DETAILS_PLAN.md`.
+Status: 7.3a, 7.3b, 7.3c, 7.3d and 7.3e completed. Detailed phase plan lives in `DesignDraft/PHASE_7_3_DETAILS_PLAN.md`.
 
 Completed implementation slices:
 
 - 7.3a shared detail foundation;
 - 7.3b Movie detail visual baseline;
-- 7.3c Series / Season detail visual baseline.
+- 7.3c Series / Season detail visual baseline;
+- 7.3d Episode detail visual baseline;
+- 7.3e unified correction dialog shell.
 
 Scope:
 - MovieDetail, SeriesOverview, TvSeasonDetail and EpisodeDetail visual rebuild;
@@ -122,6 +131,10 @@ Not in scope:
 7.3b owns only the Movie detail page visual baseline and existing Movie correction entry presentation. It does not rebuild Series / Season / Episode details, does not add subtitle management to details, and does not change source, scan, player, recommendation, Core service, database schema or migration semantics.
 
 7.3c owns only the Series and Season detail visual baselines plus Chinese UI copy around existing Season correction controls. It does not rebuild Episode detail, does not change TV query or correction services, does not add subtitle / delete / move-out detail actions, and does not touch player, scan, recommendation, Core service, database schema or migration semantics.
+
+7.3d owns only the Episode detail visual baseline, source-list presentation and in-page correction overlay entry using existing Episode detail commands. It does not introduce subtitle management, delete-record / move-out detail actions, scan or AI threshold changes, source-service semantic changes, player work, Core query changes, database schema changes or migrations.
+
+7.3e owns only the shared correction dialog shell for existing Movie, Season and Episode correction overlays. It does not change correction ViewModels, candidate search, AI / TMDB matching, source split semantics, player / subtitle work, Core services, database schema or migrations.
 
 ### 7.4 Discovery
 

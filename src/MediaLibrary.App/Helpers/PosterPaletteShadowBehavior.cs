@@ -21,6 +21,8 @@ public static class PosterPaletteShadowBehavior
     private static readonly object DiagnosticsSync = new();
     private static readonly ConcurrentDictionary<string, Color> ShadowColorCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentQueue<string> ShadowColorCacheOrder = new();
+    private static readonly ConcurrentDictionary<string, Color> SourceShadowColorCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentQueue<string> SourceShadowColorCacheOrder = new();
     private static int _paletteDiagnosticsEventCount;
     private static long _paletteDiagnosticsTotalTicks;
     private static long _paletteDiagnosticsMaxTicks;
@@ -140,6 +142,21 @@ public static class PosterPaletteShadowBehavior
             return;
         }
 
+        if (TryApplyCachedSourceShadowColor(image))
+        {
+            return;
+        }
+
+        if (TryApplyCachedBitmapShadowColor(image))
+        {
+            return;
+        }
+
+        if (image.Source is null)
+        {
+            return;
+        }
+
         image.Dispatcher.BeginInvoke(
             () => ApplyShadowColor(image),
             DispatcherPriority.Loaded);
@@ -154,10 +171,53 @@ public static class PosterPaletteShadowBehavior
             return;
         }
 
-        var hasPaletteColor = TryGetPosterShadowColor(source, out var color);
-        var shadowColor = hasPaletteColor
-            ? color
-            : FallbackShadowColor;
+        var hasPaletteColor = TryGetPosterShadowColor(image, source, out var shadowColor);
+        if (!hasPaletteColor)
+        {
+            return;
+        }
+
+        ApplyShadowColorToTarget(target, shadowColor, source, hasPaletteColor, startedAt);
+    }
+
+    private static bool TryApplyCachedSourceShadowColor(Image image)
+    {
+        if (!TryGetRequestedSourceKey(image, out var sourceKey) ||
+            !SourceShadowColorCache.TryGetValue(sourceKey, out var shadowColor) ||
+            ResolveTargetElement(image) is not UIElement target)
+        {
+            return false;
+        }
+
+        ApplyShadowColorToTarget(target, shadowColor, image.Source, hasPaletteColor: true, Stopwatch.GetTimestamp());
+        return true;
+    }
+
+    private static bool TryApplyCachedBitmapShadowColor(Image image)
+    {
+        if (image.Source is not BitmapSource bitmap ||
+            !ShadowColorCache.TryGetValue(BuildShadowColorCacheKey(bitmap), out var shadowColor) ||
+            ResolveTargetElement(image) is not UIElement target)
+        {
+            return false;
+        }
+
+        if (TryGetRequestedSourceKey(image, out var sourceKey))
+        {
+            TryCacheSourceShadowColor(sourceKey, shadowColor);
+        }
+
+        ApplyShadowColorToTarget(target, shadowColor, image.Source, hasPaletteColor: true, Stopwatch.GetTimestamp());
+        return true;
+    }
+
+    private static void ApplyShadowColorToTarget(
+        UIElement target,
+        Color shadowColor,
+        ImageSource? source,
+        bool hasPaletteColor,
+        long startedAt)
+    {
         var targetKind = "none";
         if (target is Image shadowImage)
         {
@@ -214,9 +274,15 @@ public static class PosterPaletteShadowBehavior
         return null;
     }
 
-    private static bool TryGetPosterShadowColor(ImageSource? source, out Color color)
+    private static bool TryGetPosterShadowColor(Image image, ImageSource? source, out Color color)
     {
         color = FallbackShadowColor;
+        var hasSourceKey = TryGetRequestedSourceKey(image, out var sourceKey);
+        if (hasSourceKey && SourceShadowColorCache.TryGetValue(sourceKey, out color))
+        {
+            return true;
+        }
+
         if (source is not BitmapSource bitmap || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
         {
             return false;
@@ -225,6 +291,11 @@ public static class PosterPaletteShadowBehavior
         var cacheKey = BuildShadowColorCacheKey(bitmap);
         if (ShadowColorCache.TryGetValue(cacheKey, out color))
         {
+            if (hasSourceKey)
+            {
+                TryCacheSourceShadowColor(sourceKey, color);
+            }
+
             return true;
         }
 
@@ -304,6 +375,11 @@ public static class PosterPaletteShadowBehavior
             if (TryCreateDominantHueShadowColor(hueBuckets, visiblePixelCount, chromaticWeightTotal, out color))
             {
                 TryCacheShadowColor(cacheKey, color);
+                if (hasSourceKey)
+                {
+                    TryCacheSourceShadowColor(sourceKey, color);
+                }
+
                 return true;
             }
 
@@ -311,11 +387,21 @@ public static class PosterPaletteShadowBehavior
             {
                 color = CreateDarkNeutralShadowColor(averageLuminance);
                 TryCacheShadowColor(cacheKey, color);
+                if (hasSourceKey)
+                {
+                    TryCacheSourceShadowColor(sourceKey, color);
+                }
+
                 return true;
             }
 
             color = CreateTintedShadowColor(red / weightTotal, green / weightTotal, blue / weightTotal);
             TryCacheShadowColor(cacheKey, color);
+            if (hasSourceKey)
+            {
+                TryCacheSourceShadowColor(sourceKey, color);
+            }
+
             return true;
         }
         catch
@@ -323,6 +409,19 @@ public static class PosterPaletteShadowBehavior
             color = FallbackShadowColor;
             return false;
         }
+    }
+
+    private static bool TryGetRequestedSourceKey(Image image, out string sourceKey)
+    {
+        sourceKey = string.Empty;
+        var requestedSource = PosterCacheImageBehavior.GetSource(image);
+        if (string.IsNullOrWhiteSpace(requestedSource))
+        {
+            return false;
+        }
+
+        sourceKey = requestedSource.Trim();
+        return sourceKey.Length > 0;
     }
 
     private static string BuildShadowColorCacheKey(BitmapSource bitmap)
@@ -339,6 +438,19 @@ public static class PosterPaletteShadowBehavior
                    && ShadowColorCacheOrder.TryDequeue(out var oldestKey))
             {
                 ShadowColorCache.TryRemove(oldestKey, out _);
+            }
+        }
+    }
+
+    private static void TryCacheSourceShadowColor(string sourceKey, Color color)
+    {
+        if (SourceShadowColorCache.TryAdd(sourceKey, color))
+        {
+            SourceShadowColorCacheOrder.Enqueue(sourceKey);
+            while (SourceShadowColorCache.Count > MaxShadowColorCacheEntries
+                   && SourceShadowColorCacheOrder.TryDequeue(out var oldestKey))
+            {
+                SourceShadowColorCache.TryRemove(oldestKey, out _);
             }
         }
     }

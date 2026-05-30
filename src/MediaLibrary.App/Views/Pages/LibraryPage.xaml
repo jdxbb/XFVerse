@@ -1619,11 +1619,34 @@
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Top">
                         <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
-                                <Setter Property="Visibility" Value="Visible" />
+                            <Style TargetType="Border" BasedOn="{StaticResource LoadingStateStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasMovies}" Value="True">
-                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    <DataTrigger Binding="{Binding ShowLibraryInitialLoading}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <TextBlock Text="正在加载媒体库..."
+                                       Style="{StaticResource EmptyStateTitleStyle}" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Text="正在读取媒体库内容和筛选状态。"
+                                       Style="{StaticResource InlineLoadingStyle}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1"
+                            Margin="0,18,0,0"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Top">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowLibraryEmptyState}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

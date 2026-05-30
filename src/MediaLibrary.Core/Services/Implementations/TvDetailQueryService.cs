@@ -443,6 +443,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     OverallBitrateKbps = x.OverallBitrateKbps,
                     VideoBitrateKbps = x.VideoBitrateKbps,
                     AudioBitrateKbps = x.AudioBitrateKbps,
+                    VideoFrameRate = x.VideoFrameRate,
                     MediaProbeStatus = x.MediaProbeStatus,
                     MediaProbeError = x.MediaProbeError,
                     MediaProbedAt = x.MediaProbedAt,
@@ -740,6 +741,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     OverallBitrateKbps = x.OverallBitrateKbps,
                     VideoBitrateKbps = x.VideoBitrateKbps,
                     AudioBitrateKbps = x.AudioBitrateKbps,
+                    VideoFrameRate = x.VideoFrameRate,
                     MediaProbeStatus = x.MediaProbeStatus,
                     MediaProbeError = x.MediaProbeError,
                     MediaProbedAt = x.MediaProbedAt,
@@ -881,6 +883,8 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         public int? VideoBitrateKbps { get; set; }
 
         public int? AudioBitrateKbps { get; set; }
+
+        public double? VideoFrameRate { get; set; }
 
         public MediaProbeStatus MediaProbeStatus { get; set; } = MediaProbeStatus.NotProbed;
 

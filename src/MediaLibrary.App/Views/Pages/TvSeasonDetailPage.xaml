@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.TvSeasonDetailPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
         <Style x:Key="TvDetailPillStyle" TargetType="Border">
@@ -34,21 +35,66 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Style="{StaticResource PageCardStyle}">
-                <Grid Height="360">
-                    <Border Background="{DynamicResource BrushSurfaceAlt}"
-                            CornerRadius="20"
-                            ClipToBounds="True">
-                        <Grid>
-                            <Control IsHitTestVisible="False"
-                                     Template="{StaticResource PosterPlaceholderTemplate}" />
-                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   Stretch="UniformToFill" />
-                        </Grid>
-                    </Border>
+            <Grid Width="240"
+                  Height="360"
+                  HorizontalAlignment="Left">
+                <Border x:Name="SeasonPosterClipMask"
+                        Background="White"
+                        CornerRadius="20"
+                        IsHitTestVisible="False" />
+                <Canvas ClipToBounds="False"
+                        IsHitTestVisible="False">
+                    <Image x:Name="SeasonPosterPaletteShadowHost"
+                           Width="360"
+                           Height="480"
+                           Canvas.Left="-60"
+                           Canvas.Top="-60"
+                           helpers:PosterCachedShadowBehavior.BlurRadius="30"
+                           helpers:PosterCachedShadowBehavior.CardHeight="360"
+                           helpers:PosterCachedShadowBehavior.CardWidth="240"
+                           helpers:PosterCachedShadowBehavior.CornerRadius="20"
+                           helpers:PosterCachedShadowBehavior.Direction="270"
+                           helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
+                           helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.40"
+                           helpers:PosterCachedShadowBehavior.Padding="60"
+                           helpers:PosterCachedShadowBehavior.QuantizeColor="True"
+                           helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
+                           helpers:PosterCachedShadowBehavior.ShadowDepth="8"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Stretch="Fill" />
+                    <Image Width="360"
+                           Height="480"
+                           Canvas.Left="-60"
+                           Canvas.Top="-60"
+                           helpers:PosterCachedShadowBehavior.BlurRadius="14"
+                           helpers:PosterCachedShadowBehavior.CardHeight="360"
+                           helpers:PosterCachedShadowBehavior.CardWidth="240"
+                           helpers:PosterCachedShadowBehavior.CornerRadius="20"
+                           helpers:PosterCachedShadowBehavior.Direction="270"
+                           helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.24"
+                           helpers:PosterCachedShadowBehavior.Padding="60"
+                           helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
+                           helpers:PosterCachedShadowBehavior.ShadowDepth="4"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Stretch="Fill" />
+                </Canvas>
+                <Grid>
+                    <Grid.OpacityMask>
+                        <VisualBrush Visual="{Binding ElementName=SeasonPosterClipMask}" />
+                    </Grid.OpacityMask>
+                    <Border Background="{DynamicResource BrushSurfaceAlt}" />
+                    <Control IsHitTestVisible="False"
+                             Template="{StaticResource PosterPlaceholderTemplate}" />
+                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="420"
+                           helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
+                           helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=SeasonPosterPaletteShadowHost}"
+                           helpers:PosterPaletteShadowBehavior.TargetName="SeasonPosterPaletteShadowHost"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Stretch="UniformToFill" />
                 </Grid>
-            </Border>
+            </Grid>
 
             <Border Grid.Column="2" Style="{StaticResource HeroCardStyle}">
                 <Grid>
@@ -424,56 +470,27 @@
             </Grid>
         </Border>
 
-        <Border Grid.RowSpan="3" Background="#99000000">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsSeasonCorrectionPanelOpen}" Value="True">
-                            <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <Border Width="880"
-                    MaxHeight="700"
-                    Padding="22"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource PageCardStyle}">
+        <controls:CorrectionDialogShell Grid.RowSpan="3"
+                                        DialogWidth="880"
+                                        DialogMaxHeight="700"
+                                        IsOpen="{Binding IsSeasonCorrectionPanelOpen}"
+                                        Title="季级识别修正"
+                                        Summary="修正只移动当前季已有播放源，不删除本地文件、WebDAV 文件或真实媒体源，也不会自动补空集。"
+                                        CloseCommand="{Binding CancelSeasonCorrectionCommand}"
+                                        UseDefaultActions="False">
+            <controls:CorrectionDialogShell.FooterContent>
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button Margin="0,0,8,0"
+                            Command="{Binding ApplySeasonCorrectionCommand}"
+                            Content="确认修正"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button Command="{Binding CancelSeasonCorrectionCommand}"
+                            Content="取消"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                </WrapPanel>
+            </controls:CorrectionDialogShell.FooterContent>
+            <controls:CorrectionDialogShell.DialogContent>
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="14" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="16" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="季级识别修正" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Style="{StaticResource BodyMutedTextStyle}"
-                                       Text="修正只移动当前季已有播放源，不删除本地文件、WebDAV 文件或真实媒体源，也不会自动补空集。"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Width="38"
-                                Command="{Binding CancelSeasonCorrectionCommand}"
-                                Content="&#xE711;"
-                                Style="{StaticResource DetailBackButtonStyle}"
-                                ToolTip="关闭" />
-                    </Grid>
-
-                    <ScrollViewer Grid.Row="2"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto">
-                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="330" />
                                 <ColumnDefinition Width="22" />
@@ -614,21 +631,9 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
-                        </Grid>
-                    </ScrollViewer>
-
-                    <WrapPanel Grid.Row="4" HorizontalAlignment="Right">
-                        <Button Margin="0,0,8,0"
-                                Command="{Binding ApplySeasonCorrectionCommand}"
-                                Content="确认修正"
-                                Style="{StaticResource PrimaryButtonStyle}" />
-                        <Button Command="{Binding CancelSeasonCorrectionCommand}"
-                                Content="取消"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                    </WrapPanel>
                 </Grid>
-            </Border>
-        </Border>
+            </controls:CorrectionDialogShell.DialogContent>
+        </controls:CorrectionDialogShell>
 
         <Border Grid.RowSpan="3" Background="#99000000">
             <Border.Style>

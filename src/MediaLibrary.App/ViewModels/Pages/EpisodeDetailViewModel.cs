@@ -40,6 +40,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     private string _episodeNumberText = "-";
     private string _titleText = "未选择剧集";
     private string _overview = "请先选择一个剧集。";
+    private string _stillDisplayUrl = string.Empty;
     private string _airDateText = "-";
     private string _runtimeText = "-";
     private string _watchedText = "-";
@@ -202,6 +203,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     public string TitleText { get => _titleText; private set => SetProperty(ref _titleText, value); }
 
     public string Overview { get => _overview; private set => SetProperty(ref _overview, value); }
+
+    public string StillDisplayUrl { get => _stillDisplayUrl; private set => SetProperty(ref _stillDisplayUrl, value); }
 
     public string AirDateText { get => _airDateText; private set => SetProperty(ref _airDateText, value); }
 
@@ -542,6 +545,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             EpisodeNumberText = model.EpisodeNumberText;
             TitleText = model.DisplayTitle;
             Overview = model.DisplayOverview;
+            StillDisplayUrl = model.StillDisplayUrl;
             AirDateText = model.AirDateText;
             RuntimeText = model.RuntimeText;
             WatchedText = model.WatchedText;
@@ -1880,6 +1884,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         EpisodeNumberText = "-";
         TitleText = "未选择剧集";
         Overview = "请先选择一个剧集。";
+        StillDisplayUrl = string.Empty;
         AirDateText = "-";
         RuntimeText = "-";
         WatchedText = "-";

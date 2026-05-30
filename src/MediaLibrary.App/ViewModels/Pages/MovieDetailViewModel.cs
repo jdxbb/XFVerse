@@ -41,10 +41,16 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private string _title = "未选择影片";
     private string _originalTitle = "-";
     private string _releaseYearText = "-";
+    private string _releaseDateText = "-";
     private string _overview = "请先从资源库中选择一部影片。";
     private string _posterRemoteUrl = string.Empty;
+    private string _posterDisplayUrl = string.Empty;
     private string _country = "-";
     private string _language = "-";
+    private string _directorText = "-";
+    private string _writerText = "-";
+    private string _actorsText = "-";
+    private string _productionCompanyText = "-";
     private string _runtimeText = "-";
     private string _genresText = "未提供";
     private string _aiTagsText = "尚未分类";
@@ -232,13 +238,25 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string ReleaseYearText { get => _releaseYearText; private set => SetProperty(ref _releaseYearText, value); }
 
+    public string ReleaseDateText { get => _releaseDateText; private set => SetProperty(ref _releaseDateText, value); }
+
     public string Overview { get => _overview; private set => SetProperty(ref _overview, value); }
 
     public string PosterRemoteUrl { get => _posterRemoteUrl; private set => SetProperty(ref _posterRemoteUrl, value); }
 
+    public string PosterDisplayUrl { get => _posterDisplayUrl; private set => SetProperty(ref _posterDisplayUrl, value); }
+
     public string Country { get => _country; private set => SetProperty(ref _country, value); }
 
     public string Language { get => _language; private set => SetProperty(ref _language, value); }
+
+    public string DirectorText { get => _directorText; private set => SetProperty(ref _directorText, value); }
+
+    public string WriterText { get => _writerText; private set => SetProperty(ref _writerText, value); }
+
+    public string ActorsText { get => _actorsText; private set => SetProperty(ref _actorsText, value); }
+
+    public string ProductionCompanyText { get => _productionCompanyText; private set => SetProperty(ref _productionCompanyText, value); }
 
     public string RuntimeText { get => _runtimeText; private set => SetProperty(ref _runtimeText, value); }
 
@@ -344,6 +362,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     }
 
     public string CorrectionSourceDisplay { get => _correctionSourceDisplay; private set => SetProperty(ref _correctionSourceDisplay, value); }
+
+    public string CorrectionSourceFileName { get => _correctionSourceFileName; private set => SetProperty(ref _correctionSourceFileName, value); }
+
+    public string CorrectionSourcePath { get => _correctionSourcePath; private set => SetProperty(ref _correctionSourcePath, value); }
 
     public string CorrectionPreviewText { get => _correctionPreviewText; private set => SetProperty(ref _correctionPreviewText, value); }
 
@@ -682,10 +704,18 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             TitleText = detail.Title;
             OriginalTitle = string.IsNullOrWhiteSpace(detail.OriginalTitle) ? "-" : detail.OriginalTitle;
             ReleaseYearText = detail.ReleaseYear?.ToString() ?? "-";
+            ReleaseDateText = detail.ReleaseDate.HasValue
+                ? detail.ReleaseDate.Value.ToString("yyyy-MM-dd")
+                : detail.ReleaseYear?.ToString() ?? "-";
             Overview = string.IsNullOrWhiteSpace(detail.Overview) ? "暂无简介。" : detail.Overview;
             PosterRemoteUrl = detail.PosterRemoteUrl;
+            PosterDisplayUrl = detail.PosterDisplayUrl;
             Country = string.IsNullOrWhiteSpace(detail.Country) ? "-" : detail.Country;
             Language = string.IsNullOrWhiteSpace(detail.Language) ? "-" : detail.Language;
+            DirectorText = string.IsNullOrWhiteSpace(detail.DirectorText) ? "-" : detail.DirectorText;
+            WriterText = string.IsNullOrWhiteSpace(detail.WriterText) ? "-" : detail.WriterText;
+            ActorsText = string.IsNullOrWhiteSpace(detail.ActorsText) ? "-" : detail.ActorsText;
+            ProductionCompanyText = string.IsNullOrWhiteSpace(detail.ProductionCompanyText) ? "-" : detail.ProductionCompanyText;
             RuntimeText = detail.RuntimeMinutes.HasValue ? $"{detail.RuntimeMinutes.Value} 分钟" : "-";
             GenresText = string.IsNullOrWhiteSpace(detail.GenresText) ? "未提供" : detail.GenresText;
             AiTagsText = string.IsNullOrWhiteSpace(detail.AiTagsText) ? "尚未分类" : detail.AiTagsText;
@@ -707,9 +737,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             ImdbIdText = string.IsNullOrWhiteSpace(detail.ImdbId) ? "-" : detail.ImdbId;
 
             Ratings.Clear();
-            foreach (var rating in detail.Ratings)
+            foreach (var rating in NormalizeDetailRatings(detail.Ratings))
             {
-                Ratings.Add(ToDisplayRating(rating));
+                Ratings.Add(rating);
             }
             NotifyRatingStateChanged();
 
@@ -733,6 +763,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                     : "暂无播放源 / 已入库";
             CanPlay = hasSources;
             PlayButtonText = CanPlay ? "播放默认源" : "暂无可播放源";
+            if (detail.TmdbId.HasValue && NeedsMovieCreditsHydration(detail))
+            {
+                _ = HydrateMovieCreditsForDisplayAsync(detail.MovieId, detail.TmdbId.Value, cancellationToken);
+            }
+
             if (!hasSources)
             {
                 SelectedDetailTabIndex = 0;
@@ -751,8 +786,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 SelectedDetailTabIndex = 0;
                 SelectedCorrectionTarget = CorrectionTargetMovieText;
                 CorrectionSourceDisplay = "请选择一个播放源。";
-                _correctionSourceFileName = string.Empty;
-                _correctionSourcePath = string.Empty;
+                CorrectionSourceFileName = string.Empty;
+                CorrectionSourcePath = string.Empty;
                 ClearCorrectionPreview();
                 OnPropertyChanged(nameof(HasSearchCandidates));
                 OnPropertyChanged(nameof(HasTvSearchCandidates));
@@ -764,8 +799,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             else if (_correctionMediaFileId.HasValue && Sources.All(source => source.MediaFileId != _correctionMediaFileId.Value))
             {
                 _correctionMediaFileId = null;
-                _correctionSourceFileName = string.Empty;
-                _correctionSourcePath = string.Empty;
+                CorrectionSourceFileName = string.Empty;
+                CorrectionSourcePath = string.Empty;
                 OnPropertyChanged(nameof(IsCorrectionPanelVisible));
                 ClearCorrectionPreview();
                 SearchCandidates.Clear();
@@ -1025,8 +1060,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         CurrentLibraryVisibilityState = recommendation.LibraryVisibilityState;
         SelectedDetailTabIndex = 0;
         _correctionMediaFileId = null;
-        _correctionSourceFileName = string.Empty;
-        _correctionSourcePath = string.Empty;
+        CorrectionSourceFileName = string.Empty;
+        CorrectionSourcePath = string.Empty;
         ClearCorrectionPreview();
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         _identificationStatus = IdentificationStatus.Pending;
@@ -1043,10 +1078,18 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         TitleText = recommendation.Title;
         OriginalTitle = string.IsNullOrWhiteSpace(recommendation.OriginalTitle) ? "-" : recommendation.OriginalTitle;
         ReleaseYearText = recommendation.ReleaseYear?.ToString() ?? "-";
+        ReleaseDateText = recommendation.ReleaseDate.HasValue
+            ? recommendation.ReleaseDate.Value.ToString("yyyy-MM-dd")
+            : recommendation.ReleaseYear?.ToString() ?? "-";
         Overview = string.IsNullOrWhiteSpace(recommendation.Overview) ? recommendation.Reason : recommendation.Overview;
         PosterRemoteUrl = recommendation.PosterRemoteUrl;
+        PosterDisplayUrl = recommendation.PosterRemoteUrl;
         Country = string.IsNullOrWhiteSpace(recommendation.Country) ? "-" : recommendation.Country;
         Language = string.IsNullOrWhiteSpace(recommendation.Language) ? "-" : recommendation.Language;
+        DirectorText = "-";
+        WriterText = "-";
+        ActorsText = "-";
+        ProductionCompanyText = "-";
         RuntimeText = recommendation.RuntimeMinutes.HasValue ? $"{recommendation.RuntimeMinutes.Value} 分钟" : "-";
         if (shouldAutoClassify)
         {
@@ -1088,6 +1131,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             Ratings.Add(ToDisplayRating(recommendation.OmdbRating));
         }
         NotifyRatingStateChanged();
+        if (recommendation.TmdbId.HasValue)
+        {
+            _ = HydrateMovieCreditsForDisplayAsync(null, recommendation.TmdbId.Value, cancellationToken);
+        }
 
         Sources.Clear();
         NotifySourceStateChanged();
@@ -1796,8 +1843,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         SelectedCorrectionTarget = CorrectionTargetMovieText;
         CorrectionSourceDisplay = $"{source.SourceTypeText} · {source.FileName}";
-        _correctionSourceFileName = source.FileName;
-        _correctionSourcePath = source.FilePath;
+        CorrectionSourceFileName = source.FileName;
+        CorrectionSourcePath = source.FilePath;
         ManualSearchQuery = string.IsNullOrWhiteSpace(ManualSearchQuery) ? TitleText : ManualSearchQuery;
         TvCorrectionQuery = string.IsNullOrWhiteSpace(TvCorrectionQuery) ? TitleText : TvCorrectionQuery;
         UnknownSeasonSearchQuery = string.IsNullOrWhiteSpace(UnknownSeasonSearchQuery) ? TitleText : UnknownSeasonSearchQuery;
@@ -1830,8 +1877,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private void CancelCorrection()
     {
         _correctionMediaFileId = null;
-        _correctionSourceFileName = string.Empty;
-        _correctionSourcePath = string.Empty;
+        CorrectionSourceFileName = string.Empty;
+        CorrectionSourcePath = string.Empty;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         SelectedDetailTabIndex = 0;
         SelectedCorrectionTarget = CorrectionTargetMovieText;
@@ -1899,6 +1946,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             SearchCandidates.Clear();
             foreach (var candidate in candidates)
             {
+                candidate.IsCurrentMatchedMovie = _tmdbId.HasValue && candidate.TmdbId == _tmdbId.Value;
                 SearchCandidates.Add(candidate);
             }
 
@@ -2039,7 +2087,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         return !IsCorrectionBusy
                && IsCorrectionPanelVisible
                && IsCorrectionTargetMovie
-               && parameter is MetadataSearchCandidate;
+               && parameter is MetadataSearchCandidate { IsCurrentMatchedMovie: false };
     }
 
     private async Task ApplyMovieCandidateCorrectionAsync(object? parameter)
@@ -2394,8 +2442,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private void ClearCorrectionAfterApply()
     {
         _correctionMediaFileId = null;
-        _correctionSourceFileName = string.Empty;
-        _correctionSourcePath = string.Empty;
+        CorrectionSourceFileName = string.Empty;
+        CorrectionSourcePath = string.Empty;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         SelectedDetailTabIndex = 0;
         SelectedCorrectionTarget = CorrectionTargetMovieText;
@@ -2500,10 +2548,16 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         TitleText = "未选择影片";
         OriginalTitle = "-";
         ReleaseYearText = "-";
+        ReleaseDateText = "-";
         Overview = "请先从资源库中选择一部影片。";
         PosterRemoteUrl = string.Empty;
+        PosterDisplayUrl = string.Empty;
         Country = "-";
         Language = "-";
+        DirectorText = "-";
+        WriterText = "-";
+        ActorsText = "-";
+        ProductionCompanyText = "-";
         RuntimeText = "-";
         GenresText = "未提供";
         AiTagsText = "尚未分类";
@@ -2531,7 +2585,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         SelectedUnknownSeasonTarget = null;
         IsUnknownSeasonPickerDialogOpen = false;
         _correctionMediaFileId = null;
-        _correctionSourceFileName = string.Empty;
+        CorrectionSourceFileName = string.Empty;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         SelectedDetailTabIndex = 0;
         SelectedCorrectionTarget = CorrectionTargetMovieText;
@@ -2646,6 +2700,92 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             : $"{exception.Message} Inner: {baseException.Message}";
     }
 
+    private async Task HydrateMovieCreditsForDisplayAsync(int? expectedMovieId, int tmdbId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var details = await _tmdbService.GetMovieDetailsAsync(tmdbId, cancellationToken);
+            if (details is null)
+            {
+                return;
+            }
+
+            if (expectedMovieId.HasValue)
+            {
+                if (_movieId != expectedMovieId.Value)
+                {
+                    return;
+                }
+            }
+            else if (_movieId.HasValue
+                     || _externalRecommendation?.TmdbId != tmdbId)
+            {
+                return;
+            }
+
+            ApplyMovieCreditsForDisplay(details);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            // 详情页主创补齐是展示增强，失败时保留已有影片详情，不打断页面使用。
+        }
+    }
+
+    private void ApplyMovieCreditsForDisplay(MetadataSearchCandidate details)
+    {
+        if (!string.IsNullOrWhiteSpace(details.DirectorText))
+        {
+            DirectorText = details.DirectorText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(details.WriterText))
+        {
+            WriterText = details.WriterText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(details.ActorsText))
+        {
+            ActorsText = details.ActorsText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(details.ProductionCompanyText))
+        {
+            ProductionCompanyText = details.ProductionCompanyText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(details.Country) && Country == "-")
+        {
+            Country = details.Country;
+        }
+
+        if (!string.IsNullOrWhiteSpace(details.Language) && Language == "-")
+        {
+            Language = details.Language;
+        }
+    }
+
+    private static bool NeedsMovieCreditsHydration(MovieDetailModel detail)
+    {
+        return string.IsNullOrWhiteSpace(detail.DirectorText)
+               || string.IsNullOrWhiteSpace(detail.WriterText)
+               || string.IsNullOrWhiteSpace(detail.ActorsText)
+               || string.IsNullOrWhiteSpace(detail.ProductionCompanyText);
+    }
+
+    private static IReadOnlyList<MovieRatingItem> NormalizeDetailRatings(IEnumerable<MovieRatingItem> ratings)
+    {
+        return ratings
+            .Select(ToDisplayRating)
+            .Where(rating => IsDetailRatingSource(rating.SourceName))
+            .GroupBy(rating => rating.SourceName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(rating => rating.LastUpdatedAt).First())
+            .OrderBy(rating => GetDetailRatingSourceOrder(rating.SourceName))
+            .ToList();
+    }
+
     private static MovieRatingItem ToDisplayRating(MovieRatingItem rating)
     {
         return new MovieRatingItem
@@ -2664,6 +2804,17 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         return string.Equals(sourceName, "OMDb", StringComparison.OrdinalIgnoreCase)
             ? "IMDb"
             : sourceName;
+    }
+
+    private static bool IsDetailRatingSource(string sourceName)
+    {
+        return string.Equals(sourceName, "TMDB", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(sourceName, "IMDb", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int GetDetailRatingSourceOrder(string sourceName)
+    {
+        return string.Equals(sourceName, "TMDB", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
     }
 
     private static string DescribeTmdbSearchFailure(Exception exception)

@@ -94,17 +94,25 @@ Implementation note: 7.3c keeps the existing TV query, metadata hydration, Seaso
 
 ### 7.3d - Episode Detail
 
+Status: completed 2026-05-30.
+
 - Rebuild Episode detail visual layout and source-list presentation.
 - Preserve play, default-source, manual probe, source split and watched-state commands.
 - Move correction from persistent tab / panel into the unified correction dialog entry.
 - Remove temporary stage wording from final UI copy.
 
+Implementation note: 7.3d keeps the existing Episode detail commands, source operations, watched-state command, source split warning flow and correction services. The Episode correction surface is now an in-page overlay using existing Episode correction commands. The fully shared cross-page correction-dialog shell remains 7.3e scope.
+
 ### 7.3e - Unified Correction Dialog
+
+Status: completed 2026-05-30.
 
 - Introduce one correction-dialog shell for Movie, Season, Episode and unknown/grouped detail contexts.
 - Reuse existing correction ViewModel/service capabilities.
 - Keep source split as a separate warning-confirmation flow.
 - Do not add delete, move-out or artificial aggregation actions to ordinary detail pages.
+
+Implementation note: 7.3e adds a shared `CorrectionDialogShell` for the Movie, Season and Episode detail correction overlays. The shell owns the overlay chrome, dialog card, title/summary area, close affordance, scroll container and footer action area; each page still supplies its existing correction body, commands, candidate collections, mapping fields and service behavior. Source split remains a separate warning-confirmation flow.
 
 ### 7.3f - Regression Closeout
 

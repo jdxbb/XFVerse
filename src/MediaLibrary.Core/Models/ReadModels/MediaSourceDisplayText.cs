@@ -11,6 +11,7 @@ internal static class MediaSourceDisplayText
     private const string UnknownVideoCodec = "编码未知";
     private const string UnknownAudio = "音频未知";
     private const string UnknownBitrate = "码率未知";
+    private const string UnknownFrameRate = "帧率未知";
 
     public static string FormatSourceType(ProtocolType protocolType)
     {
@@ -198,6 +199,19 @@ internal static class MediaSourceDisplayText
         return bitrateKbps.Value >= 1000
             ? string.Create(CultureInfo.InvariantCulture, $"{bitrateKbps.Value / 1000d:0.0} Mbps")
             : string.Create(CultureInfo.InvariantCulture, $"{bitrateKbps.Value} Kbps");
+    }
+
+    public static string FormatFrameRate(double? frameRate)
+    {
+        if (!frameRate.HasValue || frameRate.Value <= 0)
+        {
+            return UnknownFrameRate;
+        }
+
+        var value = frameRate.Value;
+        return value >= 100
+            ? string.Create(CultureInfo.InvariantCulture, $"{value:0} fps")
+            : string.Create(CultureInfo.InvariantCulture, $"{value:0.##} fps");
     }
 
     public static int? SelectDisplayBitrateKbps(

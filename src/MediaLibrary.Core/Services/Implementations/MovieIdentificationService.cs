@@ -1876,6 +1876,10 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         movie.PosterRemoteUrl = string.IsNullOrWhiteSpace(candidate.PosterRemoteUrl) ? null : candidate.PosterRemoteUrl;
         movie.Country = string.IsNullOrWhiteSpace(candidate.Country) ? null : candidate.Country;
         movie.Language = string.IsNullOrWhiteSpace(candidate.Language) ? null : candidate.Language;
+        movie.DirectorText = string.IsNullOrWhiteSpace(candidate.DirectorText) ? null : candidate.DirectorText;
+        movie.WriterText = string.IsNullOrWhiteSpace(candidate.WriterText) ? null : candidate.WriterText;
+        movie.ActorsText = string.IsNullOrWhiteSpace(candidate.ActorsText) ? null : candidate.ActorsText;
+        movie.ProductionCompanyText = string.IsNullOrWhiteSpace(candidate.ProductionCompanyText) ? null : candidate.ProductionCompanyText;
         movie.RuntimeMinutes = candidate.RuntimeMinutes;
         movie.TmdbId = candidate.TmdbId;
         movie.ImdbId = string.IsNullOrWhiteSpace(candidate.ImdbId) ? null : candidate.ImdbId;

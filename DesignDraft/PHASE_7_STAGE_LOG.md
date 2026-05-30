@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Stage Log
 
-Last updated: 2026-05-29
+Last updated: 2026-05-30
 
 This is the living Phase 7 handoff log. Keep entries concise and stage-oriented. Do not turn this into a full code diff.
 
@@ -281,9 +281,9 @@ Suggested commit message:
 - 7.1 complete.
 - 7.2a-d complete.
 - 7.2e audit executed.
-- 7.2-final-assets is the active closeout item in the current working tree.
-- After user review of resource hookup and this documentation sync, Phase 7.2 can close if no blockers remain.
-- Recommended next major phase: 7.3 Plan / Audit for detail pages.
+- 7.2-final-assets and subsequent poster / Home / library polish follow-ups have been handled as post-closeout work.
+- 7.3 Plan, 7.3a, 7.3b, 7.3c, 7.3d and 7.3e are complete.
+- Recommended next detail stage: 7.3f regression closeout.
 
 ## Maintenance Rule
 
@@ -398,6 +398,80 @@ Suggested commit message:
 
 - `Phase 7.3c series and season detail baseline`
 
+### 7.3d - Episode Detail
+
+Completed:
+
+- Rebuilt `EpisodeDetailPage` into the Phase 7 detail-page layout: still / placeholder hero, unified back affordance, episode status chips, overview, single-episode metadata, primary actions, state summary and source list.
+- Added Episode still-image binding through the existing poster-cache image behavior, while keeping the shared placeholder beneath missing still images. The detail still image uses an explicit 640px decode width so the 420px-wide hero image does not fall back to the shared 240px poster-cache default.
+- Replaced the old persistent Episode detail tab / correction panel presentation with an in-page correction overlay entry.
+- Preserved existing Episode commands for play, source play, set default source, manual probe, source split, watched state, refresh and correction.
+- Kept unknown-season selection as a nested overlay inside the existing Episode correction flow.
+- Removed temporary stage wording from the final Episode detail UI surface.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false` passed with 0 warnings and 0 errors during implementation.
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors at closeout.
+
+Explicit non-goals:
+
+- no shared cross-page correction-dialog shell beyond the Episode page overlay; that remains 7.3e;
+- no subtitle-management, online subtitle, player menu or P61-01 local-cache work;
+- no scan / AI recognition threshold changes;
+- no source, TV query or correction service semantic changes;
+- no delete-record / move-out detail actions;
+- no Core service, database schema, migration, database update, commit or push.
+
+Suggested commit message:
+
+- `Phase 7.3d episode detail baseline`
+
+### 7.3 Navigation Follow-up - Library First-load State
+
+Completed:
+
+- Fixed a 7.3a navigation timing regression where entering the media library from Home could show the real empty-state placeholder before the first library refresh completed.
+- Added a media-library initial-loading gate so the first render shows a loading state until the first library query finishes.
+- Kept the 7.3a behavior that switches pages before async content activation, so detail back responsiveness is not regressed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false` passed with 0 warnings and 0 errors during implementation.
+
+Explicit non-goals:
+
+- no media-library query, search, filter, sort, batch or detail-navigation semantic changes;
+- no player, scan, Core service, database schema, migration, database update, commit or push.
+
+Suggested commit message:
+
+- `Fix library first-load placeholder during navigation`
+
+### 7.2/7.3 Follow-up - Media Library Poster Shadow First-frame Stability
+
+Completed:
+
+- Fixed a media-library poster-card shadow / glow flicker that could appear after page switches or filter changes recreated poster card visuals.
+- The cached shadow bitmap itself was already reused, but `PosterCachedShadowBehavior` delayed assigning it through a Dispatcher `Loaded` callback. Newly created cards could therefore render one frame with an empty shadow image before the cached shadow appeared.
+- Changed cached-shadow application to assign synchronously once the target image is loaded, and to subscribe to the actual `Loaded` event for not-yet-loaded images. This keeps the existing full poster texture and cached shadow parameters unchanged.
+- Stabilized palette glow color on recreated cards by caching computed shadow colors by poster source URL. When the same poster returns after filtering or navigation, the palette glow can be applied before the poster bitmap raises another delayed source-change pass.
+- Avoided forcing palette glow back to the fallback color while the poster image source is temporarily null during async reload; the existing shadow color is preserved until a real poster bitmap or cached source color is available.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false` passed with 0 warnings and 0 errors during implementation.
+
+Explicit non-goals:
+
+- no poster texture, shadow, glow, color, spacing, hover or cache-size parameter changes;
+- no media-library query, search, filter, sort, batch or detail-navigation semantic changes;
+- no player, scan, Core service, database schema, migration, database update, commit or push.
+
+Suggested commit message:
+
+- `Stabilize media library poster shadow first frame`
+
 ### 7.2-post-closeout follow-up - Poster Edges, Home AI, TV Coverage, Stable Library Sort
 
 Completed:
@@ -502,3 +576,60 @@ Validation:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Migrations diff remained empty.
 - `git diff --check` passed with line-ending warnings only.
+
+### 7.3e - Unified Correction Dialog Shell
+
+Completed:
+
+- Added a shared `CorrectionDialogShell` control for detail-page correction overlays.
+- Movie detail, Season detail and Episode detail now use the shared shell for the overlay mask, dialog card, title / summary header, close button, scroll container and footer action area.
+- Existing Movie / Episode correction bodies continue to own target-type selection, TMDB search, AI assist, candidate cards, unknown-season selection and submit commands.
+- Existing Season correction body continues to own recognized / unknown target selection, AI assist, TMDB search, episode-number mapping, status text and confirm command.
+- Source split remains a separate warning-confirmation flow and was not merged into the correction dialog.
+- No delete-record, move-out, subtitle, player-menu, local-cache or artificial-aggregation actions were added to ordinary detail pages.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false` passed with 0 warnings and 0 errors during implementation.
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors at closeout.
+- Migrations diff remained empty.
+- `git diff --check` passed with line-ending warnings only.
+
+Explicit non-goals:
+
+- no correction ViewModel, candidate-search, AI-recognition, TMDB, source-split or correction-service semantic changes;
+- no player, subtitle, P61-01 local-cache, scan, Core service, database schema, migration, database update, commit or push;
+- no visual redesign beyond extracting the existing correction overlay chrome into the shared shell.
+
+Maintenance notes:
+
+- Future correction-dialog polish should first extend `CorrectionDialogShell` for shared chrome changes, while keeping page-specific correction bodies owned by their page ViewModels unless a dedicated correction-body refactor is planned.
+- Do not move source split into the correction dialog; it is governed by `page-spec/global-dialogs.md` warning confirmation semantics.
+
+Suggested commit message:
+
+- `Phase 7.3e unified correction dialog shell`
+
+### 7.3 Follow-up - Movie Detail Draft Alignment
+
+Completed:
+
+- Re-aligned `MovieDetailPage` with the movie-detail page-spec and the old full-screen draft structure while keeping current Phase 7 styling and product semantics.
+- Moved the top detail area closer to the draft hierarchy: left poster column with the unified back button, center title / original title / status chips / ratings / scrollable overview, and right-side movie information plus tag cards.
+- Moved the main action buttons into a dedicated action row above the play-source panel, matching the page-spec requirement that playback and state actions sit above sources.
+- Restored the play-source panel to a full-width bottom section instead of sharing the lower row with ratings and tags.
+- Added lightweight semantic glyphs to the main action buttons using the existing Segoe MDL2 Assets glyph set; no icon library was introduced.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no Movie detail ViewModel, correction-service, source-service, player, subtitle, scan, Core service, database schema, migration, database update, commit or push changes;
+- no fake director / writer / actor / production-company fields were added because the current `MovieDetailModel` does not expose those values;
+- no change to correction dialog body behavior beyond preserving the existing 7.3e shared shell hookup.
+
+Suggested commit message:
+
+- `Align movie detail layout with draft`

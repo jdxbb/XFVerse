@@ -20,9 +20,19 @@ public sealed class MovieDetailModel
 
     public string PosterLocalPath { get; set; } = string.Empty;
 
+    public string PosterDisplayUrl => string.IsNullOrWhiteSpace(PosterRemoteUrl) ? PosterLocalPath : PosterRemoteUrl;
+
     public string Country { get; set; } = string.Empty;
 
     public string Language { get; set; } = string.Empty;
+
+    public string DirectorText { get; set; } = string.Empty;
+
+    public string WriterText { get; set; } = string.Empty;
+
+    public string ActorsText { get; set; } = string.Empty;
+
+    public string ProductionCompanyText { get; set; } = string.Empty;
 
     public int? RuntimeMinutes { get; set; }
 

@@ -22,6 +22,14 @@ public sealed class MetadataSearchCandidate
 
     public string Language { get; set; } = string.Empty;
 
+    public string DirectorText { get; set; } = string.Empty;
+
+    public string WriterText { get; set; } = string.Empty;
+
+    public string ActorsText { get; set; } = string.Empty;
+
+    public string ProductionCompanyText { get; set; } = string.Empty;
+
     public int? RuntimeMinutes { get; set; }
 
     public string ImdbId { get; set; } = string.Empty;
@@ -31,4 +39,6 @@ public sealed class MetadataSearchCandidate
     public double? TmdbRating { get; set; }
 
     public int? TmdbVoteCount { get; set; }
+
+    public bool IsCurrentMatchedMovie { get; set; }
 }

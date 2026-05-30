@@ -26,6 +26,10 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
 
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+
     <Grid x:Name="RootGrid" Background="{DynamicResource BrushBackground}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{Binding DataContext.SidebarColumnWidth, ElementName=RootGrid}" />
@@ -34,6 +38,9 @@
 
         <Border Grid.Column="0"
                 Style="{StaticResource SidebarBorderStyle}">
+            <Border.Visibility>
+                <Binding Path="IsShellChromeVisible" Converter="{StaticResource BooleanToVisibilityConverter}" />
+            </Border.Visibility>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -463,6 +470,9 @@
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
                     MouseLeftButtonUp="TitleBar_MouseLeftButtonUp"
                     MouseMove="TitleBar_MouseMove">
+                <Border.Visibility>
+                    <Binding Path="IsShellChromeVisible" Converter="{StaticResource BooleanToVisibilityConverter}" />
+                </Border.Visibility>
                 <Grid Height="44"
                       Margin="30,6,2,6">
                     <Grid.ColumnDefinitions>
@@ -543,8 +553,18 @@
             </Border>
 
             <ContentControl Grid.Row="1"
-                            Margin="30,24,30,30"
-                            Content="{Binding CurrentPageViewModel}" />
+                            Content="{Binding CurrentPageViewModel}">
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl">
+                        <Setter Property="Margin" Value="30,24,30,30" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                                <Setter Property="Margin" Value="30,8,30,24" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
         </Grid>
     </Grid>
 </Window>

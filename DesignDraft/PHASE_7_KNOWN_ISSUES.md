@@ -6,7 +6,7 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 
 ## Blocker
 
-- None currently known for closing Phase 7.2, assuming the current final-assets work passes user review.
+- None currently known for closing Phase 7.3e.
 
 ## Deferred
 
@@ -16,8 +16,9 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 - Unified detail return behavior has a 7.3a baseline: minimal in-memory origin stack plus deterministic fallback.
 - Movie detail has a 7.3b visual baseline: poster hero, overview, metadata, actions, ratings, tags, source list and in-page correction overlay using existing correction commands.
 - Series and Season details have a 7.3c visual baseline: poster hero, overview, metadata, state/action area, Season list, Episode list and in-page Season correction overlay using existing commands.
-- Episode visual rebuild remains deferred to 7.3d.
-- A fully shared cross-page correction dialog shell remains deferred to 7.3e; 7.3b / 7.3c only move Movie / Season correction out of old persistent surfaces into page overlays.
+- Episode detail has a 7.3d visual baseline: still / placeholder hero, overview, metadata, actions, source list and in-page Episode correction overlay using existing commands.
+- 7.3e adds the shared correction dialog shell for Movie / Season / Episode overlay chrome. Page-specific correction body content, candidate lists, mapping fields and service commands remain deliberately page-owned.
+- 7.3f remains the detail regression closeout stage, including detail entry / return / correction / source-state regression and 7.2 media-library smoke checks.
 - If grouped placeholder detail experience needs deeper polish, handle it in 7.3. Do not treat current grouped placeholder entry as a 7.2 blocker.
 - Full restoration of complex source-page state such as scroll offset, deep filter snapshots or page-specific tab state remains deferred unless an existing page already exposes that state safely. 7.3a only owns reliable page-level origin return and detail hierarchy fallback.
 
@@ -45,9 +46,9 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 - Global button, spacing, color, menu, dialog, card and empty-state polish remains deferred.
 - Final large-list scroll and performance review belongs to 7.8 unless a blocker appears earlier.
 
-### Current 7.2 Closeout Items
+### 7.2 Residual Deferred Items
 
-- Missing-poster placeholder and logo hookup are Phase 7.2 final-assets closeout scope. Current working tree contains this work; if not yet accepted, keep it under user review rather than reopening 7.2 behavior work.
+- Missing-poster placeholder and logo hookup were handled in the 7.2 final-assets / post-closeout path. Do not reopen them as 7.3 detail work unless a new defect is reported.
 - Full manual "aggregate as season" dialog UI is deferred; 7.2 only organizes entry and semantics.
 
 ## Risks

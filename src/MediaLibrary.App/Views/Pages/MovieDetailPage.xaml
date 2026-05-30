@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.MovieDetailPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
         <helpers:RatingStarsConverter x:Key="RatingStarsConverter" />
@@ -20,12 +21,37 @@
         <Style x:Key="MovieDetailSourceMetaTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
             <Setter Property="Margin" Value="0,0,14,6" />
         </Style>
+
+        <Style x:Key="MovieDetailInfoLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="Margin" Value="0,0,14,8" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        </Style>
+
+        <Style x:Key="MovieDetailInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <DataTemplate x:Key="MovieDetailActionButtonTemplate">
+            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+                <TextBlock Margin="8,0,0,0"
+                           VerticalAlignment="Center"
+                           Text="{Binding}" />
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="18" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="10" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -34,234 +60,294 @@
                 <ColumnDefinition Width="260" />
                 <ColumnDefinition Width="18" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="360" />
             </Grid.ColumnDefinitions>
 
-            <Border Style="{StaticResource PageCardStyle}">
-                <Grid Height="360">
-                    <Border Background="{DynamicResource BrushSurfaceAlt}" CornerRadius="20" ClipToBounds="True">
-                        <Grid>
-                            <Control IsHitTestVisible="False"
-                                     Template="{StaticResource PosterPlaceholderTemplate}" />
-                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   Stretch="UniformToFill" />
-                        </Grid>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="36" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Button Width="44"
+                        Height="40"
+                        HorizontalAlignment="Left"
+                        Command="{Binding NavigateBackCommand}"
+                        Content="&#xE72B;"
+                        Style="{StaticResource DetailBackButtonStyle}"
+                        ToolTip="返回上一页" />
+
+                <Grid Grid.Row="2"
+                      Width="240"
+                      Height="360"
+                      HorizontalAlignment="Left">
+                    <Border x:Name="MovieDetailPosterClipMask"
+                            Background="White"
+                            CornerRadius="20"
+                            IsHitTestVisible="False" />
+                    <Canvas ClipToBounds="False"
+                            IsHitTestVisible="False">
+                        <Image x:Name="MovieDetailPosterPaletteShadowHost"
+                               Width="360"
+                               Height="480"
+                               Canvas.Left="-60"
+                               Canvas.Top="-60"
+                               helpers:PosterCachedShadowBehavior.BlurRadius="30"
+                               helpers:PosterCachedShadowBehavior.CardHeight="360"
+                               helpers:PosterCachedShadowBehavior.CardWidth="240"
+                               helpers:PosterCachedShadowBehavior.CornerRadius="20"
+                               helpers:PosterCachedShadowBehavior.Direction="270"
+                               helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
+                               helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                               helpers:PosterCachedShadowBehavior.Opacity="0.40"
+                               helpers:PosterCachedShadowBehavior.Padding="60"
+                               helpers:PosterCachedShadowBehavior.QuantizeColor="True"
+                               helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
+                               helpers:PosterCachedShadowBehavior.ShadowDepth="8"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Stretch="Fill" />
+                        <Image Width="360"
+                               Height="480"
+                               Canvas.Left="-60"
+                               Canvas.Top="-60"
+                               helpers:PosterCachedShadowBehavior.BlurRadius="14"
+                               helpers:PosterCachedShadowBehavior.CardHeight="360"
+                               helpers:PosterCachedShadowBehavior.CardWidth="240"
+                               helpers:PosterCachedShadowBehavior.CornerRadius="20"
+                               helpers:PosterCachedShadowBehavior.Direction="270"
+                               helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                               helpers:PosterCachedShadowBehavior.Opacity="0.24"
+                               helpers:PosterCachedShadowBehavior.Padding="60"
+                               helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
+                               helpers:PosterCachedShadowBehavior.ShadowDepth="4"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Stretch="Fill" />
+                    </Canvas>
+                    <Grid>
+                        <Grid.OpacityMask>
+                            <VisualBrush Visual="{Binding ElementName=MovieDetailPosterClipMask}" />
+                        </Grid.OpacityMask>
+                        <Border Background="{DynamicResource BrushSurfaceAlt}" />
+                        <Control IsHitTestVisible="False"
+                                 Template="{StaticResource PosterPlaceholderTemplate}" />
+                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="420"
+                               helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
+                               helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=MovieDetailPosterPaletteShadowHost}"
+                               helpers:PosterPaletteShadowBehavior.TargetName="MovieDetailPosterPaletteShadowHost"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Stretch="UniformToFill" />
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Column="2"
+                    MinHeight="318"
+                    Margin="0,42,0,0"
+                    Style="{StaticResource HeroCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock FontSize="30"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource BrushForegroundPrimary}"
+                                   Text="{Binding TitleText}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Margin="0,4,0,0"
+                                   Style="{StaticResource BodyMutedTextStyle}"
+                                   Text="{Binding OriginalTitle}"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <WrapPanel Margin="0,14,0,0">
+                            <Border Style="{StaticResource MovieDetailPillStyle}"
+                                    Background="{DynamicResource BrushAccent}">
+                                <TextBlock FontWeight="SemiBold"
+                                           Foreground="{DynamicResource BrushOnAccent}"
+                                           Text="电影" />
+                            </Border>
+                            <Border Style="{StaticResource MovieDetailPillStyle}">
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding ReleaseDateText, StringFormat=上映 {0}}" />
+                            </Border>
+                            <Border Style="{StaticResource MovieDetailPillStyle}">
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding RuntimeText}" />
+                            </Border>
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <Grid Grid.Row="2">
+                        <TextBlock Text="暂无评分">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRatings}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding Ratings}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="238"
+                                            MinHeight="86"
+                                            Margin="0,0,14,0"
+                                            Padding="12"
+                                            Background="{DynamicResource BrushSurfaceAlt}"
+                                            BorderBrush="{DynamicResource BrushBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="14">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="6" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding SourceName}" />
+                                                <TextBlock Grid.Column="1"
+                                                           FontSize="19"
+                                                           FontWeight="Bold"
+                                                           Foreground="{DynamicResource BrushForegroundPrimary}"
+                                                           Text="{Binding ScoreValue, StringFormat={}{0:0.0} / 10}" />
+                                            </Grid>
+                                            <Grid Grid.Row="2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Foreground="{DynamicResource BrushAccent}"
+                                                           Text="{Binding ScoreValue, Converter={StaticResource RatingStarsConverter}}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Style="{StaticResource BodyMutedTextStyle}"
+                                                           Text="{Binding VoteCount, StringFormat=票数 {0}}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+
+                    <Border Grid.Row="4"
+                             Padding="12"
+                            Background="{DynamicResource BrushSurfaceAlt}"
+                            BorderBrush="{DynamicResource BrushBorder}"
+                            BorderThickness="1"
+                            CornerRadius="14">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="简介" />
+                            <ScrollViewer Margin="0,8,0,0"
+                                           MaxHeight="82"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <TextBlock Style="{StaticResource BodyTextStyle}"
+                                           Text="{Binding Overview}"
+                                           TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2" Style="{StaticResource HeroCardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="300" />
-                    </Grid.ColumnDefinitions>
-
+            <StackPanel Grid.Column="4" Margin="0,42,0,0">
+                <Border Padding="18" Style="{StaticResource PageCardStyle}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-
-                        <Button HorizontalAlignment="Left"
-                                Command="{Binding NavigateBackCommand}"
-                                Content="&#xE72B;"
-                                Style="{StaticResource DetailBackButtonStyle}" />
-
-                        <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                            <TextBlock FontSize="34"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource BrushForegroundPrimary}"
-                                       Text="{Binding TitleText}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Style="{StaticResource BodyMutedTextStyle}"
-                                       Text="{Binding OriginalTitle}"
-                                       TextTrimming="CharacterEllipsis" />
-
-                            <WrapPanel Margin="0,18,0,0">
-                                <Border Style="{StaticResource MovieDetailPillStyle}"
-                                        Background="{DynamicResource BrushAccent}">
-                                    <TextBlock FontWeight="SemiBold"
-                                               Foreground="{DynamicResource BrushOnAccent}"
-                                               Text="{Binding IdentificationStatusText}" />
-                                </Border>
-                                <Border Style="{StaticResource MovieDetailPillStyle}">
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding ReleaseYearText, StringFormat=年份 {0}}" />
-                                </Border>
-                                <Border Style="{StaticResource MovieDetailPillStyle}">
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding RuntimeText}" />
-                                </Border>
-                                <Border Style="{StaticResource MovieDetailPillStyle}">
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding ConfidenceText, StringFormat=置信度 {0}}" />
-                                </Border>
-                            </WrapPanel>
-                        </StackPanel>
-
-                        <Grid Grid.Row="2" Margin="0,16,0,0">
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="主创信息" />
+                        <Grid Grid.Row="2">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="92" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="18" />
-                                <ColumnDefinition Width="220" />
                             </Grid.ColumnDefinitions>
-
-                            <Border Padding="14"
-                                    Background="{DynamicResource BrushSurfaceAlt}"
-                                    BorderBrush="{DynamicResource BrushBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="14">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="简介" />
-                                    <ScrollViewer Margin="0,8,0,0"
-                                                  MaxHeight="104"
-                                                  HorizontalScrollBarVisibility="Disabled"
-                                                  VerticalScrollBarVisibility="Auto">
-                                        <TextBlock Style="{StaticResource BodyTextStyle}"
-                                                   Text="{Binding Overview}"
-                                                   TextWrapping="Wrap" />
-                                    </ScrollViewer>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Grid.Column="2"
-                                    Padding="14"
-                                    Background="{DynamicResource BrushSurfaceAlt}"
-                                    BorderBrush="{DynamicResource BrushBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="14">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="基础信息" />
-                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="国家 / 地区" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding Country}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="语言" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding Language}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="TMDB / IMDb" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding TmdbIdText, StringFormat=TMDB {0}}" />
-                                    <TextBlock Style="{StaticResource BodyMutedTextStyle}" Text="{Binding ImdbIdText, StringFormat=IMDb {0}}" />
-                                </StackPanel>
-                            </Border>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Style="{StaticResource MovieDetailInfoLabelStyle}" Text="导演" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource MovieDetailInfoValueStyle}" Text="{Binding DirectorText}" />
+                            <TextBlock Grid.Row="1" Style="{StaticResource MovieDetailInfoLabelStyle}" Text="编剧" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource MovieDetailInfoValueStyle}" Text="{Binding WriterText}" />
+                            <TextBlock Grid.Row="2" Style="{StaticResource MovieDetailInfoLabelStyle}" Text="主演" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource MovieDetailInfoValueStyle}" Text="{Binding ActorsText}" />
+                            <TextBlock Grid.Row="3" Style="{StaticResource MovieDetailInfoLabelStyle}" Text="国家/地区" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource MovieDetailInfoValueStyle}" Text="{Binding Country}" />
+                            <TextBlock Grid.Row="4" Style="{StaticResource MovieDetailInfoLabelStyle}" Text="语言" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource MovieDetailInfoValueStyle}" Text="{Binding Language}" />
+                            <TextBlock Grid.Row="5" Style="{StaticResource MovieDetailInfoLabelStyle}" Text="制片公司" />
+                            <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource MovieDetailInfoValueStyle}" Text="{Binding ProductionCompanyText}" />
                         </Grid>
                     </Grid>
+                </Border>
 
-                    <StackPanel Grid.Column="2">
-                        <Button Command="{Binding OpenPlayerCommand}"
-                                Content="{Binding PlayButtonText}"
-                                IsEnabled="{Binding CanOpenPlayer}"
-                                Style="{StaticResource PrimaryButtonStyle}" />
+                <Border Margin="0,10,0,0" Padding="18" Style="{StaticResource PageCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="标签" />
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="64" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                        <UniformGrid Margin="0,12,0,0" Columns="2">
-                            <Button Margin="0,0,6,8"
-                                    Command="{Binding ToggleFavoriteCommand}"
-                                    Content="{Binding FavoriteButtonText}">
-                                <Button.Style>
-                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ShowCollectionActions}" Value="False">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                            <Button Margin="6,0,0,8"
-                                    Command="{Binding ToggleWatchedCommand}"
-                                    Content="{Binding WatchedButtonText}"
-                                    IsEnabled="{Binding CanToggleWatched}">
-                                <Button.Style>
-                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ShowWatchedAction}" Value="False">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                            <Button Margin="0,0,6,8"
-                                    Command="{Binding ToggleWantToWatchCommand}"
-                                    Content="{Binding WantToWatchButtonText}"
-                                    IsEnabled="{Binding CanToggleWantToWatch}">
-                                <Button.Style>
-                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ShowExternalWantToWatchAction}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                            <Button Margin="6,0,0,8"
-                                    Command="{Binding ToggleNotInterestedCommand}"
-                                    Content="{Binding NotInterestedButtonText}"
-                                    IsEnabled="{Binding CanToggleNotInterested}">
-                                <Button.Style>
-                                    <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ShowNotInterestedAction}" Value="False">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                        </UniformGrid>
-
-                        <Button Command="{Binding AddToLibraryCommand}"
-                                Content="{Binding AddToLibraryButtonText}"
-                                IsEnabled="{Binding CanAddToLibrary}">
-                            <Button.Style>
-                                <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowAddToLibraryAction}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-
-                        <Button Margin="0,10,0,0"
-                                Command="{Binding OpenCorrectionDialogCommand}"
-                                Content="影片识别修正">
-                            <Button.Style>
-                                <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CanUseIdentificationCorrection}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-
-                        <Border Margin="0,14,0,0" Style="{StaticResource CompactCardStyle}">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding AvailabilityText}" />
-                                <TextBlock Margin="0,12,0,0"
-                                           Style="{StaticResource BodyMutedTextStyle}"
-                                           Text="默认播放源" />
-                                <TextBlock Margin="0,6,0,0"
-                                           Style="{StaticResource BodyTextStyle}"
-                                           Text="{Binding DefaultSourceDisplay}"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Margin="0,12,0,0"
-                                           Style="{StaticResource BodyMutedTextStyle}"
-                                           Text="{Binding StatusMessage}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Grid>
-            </Border>
+                            <TextBlock Style="{StaticResource MovieDetailMetaLabelStyle}" Text="类型" />
+                            <TextBlock Grid.Column="1"
+                                       Margin="0,0,0,8"
+                                       Style="{StaticResource BodyTextStyle}"
+                                       Text="{Binding GenresText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="1" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="情绪" />
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="1"
+                                       Margin="0,0,0,8"
+                                       Style="{StaticResource BodyTextStyle}"
+                                       Text="{Binding EmotionTagsText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="2" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="场景" />
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="1"
+                                       Style="{StaticResource BodyTextStyle}"
+                                       Text="{Binding SceneTagsText}"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                    </Grid>
+                </Border>
+            </StackPanel>
         </Grid>
 
         <Grid Grid.Row="2">
@@ -271,6 +357,139 @@
                 <ColumnDefinition Width="360" />
             </Grid.ColumnDefinitions>
 
+            <WrapPanel Grid.ColumnSpan="3" VerticalAlignment="Center">
+                <Button MinWidth="164"
+                        Margin="0,0,14,10"
+                        Command="{Binding OpenPlayerCommand}"
+                        Content="{Binding PlayButtonText}"
+                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        IsEnabled="{Binding CanOpenPlayer}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Tag="&#xE768;" />
+                <Button MinWidth="148"
+                        Margin="0,0,14,10"
+                        Command="{Binding ToggleFavoriteCommand}"
+                        Content="{Binding FavoriteButtonText}"
+                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        Tag="&#xEB51;">
+                    <Button.Style>
+                        <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowCollectionActions}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button MinWidth="148"
+                        Margin="0,0,14,10"
+                        Command="{Binding ToggleWatchedCommand}"
+                        Content="{Binding WatchedButtonText}"
+                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        IsEnabled="{Binding CanToggleWatched}"
+                        Tag="&#xE8FB;">
+                    <Button.Style>
+                        <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowWatchedAction}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button MinWidth="148"
+                        Margin="0,0,14,10"
+                        Command="{Binding ToggleWantToWatchCommand}"
+                        Content="{Binding WantToWatchButtonText}"
+                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        IsEnabled="{Binding CanToggleWantToWatch}"
+                        Tag="&#xE734;">
+                    <Button.Style>
+                        <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowExternalWantToWatchAction}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button MinWidth="148"
+                        Margin="0,0,14,10"
+                        Command="{Binding ToggleNotInterestedCommand}"
+                        Content="{Binding NotInterestedButtonText}"
+                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        IsEnabled="{Binding CanToggleNotInterested}"
+                        Tag="&#xE711;">
+                    <Button.Style>
+                        <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowNotInterestedAction}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button MinWidth="148"
+                        Margin="0,0,14,10"
+                        Command="{Binding AddToLibraryCommand}"
+                        Content="{Binding AddToLibraryButtonText}"
+                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        IsEnabled="{Binding CanAddToLibrary}"
+                        Tag="&#xE710;">
+                    <Button.Style>
+                        <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowAddToLibraryAction}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button MinWidth="172"
+                        Margin="0,0,14,10"
+                        Command="{Binding OpenCorrectionDialogCommand}"
+                        Content="影片识别修正"
+                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        Tag="&#xE70F;">
+                    <Button.Style>
+                        <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CanUseIdentificationCorrection}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </WrapPanel>
+
+            <Border Grid.Column="2" Visibility="Collapsed" Style="{StaticResource CompactCardStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding AvailabilityText}" />
+                    <TextBlock Margin="0,8,0,0"
+                               Style="{StaticResource BodyMutedTextStyle}"
+                               Text="{Binding DefaultSourceDisplay}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Margin="0,8,0,0"
+                               Style="{StaticResource BodyMutedTextStyle}"
+                               Text="{Binding StatusMessage}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="4">
             <Border Style="{StaticResource PageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -374,12 +593,13 @@
                                         <WrapPanel Margin="0,10,0,0">
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding Extension, StringFormat=格式 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding ResolutionText, StringFormat=分辨率 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding FrameRateText, StringFormat=帧率 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding DurationText, StringFormat=时长 {0}}" />
-                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding BitrateText, StringFormat=码率 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding VideoBitrateText, StringFormat=视频码率 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding VideoCodecText, StringFormat=视频 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding AudioText, StringFormat=音频 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding FormattedFileSize, StringFormat=大小 {0}}" />
-                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding ProbeStatusText, StringFormat=识别状态 {0}}" />
+                                            <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding ProbeStatusText, StringFormat=探测状态 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding LastPlayedText, StringFormat=最近播放 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding LastPlayPositionText, StringFormat=上次播放位置 {0}}" />
                                             <TextBlock Style="{StaticResource MovieDetailSourceMetaTextStyle}" Text="{Binding ProbeErrorText}" />
@@ -409,11 +629,11 @@
                                                 </Style>
                                             </Button.Style>
                                         </Button>
-                                        <Button Margin="0,0,8,0"
-                                                Command="{Binding DataContext.ManualProbeSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Content="探测"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
+                                         <Button Margin="0,0,8,0"
+                                                 Command="{Binding DataContext.ManualProbeSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                 CommandParameter="{Binding}"
+                                                 Content="立即探测"
+                                                 Style="{StaticResource SecondaryButtonStyle}" />
                                         <Button Command="{Binding DataContext.BeginSourceCorrectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Content="修正"
@@ -433,134 +653,17 @@
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Column="2">
-                <Border Style="{StaticResource PageCardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="评分" />
-                        <TextBlock Margin="0,10,0,0"
-                                   Text="暂无评分">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasRatings}" Value="False">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                        <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Ratings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Margin="0,0,0,10"
-                                            Padding="12"
-                                            Background="{DynamicResource BrushSurfaceAlt}"
-                                            BorderBrush="{DynamicResource BrushBorder}"
-                                            BorderThickness="1"
-                                            CornerRadius="14">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding SourceName}" />
-                                                <TextBlock Margin="0,6,0,0"
-                                                           Foreground="{DynamicResource BrushAccent}"
-                                                           Text="{Binding ScoreValue, Converter={StaticResource RatingStarsConverter}}" />
-                                                <TextBlock Margin="0,4,0,0"
-                                                           Style="{StaticResource BodyMutedTextStyle}"
-                                                           Text="{Binding VoteCount, StringFormat=票数 {0}}" />
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="1"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="24"
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource BrushForegroundPrimary}"
-                                                       Text="{Binding ScoreValue, StringFormat={}{0:0.0} / 10}" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-
-                <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="标签" />
-                        <TextBlock Margin="0,12,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="类型" />
-                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
-                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding GenresText}" TextWrapping="Wrap" />
-                        </Border>
-                        <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="AI 标签" />
-                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
-                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding AiTagsText}" TextWrapping="Wrap" />
-                        </Border>
-                        <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="情绪" />
-                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
-                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding EmotionTagsText}" TextWrapping="Wrap" />
-                        </Border>
-                        <TextBlock Margin="0,10,0,0" Style="{StaticResource MovieDetailMetaLabelStyle}" Text="场景" />
-                        <Border HorizontalAlignment="Left" Style="{StaticResource MovieDetailPillStyle}">
-                            <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding SceneTagsText}" TextWrapping="Wrap" />
-                        </Border>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
         </Grid>
 
-        <Border Grid.RowSpan="3" Background="#99000000">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsCorrectionPanelVisible}" Value="True">
-                            <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <Border Width="980"
-                    MaxHeight="720"
-                    Padding="22"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource PageCardStyle}">
+        <controls:CorrectionDialogShell Grid.RowSpan="5"
+                                        IsOpen="{Binding IsCorrectionPanelVisible}"
+                                        Title="影片识别修正"
+                                        Summary="{Binding CorrectionSourceDisplay}"
+                                        StatusText="{Binding StatusMessage}"
+                                        CloseCommand="{Binding CancelCorrectionCommand}"
+                                        CancelCommand="{Binding CancelCorrectionCommand}">
+            <controls:CorrectionDialogShell.DialogContent>
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="16" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="16" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="影片识别修正" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Style="{StaticResource BodyMutedTextStyle}"
-                                       Text="{Binding CorrectionSourceDisplay}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Width="38"
-                                Command="{Binding CancelCorrectionCommand}"
-                                Content="&#xE711;"
-                                Style="{StaticResource DetailBackButtonStyle}"
-                                ToolTip="关闭" />
-                    </Grid>
-
-                    <ScrollViewer Grid.Row="2"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto">
-                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="350" />
                                 <ColumnDefinition Width="22" />
@@ -568,7 +671,37 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel>
-                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="目标类型" />
+                                <Border Padding="12"
+                                        Background="{DynamicResource BrushSurfaceAlt}"
+                                        BorderBrush="{DynamicResource BrushBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Style="{StaticResource MovieDetailInfoLabelStyle}" Text="识别文件名" />
+                                        <TextBlock Grid.Column="1"
+                                                   Style="{StaticResource MovieDetailInfoValueStyle}"
+                                                   Text="{Binding CorrectionSourceFileName}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding CorrectionSourceFileName}" />
+                                        <TextBlock Grid.Row="1" Style="{StaticResource MovieDetailInfoLabelStyle}" Text="识别路径" />
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource MovieDetailInfoValueStyle}"
+                                                   Text="{Binding CorrectionSourcePath}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding CorrectionSourcePath}" />
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock Margin="0,16,0,0" Style="{StaticResource BodyTextStyle}" Text="目标类型" />
                                 <ComboBox Margin="0,8,0,0"
                                           ItemsSource="{Binding CorrectionTargetOptions}"
                                           PreviewMouseWheel="CorrectionTargetComboBox_PreviewMouseWheel"
@@ -731,9 +864,19 @@
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Margin="0,0,16,0">
                                                     <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding Title}" />
-                                                    <TextBlock Margin="0,5,0,0"
-                                                               Style="{StaticResource BodyMutedTextStyle}"
-                                                               Text="{Binding ReleaseYear}" />
+                                                    <WrapPanel Margin="0,5,0,0">
+                                                        <TextBlock Margin="0,0,14,0"
+                                                                   Style="{StaticResource BodyMutedTextStyle}"
+                                                                   Text="{Binding ReleaseYear, StringFormat=年份 {0}}" />
+                                                        <TextBlock Margin="0,0,14,0"
+                                                                   Style="{StaticResource BodyMutedTextStyle}"
+                                                                   Text="{Binding OriginalTitle, StringFormat=原名 {0}}" />
+                                                        <TextBlock Margin="0,0,14,0"
+                                                                   Style="{StaticResource BodyMutedTextStyle}"
+                                                                   Text="{Binding Country, StringFormat=国家 {0}}" />
+                                                        <TextBlock Style="{StaticResource BodyMutedTextStyle}"
+                                                                   Text="{Binding TmdbId, StringFormat=TMDB {0}}" />
+                                                    </WrapPanel>
                                                     <ScrollViewer Margin="0,7,0,0"
                                                                   MaxHeight="92"
                                                                   HorizontalScrollBarVisibility="Disabled"
@@ -746,9 +889,19 @@
                                                 <Button Grid.Column="1"
                                                         VerticalAlignment="Center"
                                                         Command="{Binding DataContext.ApplyManualMatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="选择影片"
-                                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                                        CommandParameter="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                            <Setter Property="Content" Value="选择影片" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCurrentMatchedMovie}" Value="True">
+                                                                    <Setter Property="Content" Value="已修正为该影片" />
+                                                                    <Setter Property="IsEnabled" Value="False" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
                                             </Grid>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
@@ -837,28 +990,11 @@
                                     </ListBox.ItemTemplate>
                                 </ListBox>
                             </StackPanel>
-                        </Grid>
-                    </ScrollViewer>
-
-                    <Grid Grid.Row="4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="120" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock VerticalAlignment="Center"
-                                   Style="{StaticResource BodyMutedTextStyle}"
-                                   Text="{Binding StatusMessage}"
-                                   TextWrapping="Wrap" />
-                        <Button Grid.Column="1"
-                                Command="{Binding CancelCorrectionCommand}"
-                                Content="取消"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                    </Grid>
                 </Grid>
-            </Border>
-        </Border>
+            </controls:CorrectionDialogShell.DialogContent>
+        </controls:CorrectionDialogShell>
 
-        <Border Grid.RowSpan="3"
+        <Border Grid.RowSpan="5"
                 Background="#99000000">
             <Border.Style>
                 <Style TargetType="Border">

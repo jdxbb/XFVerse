@@ -5,11 +5,15 @@ namespace MediaLibrary.Core.Helpers;
 public static class AppPaths
 {
     private const string AppFolderName = "MediaLibrary";
+    private const string AppDataDirectoryOverrideEnvironmentVariable = "XFVERSE_APPDATA_DIR";
 
     public static string GetAppDataDirectory()
     {
-        var basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var appDataDirectory = Path.Combine(basePath, AppFolderName);
+        var overrideDirectory = Environment.GetEnvironmentVariable(AppDataDirectoryOverrideEnvironmentVariable);
+        var appDataDirectory = string.IsNullOrWhiteSpace(overrideDirectory)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppFolderName)
+            : overrideDirectory;
+
         Directory.CreateDirectory(appDataDirectory);
         return appDataDirectory;
     }

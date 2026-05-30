@@ -36,6 +36,8 @@ public sealed class MovieSourceItem
 
     public int? AudioBitrateKbps { get; set; }
 
+    public double? VideoFrameRate { get; set; }
+
     public MediaProbeStatus MediaProbeStatus { get; set; } = MediaProbeStatus.NotProbed;
 
     public string? MediaProbeError { get; set; }
@@ -68,6 +70,10 @@ public sealed class MovieSourceItem
 
     public string BitrateText => MediaSourceDisplayText.FormatBitrate(
         MediaSourceDisplayText.SelectDisplayBitrateKbps(OverallBitrateKbps, VideoBitrateKbps, AudioBitrateKbps));
+
+    public string VideoBitrateText => MediaSourceDisplayText.FormatBitrate(VideoBitrateKbps);
+
+    public string FrameRateText => MediaSourceDisplayText.FormatFrameRate(VideoFrameRate);
 
     public string TechnicalSummary => MediaSourceDisplayText.BuildTechnicalSummary(
         ResolutionWidth,

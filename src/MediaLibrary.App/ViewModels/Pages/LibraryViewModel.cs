@@ -123,11 +123,13 @@ public sealed class LibraryViewModel : PageViewModelBase
     private bool _hasUserChangedLayoutThisSession;
     private bool _isBatchSelectionMode;
     private bool _isBatchOperationRunning;
+    private bool _hasLoadedLibraryOnce;
+    private bool _isLibraryInitialLoading = true;
     private bool _isRemovedLibraryPanelOpen;
     private bool _isRemovedLibraryLoading;
     private bool _isManualAggregationDialogOpen;
     private bool _isManualAggregationBusy;
-    private string _statusMessage = "媒体库会展示已识别的真实影片数据。";
+    private string _statusMessage = "正在加载媒体库...";
     private string _batchResultSummary = string.Empty;
     private string _manualAggregationSeriesTitle = string.Empty;
     private string _manualAggregationSeasonTitle = string.Empty;
@@ -637,6 +639,23 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public bool HasMovies => Movies.Count > 0;
 
+    public bool IsLibraryInitialLoading
+    {
+        get => _isLibraryInitialLoading;
+        private set
+        {
+            if (SetProperty(ref _isLibraryInitialLoading, value))
+            {
+                OnPropertyChanged(nameof(ShowLibraryInitialLoading));
+                OnPropertyChanged(nameof(ShowLibraryEmptyState));
+            }
+        }
+    }
+
+    public bool ShowLibraryInitialLoading => IsLibraryInitialLoading && !HasMovies;
+
+    public bool ShowLibraryEmptyState => !IsLibraryInitialLoading && !HasMovies;
+
     public string EmptyStateTitle => _allMovies.Count == 0
         ? "媒体库暂无内容"
         : "没有匹配结果";
@@ -831,6 +850,11 @@ public sealed class LibraryViewModel : PageViewModelBase
             _isActive = true;
         }
 
+        if (IsLibraryInitialLoading && !HasMovies)
+        {
+            StatusMessage = "正在加载媒体库...";
+        }
+
         return RequestLibraryRefreshAsync(RefreshReasonActivate, debounce: false, allowWhenInactive: true, cancellationToken);
     }
 
@@ -880,6 +904,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             tagDecadeElapsedMs = tagDecadeStopwatch.ElapsedMilliseconds;
 
             filterMetrics = ApplyFiltersWithMetrics();
+            _hasLoadedLibraryOnce = true;
+            IsLibraryInitialLoading = false;
 
             if (_allMovies.Count == 0)
             {
@@ -897,11 +923,36 @@ public sealed class LibraryViewModel : PageViewModelBase
                     totalStopwatch.ElapsedMilliseconds));
             ScheduleRenderReadyDiagnostics(refreshId, refreshRequest, queryElapsedMs, tagDecadeElapsedMs, filterMetrics, totalStopwatch.ElapsedMilliseconds);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            totalStopwatch.Stop();
+            if (!_hasLoadedLibraryOnce)
+            {
+                IsLibraryInitialLoading = true;
+            }
+
+            WriteLibraryRefreshEvent(
+                "library-refresh-canceled",
+                BuildRefreshLogFields(
+                    refreshId,
+                    refreshRequest,
+                    queryElapsedMs,
+                    tagDecadeElapsedMs,
+                    filterMetrics,
+                    totalStopwatch.ElapsedMilliseconds));
+        }
         catch (Exception exception)
         {
             totalStopwatch.Stop();
+            if (!_hasLoadedLibraryOnce)
+            {
+                IsLibraryInitialLoading = false;
+            }
+
             Movies.ReplaceAll([]);
             OnPropertyChanged(nameof(HasMovies));
+            OnPropertyChanged(nameof(ShowLibraryInitialLoading));
+            OnPropertyChanged(nameof(ShowLibraryEmptyState));
             WriteLibraryRefreshEvent(
                 "library-refresh-failed",
                 BuildRefreshLogFields(
@@ -2026,6 +2077,8 @@ public sealed class LibraryViewModel : PageViewModelBase
         Movies.ReplaceAll(viewModels);
 
         OnPropertyChanged(nameof(HasMovies));
+        OnPropertyChanged(nameof(ShowLibraryInitialLoading));
+        OnPropertyChanged(nameof(ShowLibraryEmptyState));
         OnPropertyChanged(nameof(EmptyStateTitle));
         OnPropertyChanged(nameof(EmptyStateMessage));
         RefreshBatchCommandState();

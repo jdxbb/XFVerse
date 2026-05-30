@@ -24,6 +24,14 @@ public sealed class Movie
 
     public string? Language { get; set; }
 
+    public string? DirectorText { get; set; }
+
+    public string? WriterText { get; set; }
+
+    public string? ActorsText { get; set; }
+
+    public string? ProductionCompanyText { get; set; }
+
     public int? RuntimeMinutes { get; set; }
 
     public int? TmdbId { get; set; }

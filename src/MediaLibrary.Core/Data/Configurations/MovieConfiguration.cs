@@ -34,6 +34,18 @@ public sealed class MovieConfiguration : IEntityTypeConfiguration<Movie>
         builder.Property(x => x.Language)
             .HasMaxLength(120);
 
+        builder.Property(x => x.DirectorText)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.WriterText)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.ActorsText)
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.ProductionCompanyText)
+            .HasMaxLength(500);
+
         builder.Property(x => x.ImdbId)
             .HasMaxLength(40);
 

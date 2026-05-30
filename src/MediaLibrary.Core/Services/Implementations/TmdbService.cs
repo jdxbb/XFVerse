@@ -20,7 +20,7 @@ public sealed class TmdbService : ITmdbService
     private const string TmdbLanguage = "zh-CN";
     private const string TmdbProvider = "TMDB";
     private const string TmdbSearchCacheType = "Search";
-    private const string TmdbDetailCacheType = "Detail";
+    private const string TmdbDetailCacheType = "DetailCredits";
     private const string TmdbExternalIdsCacheType = "ExternalIds";
     private const int DiscoveryPageSize = 20;
     internal const int HttpConcurrencyLimit = 8;
@@ -224,7 +224,11 @@ public sealed class TmdbService : ITmdbService
                 JsonDocument detailsDocument;
                 try
                 {
-                    using var detailsResponse = await SendGetAsync($"movie/{tmdbId}?language={TmdbLanguage}", options, "tmdb-detail", cancellationToken);
+                    using var detailsResponse = await SendGetAsync(
+                        $"movie/{tmdbId}?language={TmdbLanguage}&append_to_response=credits",
+                        options,
+                        "tmdb-detail",
+                        cancellationToken);
                     EnsureSuccessStatusCode(detailsResponse);
 
                     await using var detailsStream = await detailsResponse.Content.ReadAsStreamAsync(cancellationToken);
@@ -1157,7 +1161,7 @@ public sealed class TmdbService : ITmdbService
 
     private static string BuildTmdbDetailCacheKey(int tmdbId, TmdbRequestOptions options)
     {
-        return $"detail|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|language={TmdbLanguage}|tmdb={tmdbId}";
+        return $"detail-credits|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|language={TmdbLanguage}|tmdb={tmdbId}";
     }
 
     private static string BuildTmdbExternalIdsCacheKey(int tmdbId, TmdbRequestOptions options)
@@ -1332,6 +1336,10 @@ public sealed class TmdbService : ITmdbService
             GenresText = string.Join(" / ", EnumerateArrayStrings(details, "genres", "name")),
             Country = string.Join(" / ", EnumerateArrayStrings(details, "production_countries", "name")),
             Language = string.Join(" / ", EnumerateArrayStrings(details, "spoken_languages", "english_name")),
+            DirectorText = JoinNames(EnumerateMovieCrewNames(details, "Director"), 6),
+            WriterText = JoinNames(EnumerateMovieCrewNames(details, "Writer", "Screenplay", "Story"), 8),
+            ActorsText = JoinNames(EnumerateMovieCastNames(details), 10),
+            ProductionCompanyText = JoinNames(EnumerateArrayStrings(details, "production_companies", "name"), 6),
             RuntimeMinutes = GetInt(details, "runtime"),
             ImdbId = GetString(details, "imdb_id"),
             TmdbRating = GetDouble(details, "vote_average"),
@@ -1723,11 +1731,16 @@ public sealed class TmdbService : ITmdbService
             GenresText = candidate.GenresText,
             Country = candidate.Country,
             Language = candidate.Language,
+            DirectorText = candidate.DirectorText,
+            WriterText = candidate.WriterText,
+            ActorsText = candidate.ActorsText,
+            ProductionCompanyText = candidate.ProductionCompanyText,
             RuntimeMinutes = candidate.RuntimeMinutes,
             ImdbId = candidate.ImdbId,
             Confidence = candidate.Confidence,
             TmdbRating = candidate.TmdbRating,
-            TmdbVoteCount = candidate.TmdbVoteCount
+            TmdbVoteCount = candidate.TmdbVoteCount,
+            IsCurrentMatchedMovie = candidate.IsCurrentMatchedMovie
         };
     }
 
@@ -1878,6 +1891,63 @@ public sealed class TmdbService : ITmdbService
                 yield return value;
             }
         }
+    }
+
+    private static IEnumerable<string> EnumerateMovieCrewNames(JsonElement details, params string[] jobs)
+    {
+        if (!details.TryGetProperty("credits", out var credits)
+            || !credits.TryGetProperty("crew", out var crew)
+            || crew.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        var jobSet = new HashSet<string>(jobs, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in crew.EnumerateArray())
+        {
+            var job = GetString(item, "job");
+            if (!jobSet.Contains(job))
+            {
+                continue;
+            }
+
+            var name = GetString(item, "name");
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                yield return name;
+            }
+        }
+    }
+
+    private static IEnumerable<string> EnumerateMovieCastNames(JsonElement details)
+    {
+        if (!details.TryGetProperty("credits", out var credits)
+            || !credits.TryGetProperty("cast", out var cast)
+            || cast.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in cast.EnumerateArray())
+        {
+            var name = GetString(item, "name");
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                yield return name;
+            }
+        }
+    }
+
+    private static string JoinNames(IEnumerable<string> names, int maxCount)
+    {
+        var values = names
+            .Select(name => name.Trim())
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .Take(maxCount)
+            .ToArray();
+
+        return values.Length == 0 ? string.Empty : string.Join(" / ", values);
     }
 
     private static IEnumerable<int> EnumerateIntArray(JsonElement element, string arrayPropertyName)

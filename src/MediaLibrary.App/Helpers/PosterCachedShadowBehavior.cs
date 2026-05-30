@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 
 namespace MediaLibrary.App.Helpers;
 
@@ -98,9 +97,9 @@ public static class PosterCachedShadowBehavior
             typeof(PosterCachedShadowBehavior),
             new PropertyMetadata(7d, OnShadowPropertyChanged));
 
-    private static readonly DependencyProperty IsApplyQueuedProperty =
+    private static readonly DependencyProperty IsLoadedSubscribedProperty =
         DependencyProperty.RegisterAttached(
-            "IsApplyQueued",
+            "IsLoadedSubscribed",
             typeof(bool),
             typeof(PosterCachedShadowBehavior),
             new PropertyMetadata(false));
@@ -229,25 +228,37 @@ public static class PosterCachedShadowBehavior
     {
         if (target is Image image)
         {
-            QueueApplyShadowImage(image);
+            ApplyShadowImageWhenReady(image);
         }
     }
 
-    private static void QueueApplyShadowImage(Image image)
+    private static void ApplyShadowImageWhenReady(Image image)
     {
-        if ((bool)image.GetValue(IsApplyQueuedProperty))
+        if (image.IsLoaded)
+        {
+            ApplyShadowImage(image);
+            return;
+        }
+
+        if ((bool)image.GetValue(IsLoadedSubscribedProperty))
         {
             return;
         }
 
-        image.SetValue(IsApplyQueuedProperty, true);
-        image.Dispatcher.BeginInvoke(
-            () =>
-            {
-                image.SetValue(IsApplyQueuedProperty, false);
-                ApplyShadowImage(image);
-            },
-            DispatcherPriority.Loaded);
+        image.SetValue(IsLoadedSubscribedProperty, true);
+        image.Loaded += OnImageLoaded;
+    }
+
+    private static void OnImageLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Image image)
+        {
+            return;
+        }
+
+        image.Loaded -= OnImageLoaded;
+        image.SetValue(IsLoadedSubscribedProperty, false);
+        ApplyShadowImage(image);
     }
 
     private static void ApplyShadowImage(Image image)

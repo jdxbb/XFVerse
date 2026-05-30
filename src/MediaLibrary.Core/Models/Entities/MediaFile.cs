@@ -52,6 +52,8 @@ public sealed class MediaFile
 
     public int? AudioBitrateKbps { get; set; }
 
+    public double? VideoFrameRate { get; set; }
+
     public MediaProbeStatus MediaProbeStatus { get; set; } = MediaProbeStatus.NotProbed;
 
     public string? MediaProbeError { get; set; }

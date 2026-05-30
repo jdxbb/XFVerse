@@ -27,6 +27,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _currentPageTitle = string.Empty;
     private string _currentPageSubtitle = string.Empty;
     private bool _isHomePageActive;
+    private bool _isDetailRouteActive;
     private bool _isSidebarExpanded = true;
     private bool _isUserMenuOpen;
     private string _userMenuStatusMessage = string.Empty;
@@ -126,8 +127,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     public GridLength SidebarColumnWidth => IsSidebarExpanded
-        ? new GridLength(SidebarExpandedWidth)
-        : new GridLength(SidebarCollapsedWidth);
+        ? new GridLength(IsDetailRouteActive ? 0 : SidebarExpandedWidth)
+        : new GridLength(IsDetailRouteActive ? 0 : SidebarCollapsedWidth);
 
     public bool IsSidebarCollapsed => !IsSidebarExpanded;
 
@@ -223,6 +224,21 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    public bool IsDetailRouteActive
+    {
+        get => _isDetailRouteActive;
+        private set
+        {
+            if (SetProperty(ref _isDetailRouteActive, value))
+            {
+                OnPropertyChanged(nameof(SidebarColumnWidth));
+                OnPropertyChanged(nameof(IsShellChromeVisible));
+            }
+        }
+    }
+
+    public bool IsShellChromeVisible => !IsDetailRouteActive;
+
     public string ShellPageTitle => IsHomePageActive && IsSidebarExpanded
         ? $"欢迎回来，{UserDisplayName} 👋"
         : CurrentPageTitle;
@@ -266,9 +282,18 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         CurrentPageViewModel = pageViewModel;
         IsHomePageActive = pageViewModel is HomeViewModel;
+        IsDetailRouteActive = IsDetailPageViewModel(pageViewModel);
         CurrentPageTitle = pageViewModel.Title;
         CurrentPageSubtitle = pageViewModel.Subtitle;
         _ = ActivatePageContentAsync(pageViewModel, activationVersion, activationToken);
+    }
+
+    private static bool IsDetailPageViewModel(PageViewModelBase pageViewModel)
+    {
+        return pageViewModel is MovieDetailViewModel
+            or SeriesOverviewViewModel
+            or TvSeasonDetailViewModel
+            or EpisodeDetailViewModel;
     }
 
     private async Task ActivatePageContentAsync(

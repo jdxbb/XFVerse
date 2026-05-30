@@ -922,7 +922,8 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
             audio?.SampleRate,
             overallBitrateKbps,
             video?.BitrateKbps,
-            audio?.BitrateKbps);
+            audio?.BitrateKbps,
+            video?.FrameRate);
     }
 
     private static StreamProbeResult ParseStream(JsonElement stream)
@@ -933,7 +934,8 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
             GetInt(stream, "height"),
             GetInt(stream, "channels"),
             GetInt(stream, "sample_rate"),
-            ParseBitrateKbps(stream));
+            ParseBitrateKbps(stream),
+            ParseFrameRate(stream));
     }
 
     private static int? ParseDurationSeconds(JsonElement format)
@@ -954,6 +956,38 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         }
 
         return (int)Math.Min(int.MaxValue, Math.Round(bitsPerSecond / 1000d, MidpointRounding.AwayFromZero));
+    }
+
+    private static double? ParseFrameRate(JsonElement stream)
+    {
+        var value = GetString(stream, "avg_frame_rate");
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "0/0", StringComparison.Ordinal))
+        {
+            value = GetString(stream, "r_frame_rate");
+        }
+
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "0/0", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Contains('/', StringComparison.Ordinal))
+        {
+            var parts = trimmed.Split('/', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length == 2
+                && double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var numerator)
+                && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var denominator)
+                && numerator > 0
+                && denominator > 0)
+            {
+                return Math.Round(numerator / denominator, 3, MidpointRounding.AwayFromZero);
+            }
+        }
+
+        return double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) && parsed > 0
+            ? Math.Round(parsed, 3, MidpointRounding.AwayFromZero)
+            : null;
     }
 
     private static string? GetString(JsonElement element, string propertyName)
@@ -1014,6 +1048,7 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         mediaFile.OverallBitrateKbps = result.OverallBitrateKbps;
         mediaFile.VideoBitrateKbps = result.VideoBitrateKbps;
         mediaFile.AudioBitrateKbps = result.AudioBitrateKbps;
+        mediaFile.VideoFrameRate = result.VideoFrameRate;
         mediaFile.CodecInfo = BuildCodecInfo(result);
         mediaFile.MediaProbeStatus = MediaProbeStatus.Success;
         mediaFile.MediaProbeError = null;
@@ -1153,7 +1188,8 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         int? AudioSampleRate,
         int? OverallBitrateKbps,
         int? VideoBitrateKbps,
-        int? AudioBitrateKbps);
+        int? AudioBitrateKbps,
+        double? VideoFrameRate);
 
     private sealed record StreamProbeResult(
         string? CodecName,
@@ -1161,5 +1197,6 @@ public sealed class MediaProbeService : IMediaProbeService, IDisposable
         int? Height,
         int? Channels,
         int? SampleRate,
-        int? BitrateKbps);
+        int? BitrateKbps,
+        double? FrameRate);
 }
