@@ -140,3 +140,30 @@
 - 整理 `UI_REDESIGN_PLAN.md`，标记 UI-0 到 UI-9 完成。
 - 重写 `UI_REDESIGN_KNOWN_ISSUES.md`，按 Blocker、Deferred、Known Limitation、Noise 收口。
 - 本阶段未新增功能，未新增 DB / migration，未改推荐算法、播放器、扫描识别核心或 API 调用逻辑。
+
+## 详情页体验回归修复
+
+- 统一输入框占位提示进入 `TextBox` 模板，与实际输入内容复用同一 `Padding`，并在 IME 首次组合输入时立即隐藏。
+- 媒体库搜索和修正窗口输入框已接入统一占位提示；修正窗口空输入时恢复提示显示。
+- 电影、剧、季、集简介以及修正候选简介的纯文本滚动区已接入半行截断提示；表格和列表滚动区不应用该规则。
+- 剧详情 Season 列表、季详情 Episode 列表和集详情信息卡完成针对性间距与对齐调整。
+- 未新增 DB / migration，未改媒体库语义或扫描识别规则。
+
+验证：
+
+- `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+## 修正弹窗模态化与详情页闪退修复
+
+- 修正弹窗遮罩改为独立 `Popup`，打开后覆盖整个宿主窗口并拦截下层交互；窗口移动、缩放和状态切换时同步刷新遮罩尺寸。
+- 修正弹窗下拉框改为现代化圆角样式，候选列表补充分隔线、层级间距、文本对齐和滚动提示。
+- 电影详情页进入即闪退的根因是 `CorrectionDialogComboBoxStyle` 在 `Controls.xaml` 中提前引用尚未合并的 `ComboBoxStyle`。该样式已移动到 `Inputs.xaml`，确保基础样式先加载再继承。
+- 未新增 DB / migration，未修改识别、修正事务或媒体库语义。
+
+验证：
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false`：通过，运行中的应用实例锁定旧 `.exe`，产生 1 条删除 apphost 警告。
+- STA 运行时实例化：`MovieDetailPage`、`SeriesOverviewPage`、`TvSeasonDetailPage`、`EpisodeDetailPage` 均通过。
+- STA 模态遮罩验证：`CorrectionDialogShell` 打开后覆盖宿主窗口，通过。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。

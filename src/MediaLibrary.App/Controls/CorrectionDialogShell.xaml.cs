@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace MediaLibrary.App.Controls;
 
@@ -9,10 +10,16 @@ public partial class CorrectionDialogShell : UserControl
     public CorrectionDialogShell()
     {
         InitializeComponent();
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
     public static readonly DependencyProperty IsOpenProperty =
-        DependencyProperty.Register(nameof(IsOpen), typeof(bool), typeof(CorrectionDialogShell), new PropertyMetadata(false));
+        DependencyProperty.Register(
+            nameof(IsOpen),
+            typeof(bool),
+            typeof(CorrectionDialogShell),
+            new PropertyMetadata(false, OnIsOpenChanged));
 
     public bool IsOpen
     {
@@ -135,5 +142,108 @@ public partial class CorrectionDialogShell : UserControl
     {
         get => (GridLength)GetValue(FooterSpacingProperty);
         set => SetValue(FooterSpacingProperty, value);
+    }
+
+    private Window? _ownerWindow;
+
+    private static void OnIsOpenChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
+    {
+        if (target is CorrectionDialogShell shell)
+        {
+            shell.UpdateModalState((bool)e.NewValue);
+        }
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (IsOpen)
+        {
+            UpdateModalState(true);
+        }
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        DetachOwnerWindow();
+    }
+
+    private void UpdateModalState(bool isOpen)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (!isOpen)
+        {
+            DetachOwnerWindow();
+            return;
+        }
+
+        AttachOwnerWindow(Window.GetWindow(this));
+        UpdateOverlayPlacement();
+        _ = Dispatcher.BeginInvoke(
+            () =>
+            {
+                UpdateOverlayPlacement();
+                DialogCard.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    private void AttachOwnerWindow(Window? ownerWindow)
+    {
+        if (ReferenceEquals(_ownerWindow, ownerWindow))
+        {
+            return;
+        }
+
+        DetachOwnerWindow();
+        _ownerWindow = ownerWindow;
+        if (_ownerWindow is null)
+        {
+            return;
+        }
+
+        _ownerWindow.LocationChanged += OnOwnerWindowBoundsChanged;
+        _ownerWindow.SizeChanged += OnOwnerWindowBoundsChanged;
+        _ownerWindow.StateChanged += OnOwnerWindowStateChanged;
+    }
+
+    private void DetachOwnerWindow()
+    {
+        if (_ownerWindow is null)
+        {
+            return;
+        }
+
+        _ownerWindow.LocationChanged -= OnOwnerWindowBoundsChanged;
+        _ownerWindow.SizeChanged -= OnOwnerWindowBoundsChanged;
+        _ownerWindow.StateChanged -= OnOwnerWindowStateChanged;
+        _ownerWindow = null;
+    }
+
+    private void OnOwnerWindowBoundsChanged(object? sender, EventArgs e)
+    {
+        UpdateOverlayPlacement();
+    }
+
+    private void OnOwnerWindowStateChanged(object? sender, EventArgs e)
+    {
+        UpdateOverlayPlacement();
+    }
+
+    private void UpdateOverlayPlacement()
+    {
+        if (_ownerWindow is null)
+        {
+            return;
+        }
+
+        OverlayPopup.PlacementTarget = _ownerWindow;
+        OverlayPopup.HorizontalOffset = 0d;
+        OverlayPopup.VerticalOffset = 0d;
+        OverlayLayer.Width = Math.Max(1d, _ownerWindow.ActualWidth);
+        OverlayLayer.Height = Math.Max(1d, _ownerWindow.ActualHeight);
     }
 }

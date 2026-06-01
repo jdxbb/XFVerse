@@ -280,7 +280,8 @@
                                               Margin="0,5,0,0"
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto"
-                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                              helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                     <ScrollViewer.Resources>
                                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource TvSeasonModernScrollBarStyle}" />
                                     </ScrollViewer.Resources>
@@ -348,7 +349,7 @@
                     </Grid>
                 </Border>
 
-                <Grid Grid.Row="2" VerticalAlignment="Center">
+                <Grid Grid.Row="2" Margin="0,0,14,0" VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -361,9 +362,11 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Button Grid.Column="0" Command="{Binding TogglePreferenceCommand}" Content="{Binding PreferenceButtonText}" ContentTemplate="{StaticResource TvSeasonDetailActionButtonTemplate}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="{Binding PreferenceButtonIcon}" />
-                    <Button Grid.Column="2" Command="{Binding MarkSeasonWatchedCommand}" Content="标记已看" ContentTemplate="{StaticResource TvSeasonDetailActionButtonTemplate}" Tag="{Binding WatchedButtonIcon}">
+                    <Button Grid.Column="2" ContentTemplate="{StaticResource TvSeasonDetailActionButtonTemplate}" Tag="{Binding WatchedButtonIcon}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource GlassSecondaryButtonStyle}">
+                                <Setter Property="Command" Value="{Binding MarkSeasonWatchedCommand}" />
+                                <Setter Property="Content" Value="标记已看" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSeasonWatched}" Value="True">
                                         <Setter Property="Command" Value="{Binding MarkSeasonUnwatchedCommand}" />
@@ -406,7 +409,7 @@
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
                          VirtualizingPanel.ScrollUnit="Pixel"
-                         Margin="0,0,-8,0">
+                         Margin="0,0,-6,0">
                     <ListBox.Resources>
                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource TvSeasonModernScrollBarStyle}" />
                     </ListBox.Resources>
@@ -446,7 +449,7 @@
                     </ListBox.Style>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="0,8,0,8"
+                            <Border Padding="0,8,14,8"
                                     BorderThickness="0">
                                 <Border.Style>
                                     <Style TargetType="Border">
@@ -462,7 +465,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="260" />
+                                        <ColumnDefinition Width="320" />
                                     </Grid.ColumnDefinitions>
 
                                     <Border MinWidth="54"
@@ -496,7 +499,7 @@
                                                    Margin="0,6,0,0"
                                                    MaxHeight="38"
                                                    Style="{StaticResource BodyTextStyle}"
-                                                   Text="{Binding Overview}"
+                                                   Text="{Binding OverviewDisplayText}"
                                                    TextTrimming="CharacterEllipsis"
                                                    TextWrapping="Wrap" />
                                         <StackPanel Grid.Row="2" Margin="0,8,0,0" Orientation="Horizontal">
@@ -520,11 +523,11 @@
                                                 Style="{StaticResource GlassSecondaryButtonStyle}" />
                                         <Button Margin="0,0,8,0"
                                                 Focusable="False"
-                                                Command="{Binding DataContext.MarkEpisodeWatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Content="标记已看">
+                                                CommandParameter="{Binding}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource GlassSecondaryButtonStyle}">
+                                                    <Setter Property="Command" Value="{Binding DataContext.MarkEpisodeWatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                                    <Setter Property="Content" Value="标记已看" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsWatched}" Value="True">
                                                             <Setter Property="Command" Value="{Binding DataContext.MarkEpisodeUnwatchedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />

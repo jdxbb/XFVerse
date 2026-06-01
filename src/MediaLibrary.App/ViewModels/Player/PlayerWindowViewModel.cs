@@ -2512,23 +2512,24 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             TracePlayback(
                 $"playback-play-start mediaFileId={source.MediaFileId} mode={FormatPlaybackMode(_currentPlaybackMode)} engine=mpv");
             _isAwaitingInitialPlaybackProgress = shouldResumePlaying;
-            await _playbackEngine!.LoadAsync(
-                new PlaybackLoadRequest
-                {
-                    MediaFileId = source.MediaFileId,
-                    SourceConnectionId = source.SourceConnectionId,
-                    PlaybackUrl = playbackUrl,
-                    ProtocolType = source.ProtocolType,
-                    Username = isLocalFile ? string.Empty : source.Username,
-                    Password = isLocalFile ? string.Empty : source.Password,
-                    IsLocalFile = isLocalFile,
-                    StartPositionSeconds = Math.Max(0, resumePosition),
-                    FileSize = source.FileSize,
-                    LastModifiedAt = source.LastModifiedAt,
-                    VideoCodec = source.VideoCodec,
-                    ResolutionWidth = source.ResolutionWidth,
-                    ResolutionHeight = source.ResolutionHeight
-                });
+            var loadRequest = new PlaybackLoadRequest
+            {
+                MediaFileId = source.MediaFileId,
+                SourceConnectionId = source.SourceConnectionId,
+                PlaybackUrl = playbackUrl,
+                ProtocolType = source.ProtocolType,
+                Username = isLocalFile ? string.Empty : source.Username,
+                Password = isLocalFile ? string.Empty : source.Password,
+                IsLocalFile = isLocalFile,
+                StartPositionSeconds = Math.Max(0, resumePosition),
+                FileSize = source.FileSize,
+                LastModifiedAt = source.LastModifiedAt,
+                VideoCodec = source.VideoCodec,
+                ResolutionWidth = source.ResolutionWidth,
+                ResolutionHeight = source.ResolutionHeight
+            };
+            var playbackEngine = _playbackEngine!;
+            await Task.Run(() => playbackEngine.LoadAsync(loadRequest));
             TracePlayback(
                 $"playback-media-create-success mediaFileId={source.MediaFileId} mode={FormatPlaybackMode(_currentPlaybackMode)} uriKind={uriKind}");
             TracePlayback(
@@ -2541,7 +2542,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                RecordSubtitleTrackDiscoveryUpdate(source.MediaFileId, _playbackEngine.SubtitleTracks);
+                RecordSubtitleTrackDiscoveryUpdate(source.MediaFileId, playbackEngine.SubtitleTracks);
             }
             _isStopped = false;
             ApplyVolumeToPlayer();
@@ -2563,11 +2564,11 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
             if (!shouldResumePlaying)
             {
-                _playbackEngine.Pause();
+                playbackEngine.Pause();
             }
             else
             {
-                _playbackEngine.Play();
+                playbackEngine.Play();
             }
         }
         catch (Exception exception)
@@ -2645,7 +2646,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         {
             engine = _playbackEngineFactory.Create();
             SubscribePlaybackEngine(engine);
-            await engine.InitializeAsync(_playbackHostHandle);
+            await Task.Run(() => engine.InitializeAsync(_playbackHostHandle));
             _playbackEngine = engine;
             TracePlayback("playback-engine-selected engine=mpv");
             return true;
@@ -4060,7 +4061,6 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
         var watched = (int)Math.Max(0, (DateTime.UtcNow - _historyStartedAt).TotalSeconds);
         var normalizedPosition = Math.Max(0, positionSeconds);
-        UpdateActiveSourceProgressSnapshot(normalizedPosition);
         var mediaDurationSeconds = GetCurrentMediaDurationSeconds();
         if (normalizedPosition <= 0 || watched < 3)
         {
@@ -4106,6 +4106,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
                 watched,
                 isCompleted,
                 mediaDurationSeconds);
+            UpdateActiveSourceProgressSnapshot(normalizedPosition);
             NotifyAutoWatchedChanged(autoWatchedChanged);
             MpvPlaybackDiagnostics.Write($"mpv-watch-history-save mediaFileId={_activeMediaFileId ?? SelectedSource?.MediaFileId ?? 0} positionSeconds={normalizedPosition} completed={isCompleted.ToString().ToLowerInvariant()}");
         }

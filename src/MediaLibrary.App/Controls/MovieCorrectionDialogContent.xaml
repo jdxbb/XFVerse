@@ -23,29 +23,12 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="CorrectionPlaceholderStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource BodyMutedTextStyle}">
-            <Setter Property="Margin" Value="12,0,32,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="Opacity" Value="0.62" />
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <Trigger Property="Tag" Value="">
-                    <Setter Property="Visibility" Value="Visible" />
-                </Trigger>
-                <Trigger Property="Tag" Value="{x:Null}">
-                    <Setter Property="Visibility" Value="Visible" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
         <Style x:Key="CorrectionToolbarButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource GlassSecondaryButtonStyle}">
             <Setter Property="Height" Value="36" />
             <Setter Property="Padding" Value="12,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="CorrectionTextBoxStyle"
@@ -69,7 +52,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ListBoxItem}">
@@ -171,6 +154,23 @@
                     Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
         </Style>
 
+        <Style x:Key="CorrectionInfoLabelStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="CorrectionInfoValueStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource CorrectionTrimmedTextStyle}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="CorrectionNestedRowBorderStyle" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushDivider}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+
         <Style x:Key="CorrectionModePanelStyle" TargetType="Grid">
             <Setter Property="Visibility" Value="Collapsed" />
         </Style>
@@ -205,20 +205,11 @@
                                                        FontFamily="Segoe MDL2 Assets"
                                                        FontSize="12"
                                                        Foreground="{DynamicResource BrushForegroundMuted}"
-                                                       RenderTransformOrigin="0.5,0.5"
-                                                       Text="&#xE70D;">
-                                                <TextBlock.RenderTransform>
-                                                    <RotateTransform Angle="0" />
-                                                </TextBlock.RenderTransform>
-                                            </TextBlock>
+                                                       Text="&#xE70D;" />
                                         </Grid>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="Arrow" Property="RenderTransform">
-                                                    <Setter.Value>
-                                                        <RotateTransform Angle="90" />
-                                                    </Setter.Value>
-                                                </Setter>
+                                                <Setter TargetName="Arrow" Property="Text" Value="&#xE70E;" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -284,11 +275,11 @@
                         <ColumnDefinition Width="138" />
                     </Grid.ColumnDefinitions>
                     <Grid>
-                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                        <TextBox x:Name="MovieSearchTextBox"
+                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入需要搜索的影片名"
+                                 Style="{StaticResource CorrectionTextBoxStyle}"
                                  Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Tag="{Binding ManualSearchQuery}"
-                                   Text="请输入需要搜索的影片名"
-                                   Style="{StaticResource CorrectionPlaceholderStyle}" />
                         <Button Margin="0,0,7,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
@@ -297,11 +288,11 @@
                                 Style="{StaticResource CorrectionClearButtonStyle}" />
                     </Grid>
                     <Grid Grid.Column="2">
-                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                        <TextBox x:Name="MovieYearTextBox"
+                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="影片的上映年份（可选）"
+                                 Style="{StaticResource CorrectionTextBoxStyle}"
                                  Text="{Binding ManualSearchYear, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Tag="{Binding ManualSearchYear}"
-                                   Text="影片的上映年份（可选）"
-                                   Style="{StaticResource CorrectionPlaceholderStyle}" />
                         <Button Margin="0,0,7,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
@@ -312,7 +303,7 @@
                     <Button Grid.Column="4"
                             Command="{Binding SearchCandidatesCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe MDL2 Assets"
                                        RenderTransformOrigin="0.5,0.5"
                                        Style="{StaticResource CorrectionToolbarIconStyle}"
@@ -321,18 +312,18 @@
                                     <ScaleTransform ScaleX="-1" />
                                 </TextBlock.RenderTransform>
                             </TextBlock>
-                            <TextBlock Margin="7,0,0,0" Text="TMDB" />
+                            <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="TMDB" />
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="6"
                             Command="{Binding AiSuggestSearchCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe UI Symbol"
                                        FontSize="16"
                                        Style="{StaticResource CorrectionToolbarIconStyle}"
                                        Text="✦" />
-                            <TextBlock Margin="7,0,0,0" Text="AI辅助识别" />
+                            <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="AI辅助识别" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -359,11 +350,11 @@
                         <ColumnDefinition Width="138" />
                     </Grid.ColumnDefinitions>
                     <Grid>
-                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                        <TextBox x:Name="TvSearchTextBox"
+                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入需要搜索的电视剧名"
+                                 Style="{StaticResource CorrectionTextBoxStyle}"
                                  Text="{Binding TvCorrectionQuery, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Tag="{Binding TvCorrectionQuery}"
-                                   Text="请输入需要搜索的电视剧名"
-                                   Style="{StaticResource CorrectionPlaceholderStyle}" />
                         <Button Margin="0,0,7,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
@@ -372,9 +363,11 @@
                                 Style="{StaticResource CorrectionClearButtonStyle}" />
                     </Grid>
                     <Grid Grid.Column="2">
-                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                        <TextBox x:Name="SeasonNumberTextBox"
+                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="季号"
+                                 Style="{StaticResource CorrectionTextBoxStyle}"
                                  Text="{Binding CorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Tag="{Binding CorrectionSeasonNumber}" Text="季号" Style="{StaticResource CorrectionPlaceholderStyle}" />
                         <Button Margin="0,0,7,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
@@ -383,9 +376,11 @@
                                 Style="{StaticResource CorrectionClearButtonStyle}" />
                     </Grid>
                     <Grid Grid.Column="4">
-                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                        <TextBox x:Name="EpisodeNumberTextBox"
+                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="集号"
+                                 Style="{StaticResource CorrectionTextBoxStyle}"
                                  Text="{Binding CorrectionEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Tag="{Binding CorrectionEpisodeNumber}" Text="集号" Style="{StaticResource CorrectionPlaceholderStyle}" />
                         <Button Margin="0,0,7,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
@@ -396,7 +391,7 @@
                     <Button Grid.Column="6"
                             Command="{Binding SearchCandidatesCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe MDL2 Assets"
                                        RenderTransformOrigin="0.5,0.5"
                                        Style="{StaticResource CorrectionToolbarIconStyle}"
@@ -405,18 +400,18 @@
                                     <ScaleTransform ScaleX="-1" />
                                 </TextBlock.RenderTransform>
                             </TextBlock>
-                            <TextBlock Margin="7,0,0,0" Text="TMDB" />
+                            <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="TMDB" />
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="8"
                             Command="{Binding AiSuggestSearchCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe UI Symbol"
                                        FontSize="16"
                                        Style="{StaticResource CorrectionToolbarIconStyle}"
                                        Text="✦" />
-                            <TextBlock Margin="7,0,0,0" Text="AI辅助识别" />
+                            <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="AI辅助识别" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -434,12 +429,14 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="128" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="132" />
+                        <ColumnDefinition Width="158" />
                     </Grid.ColumnDefinitions>
                     <Grid>
-                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                        <TextBox x:Name="UnknownSeasonEpisodeNumberTextBox"
+                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="集号"
+                                 Style="{StaticResource CorrectionTextBoxStyle}"
                                  Text="{Binding UnknownSeasonEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Tag="{Binding UnknownSeasonEpisodeNumber}" Text="集号" Style="{StaticResource CorrectionPlaceholderStyle}" />
                         <Button Margin="0,0,7,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
@@ -448,6 +445,9 @@
                                 Style="{StaticResource CorrectionClearButtonStyle}" />
                     </Grid>
                     <Button Grid.Column="2"
+                            Height="36"
+                            Margin="0,0,26,0"
+                            VerticalAlignment="Center"
                             Command="{Binding ApplyUnknownSeasonCorrectionCommand}"
                             Content="加入到该季"
                             Style="{StaticResource CorrectionToolbarButtonStyle}" />
@@ -519,27 +519,43 @@
                                     <ColumnDefinition Width="14" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="82"
-                                        Height="123"
-                                        Background="{DynamicResource BrushGlassSurface}"
-                                        CornerRadius="10"
-                                        ClipToBounds="True"
+                                 <Border Width="82"
+                                         Height="123"
+                                         VerticalAlignment="Center"
+                                         Background="{DynamicResource BrushGlassSurface}"
+                                         CornerRadius="10"
+                                         ClipToBounds="True"
                                         Effect="{StaticResource ShadowCard}">
                                     <Grid>
                                         <Control IsHitTestVisible="False" Template="{StaticResource PosterPlaceholderTemplate}" />
-                                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="220"
-                                               helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
-                                               RenderOptions.BitmapScalingMode="HighQuality"
-                                               Stretch="UniformToFill" />
-                                    </Grid>
-                                </Border>
-                                <Grid Grid.Column="2" Margin="0,2,0,2">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="7" />
+                                         <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="220"
+                                                helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                RenderOptions.BitmapScalingMode="HighQuality"
+                                                Stretch="UniformToFill" />
+                                        <Border BorderBrush="#42FFFFFF"
+                                                BorderThickness="1"
+                                                CornerRadius="10">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Offset="0" Color="#24FFFFFF" />
+                                                    <GradientStop Offset="0.46" Color="#00000000" />
+                                                    <GradientStop Offset="1" Color="#16000000" />
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                     </Grid>
+                                 </Border>
+                                 <Grid Grid.Column="2"
+                                       Height="123"
+                                       VerticalAlignment="Center">
+                                     <Grid.RowDefinitions>
+                                         <RowDefinition Height="Auto" />
+                                         <RowDefinition Height="7" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
-                                    <StackPanel Orientation="Horizontal">
+                                     <StackPanel Margin="0,5,0,0"
+                                                 VerticalAlignment="Top"
+                                                 Orientation="Horizontal">
                                         <TextBlock FontSize="16"
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource BrushForegroundPrimary}"
@@ -552,7 +568,8 @@
                                     <ScrollViewer Grid.Row="2"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   VerticalScrollBarVisibility="Auto"
-                                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                                  helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                         <ScrollViewer.Resources>
                                             <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CorrectionModernScrollBarStyle}" />
                                         </ScrollViewer.Resources>
@@ -564,17 +581,33 @@
                                         </TextBlock>
                                     </ScrollViewer>
                                 </Grid>
-                                <StackPanel Grid.Column="4" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
-                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding ReleaseDateText}" />
-                                        <TextBlock Margin="14,0,0,0" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE823;" />
-                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding RuntimeText}" />
-                                    </StackPanel>
-                                    <TextBlock Margin="0,9,0,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding DirectorDisplayText, StringFormat=导演  {0}}" />
-                                    <TextBlock Margin="0,6,0,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding CountryDisplayText, StringFormat=国家/地区  {0}}" />
-                                    <TextBlock Margin="0,6,0,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding LanguageDisplayText, StringFormat=语言  {0}}" />
-                                </StackPanel>
+                                 <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                     <StackPanel Orientation="Horizontal">
+                                         <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
+                                         <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding ReleaseDateText}" />
+                                         <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE823;" />
+                                         <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding RuntimeText}" />
+                                     </StackPanel>
+                                     <Grid Margin="0,9,0,0">
+                                         <Grid.ColumnDefinitions>
+                                             <ColumnDefinition Width="64" />
+                                             <ColumnDefinition Width="*" />
+                                         </Grid.ColumnDefinitions>
+                                         <Grid.RowDefinitions>
+                                             <RowDefinition Height="Auto" />
+                                             <RowDefinition Height="6" />
+                                             <RowDefinition Height="Auto" />
+                                             <RowDefinition Height="6" />
+                                             <RowDefinition Height="Auto" />
+                                         </Grid.RowDefinitions>
+                                         <TextBlock Style="{StaticResource CorrectionInfoLabelStyle}" Text="导演" />
+                                         <TextBlock Grid.Column="1" Style="{StaticResource CorrectionInfoValueStyle}" Text="{Binding DirectorDisplayText}" />
+                                         <TextBlock Grid.Row="2" Style="{StaticResource CorrectionInfoLabelStyle}" Text="国家/地区" />
+                                         <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource CorrectionInfoValueStyle}" Text="{Binding CountryDisplayText}" />
+                                         <TextBlock Grid.Row="4" Style="{StaticResource CorrectionInfoLabelStyle}" Text="语言" />
+                                         <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource CorrectionInfoValueStyle}" Text="{Binding LanguageDisplayText}" />
+                                     </Grid>
+                                 </StackPanel>
                                 <Button Grid.Column="6"
                                         MinWidth="92"
                                         VerticalAlignment="Center"
@@ -650,31 +683,31 @@
                                                 <RowDefinition Height="7" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock VerticalAlignment="Bottom" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
-                                                <TextBlock Margin="9,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding OriginalSeriesTitleDisplayText}" />
-                                                <Border Width="1"
-                                                        Height="16"
-                                                        Margin="12,0"
-                                                        VerticalAlignment="Center"
-                                                        Background="{DynamicResource BrushBorder}" />
-                                                <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
-                                                <TextBlock Margin="7,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding FirstAirDateDisplayText}" />
-                                                <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
-                                                <TextBlock Margin="7,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
-                                            </StackPanel>
-                                            <Grid Grid.Row="2">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="116" />
-                                                    <ColumnDefinition Width="1.35*" />
-                                                    <ColumnDefinition Width="1*" />
-                                                    <ColumnDefinition Width="0.86*" />
+                                             <StackPanel Orientation="Horizontal">
+                                                 <TextBlock VerticalAlignment="Bottom" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
+                                                 <TextBlock Margin="9,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding OriginalSeriesTitleDisplayText}" />
+                                                 <Border Width="1"
+                                                         Height="14"
+                                                         Margin="12,2,12,0"
+                                                         VerticalAlignment="Center"
+                                                         Background="{DynamicResource BrushBorder}" />
+                                                 <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
+                                                 <TextBlock Margin="7,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding FirstAirDateDisplayText}" />
+                                                 <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
+                                                 <TextBlock Margin="7,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
+                                             </StackPanel>
+                                             <Grid Grid.Row="2">
+                                                 <Grid.ColumnDefinitions>
+                                                     <ColumnDefinition Width="130" />
+                                                     <ColumnDefinition Width="1.35*" />
+                                                     <ColumnDefinition Width="1*" />
+                                                     <ColumnDefinition Width="0.86*" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding DirectorText, StringFormat=导演  {0}}" />
-                                                <TextBlock Grid.Column="1" Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding GenresDisplayText, StringFormat=类型  {0}}" />
-                                                <TextBlock Grid.Column="2" Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding CountryDisplayText, StringFormat=国家/地区  {0}}" />
-                                                <TextBlock Grid.Column="3" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding LanguageDisplayText, StringFormat=语言  {0}}" />
-                                            </Grid>
+                                                 <TextBlock Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding DirectorText, StringFormat=导演  {0}}" />
+                                                 <TextBlock Grid.Column="1" Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding GenresDisplayText, StringFormat=类型  {0}}" />
+                                                 <TextBlock Grid.Column="2" Margin="0,0,5,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding CountryDisplayText, StringFormat=国家/地区  {0}}" />
+                                                 <TextBlock Grid.Column="3" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding LanguageDisplayText, StringFormat=语言  {0}}" />
+                                             </Grid>
                                         </Grid>
                                         <Button Grid.Column="2"
                                                 Width="96"
@@ -685,10 +718,14 @@
                                                 Style="{StaticResource GlassPrimaryButtonStyle}" />
                                     </Grid>
                                 </Expander.Header>
-                                <ItemsControl Margin="22,0,0,0" ItemsSource="{Binding Seasons}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,0,0,9">
+                                <Border Margin="22,0,26,0"
+                                        BorderBrush="{DynamicResource BrushDivider}"
+                                        BorderThickness="0,1,0,0">
+                                    <ItemsControl ItemsSource="{Binding Seasons}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource CorrectionNestedRowBorderStyle}">
+                                                    <Grid Margin="0,9,0,9">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="12" />
                                                     <ColumnDefinition Width="14" />
@@ -713,10 +750,12 @@
                                                         CommandParameter="{Binding}"
                                                         Content="修正到季"
                                                         Style="{StaticResource GlassPrimaryButtonStyle}" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
                             </Expander>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -763,16 +802,22 @@
                         <DataTemplate>
                             <Expander Style="{StaticResource CorrectionRowExpanderStyle}">
                                 <Expander.Header>
-                                    <StackPanel Margin="0,12,0,12" Orientation="Horizontal">
-                                        <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
+                                    <StackPanel Margin="0,12,0,12"
+                                                VerticalAlignment="Center"
+                                                Orientation="Horizontal">
+                                        <TextBlock VerticalAlignment="Bottom" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
                                         <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
-                                        <TextBlock Margin="7,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
                                     </StackPanel>
                                 </Expander.Header>
-                                <ItemsControl Margin="22,0,0,0" ItemsSource="{Binding Seasons}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,0,0,9">
+                                <Border Margin="22,0,26,0"
+                                        BorderBrush="{DynamicResource BrushDivider}"
+                                        BorderThickness="0,1,0,0">
+                                    <ItemsControl ItemsSource="{Binding Seasons}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource CorrectionNestedRowBorderStyle}">
+                                                    <Grid Margin="0,9,0,9">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="12" />
                                                     <ColumnDefinition Width="14" />
@@ -795,10 +840,12 @@
                                                         CommandParameter="{Binding}"
                                                         Content="选择该季"
                                                         Style="{StaticResource GlassPrimaryButtonStyle}" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
                             </Expander>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -873,7 +920,7 @@
                         Content="确认修正"
                         Style="{StaticResource GlassPrimaryButtonStyle}" />
                 <Button MinWidth="84"
-                        Margin="10,0,0,0"
+                        Margin="36,0,0,0"
                         Command="{Binding CancelCorrectionCommand}"
                         Content="取消"
                         Style="{StaticResource GlassSecondaryButtonStyle}" />

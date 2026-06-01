@@ -117,6 +117,8 @@ public sealed class TvSeasonEpisodeListItem : INotifyPropertyChanged
 
     public string Overview { get; set; } = string.Empty;
 
+    public string OverviewDisplayText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
+
     public DateTime? AirDate { get; set; }
 
     public int? RuntimeMinutes { get; set; }

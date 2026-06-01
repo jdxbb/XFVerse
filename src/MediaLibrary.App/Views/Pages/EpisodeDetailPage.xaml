@@ -152,20 +152,20 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Grid Width="620" Height="349" Margin="0,14,0,0">
+            <Grid Width="600" Height="338" Margin="0,14,0,0">
                 <Border x:Name="EpisodeStillClipMask"
                         Background="White"
                         CornerRadius="20"
                         IsHitTestVisible="False" />
                 <Canvas ClipToBounds="False" IsHitTestVisible="False">
                     <Image x:Name="EpisodeStillPaletteShadowHost"
-                           Width="740"
-                           Height="469"
+                           Width="720"
+                           Height="458"
                            Canvas.Left="-60"
                            Canvas.Top="-60"
                            helpers:PosterCachedShadowBehavior.BlurRadius="30"
-                           helpers:PosterCachedShadowBehavior.CardHeight="349"
-                           helpers:PosterCachedShadowBehavior.CardWidth="620"
+                           helpers:PosterCachedShadowBehavior.CardHeight="338"
+                           helpers:PosterCachedShadowBehavior.CardWidth="600"
                            helpers:PosterCachedShadowBehavior.CornerRadius="20"
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
@@ -193,7 +193,7 @@
 
             <Grid Grid.Column="2" Margin="0,14,0,0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="293" />
+                    <RowDefinition Height="282" />
                     <RowDefinition Height="12" />
                     <RowDefinition Height="44" />
                 </Grid.RowDefinitions>
@@ -203,7 +203,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="300" />
+                            <ColumnDefinition Width="276" />
                         </Grid.ColumnDefinitions>
 
                         <Grid>
@@ -230,19 +230,19 @@
                                                TextTrimming="CharacterEllipsis"
                                                TextWrapping="NoWrap"
                                                helpers:TrimmedTextToolTipBehavior.FullText="{Binding SeriesAndOriginalNameText}" />
-                                    <TextBlock Margin="18,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource BrushForegroundSecondary}" Text="&#xE787;" />
-                                    <TextBlock Margin="6,0,0,0" FontSize="17" Foreground="{DynamicResource BrushForegroundSecondary}" Text="{Binding AirDateText}" />
+                                    <TextBlock Margin="18,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource BrushForegroundSecondary}" Text="&#xE787;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Bottom" FontSize="14" Foreground="{DynamicResource BrushForegroundSecondary}" Text="{Binding AirDateText}" />
                                 </StackPanel>
                             </StackPanel>
 
-                            <Border Grid.Row="2" Width="330" Padding="8" HorizontalAlignment="Center" Background="{DynamicResource BrushGlassSurfaceAlt}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
+                            <Border Grid.Row="2" Width="294" Padding="8" HorizontalAlignment="Center" Background="{DynamicResource BrushGlassSurfaceAlt}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="96" />
+                                        <ColumnDefinition Width="88" />
                                         <ColumnDefinition Width="3" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="3" />
-                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="78" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Horizontal">
                                         <Border Width="24" Height="24" Margin="0,0,7,0" HorizontalAlignment="Left" Background="{DynamicResource BrushGlassSelected}" CornerRadius="7">
@@ -274,7 +274,7 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="简介" />
-                                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" helpers:ScrollBarAutoRevealBehavior.IsEnabled="True" helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                     <ScrollViewer.Resources>
                                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource EpisodeDetailModernScrollBarStyle}" />
                                     </ScrollViewer.Resources>
@@ -336,7 +336,7 @@
                     </Grid>
                 </Border>
 
-                <Grid Grid.Row="2" Margin="26,0">
+                <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -478,7 +478,7 @@
 
                                 <StackPanel Grid.Column="10"
                                             Margin="6,0,0,0"
-                                            HorizontalAlignment="Center"
+                                            HorizontalAlignment="Right"
                                             Orientation="Horizontal"
                                             VerticalAlignment="Center">
                                     <Button Width="48"
@@ -512,7 +512,6 @@
                                             IsEnabled="{Binding DataContext.CanResetSourcesToUnidentified, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             Style="{StaticResource EpisodeDetailSourceActionButtonStyle}" />
                                     <Button Width="48"
-                                            Margin="0,0,6,0"
                                             Command="{Binding DataContext.ManualProbeSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Content="探测"

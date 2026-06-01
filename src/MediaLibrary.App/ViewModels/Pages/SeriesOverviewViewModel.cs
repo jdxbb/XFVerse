@@ -147,7 +147,12 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 return "暂无季信息";
             }
 
-            return Seasons.All(x => x.IsVisibleInLibrary) ? "移出全部季" : "补充加入全部季";
+            if (Seasons.All(x => x.IsVisibleInLibrary))
+            {
+                return "移出全部季";
+            }
+
+            return Seasons.Any(x => x.IsVisibleInLibrary) ? "补充加入全部季" : "加入全部季";
         }
     }
 

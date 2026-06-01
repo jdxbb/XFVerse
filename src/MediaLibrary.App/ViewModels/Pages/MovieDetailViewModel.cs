@@ -362,7 +362,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string PreferenceButtonIcon => IsWatched
         ? IsFavorite ? "\uEB52" : "\uEB51"
-        : IsWantToWatch ? "\uE738" : "\uE710";
+        : IsWantToWatch ? "\uE735" : "\uE734";
 
     public string NotInterestedButtonIcon => "\uE814";
 
@@ -792,8 +792,37 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         await LoadMovieAsync(selectedMovieId.Value, cancellationToken);
     }
 
+    public void PrepareForActivation()
+    {
+        var selectedExternalRecommendation = _navigationStateService.SelectedExternalRecommendation;
+        if (selectedExternalRecommendation is not null)
+        {
+            if (!ReferenceEquals(_externalRecommendation, selectedExternalRecommendation))
+            {
+                ClearMovieState("正在加载影片详情...");
+            }
+
+            return;
+        }
+
+        var selectedMovieId = _navigationStateService.SelectedMovieId;
+        if (selectedMovieId.HasValue
+            && (!_movieId.HasValue
+                || _movieId.Value != selectedMovieId.Value
+                || _externalRecommendation is not null))
+        {
+            ClearMovieState("正在加载影片详情...");
+        }
+    }
+
     private async Task LoadMovieAsync(int movieId, CancellationToken cancellationToken)
     {
+        if (_movieId.HasValue && _movieId.Value != movieId)
+        {
+            ClearMovieState("正在加载影片详情...");
+            await Task.Yield();
+        }
+
         try
         {
             var detail = await _movieDetailQueryService.GetMovieDetailAsync(movieId, cancellationToken);

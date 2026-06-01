@@ -109,24 +109,13 @@ public partial class PlayerWindow : Window
             ShowControlBar();
             RestartControlBarTimer();
             _cursorPollTimer.Start();
-            if (!_isFullScreen)
-            {
-                _ = Dispatcher.BeginInvoke(
-                    () =>
-                    {
-                        if (!_isFullScreen && IsLoaded)
-                        {
-                            ToggleFullScreen();
-                        }
-                    },
-                    DispatcherPriority.ApplicationIdle);
-            }
         };
         Activated += OnWindowActivated;
         Deactivated += OnWindowDeactivated;
         StateChanged += OnWindowStateChanged;
         LocationChanged += (_, _) => UpdatePopupPlacements();
         SizeChanged += (_, _) => UpdatePopupPlacements();
+        EnterFullScreen();
         UpdatePlayerChromeVisibility();
         UpdatePlayerMaximizeRestoreButton();
     }
@@ -1419,11 +1408,18 @@ public partial class PlayerWindow : Window
             return;
         }
 
+        EnterFullScreen();
+    }
+
+    private void EnterFullScreen()
+    {
         _previousState = WindowState;
         _previousStyle = WindowStyle;
         _previousResizeMode = ResizeMode;
         _isFullScreen = true;
         _isFullScreenChromeVisible = true;
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
         WindowState = WindowState.Maximized;
         UpdatePlayerChromeVisibility();
         _lastCursorPosition = null;
@@ -1436,6 +1432,8 @@ public partial class PlayerWindow : Window
     {
         _isFullScreen = false;
         _isFullScreenChromeVisible = true;
+        WindowStyle = _previousStyle;
+        ResizeMode = _previousResizeMode;
         WindowState = _previousState;
         UpdatePlayerChromeVisibility();
         UpdatePlayerMaximizeRestoreButton();
@@ -1866,9 +1864,9 @@ public partial class PlayerWindow : Window
             return new IntPtr(1);
         }
 
-        if (msg == WmGetMinMaxInfo && !_isFullScreen)
+        if (msg == WmGetMinMaxInfo)
         {
-            ApplyMonitorWorkArea(lParam);
+            ApplyMonitorBounds(lParam, useFullMonitorArea: _isFullScreen);
             handled = true;
         }
         else if (msg == WmSizing && !_isFullScreen)
@@ -1910,7 +1908,7 @@ public partial class PlayerWindow : Window
         return onHorizontalEdge ^ onVerticalEdge;
     }
 
-    private void ApplyMonitorWorkArea(IntPtr lParam)
+    private void ApplyMonitorBounds(IntPtr lParam, bool useFullMonitorArea)
     {
         if (_windowSource?.Handle is not { } handle || handle == IntPtr.Zero)
         {
@@ -1934,7 +1932,7 @@ public partial class PlayerWindow : Window
         }
 
         var minMaxInfo = Marshal.PtrToStructure<MINMAXINFO>(lParam);
-        var workArea = monitorInfo.WorkArea;
+        var workArea = useFullMonitorArea ? monitorInfo.MonitorArea : monitorInfo.WorkArea;
         var monitorArea = monitorInfo.MonitorArea;
 
         minMaxInfo.MaxPosition.X = Math.Abs(workArea.Left - monitorArea.Left);

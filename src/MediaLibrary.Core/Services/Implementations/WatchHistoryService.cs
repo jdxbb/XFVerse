@@ -927,8 +927,9 @@ public sealed class WatchHistoryService : IWatchHistoryService
         }
 
         var movieId = history.MovieId.Value;
-        if (history.LastPlayPositionSeconds > 0
-            || history.DurationWatchedSeconds > 0
+        // A resumed session is initialized with its prior position. Only newly watched time proves
+        // that an ultra-short session should survive close-time discard.
+        if (history.DurationWatchedSeconds > 0
             || history.IsCompleted)
         {
             history.EndedAt ??= DateTime.UtcNow;
@@ -960,8 +961,7 @@ public sealed class WatchHistoryService : IWatchHistoryService
         CancellationToken cancellationToken)
     {
         var episodeId = history.EpisodeId!.Value;
-        if (history.LastPlayPositionSeconds > 0
-            || history.DurationWatchedSeconds > 0
+        if (history.DurationWatchedSeconds > 0
             || history.IsCompleted)
         {
             history.EndedAt ??= DateTime.UtcNow;

@@ -22,7 +22,7 @@ public sealed class TmdbService : ITmdbService
     private const string TmdbSearchCacheType = "Search";
     private const string TmdbDetailCacheType = "DetailCredits";
     private const string TmdbExternalIdsCacheType = "ExternalIds";
-    private const string TvSeriesDetailCacheSchemaVersion = "v3";
+    private const string TvSeriesDetailCacheSchemaVersion = "v4";
     private const int DiscoveryPageSize = 20;
     internal const int HttpConcurrencyLimit = 8;
     private const int SearchCacheLimit = 300;
@@ -642,7 +642,7 @@ public sealed class TmdbService : ITmdbService
         try
         {
             using var response = await SendGetAsync(
-                $"tv/{seriesId}?language={Uri.EscapeDataString(safeLanguage)}&append_to_response=credits",
+                $"tv/{seriesId}?language={Uri.EscapeDataString(safeLanguage)}&append_to_response=credits,aggregate_credits",
                 options,
                 "tmdb-tv-series-detail",
                 cancellationToken);
@@ -1512,10 +1512,14 @@ public sealed class TmdbService : ITmdbService
             FirstAirYear = ParseYear(firstAirDate),
             GenresText = TmdbTvGenreMapper.NormalizeGenreNames(
                 string.Join(" / ", EnumerateArrayStrings(root, "genres", "name"))),
-            DirectorText = JoinNames(EnumerateMovieCrewNames(root, "Director", "Series Director"), 6),
+            DirectorText = JoinNames(
+                EnumerateMovieCrewNames(root, "Director", "Series Director")
+                    .Concat(EnumerateAggregateTvCrewNames(root, "Director", "Series Director")),
+                6),
             WriterText = JoinNames(
                 EnumerateArrayStrings(root, "created_by", "name")
-                    .Concat(EnumerateMovieCrewNames(root, "Writer", "Screenplay", "Story", "Teleplay")),
+                    .Concat(EnumerateMovieCrewNames(root, "Writer", "Screenplay", "Story", "Teleplay"))
+                    .Concat(EnumerateAggregateTvCrewNames(root, "Writer", "Screenplay", "Story", "Teleplay")),
                 8),
             ActorsText = JoinNames(EnumerateMovieCastNames(root), 10),
             ProductionStatus = GetString(root, "status"),
@@ -1947,6 +1951,33 @@ public sealed class TmdbService : ITmdbService
 
         foreach (var item in cast.EnumerateArray())
         {
+            var name = GetString(item, "name");
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                yield return name;
+            }
+        }
+    }
+
+    private static IEnumerable<string> EnumerateAggregateTvCrewNames(JsonElement details, params string[] jobs)
+    {
+        if (!details.TryGetProperty("aggregate_credits", out var aggregateCredits)
+            || !aggregateCredits.TryGetProperty("crew", out var crew)
+            || crew.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        var jobSet = new HashSet<string>(jobs, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in crew.EnumerateArray())
+        {
+            if (!item.TryGetProperty("jobs", out var itemJobs)
+                || itemJobs.ValueKind != JsonValueKind.Array
+                || !itemJobs.EnumerateArray().Any(job => jobSet.Contains(GetString(job, "job"))))
+            {
+                continue;
+            }
+
             var name = GetString(item, "name");
             if (!string.IsNullOrWhiteSpace(name))
             {

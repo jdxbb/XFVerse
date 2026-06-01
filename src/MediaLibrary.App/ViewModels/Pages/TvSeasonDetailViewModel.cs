@@ -574,7 +574,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public string PreferenceButtonIcon => IsSeasonWatched
         ? IsFavorite ? "\uEB52" : "\uEB51"
-        : IsWantToWatch ? "\uE738" : "\uE710";
+        : IsWantToWatch ? "\uE735" : "\uE734";
 
     public string NotInterestedButtonIcon => "\uE814";
 
@@ -723,6 +723,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             }
 
             _ = LoadRatingDisplayAsync(model.SeasonId, cancellationToken);
+            if (model.TmdbSeriesId.HasValue)
+            {
+                _ = EnsureSeriesMetadataAndRefreshAsync(model.SeriesId, model.SeasonId, cancellationToken);
+            }
+
             if (shouldEnsureEpisodeMetadata)
             {
                 _ = EnsureSeasonEpisodesAndRefreshAsync(model.SeasonId, cancellationToken);
@@ -802,6 +807,48 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             {
                 StatusMessage = $"本季集信息补齐失败：{DescribeException(exception)}";
             }
+        }
+    }
+
+    private async Task EnsureSeriesMetadataAndRefreshAsync(
+        int seriesId,
+        int seasonId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Run(
+                () => _metadataHydrationService.EnsureHydratedBySeriesIdAsync(
+                    seriesId,
+                    cancellationToken: cancellationToken),
+                cancellationToken);
+
+            if (_navigationStateService.SelectedTvSeasonId != seasonId)
+            {
+                return;
+            }
+
+            var model = await _tvDetailQueryService.GetSeasonDetailAsync(seasonId, cancellationToken);
+            if (model is null)
+            {
+                return;
+            }
+
+            CountryText = MovieMetadataDisplayText.LocalizeCountries(model.SeriesCountry);
+            LanguageText = MovieMetadataDisplayText.LocalizeLanguages(model.SeriesLanguage);
+            DirectorText = string.IsNullOrWhiteSpace(model.SeriesDirectorText) ? "-" : model.SeriesDirectorText;
+            WriterText = string.IsNullOrWhiteSpace(model.SeriesWriterText) ? "-" : model.SeriesWriterText;
+            ActorsText = string.IsNullOrWhiteSpace(model.SeriesActorsText) ? "-" : model.SeriesActorsText;
+            NetworksText = string.IsNullOrWhiteSpace(model.SeriesNetworksText) ? "未提供" : model.SeriesNetworksText;
+            ProductionCompaniesText = string.IsNullOrWhiteSpace(model.SeriesProductionCompaniesText)
+                ? "未提供"
+                : model.SeriesProductionCompaniesText;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch
+        {
         }
     }
 

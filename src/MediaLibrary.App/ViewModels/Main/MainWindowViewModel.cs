@@ -306,6 +306,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             CurrentPageViewModel?.Deactivate();
         }
 
+        if (pageViewModel is MovieDetailViewModel movieDetail)
+        {
+            movieDetail.PrepareForActivation();
+        }
+
         _pageActivationCancellation?.Cancel();
         _pageActivationCancellation?.Dispose();
         _pageActivationCancellation = new CancellationTokenSource();

@@ -74,13 +74,8 @@
                    SnapsToDevicePixels="True"
                    Stretch="UniformToFill" />
             <Grid IsHitTestVisible="False">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="0.36*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="0.64*" />
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="1"
-                           HorizontalAlignment="Center"
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            FontSize="26"
                            Text="无海报"
                            Style="{StaticResource PosterPlaceholderLabelTextStyle}" />

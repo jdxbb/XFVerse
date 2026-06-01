@@ -783,31 +783,12 @@
                         <TextBlock Text="搜索媒体" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <Grid>
                             <TextBox x:Name="SearchTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                     helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入需要搜索的影视作品名/导演/演员"
                                      KeyDown="SearchTextBox_KeyDown"
                                      Style="{StaticResource LibrarySearchBoxStyle}"
                                      Padding="10,3,30,3"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Margin="10,0,34,0"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource BrushForegroundMuted}"
-                                       FontSize="12"
-                                       IsHitTestVisible="False"
-                                       Opacity="0.68"
-                                       Text="请输入需要搜索的影视作品名/导演/演员">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SearchText}" Value="">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
                             <Button HorizontalAlignment="Right"
                                     VerticalAlignment="Center"
                                     Margin="0,0,4,0"
@@ -1599,10 +1580,50 @@
                                                            helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListDisplayTitleText}"
                                                            Style="{StaticResource LibraryMediaTitleTextStyle}" />
                                                 <Grid Grid.Column="2">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="1.8*" />
                                                         <ColumnDefinition Width="10" />
-                                                        <ColumnDefinition Width="3*" />
+                                                        <ColumnDefinition Width="3.2*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding DirectorText}"
+                                                               VerticalAlignment="Bottom"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap"
+                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding DirectorText}"
+                                                               Style="{StaticResource LibraryMediaMutedTextStyle}" />
+                                                    <TextBlock Grid.Column="2"
+                                                               VerticalAlignment="Bottom"
+                                                               Text="{Binding CastText}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap"
+                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding CastText}"
+                                                               Style="{StaticResource LibraryMediaMutedTextStyle}" />
+                                                </Grid>
+                                                <Grid Grid.Column="2">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="1.6*" />
+                                                        <ColumnDefinition Width="10" />
+                                                        <ColumnDefinition Width="3.4*" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{Binding DirectorText}"
                                                                VerticalAlignment="Bottom"

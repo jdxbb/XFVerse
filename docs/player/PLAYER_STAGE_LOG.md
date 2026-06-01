@@ -868,3 +868,33 @@ Verification:
 - Do not record temporary guesses as facts.
 - Documentation does not replace build and manual validation.
 - Keep each document short; archive old content when it grows beyond about 200 lines.
+
+## Default Fullscreen Startup Follow-up
+
+Goal: keep the player default-fullscreen behavior without rebuilding window chrome during playback initialization.
+
+Completed:
+- The player now enters default fullscreen before the window is shown instead of queueing a fullscreen transition at `ApplicationIdle`.
+- Fullscreen still uses borderless monitor bounds; restore still returns to the previous window style, resize mode, and state.
+- Playback source selection, mpv load semantics, and watch-history gating remain unchanged.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual runtime regression is still required for first-open Movie playback and Episode playback.
+
+## External Subtitle Startup Responsiveness Follow-up
+
+Goal: keep Movie playback startup responsive when an automatically selected WebDAV subtitle is slow or unavailable.
+
+Completed:
+- Changed mpv external subtitle `sub-add` from synchronous `mpv_command` to `mpv_command_async`.
+- Kept subtitle switch tracking and timeout behavior; added async command reply diagnostics without logging subtitle URLs or credentials.
+- Episode playback behavior, default fullscreen behavior, playback source selection, and watch-history gating remain unchanged.
+
+Evidence:
+- Recent desensitized player logs showed Movie startup reaching `mpv-r3-external-subtitle-add-start` without a command return, while Episode samples without external subtitles did not enter this path.
+- Historical desensitized player logs also contained a failed synchronous `sub-add` call that blocked for about 19 seconds.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual runtime regression is still required for Movie playback with an automatically selected slow or unavailable WebDAV subtitle.

@@ -143,17 +143,6 @@
         <Setter Property="Margin" Value="0,6,0,0" />
     </Style>
 
-    <Style x:Key="CorrectionDialogComboBoxStyle"
-           TargetType="ComboBox"
-           BasedOn="{StaticResource FormComboBoxStyle}">
-        <Setter Property="MinHeight" Value="36" />
-        <Setter Property="Height" Value="36" />
-        <Setter Property="Padding" Value="10,5" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="FontSize" Value="12" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-    </Style>
-
     <Style x:Key="SectionListBoxStyle" TargetType="ListBox">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />

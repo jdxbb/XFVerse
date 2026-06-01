@@ -22,7 +22,7 @@ public static class ScrollBarAutoRevealBehavior
             "IsRevealed",
             typeof(bool),
             typeof(ScrollBarAutoRevealBehavior),
-            new PropertyMetadata(false));
+            new PropertyMetadata(false, OnIsRevealedChanged));
 
     private static readonly DependencyProperty RevealTimerProperty =
         DependencyProperty.RegisterAttached(
@@ -157,6 +157,7 @@ public static class ScrollBarAutoRevealBehavior
 
     private static void Reveal(ScrollViewer viewer)
     {
+        SetIsRevealed(viewer, true);
         foreach (var scrollBar in FindVisualDescendants<ScrollBar>(viewer, includeRoot: false))
         {
             SetIsRevealed(scrollBar, true);
@@ -172,6 +173,7 @@ public static class ScrollBarAutoRevealBehavior
             timer.Tick += (_, _) =>
             {
                 timer.Stop();
+                SetIsRevealed(viewer, false);
                 foreach (var scrollBar in FindVisualDescendants<ScrollBar>(viewer, includeRoot: false))
                 {
                     SetIsRevealed(scrollBar, false);
@@ -182,6 +184,14 @@ public static class ScrollBarAutoRevealBehavior
 
         timer.Stop();
         timer.Start();
+    }
+
+    private static void OnIsRevealedChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
+    {
+        if (target is ScrollViewer viewer)
+        {
+            TextScrollOverflowCueBehavior.Refresh(viewer);
+        }
     }
 
     private static IEnumerable<T> FindVisualDescendants<T>(DependencyObject root, bool includeRoot)

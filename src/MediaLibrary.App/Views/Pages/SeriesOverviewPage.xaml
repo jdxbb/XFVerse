@@ -307,7 +307,8 @@
                                           Margin="0,5,0,0"
                                           HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto"
-                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                          helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                 <ScrollViewer.Resources>
                                     <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SeriesDetailModernScrollBarStyle}" />
                                 </ScrollViewer.Resources>
@@ -386,7 +387,7 @@
                     <RowDefinition Height="8" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Grid>
+                <Grid Margin="0,0,14,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -419,7 +420,7 @@
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
                          VirtualizingPanel.ScrollUnit="Pixel"
-                         Margin="0,0,-8,0">
+                         Margin="0,0,-6,0">
                     <ListBox.Resources>
                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SeriesDetailModernScrollBarStyle}" />
                     </ListBox.Resources>
@@ -459,14 +460,18 @@
                     </ListBox.Style>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid MinHeight="126" Margin="0,8,0,8">
+                            <Grid MinHeight="138" Margin="0,8,14,8">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="76" />
-                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="88" />
+                                    <ColumnDefinition Width="4" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="110" />
                                 </Grid.ColumnDefinitions>
-                                <Grid Width="76" Height="114">
+                                <Grid Width="76"
+                                      Height="114"
+                                      Margin="12,12,0,0"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Top">
                                     <Canvas ClipToBounds="False" IsHitTestVisible="False">
                                         <Image x:Name="SeasonRowPosterPaletteShadowHost"
                                                Width="116"
@@ -493,6 +498,18 @@
                                                    helpers:PosterPaletteShadowBehavior.TargetName="SeasonRowPosterPaletteShadowHost"
                                                    RenderOptions.BitmapScalingMode="HighQuality"
                                                    Stretch="UniformToFill" />
+                                            <Border BorderBrush="{DynamicResource BrushBorder}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="10"
+                                                    IsHitTestVisible="False">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                        <GradientStop Offset="0" Color="#18FFFFFF" />
+                                                        <GradientStop Offset="0.54" Color="#00FFFFFF" />
+                                                        <GradientStop Offset="1" Color="#16000000" />
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                            </Border>
                                         </Grid>
                                     </Border>
                                 </Grid>

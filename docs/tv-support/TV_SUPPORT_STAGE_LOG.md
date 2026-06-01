@@ -51,6 +51,24 @@ Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 
+### TV Correction Dialog Visual Follow-up
+
+Completed:
+
+- TV Series and Season correction candidates now use clearer nested separators, aligned metadata text, and consistent row spacing without changing correction commands or transaction semantics.
+- Unknown Season attachment candidates use the same nested row treatment and keep `特别篇` for Season 0.
+- The shared correction shell now opens as a full-window modal popup, so detail-page interactions remain blocked while correction is active.
+
+Not done:
+
+- No TV matching threshold, correction apply rule, scan rule, schema migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false` passed. A running application instance kept the previous apphost `.exe` locked, so the build reported one apphost cleanup warning.
+- STA runtime instantiation passed for Movie, Series, Season, and Episode detail pages.
+- Current migrations diff remained empty.
+
 ### Movie Correction Dialog Follow-up - Bounded TV Candidate Details
 
 Completed:
@@ -68,6 +86,26 @@ Not done:
 Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+### TV Detail Metadata and Layout Follow-up
+
+Completed:
+
+- TV series detail requests now include TMDB `aggregate_credits` and merge episode-level director / writer jobs with existing series-level credits.
+- TV series detail cache schema advanced to `v4`, so existing persistent detail cache entries do not mask the new crew fields.
+- Season detail triggers background series metadata hydration and refreshes crew / production fields when opened directly.
+- Series Season rows now reserve left / top shadow safety space, keep rounded poster clipping, and add a subtle poster surface treatment.
+- Season Episode rows reserve a wider right-side action area without moving the right edge, display `暂无简介` for blank overviews, and keep the scrollbar in a separate right-side lane.
+
+Not done:
+
+- No schema migration, database update, scan rule change, recommendation change, commit, or push was added.
+- Runtime visual acceptance remains required for poster glow, button alignment, scrollbar lane spacing, and TMDB crew availability.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
 
 ### TV Detail Follow-up - Persisted Series Crew Metadata
 

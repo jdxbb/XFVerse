@@ -75,7 +75,19 @@
         </Style>
 
         <DataTemplate x:Key="MovieDetailTagTemplate">
-            <Border Style="{StaticResource MovieDetailTagChipStyle}">
+            <Border>
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource MovieDetailTagChipStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding}" Value="-">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <TextBlock Style="{StaticResource MovieDetailMetaLabelStyle}" Margin="0" Text="{Binding}" />
             </Border>
         </DataTemplate>
@@ -419,7 +431,8 @@
                                               Margin="0,5,0,0"
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto"
-                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                              helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                     <ScrollViewer.Resources>
                                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource MovieDetailModernScrollBarStyle}" />
                                     </ScrollViewer.Resources>
@@ -866,15 +879,57 @@
                         <ColumnDefinition Width="10" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Path Width="16"
-                          Height="18"
-                          VerticalAlignment="Center"
-                          Data="M2,1 L10,1 L14,5 L14,17 L2,17 Z M10,1 L10,5 L14,5"
-                          Fill="Transparent"
-                          Stretch="Uniform"
-                          Stroke="{DynamicResource BrushForegroundMuted}"
-                          StrokeLineJoin="Round"
-                          StrokeThickness="1.4" />
+                    <Viewbox Width="20"
+                             Height="20"
+                             VerticalAlignment="Center">
+                        <Canvas Width="20" Height="20">
+                            <Ellipse Canvas.Left="1.2"
+                                     Canvas.Top="1.2"
+                                     Width="15.6"
+                                     Height="15.6"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.4" />
+                            <Ellipse Canvas.Left="7.1"
+                                     Canvas.Top="7.1"
+                                     Width="3.8"
+                                     Height="3.8"
+                                     Fill="{DynamicResource BrushForegroundMuted}" />
+                            <Ellipse Canvas.Left="7.3"
+                                     Canvas.Top="3.3"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Ellipse Canvas.Left="11.2"
+                                     Canvas.Top="7.2"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Ellipse Canvas.Left="7.3"
+                                     Canvas.Top="11.1"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Ellipse Canvas.Left="3.4"
+                                     Canvas.Top="7.2"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Path Data="M13.5,15.1 C15.6,17 17.3,17.8 19,17.8"
+                                  Fill="Transparent"
+                                  Stroke="{DynamicResource BrushForegroundMuted}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeThickness="1.4" />
+                        </Canvas>
+                    </Viewbox>
                     <ComboBox Grid.Column="2"
                               ItemsSource="{Binding Sources}"
                               SelectedItem="{Binding SelectedCorrectionSource, Mode=TwoWay}"

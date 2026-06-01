@@ -59,6 +59,7 @@ public sealed class MpvPlayerSession : IAsyncDisposable
     private bool _isBuffering;
     private bool _fileLoaded;
     private bool _playbackRestarted;
+    private long _asyncCommandReplyUserData;
     private bool _resumeSeekReadyRaised;
     private bool _resumeSeekCommandReturned;
     private bool _resumeSeekRecoveryAttempted;
@@ -530,9 +531,10 @@ public sealed class MpvPlayerSession : IAsyncDisposable
 
         MpvPlaybackDiagnostics.Write(
             $"mpv-r3-external-subtitle-add-start sessionId={SessionId} urlLength={playbackUrl.Length} auth={auth}");
-        var result = InvokeCommand(handle, "sub-add", playbackUrl, select ? "select" : "auto");
+        var replyUserData = unchecked((ulong)Interlocked.Increment(ref _asyncCommandReplyUserData));
+        var result = InvokeCommandAsync(handle, replyUserData, "sub-add", playbackUrl, select ? "select" : "auto");
         MpvPlaybackDiagnostics.Write(
-            $"mpv-r3-external-subtitle-add-result sessionId={SessionId} result={result}");
+            $"mpv-r3-external-subtitle-add-submit sessionId={SessionId} replyUserData={replyUserData} result={result}");
         if (result < 0)
         {
             MpvPlaybackDiagnostics.Write(
@@ -681,10 +683,24 @@ public sealed class MpvPlayerSession : IAsyncDisposable
             case MpvEventId.LogMessage:
                 HandleLogMessage(mpvEvent);
                 break;
+            case MpvEventId.CommandReply:
+                HandleCommandReply(mpvEvent);
+                break;
             case MpvEventId.TracksChanged:
             case MpvEventId.TrackSwitched:
                 RefreshTrackListFromProperty(mpvEvent.EventId.ToString());
                 break;
+        }
+    }
+
+    private void HandleCommandReply(MpvEvent mpvEvent)
+    {
+        MpvPlaybackDiagnostics.Write(
+            $"mpv-r3-async-command-reply sessionId={SessionId} replyUserData={mpvEvent.ReplyUserData} result={mpvEvent.Error}");
+        if (mpvEvent.Error < 0)
+        {
+            MpvPlaybackDiagnostics.Write(
+                $"mpv-r3-subtitle-select-failed sessionId={SessionId} kind=external reason={SanitizeLogPart(FormatMpvError(mpvEvent.Error))}");
         }
     }
 
@@ -2540,6 +2556,46 @@ public sealed class MpvPlayerSession : IAsyncDisposable
 
             Marshal.WriteIntPtr(argv, args.Length * IntPtr.Size, IntPtr.Zero);
             return MpvNative.Command(handle, argv);
+        }
+        finally
+        {
+            if (argv != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(argv);
+            }
+
+            foreach (var pointer in stringPointers)
+            {
+                if (pointer != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(pointer);
+                }
+            }
+        }
+    }
+
+    private static int InvokeCommandAsync(IntPtr handle, ulong replyUserData, params string[] args)
+    {
+        var stringPointers = new IntPtr[args.Length];
+        var argv = IntPtr.Zero;
+        try
+        {
+            for (var i = 0; i < args.Length; i++)
+            {
+                var bytes = Encoding.UTF8.GetBytes(args[i] + '\0');
+                var pointer = Marshal.AllocHGlobal(bytes.Length);
+                Marshal.Copy(bytes, 0, pointer, bytes.Length);
+                stringPointers[i] = pointer;
+            }
+
+            argv = Marshal.AllocHGlobal(IntPtr.Size * (args.Length + 1));
+            for (var i = 0; i < stringPointers.Length; i++)
+            {
+                Marshal.WriteIntPtr(argv, i * IntPtr.Size, stringPointers[i]);
+            }
+
+            Marshal.WriteIntPtr(argv, args.Length * IntPtr.Size, IntPtr.Zero);
+            return MpvNative.CommandAsync(handle, replyUserData, argv);
         }
         finally
         {
