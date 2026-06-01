@@ -20,6 +20,18 @@ public sealed class TmdbTvSeriesDetailResult
 
     public string GenresText { get; set; } = string.Empty;
 
+    public string DirectorText { get; set; } = string.Empty;
+
+    public string WriterText { get; set; } = string.Empty;
+
+    public string ActorsText { get; set; } = string.Empty;
+
+    public string ProductionStatus { get; set; } = string.Empty;
+
+    public string NetworksText { get; set; } = string.Empty;
+
+    public string ProductionCompaniesText { get; set; } = string.Empty;
+
     public string OriginalLanguage { get; set; } = string.Empty;
 
     public IReadOnlyList<string> OriginCountries { get; set; } = [];

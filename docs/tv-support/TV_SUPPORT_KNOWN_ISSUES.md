@@ -693,3 +693,62 @@ Deferred:
 Noise:
 
 - The visible media-library sort intentionally does not use raw Movie / TV Series / TV Season metadata `UpdatedAt`, because those fields may be touched by scan metadata refresh and are not reliable evidence of a user-visible library update.
+
+## TV Metadata Enrichment Follow-up Known Issues
+
+Blocker:
+
+- None after the approved migration audit.
+
+Deferred:
+
+- TV creator / showrunner persistence and TV rating snapshot persistence remain separate decisions. The current detail layouts only consume production status, broadcast platforms and production companies from persisted Series metadata.
+- Existing databases require the normal application upgrade path to apply `AddTvSeriesProductionMetadata`; this implementation intentionally does not execute database update.
+
+Noise:
+
+- Existing persistent TMDB TV Series detail cache rows use the previous key schema. New requests use the `v2` key and safely leave old cache rows for normal cache cleanup.
+
+## TV Detail Polish Follow-up Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Runtime visual acceptance is still required for Series / Season / Episode spacing, scrollbar placement, the full-screen player frame and pointer interaction feel. This follow-up intentionally avoids screenshot-heavy iteration because final acceptance is manual.
+- Four-digit Season / Episode parsing keeps the existing rule priority. Ambiguous release naming still belongs to the existing correction workflow rather than a new heuristic.
+
+Noise:
+
+- `D2` / `00` formatting remains in display code intentionally. These formats define a minimum width and do not truncate three- or four-digit Season / Episode values.
+
+## TV / Media Library Genre Filter Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Existing persisted TV genre strings are normalized when the media library loads. A dedicated one-time data rewrite is unnecessary unless another page later requires normalized storage for its own behavior.
+
+Noise:
+
+- TMDB TV search results already use genre-ID mapping. Media-library normalization is compatibility handling for older detail rows, not a second genre vocabulary.
+
+## TV Series Crew Metadata Follow-up Known Issues
+
+Blocker:
+
+- None after build verification and migration audit.
+
+Deferred:
+
+- Existing databases require the normal application upgrade path to apply `AddTvSeriesCrewMetadata` after `AddTvSeriesProductionMetadata`; this implementation intentionally does not execute database update.
+- TMDB TV correction-search rows now use bounded detail enrichment: at most 12 candidates, concurrency limit 4 and per-row fallback when a detail request fails.
+
+Noise:
+
+- Existing persistent TMDB TV detail cache rows use the previous schema key. New requests use `v3`; old cache rows remain for normal cache cleanup.

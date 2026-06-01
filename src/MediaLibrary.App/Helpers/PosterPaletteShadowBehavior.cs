@@ -23,6 +23,7 @@ public static class PosterPaletteShadowBehavior
     private static readonly ConcurrentQueue<string> ShadowColorCacheOrder = new();
     private static readonly ConcurrentDictionary<string, Color> SourceShadowColorCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentQueue<string> SourceShadowColorCacheOrder = new();
+    private static readonly Lazy<Color> PlaceholderPosterShadowColor = new(CreatePlaceholderPosterShadowColor);
     private static int _paletteDiagnosticsEventCount;
     private static long _paletteDiagnosticsTotalTicks;
     private static long _paletteDiagnosticsMaxTicks;
@@ -48,6 +49,13 @@ public static class PosterPaletteShadowBehavior
             typeof(bool),
             typeof(PosterPaletteShadowBehavior),
             new PropertyMetadata(false));
+
+    private static readonly DependencyProperty ApplyVersionProperty =
+        DependencyProperty.RegisterAttached(
+            "ApplyVersion",
+            typeof(int),
+            typeof(PosterPaletteShadowBehavior),
+            new PropertyMetadata(0));
 
     public static string? GetTargetName(DependencyObject target)
     {
@@ -142,6 +150,15 @@ public static class PosterPaletteShadowBehavior
             return;
         }
 
+        var applyVersion = (int)image.GetValue(ApplyVersionProperty) + 1;
+        image.SetValue(ApplyVersionProperty, applyVersion);
+        var hasSourceKey = TryGetRequestedSourceKey(image, out var sourceKey);
+        if (!hasSourceKey && image.Source is null)
+        {
+            ApplyPlaceholderShadowColor(image);
+            return;
+        }
+
         if (TryApplyCachedSourceShadowColor(image))
         {
             return;
@@ -158,12 +175,18 @@ public static class PosterPaletteShadowBehavior
         }
 
         image.Dispatcher.BeginInvoke(
-            () => ApplyShadowColor(image),
+            () => ApplyShadowColor(image, hasSourceKey ? sourceKey : null, applyVersion),
             DispatcherPriority.Loaded);
     }
 
-    private static void ApplyShadowColor(Image image)
+    private static void ApplyShadowColor(Image image, string? expectedSourceKey, int applyVersion)
     {
+        if ((int)image.GetValue(ApplyVersionProperty) != applyVersion
+            || !MatchesRequestedSourceKey(image, expectedSourceKey))
+        {
+            return;
+        }
+
         var startedAt = Stopwatch.GetTimestamp();
         var source = image.Source;
         if (ResolveTargetElement(image) is not UIElement target)
@@ -178,6 +201,52 @@ public static class PosterPaletteShadowBehavior
         }
 
         ApplyShadowColorToTarget(target, shadowColor, source, hasPaletteColor, startedAt);
+    }
+
+    private static void ApplyPlaceholderShadowColor(Image image)
+    {
+        if (ResolveTargetElement(image) is not { } target)
+        {
+            return;
+        }
+
+        ApplyShadowColorToTarget(
+            target,
+            PlaceholderPosterShadowColor.Value,
+            source: null,
+            hasPaletteColor: true,
+            Stopwatch.GetTimestamp());
+    }
+
+    private static bool MatchesRequestedSourceKey(Image image, string? expectedSourceKey)
+    {
+        var hasCurrentSourceKey = TryGetRequestedSourceKey(image, out var currentSourceKey);
+        return expectedSourceKey is null
+            ? !hasCurrentSourceKey
+            : hasCurrentSourceKey && string.Equals(currentSourceKey, expectedSourceKey, StringComparison.Ordinal);
+    }
+
+    private static Color CreatePlaceholderPosterShadowColor()
+    {
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(
+                "pack://application:,,,/MediaLibrary.App;component/Assets/poster-placeholder.png",
+                UriKind.Absolute);
+            bitmap.EndInit();
+            bitmap.Freeze();
+            var placeholderImage = new Image { Source = bitmap };
+            return TryGetPosterShadowColor(placeholderImage, bitmap, out var color)
+                ? color
+                : FallbackShadowColor;
+        }
+        catch
+        {
+            return FallbackShadowColor;
+        }
     }
 
     private static bool TryApplyCachedSourceShadowColor(Image image)

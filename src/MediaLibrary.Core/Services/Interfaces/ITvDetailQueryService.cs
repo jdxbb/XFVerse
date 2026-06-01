@@ -27,4 +27,16 @@ public interface ITvDetailQueryService
     Task<string> GetSeasonImdbSeriesRatingDisplayAsync(
         int seasonId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MovieRatingItem>> GetSeriesRatingsAsync(
+        int seriesId,
+        CancellationToken cancellationToken = default);
+
+    Task<MovieRatingItem> GetSeasonTmdbRatingAsync(
+        int seasonId,
+        CancellationToken cancellationToken = default);
+
+    Task<MovieRatingItem> GetEpisodeTmdbRatingAsync(
+        int episodeId,
+        CancellationToken cancellationToken = default);
 }

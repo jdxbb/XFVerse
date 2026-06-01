@@ -200,10 +200,11 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
     {
         get
         {
-            var originalPart = HasOriginalTitle ? $" | {OriginalTitle}" : string.Empty;
-            return $"{Title}{originalPart}      {ListTitleMetaText}";
+            return $"{ListDisplayTitleText}      {ListTitleMetaText}";
         }
     }
+
+    public string ListDisplayTitleText => HasOriginalTitle ? $"{Title} | {OriginalTitle}" : Title;
 
     public string OriginalTitleSeparatorText => HasOriginalTitle ? " | " : string.Empty;
 
@@ -227,9 +228,9 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public string ListTagLine => JoinVisibleGroups(ListTagGroupOneText, ListTagGroupTwoText, ListTagGroupThreeText);
 
-    public string DirectorText => "导演 -";
+    public string DirectorText => $"导演 {FormatCrewText(Movie.DirectorText)}";
 
-    public string CastText => "演员 -";
+    public string CastText => $"演员 {FormatCrewText(Movie.ActorsText)}";
 
     public string RuntimeText => RuntimeMinutes is > 0
         ? $"{RuntimeMinutes.Value / 60:00}:{RuntimeMinutes.Value % 60:00}:00"
@@ -664,5 +665,10 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
             .Where(character => !char.IsWhiteSpace(character))
             .Take(remaining);
         return $"{new string(chars.ToArray())}{TagOverflowMarker}";
+    }
+
+    private static string FormatCrewText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     }
 }

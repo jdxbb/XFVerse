@@ -280,6 +280,78 @@ public sealed class UserCollectionService : IUserCollectionService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task SetWantToWatchAsync(
+        int movieId,
+        bool isWantToWatch,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var movie = await dbContext.Movies
+            .Include(x => x.MediaFiles)
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken)
+            ?? throw new InvalidOperationException("影片不存在。");
+
+        if (isWantToWatch && movie.IsWatched)
+        {
+            throw new InvalidOperationException("已看影片不能加入想看。");
+        }
+
+        var entity = await FindCollectionEntityForMovieAsync(dbContext, movie, cancellationToken);
+        if (entity is null && !isWantToWatch)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        var oldWantToWatch = entity?.IsWantToWatch ?? false;
+        var oldNotInterested = entity?.IsNotInterested ?? false;
+
+        if (entity is null)
+        {
+            entity = new UserMovieCollectionItem
+            {
+                CreatedAt = now
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
+        }
+
+        ApplyMovieSnapshot(entity, movie);
+        entity.IsWatched = movie.IsWatched;
+        entity.IsWantToWatch = isWantToWatch;
+        if (isWantToWatch)
+        {
+            entity.IsNotInterested = false;
+        }
+
+        RestoreAutoVisibilityForPositiveState(entity, isWantToWatch);
+        entity.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            movie.Id,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldWantToWatch,
+            entity.IsWantToWatch,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            movie.Id,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            oldNotInterested,
+            entity.IsNotInterested,
+            changeSource,
+            now);
+        CleanupCollectionEntityIfEmpty(dbContext, entity);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task SetWatchedAsync(
         AiRecommendationItem recommendation,
         bool isWatched,

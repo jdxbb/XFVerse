@@ -3,16 +3,99 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
-        <Style x:Key="TvDetailPillStyle" TargetType="Border">
-            <Setter Property="Margin" Value="0,0,10,10" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurface}" />
-            <Setter Property="CornerRadius" Value="999" />
+        <helpers:RatingStarsConverter x:Key="RatingStarsConverter" />
+
+        <Style x:Key="SeriesDetailSmallCardTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
+            <Setter Property="FontSize" Value="15" />
         </Style>
 
-        <Style x:Key="TvDetailMetaLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-            <Setter Property="Margin" Value="0,0,0,4" />
+        <Style x:Key="SeriesDetailInfoLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="Margin" Value="0,0,14,4" />
             <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        </Style>
+
+        <Style x:Key="SeriesDetailInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="helpers:TrimmedTextToolTipBehavior.FullText" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+        </Style>
+
+        <DataTemplate x:Key="SeriesDetailActionButtonTemplate">
+            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+                <TextBlock Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           Text="{Binding}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <Style x:Key="SeriesDetailModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border Width="6"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="3"
+                                Opacity="0.58" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SeriesDetailModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SeriesDetailModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="MinWidth" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Width="{TemplateBinding Width}" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Style="{StaticResource SeriesDetailModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource SeriesDetailModernScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Style="{StaticResource SeriesDetailModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="IsMouseCaptureWithin" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}"
+                             Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
@@ -25,244 +108,348 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="250" />
+                <ColumnDefinition Width="240" />
                 <ColumnDefinition Width="18" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Grid Width="240"
-                  Height="360"
-                  HorizontalAlignment="Left">
-                <Border x:Name="SeriesPosterClipMask"
-                        Background="White"
-                        CornerRadius="20"
-                        IsHitTestVisible="False" />
-                <Canvas ClipToBounds="False"
-                        IsHitTestVisible="False">
-                    <Image x:Name="SeriesPosterPaletteShadowHost"
-                           Width="360"
-                           Height="480"
-                           Canvas.Left="-60"
-                           Canvas.Top="-60"
-                           helpers:PosterCachedShadowBehavior.BlurRadius="30"
-                           helpers:PosterCachedShadowBehavior.CardHeight="360"
-                           helpers:PosterCachedShadowBehavior.CardWidth="240"
-                           helpers:PosterCachedShadowBehavior.CornerRadius="20"
-                           helpers:PosterCachedShadowBehavior.Direction="270"
-                           helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
-                           helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.40"
-                           helpers:PosterCachedShadowBehavior.Padding="60"
-                           helpers:PosterCachedShadowBehavior.QuantizeColor="True"
-                           helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
-                           helpers:PosterCachedShadowBehavior.ShadowDepth="8"
-                           RenderOptions.BitmapScalingMode="HighQuality"
-                           Stretch="Fill" />
-                    <Image Width="360"
-                           Height="480"
-                           Canvas.Left="-60"
-                           Canvas.Top="-60"
-                           helpers:PosterCachedShadowBehavior.BlurRadius="14"
-                           helpers:PosterCachedShadowBehavior.CardHeight="360"
-                           helpers:PosterCachedShadowBehavior.CardWidth="240"
-                           helpers:PosterCachedShadowBehavior.CornerRadius="20"
-                           helpers:PosterCachedShadowBehavior.Direction="270"
-                           helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.24"
-                           helpers:PosterCachedShadowBehavior.Padding="60"
-                           helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
-                           helpers:PosterCachedShadowBehavior.ShadowDepth="4"
-                           RenderOptions.BitmapScalingMode="HighQuality"
-                           Stretch="Fill" />
-                </Canvas>
-                <Grid>
-                    <Grid.OpacityMask>
-                        <VisualBrush Visual="{Binding ElementName=SeriesPosterClipMask}" />
-                    </Grid.OpacityMask>
-                    <Border Background="{DynamicResource BrushSurfaceAlt}" />
-                    <Control IsHitTestVisible="False"
-                             Template="{StaticResource PosterPlaceholderTemplate}" />
-                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="420"
-                           helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
-                           helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=SeriesPosterPaletteShadowHost}"
-                           helpers:PosterPaletteShadowBehavior.TargetName="SeriesPosterPaletteShadowHost"
-                           RenderOptions.BitmapScalingMode="HighQuality"
-                           Stretch="UniformToFill" />
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="1" Width="240" Height="360" HorizontalAlignment="Left">
+                    <Border x:Name="SeriesPosterClipMask" Background="White" CornerRadius="20" IsHitTestVisible="False" />
+                    <Canvas ClipToBounds="False" IsHitTestVisible="False">
+                        <Image x:Name="SeriesPosterPaletteShadowHost"
+                               Width="360"
+                               Height="480"
+                               Canvas.Left="-60"
+                               Canvas.Top="-60"
+                               helpers:PosterCachedShadowBehavior.BlurRadius="30"
+                               helpers:PosterCachedShadowBehavior.CardHeight="360"
+                               helpers:PosterCachedShadowBehavior.CardWidth="240"
+                               helpers:PosterCachedShadowBehavior.CornerRadius="20"
+                               helpers:PosterCachedShadowBehavior.Direction="270"
+                               helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
+                               helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                               helpers:PosterCachedShadowBehavior.Opacity="0.40"
+                               helpers:PosterCachedShadowBehavior.Padding="60"
+                               helpers:PosterCachedShadowBehavior.QuantizeColor="True"
+                               helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
+                               helpers:PosterCachedShadowBehavior.ShadowDepth="8"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Stretch="Fill" />
+                        <Image Width="360"
+                               Height="480"
+                               Canvas.Left="-60"
+                               Canvas.Top="-60"
+                               helpers:PosterCachedShadowBehavior.BlurRadius="14"
+                               helpers:PosterCachedShadowBehavior.CardHeight="360"
+                               helpers:PosterCachedShadowBehavior.CardWidth="240"
+                               helpers:PosterCachedShadowBehavior.CornerRadius="20"
+                               helpers:PosterCachedShadowBehavior.Direction="270"
+                               helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                               helpers:PosterCachedShadowBehavior.Opacity="0.24"
+                               helpers:PosterCachedShadowBehavior.Padding="60"
+                               helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
+                               helpers:PosterCachedShadowBehavior.ShadowDepth="4"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Stretch="Fill" />
+                    </Canvas>
+                    <Grid>
+                        <Grid.OpacityMask>
+                            <VisualBrush Visual="{Binding ElementName=SeriesPosterClipMask}" />
+                        </Grid.OpacityMask>
+                        <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
+                        <Control IsHitTestVisible="False" Template="{StaticResource PosterPlaceholderLargeTemplate}" />
+                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="420"
+                               helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
+                               helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=SeriesPosterPaletteShadowHost}"
+                               helpers:PosterPaletteShadowBehavior.TargetName="SeriesPosterPaletteShadowHost"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Stretch="UniformToFill" />
+                    </Grid>
                 </Grid>
             </Grid>
 
-            <Border Grid.Column="2" Style="{StaticResource HeroCardStyle}">
+            <Border Grid.Column="2"
+                    Height="360"
+                    Margin="0,14,0,0"
+                    Style="{StaticResource HeroCardStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="310" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="390" />
                     </Grid.ColumnDefinitions>
 
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="106" />
+                            <RowDefinition Height="10" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-
-                        <Button HorizontalAlignment="Left"
-                                Command="{Binding NavigateBackCommand}"
-                                Content="&#xE72B;"
-                                Style="{StaticResource DetailBackButtonStyle}" />
-
-                        <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                            <TextBlock FontSize="34"
+                        <StackPanel>
+                            <TextBlock FontSize="30"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource BrushForegroundPrimary}"
                                        Text="{Binding Name}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Style="{StaticResource BodyMutedTextStyle}"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="NoWrap"
+                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding Name}" />
+                            <TextBlock Margin="0,2,0,0"
+                                       FontSize="17"
+                                       Foreground="{DynamicResource BrushForegroundMuted}"
                                        Text="{Binding OriginalName}"
-                                       TextTrimming="CharacterEllipsis" />
-
-                            <WrapPanel Margin="0,18,0,0">
-                                <Border Style="{StaticResource TvDetailPillStyle}"
-                                        Background="{DynamicResource BrushAccent}">
-                                    <TextBlock FontWeight="SemiBold"
-                                               Foreground="{DynamicResource BrushOnAccent}"
-                                               Text="电视剧" />
-                                </Border>
-                                <Border Style="{StaticResource TvDetailPillStyle}">
-                                    <TextBlock Style="{StaticResource BodyTextStyle}"
-                                               Text="{Binding FirstAirDateText, StringFormat=首播 {0}}" />
-                                </Border>
-                                <Border Style="{StaticResource TvDetailPillStyle}">
-                                    <TextBlock Style="{StaticResource BodyTextStyle}"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="NoWrap"
+                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding OriginalName}" />
+                            <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock VerticalAlignment="Center"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="16"
+                                               Foreground="{DynamicResource BrushForegroundSecondary}"
+                                               Text="&#xE787;" />
+                                    <TextBlock Margin="6,0,0,0"
+                                               FontSize="17"
+                                               Foreground="{DynamicResource BrushForegroundSecondary}"
+                                               Text="{Binding FirstAirDateText}" />
+                                </StackPanel>
+                                <StackPanel Margin="18,0,0,0" Orientation="Horizontal">
+                                    <TextBlock VerticalAlignment="Center"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="16"
+                                               Foreground="{DynamicResource BrushForegroundSecondary}"
+                                               Text="&#xE8B2;" />
+                                    <TextBlock Margin="6,0,0,0"
+                                               FontSize="17"
+                                               Foreground="{DynamicResource BrushForegroundSecondary}"
                                                Text="{Binding SeasonCountText}" />
-                                </Border>
-                                <Border Style="{StaticResource TvDetailPillStyle}">
-                                    <TextBlock Style="{StaticResource BodyTextStyle}"
-                                               Text="{Binding SourceSummary}" />
-                                </Border>
-                            </WrapPanel>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
 
-                        <Grid Grid.Row="2" Margin="0,16,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="18" />
-                                <ColumnDefinition Width="220" />
-                            </Grid.ColumnDefinitions>
+                        <ItemsControl Grid.Row="2" Margin="8,0" ItemsSource="{Binding Ratings}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1" Columns="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="8,0"
+                                            Padding="10"
+                                            Background="{DynamicResource BrushGlassSurfaceAlt}"
+                                            BorderBrush="{DynamicResource BrushBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="12">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <StackPanel HorizontalAlignment="Left" Orientation="Horizontal">
+                                                <Border Width="24" Height="24" Margin="0,0,7,0" Background="{DynamicResource BrushGlassSelected}" CornerRadius="7">
+                                                    <TextBlock HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="16"
+                                                               Foreground="{DynamicResource BrushAccent}"
+                                                               LineHeight="16"
+                                                               LineStackingStrategy="BlockLineHeight"
+                                                               Text="&#x2605;"
+                                                               TextAlignment="Center" />
+                                                </Border>
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Style="{StaticResource SeriesDetailSmallCardTitleStyle}"
+                                                           Text="{Binding SourceName}" />
+                                            </StackPanel>
+                                            <Grid Grid.Row="1" Margin="0,7,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="3*" />
+                                                    <ColumnDefinition Width="3" />
+                                                    <ColumnDefinition Width="2*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                                                        <TextBlock FontSize="15" FontWeight="Bold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding ScoreDisplayText}" />
+                                                        <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource BrushForegroundMuted}" Text="/" />
+                                                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource BrushForegroundMuted}" Text="10" />
+                                                    </StackPanel>
+                                                    <TextBlock HorizontalAlignment="Center"
+                                                               Margin="0,2,0,0"
+                                                               FontSize="18"
+                                                               Foreground="{DynamicResource BrushAccent}"
+                                                               Text="{Binding ScoreValue, Converter={StaticResource RatingStarsConverter}}" />
+                                                </StackPanel>
+                                                <Border Grid.Column="1" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
+                                                <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <TextBlock HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="票数" />
+                                                    <TextBlock HorizontalAlignment="Center" Margin="0,2,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding VoteCountDisplayText}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
-                            <Border Padding="14"
-                                    Background="{DynamicResource BrushSurfaceAlt}"
-                                    BorderBrush="{DynamicResource BrushBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="14">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="简介" />
-                                    <ScrollViewer Margin="0,8,0,0"
-                                                  MaxHeight="116"
-                                                  HorizontalScrollBarVisibility="Disabled"
-                                                  VerticalScrollBarVisibility="Auto">
-                                        <TextBlock Style="{StaticResource BodyTextStyle}"
-                                                   Text="{Binding Overview}"
-                                                   TextWrapping="Wrap" />
-                                    </ScrollViewer>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Grid.Column="2"
-                                    Padding="14"
-                                    Background="{DynamicResource BrushSurfaceAlt}"
-                                    BorderBrush="{DynamicResource BrushBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="14">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="基础信息" />
-                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource TvDetailMetaLabelStyle}" Text="类型" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}"
-                                               Text="{Binding GenresText}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource TvDetailMetaLabelStyle}" Text="Season" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}"
-                                               Text="{Binding SeasonCountText}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,10,0,0" Style="{StaticResource TvDetailMetaLabelStyle}" Text="播放源" />
-                                    <TextBlock Style="{StaticResource BodyTextStyle}"
-                                               Text="{Binding SourceSummary}"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Border>
+                        <Grid Grid.Row="4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Style="{StaticResource SeriesDetailSmallCardTitleStyle}" Text="简介" />
+                            <ScrollViewer Grid.Row="1"
+                                          Margin="0,5,0,0"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto"
+                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SeriesDetailModernScrollBarStyle}" />
+                                </ScrollViewer.Resources>
+                                <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding Overview}" TextWrapping="Wrap" />
+                            </ScrollViewer>
                         </Grid>
                     </Grid>
 
-                    <StackPanel Grid.Column="2">
-                        <Border Style="{StaticResource CompactCardStyle}">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="剧集状态" />
-                                <TextBlock Margin="0,10,0,0"
-                                           Style="{StaticResource BodyMutedTextStyle}"
-                                           Text="{Binding StatusMessage}"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Margin="0,12,0,0"
-                                           Style="{StaticResource BodyMutedTextStyle}"
-                                           Text="来源摘要" />
-                                <TextBlock Margin="0,6,0,0"
-                                           Style="{StaticResource BodyTextStyle}"
-                                           Text="{Binding SourceSummary}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-
-                        <Button Margin="0,14,0,0"
-                                Command="{Binding AddSeriesToLibraryCommand}"
-                                Content="{Binding AddSeriesToLibraryButtonText}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowSeriesLibraryAction}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-                    </StackPanel>
+                    <Border Grid.Column="2" Padding="10" Style="{StaticResource GlassPageCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="6" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Style="{StaticResource SeriesDetailSmallCardTitleStyle}" Text="电视剧信息" />
+                            <ScrollViewer Grid.Row="2"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto"
+                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SeriesDetailModernScrollBarStyle}" />
+                                </ScrollViewer.Resources>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="86" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="导演" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding DirectorText}" />
+                                <TextBlock Grid.Row="1" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="编剧" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding WriterText}" />
+                                <TextBlock Grid.Row="2" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="主演" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding ActorsText}" />
+                                <TextBlock Grid.Row="3" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="国家/地区" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding CountryText}" />
+                                <TextBlock Grid.Row="4" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="语言" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding LanguageText}" />
+                                <TextBlock Grid.Row="5" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="类型" />
+                                <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding GenresText}" />
+                                <TextBlock Grid.Row="6" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="制片公司" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding ProductionCompaniesText}" />
+                                <TextBlock Grid.Row="7" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="制作状态" />
+                                <TextBlock Grid.Row="7" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding ProductionStatusText}" />
+                                <TextBlock Grid.Row="8" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="播出平台" />
+                                <TextBlock Grid.Row="8" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding NetworksText}" />
+                                <TextBlock Grid.Row="9" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="总季数" />
+                                <TextBlock Grid.Row="9" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding SeasonCountText}" />
+                                <TextBlock Grid.Row="10" Style="{StaticResource SeriesDetailInfoLabelStyle}" Text="总集数" />
+                                <TextBlock Grid.Row="10" Grid.Column="1" Style="{StaticResource SeriesDetailInfoValueStyle}" Text="{Binding EpisodeCountText}" />
+                            </Grid>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>
 
-        <Border Grid.Row="2" Style="{StaticResource PageCardStyle}">
+        <Border Grid.Row="2" Style="{StaticResource GlassPageCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="14" />
+                    <RowDefinition Height="8" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="Season 列表" />
-                        <TextBlock Margin="0,6,0,0"
-                                   Style="{StaticResource BodyMutedTextStyle}"
-                                   Text="已识别季、未识别季和 metadata-only 季使用同一列表结构，进入季详情后再查看集列表。" />
-                    </StackPanel>
-                    <TextBlock Grid.Column="1"
-                               VerticalAlignment="Center"
-                               Style="{StaticResource BodyMutedTextStyle}"
-                               Text="{Binding SeasonCountText}" />
+                    <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="Season" />
+                    <Button Grid.Column="1"
+                            Command="{Binding AddSeriesToLibraryCommand}"
+                            Content="{Binding AddSeriesToLibraryButtonText}"
+                            ContentTemplate="{StaticResource SeriesDetailActionButtonTemplate}"
+                            Tag="{Binding AddSeriesToLibraryButtonIcon}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GlassSecondaryButtonStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowSeriesLibraryAction}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </Grid>
 
                 <ListBox Grid.Row="2"
                          ItemsSource="{Binding Seasons}"
+                         Background="Transparent"
+                         BorderBrush="{DynamicResource BrushBorder}"
+                         BorderThickness="0,1,0,0"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         Margin="0,0,-8,0">
+                    <ListBox.Resources>
+                        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SeriesDetailModernScrollBarStyle}" />
+                    </ListBox.Resources>
                     <ListBox.Style>
-                        <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+                        <Style TargetType="ListBox">
                             <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="ItemContainerStyle">
+                                <Setter.Value>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Focusable" Value="False" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+                                        <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}">
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Setter.Value>
+                            </Setter>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding HasSeasons}" Value="True">
                                     <Setter Property="Visibility" Value="Visible" />
@@ -272,89 +459,80 @@
                     </ListBox.Style>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="12"
-                                    Background="{DynamicResource BrushSurfaceAlt}"
-                                    BorderBrush="{DynamicResource BrushBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="14">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="86" />
-                                        <ColumnDefinition Width="16" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="154" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <Border Width="86"
-                                            Height="126"
-                                            Background="{DynamicResource BrushSurface}"
-                                            CornerRadius="12"
-                                            ClipToBounds="True">
+                            <Grid MinHeight="126" Margin="0,8,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="110" />
+                                </Grid.ColumnDefinitions>
+                                <Grid Width="76" Height="114">
+                                    <Canvas ClipToBounds="False" IsHitTestVisible="False">
+                                        <Image x:Name="SeasonRowPosterPaletteShadowHost"
+                                               Width="116"
+                                               Height="154"
+                                               Canvas.Left="-20"
+                                               Canvas.Top="-20"
+                                               helpers:PosterCachedShadowBehavior.BlurRadius="18"
+                                               helpers:PosterCachedShadowBehavior.CardHeight="114"
+                                               helpers:PosterCachedShadowBehavior.CardWidth="76"
+                                               helpers:PosterCachedShadowBehavior.CornerRadius="10"
+                                               helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                                               helpers:PosterCachedShadowBehavior.Opacity="0.32"
+                                               helpers:PosterCachedShadowBehavior.Padding="20"
+                                               helpers:PosterCachedShadowBehavior.QuantizeColor="True"
+                                               helpers:PosterCachedShadowBehavior.ShadowDepth="5"
+                                               Stretch="Fill" />
+                                    </Canvas>
+                                    <Border Background="{DynamicResource BrushGlassSurface}" CornerRadius="10" ClipToBounds="True" Effect="{StaticResource ShadowCard}">
                                         <Grid>
-                                            <Control IsHitTestVisible="False"
-                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
-                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
+                                            <Control IsHitTestVisible="False" Template="{StaticResource PosterPlaceholderTemplate}" />
+                                            <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="160"
+                                                   helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
+                                                   helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=SeasonRowPosterPaletteShadowHost}"
+                                                   helpers:PosterPaletteShadowBehavior.TargetName="SeasonRowPosterPaletteShadowHost"
                                                    RenderOptions.BitmapScalingMode="HighQuality"
                                                    Stretch="UniformToFill" />
                                         </Grid>
                                     </Border>
-
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                        <WrapPanel>
-                                            <TextBlock VerticalAlignment="Center"
-                                                       Style="{StaticResource SectionTitleTextStyle}"
-                                                       Text="{Binding Name}"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <Border Margin="10,0,0,0"
-                                                    Padding="8,4"
-                                                    Background="{DynamicResource BrushAccentSoft}"
-                                                    CornerRadius="999">
-                                                <TextBlock Style="{StaticResource BodyMutedTextStyle}"
-                                                           Text="{Binding SeasonNumberText}" />
-                                            </Border>
-                                            <Border Margin="8,0,0,0"
-                                                    Padding="8,4"
-                                                    Background="{DynamicResource BrushSurface}"
-                                                    CornerRadius="999">
-                                                <TextBlock Style="{StaticResource BodyMutedTextStyle}"
-                                                           Text="{Binding IdentificationStatusText}" />
-                                            </Border>
-                                        </WrapPanel>
-
-                                        <WrapPanel Margin="0,10,0,0">
-                                            <TextBlock Margin="0,0,16,0"
-                                                       Style="{StaticResource BodyTextStyle}"
-                                                       Text="{Binding ProgressText}" />
-                                            <TextBlock Margin="0,0,16,0"
-                                                       Style="{StaticResource BodyTextStyle}"
-                                                       Text="{Binding InLibraryText}" />
-                                            <TextBlock Margin="0,0,16,0"
-                                                       Style="{StaticResource BodyMutedTextStyle}"
-                                                       Text="{Binding SourceSummary}" />
-                                            <TextBlock Margin="0,0,16,0"
-                                                       Style="{StaticResource BodyMutedTextStyle}"
-                                                       Text="{Binding AirDateText, StringFormat=首播 {0}}" />
-                                        </WrapPanel>
-                                    </StackPanel>
-
-                                    <Button Grid.Column="3"
-                                            VerticalAlignment="Center"
-                                            Command="{Binding DataContext.NavigateToSeasonCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            Content="查看季详情"
-                                            Style="{StaticResource PrimaryButtonStyle}" />
                                 </Grid>
-                            </Border>
+                                <StackPanel Grid.Column="2"
+                                            Margin="0,2,18,2"
+                                            VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource SectionTitleTextStyle}"
+                                                   Text="{Binding SeasonDisplayText}" />
+                                        <TextBlock Margin="12,0,0,0"
+                                                   Style="{StaticResource SectionTitleTextStyle}"
+                                                   Text="{Binding SeasonNameDisplayText}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   TextWrapping="NoWrap"
+                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding SeasonNameDisplayText}" />
+                                    </StackPanel>
+                                    <TextBlock Margin="0,5,0,0"
+                                               Style="{StaticResource BodyMutedTextStyle}"
+                                               Text="{Binding AirDateText, StringFormat=首播 {0}}" />
+                                    <TextBlock Margin="0,5,0,0"
+                                               Style="{StaticResource BodyMutedTextStyle}"
+                                               Text="{Binding SourceCountText}" />
+                                    <TextBlock Margin="0,5,0,0"
+                                               Style="{StaticResource BodyMutedTextStyle}"
+                                               Text="{Binding WatchedSummaryText}" />
+                                </StackPanel>
+                                <Button Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Focusable="False"
+                                        Command="{Binding DataContext.NavigateToSeasonCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        Content="查看详情"
+                                        Style="{StaticResource GlassSecondaryButtonStyle}" />
+                            </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <Border Grid.Row="2"
-                        Padding="18"
-                        Background="{DynamicResource BrushSurfaceAlt}"
-                        BorderBrush="{DynamicResource BrushBorder}"
-                        BorderThickness="1"
-                        CornerRadius="16">
+                <Border Grid.Row="2" Background="Transparent">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed" />
@@ -368,17 +546,11 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                        <TextBlock HorizontalAlignment="Center"
-                                   Style="{StaticResource SectionTitleTextStyle}"
-                                   Text="暂无可展示的 Season" />
-                        <TextBlock Margin="0,8,0,0"
-                                   HorizontalAlignment="Center"
-                                   Style="{StaticResource BodyMutedTextStyle}"
-                                   Text="{Binding StatusMessage}"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource BodyMutedTextStyle}"
+                               Text="{Binding StatusMessage}"
+                               TextWrapping="Wrap" />
                 </Border>
             </Grid>
         </Border>

@@ -28,6 +28,8 @@ public sealed class UnknownTvSeasonCorrectionSeriesGroup
 
     public string HeaderSubtitle { get; }
 
+    public string SeasonCountText => $"共 {Seasons.Count} 季";
+
     public ObservableCollection<UnknownTvSeasonCorrectionTargetItem> Seasons { get; } = [];
 
     public static IReadOnlyList<UnknownTvSeasonCorrectionSeriesGroup> FromTargets(

@@ -33,13 +33,6 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
         dbContext.WatchHistories.Add(history);
 
-        var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
-        if (movie is not null)
-        {
-            movie.LastPlayedAt = DateTime.UtcNow;
-            movie.UpdatedAt = DateTime.UtcNow;
-        }
-
         await dbContext.SaveChangesAsync(cancellationToken);
         return history.Id;
     }
@@ -64,18 +57,6 @@ public sealed class WatchHistoryService : IWatchHistoryService
         };
 
         dbContext.WatchHistories.Add(history);
-
-        var episode = await dbContext.TvEpisodes.FirstOrDefaultAsync(x => x.Id == episodeId, cancellationToken);
-        if (episode is not null)
-        {
-            episode.LastPlayedAt = now;
-            if (normalizedInitialPosition > 0)
-            {
-                episode.LastPlayPositionSeconds = normalizedInitialPosition;
-            }
-
-            episode.UpdatedAt = now;
-        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return history.Id;

@@ -1500,6 +1500,9 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         tvSeries.FirstAirDate = null;
         tvSeries.FirstAirYear = null;
         tvSeries.GenresText = null;
+        tvSeries.ProductionStatus = null;
+        tvSeries.NetworksText = null;
+        tvSeries.ProductionCompaniesText = null;
         tvSeries.UpdatedAt = now;
 
         var tvSeason = await dbContext.TvSeasons
@@ -2111,6 +2114,9 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         tvSeries.FirstAirDate = ParseDate(FirstNonEmpty(seriesDetails?.FirstAirDate, searchItem?.FirstAirDate));
         tvSeries.FirstAirYear = seriesDetails?.FirstAirYear ?? searchItem?.FirstAirYear;
         tvSeries.GenresText = Truncate(seriesDetails?.GenresText ?? string.Empty, 1000);
+        tvSeries.ProductionStatus = Truncate(seriesDetails?.ProductionStatus, 120);
+        tvSeries.NetworksText = Truncate(seriesDetails?.NetworksText, 1000);
+        tvSeries.ProductionCompaniesText = Truncate(seriesDetails?.ProductionCompaniesText, 1000);
         tvSeries.UpdatedAt = DateTime.UtcNow;
         return tvSeries;
     }
@@ -3032,7 +3038,7 @@ public sealed class TvSeasonIdentificationService : ITvSeasonIdentificationServi
         var normalized = value.Trim();
         normalized = System.Text.RegularExpressions.Regex.Replace(
             normalized,
-            @"(?:[\s._-]*[Ss]\d{1,2}|[\s._-]*Season\s*\d{1,2}|[\s._-]*\u7b2c\s*[0-9一二三四五六七八九十两]{1,4}\s*\u5b63(?:\s*\u5168\s*\d{1,3}\s*\u96c6)?)",
+            @"(?:[\s._-]*[Ss]\d{1,4}|[\s._-]*Season\s*\d{1,4}|[\s._-]*\u7b2c\s*[0-9一二三四五六七八九十两]{1,4}\s*\u5b63(?:\s*\u5168\s*\d{1,4}\s*\u96c6)?)",
             " ",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
         return TvEpisodeFileNameParser.CleanSeriesNameCandidate(normalized);

@@ -23,6 +23,10 @@ public interface IMovieIdentificationService
         int? releaseYear,
         CancellationToken cancellationToken = default);
 
+    Task<bool> EnsureMovieCreditsAsync(
+        int movieId,
+        CancellationToken cancellationToken = default);
+
     Task<AutoIdentifyResult> AutoIdentifyWithFirstResultAsync(
         int movieId,
         CancellationToken cancellationToken = default);

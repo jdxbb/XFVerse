@@ -2289,7 +2289,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
         catch (Exception exception)
         {
-            setStatusMessage($"刷新影片库内状态失败，已使用当前卡片状态打开：{DescribeException(exception)}");
+            setStatusMessage($"刷新影片收藏状态失败，已使用当前卡片状态打开：{DescribeException(exception)}");
         }
     }
 

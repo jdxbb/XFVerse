@@ -1,5 +1,28 @@
 # TV Support Stage Log
 
+## TV Metadata Enrichment Follow-up - Persisted Production Metadata
+
+Completed:
+
+- Added user-approved persisted `TvSeries` fields for production status, broadcast platforms / networks and production companies.
+- Added `AddTvSeriesProductionMetadata`; the migration is limited to three nullable `TvSeries` columns. No database update was executed.
+- Extended TMDB TV Series detail parsing plus the existing hydration, TV identification and unknown-Season correction write paths.
+- Placeholder reset paths clear the new production metadata, so unidentified carriers do not retain stale identified-Series values.
+- Versioned the persistent TMDB TV Series detail cache key and extended summary completeness checks, allowing existing rows and old cached payloads to refresh safely after upgrade.
+- Series, Season and Episode detail pages now read the persisted Series-level values. Season and Episode storage remains unchanged.
+- Media-library Movie list rows now read the existing persisted Movie director and actor values instead of fixed placeholder text. This does not change TV scanning semantics.
+
+Not done:
+
+- No database update, commit, push, TV rating persistence, scanner recognition rule change or Season / Episode metadata duplication was added.
+
+Validation:
+
+- Pre-migration `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Final `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Migration audit confirmed that only the approved `TvSeries` columns were generated.
+
 ## Phase 4.18 - Full Phase 4 Regression And Commit Closeout
 
 Completed:
@@ -27,6 +50,83 @@ Not done:
 Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+### Movie Correction Dialog Follow-up - Bounded TV Candidate Details
+
+Completed:
+
+- Movie correction TV candidates now enrich at most 12 TMDB Series detail rows with a concurrency limit of 4.
+- Candidate rows show real director text when credits are available, normalized TV genre labels, localized country / region and localized language text.
+- A failed detail request falls back to the search-only row instead of clearing the full TV candidate list.
+- Series and Season candidate actions now select the TV correction target. The Movie correction dialog applies the selected target only after the bottom `确认修正` action.
+- TV candidate and unknown-Season lists use pixel scrolling, Season 0 displays as `特别篇`, and the count icon matches the TV detail pages.
+
+Not done:
+
+- No TV scan rule, persistence schema, migration, database update, commit or push changed in this follow-up.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+### TV Detail Follow-up - Persisted Series Crew Metadata
+
+Completed:
+
+- Added user-approved nullable `TvSeries.DirectorText`, `WriterText` and `ActorsText` columns through `AddTvSeriesCrewMetadata`.
+- Kept crew ownership at `TvSeries`; Season and Episode detail read through the owning Series instead of duplicating data.
+- Extended TMDB TV detail requests with `append_to_response=credits`. Director reads TV crew, writer combines `created_by` with writing crew, and actors read ordered TV cast.
+- Bumped the TV detail persistent-cache schema to `v3` so prior cached payloads without crew fields do not block enrichment.
+- Added crew fields to TV summary-hydration completeness checks and upsert mapping.
+- Wired real TV director and actor values into media-library Series and Season list rows. Movie list rows continue using existing persisted Movie crew fields.
+
+Not done:
+
+- No database update, commit or push was executed.
+- No Season / Episode crew columns were added.
+- The later Movie correction-dialog follow-up adds bounded TV correction-search detail enrichment: at most 12 rows with concurrency limit 4 and per-row fallback.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors before migration generation.
+- `AddTvSeriesCrewMetadata` only adds `ActorsText`, `DirectorText` and `WriterText` to `TvSeries`.
+
+### TV Detail Polish Follow-up - State Semantics And Four-digit Season/Episode Compatibility
+
+Completed:
+
+- Updated Series / Season / Episode detail presentation to share the revised detail hierarchy: layered glass surfaces, larger detail placeholders, meaningful Season / Episode titles, scrollable information cards and compact row layouts.
+- Updated Series and Season media-library actions to use `加入媒体库 / 移出媒体库` toggles with the existing hide-only semantics.
+- Fixed manual Season / Episode watched-state updates so they no longer write playback timestamps, progress or duration. Episode-row watched toggles now refresh locally instead of rebuilding the Season page list.
+- Extended TV filename parsing and unidentified grouping compatibility from two-digit to four-digit Season / Episode numbers without changing existing parser priority.
+- Kept the existing persisted TV production metadata source for status, networks and production companies. No additional schema change was introduced.
+
+Not done:
+
+- No scanner confidence threshold, automatic metadata migration, database update, commit or push was added.
+- Runtime visual acceptance remains manual for final spacing, scrollbar placement and full-screen framing.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current follow-up introduced no new migration.
+
+### TV / Media Library Follow-up - Genre Filter Mapping
+
+Completed:
+
+- Reused the existing TMDB TV genre vocabulary in media-library filtering, including `Sci-Fi & Fantasy -> 科幻奇幻`.
+- Added a TV-specific tag table under the media-library tag menu. TV filtering no longer reuses Movie type / emotion / scene tags.
+- Existing media-library rows normalize raw TMDB TV genre names on load; newly fetched TV details normalize before persistence.
+
+Not done:
+
+- No schema migration, database update, scan heuristic change, commit or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
 - Current migrations diff remained empty.
 - No automated test project is currently present in `MediaLibrary.sln`; validation used code audit, document audit, required git checks, migration diff, and build.
 

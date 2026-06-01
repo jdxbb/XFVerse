@@ -37,6 +37,24 @@ public sealed class TvSeriesConfiguration : IEntityTypeConfiguration<TvSeries>
         builder.Property(x => x.GenresText)
             .HasMaxLength(1000);
 
+        builder.Property(x => x.DirectorText)
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.WriterText)
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.ActorsText)
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.ProductionStatus)
+            .HasMaxLength(120);
+
+        builder.Property(x => x.NetworksText)
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.ProductionCompaniesText)
+            .HasMaxLength(1000);
+
         builder.HasIndex(x => x.TmdbSeriesId)
             .IsUnique();
 

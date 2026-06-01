@@ -526,6 +526,9 @@ public sealed class UnknownSeasonCorrectionService : IUnknownSeasonCorrectionSer
         series.FirstAirDate = ParseDate(details.FirstAirDate);
         series.FirstAirYear = details.FirstAirYear;
         series.GenresText = Truncate(details.GenresText, 1000);
+        series.ProductionStatus = Truncate(details.ProductionStatus, 120);
+        series.NetworksText = Truncate(details.NetworksText, 1000);
+        series.ProductionCompaniesText = Truncate(details.ProductionCompaniesText, 1000);
         series.UpdatedAt = now;
         return series;
     }

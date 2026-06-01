@@ -126,6 +126,7 @@ public partial class LibraryPage : UserControl
         _openContextMenu = contextMenu;
         contextMenu.IsOpen = true;
         AlignContextMenuToButtonCenter(button, contextMenu);
+        ConfigureSubmenusToOpenRight(contextMenu);
         e.Handled = true;
     }
 
@@ -291,6 +292,56 @@ public partial class LibraryPage : UserControl
                 RecordScrollDiagnostics(sender, e, Stopwatch.GetElapsedTime(startedAt));
             }
         }
+    }
+
+    private static void ConfigureSubmenusToOpenRight(ItemsControl root)
+    {
+        foreach (var menuItem in root.Items.OfType<MenuItem>())
+        {
+            menuItem.SubmenuOpened -= OnSubmenuOpened;
+            menuItem.SubmenuOpened += OnSubmenuOpened;
+            ConfigureSubmenuPopupToOpenRight(menuItem);
+            ConfigureSubmenusToOpenRight(menuItem);
+        }
+    }
+
+    private static void OnSubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        ConfigureSubmenuPopupToOpenRight(menuItem);
+        ConfigureSubmenusToOpenRight(menuItem);
+        _ = menuItem.Dispatcher.BeginInvoke(
+            () => ConfigureSubmenuPopupToOpenRight(menuItem),
+            DispatcherPriority.Loaded);
+    }
+
+    private static void ConfigureSubmenuPopupToOpenRight(MenuItem menuItem)
+    {
+        menuItem.ApplyTemplate();
+        if (menuItem.Template.FindName("PART_Popup", menuItem) is not Popup popup)
+        {
+            return;
+        }
+
+        popup.PlacementTarget = menuItem;
+        popup.Placement = PlacementMode.Custom;
+        popup.CustomPopupPlacementCallback = PlaceSubmenuOnRight;
+        popup.HorizontalOffset = 0;
+        popup.VerticalOffset = -7;
+    }
+
+    private static CustomPopupPlacement[] PlaceSubmenuOnRight(Size popupSize, Size targetSize, Point offset)
+    {
+        return
+        [
+            new CustomPopupPlacement(
+                new Point(targetSize.Width, 0),
+                PopupPrimaryAxis.Horizontal)
+        ];
     }
 
     private static void UpdateDecadeFilterMenuChecks(ContextMenu contextMenu, LibraryViewModel viewModel)

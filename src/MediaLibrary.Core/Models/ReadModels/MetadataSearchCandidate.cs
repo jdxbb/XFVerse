@@ -41,4 +41,22 @@ public sealed class MetadataSearchCandidate
     public int? TmdbVoteCount { get; set; }
 
     public bool IsCurrentMatchedMovie { get; set; }
+
+    public string ReleaseDateText => ReleaseDate?.ToString("yyyy-MM-dd")
+                                     ?? ReleaseYear?.ToString()
+                                     ?? "-";
+
+    public string RuntimeText => RuntimeMinutes is > 0
+        ? $"{RuntimeMinutes.Value / 60:00}:{RuntimeMinutes.Value % 60:00}:00"
+        : "-";
+
+    public string OriginalTitleDisplayText => string.IsNullOrWhiteSpace(OriginalTitle) ? "-" : OriginalTitle;
+
+    public string OverviewDisplayText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
+
+    public string DirectorDisplayText => string.IsNullOrWhiteSpace(DirectorText) ? "-" : DirectorText;
+
+    public string CountryDisplayText => string.IsNullOrWhiteSpace(Country) ? "-" : Country;
+
+    public string LanguageDisplayText => string.IsNullOrWhiteSpace(Language) ? "-" : Language;
 }

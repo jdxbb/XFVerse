@@ -46,6 +46,48 @@
         </Grid>
     </ControlTemplate>
 
+    <ControlTemplate x:Key="PosterPlaceholderLargeTemplate" TargetType="{x:Type Control}">
+        <Grid ClipToBounds="True" SnapsToDevicePixels="True">
+            <Image Source="pack://application:,,,/MediaLibrary.App;component/Assets/poster-placeholder.png"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   SnapsToDevicePixels="True"
+                   Stretch="UniformToFill" />
+            <Grid IsHitTestVisible="False">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="0.36*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="0.64*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="1"
+                           HorizontalAlignment="Center"
+                           FontSize="22"
+                           Text="无海报"
+                           Style="{StaticResource PosterPlaceholderLabelTextStyle}" />
+            </Grid>
+        </Grid>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="PosterPlaceholderWideTemplate" TargetType="{x:Type Control}">
+        <Grid ClipToBounds="True" SnapsToDevicePixels="True">
+            <Image Source="pack://application:,,,/MediaLibrary.App;component/Assets/poster-placeholder.png"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   SnapsToDevicePixels="True"
+                   Stretch="UniformToFill" />
+            <Grid IsHitTestVisible="False">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="0.36*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="0.64*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="1"
+                           HorizontalAlignment="Center"
+                           FontSize="26"
+                           Text="无海报"
+                           Style="{StaticResource PosterPlaceholderLabelTextStyle}" />
+            </Grid>
+        </Grid>
+    </ControlTemplate>
+
     <Style x:Key="MonospacePathTextStyle" TargetType="TextBlock" BasedOn="{StaticResource TruncatedTextBlockStyle}">
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyMono}" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeMetadata}" />

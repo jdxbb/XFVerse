@@ -22,6 +22,7 @@ public sealed class TmdbService : ITmdbService
     private const string TmdbSearchCacheType = "Search";
     private const string TmdbDetailCacheType = "DetailCredits";
     private const string TmdbExternalIdsCacheType = "ExternalIds";
+    private const string TvSeriesDetailCacheSchemaVersion = "v3";
     private const int DiscoveryPageSize = 20;
     internal const int HttpConcurrencyLimit = 8;
     private const int SearchCacheLimit = 300;
@@ -641,7 +642,7 @@ public sealed class TmdbService : ITmdbService
         try
         {
             using var response = await SendGetAsync(
-                $"tv/{seriesId}?language={Uri.EscapeDataString(safeLanguage)}",
+                $"tv/{seriesId}?language={Uri.EscapeDataString(safeLanguage)}&append_to_response=credits",
                 options,
                 "tmdb-tv-series-detail",
                 cancellationToken);
@@ -1181,7 +1182,7 @@ public sealed class TmdbService : ITmdbService
 
     private static string BuildTmdbTvSeriesDetailCacheKey(int seriesId, string language, TmdbRequestOptions options)
     {
-        return $"tv-series-detail|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|language={language}|series={seriesId}";
+        return $"tv-series-detail|schema={TvSeriesDetailCacheSchemaVersion}|base={options.ApiBaseUrl}|auth={options.AuthFingerprint}|language={language}|series={seriesId}";
     }
 
     private static string BuildTmdbTvSeasonDetailCacheKey(int seriesId, int seasonNumber, string language, TmdbRequestOptions options)
@@ -1509,7 +1510,17 @@ public sealed class TmdbService : ITmdbService
             BackdropRemoteUrl = BuildImageUrl(GetString(root, "backdrop_path")),
             FirstAirDate = firstAirDate,
             FirstAirYear = ParseYear(firstAirDate),
-            GenresText = string.Join(" / ", EnumerateArrayStrings(root, "genres", "name")),
+            GenresText = TmdbTvGenreMapper.NormalizeGenreNames(
+                string.Join(" / ", EnumerateArrayStrings(root, "genres", "name"))),
+            DirectorText = JoinNames(EnumerateMovieCrewNames(root, "Director", "Series Director"), 6),
+            WriterText = JoinNames(
+                EnumerateArrayStrings(root, "created_by", "name")
+                    .Concat(EnumerateMovieCrewNames(root, "Writer", "Screenplay", "Story", "Teleplay")),
+                8),
+            ActorsText = JoinNames(EnumerateMovieCastNames(root), 10),
+            ProductionStatus = GetString(root, "status"),
+            NetworksText = string.Join(" / ", EnumerateArrayStrings(root, "networks", "name")),
+            ProductionCompaniesText = string.Join(" / ", EnumerateArrayStrings(root, "production_companies", "name")),
             OriginalLanguage = GetString(root, "original_language"),
             OriginCountries = EnumerateStringArray(root, "origin_country").ToList(),
             NumberOfSeasons = GetInt(root, "number_of_seasons"),
@@ -1790,6 +1801,12 @@ public sealed class TmdbService : ITmdbService
             FirstAirDate = detail.FirstAirDate,
             FirstAirYear = detail.FirstAirYear,
             GenresText = detail.GenresText,
+            DirectorText = detail.DirectorText,
+            WriterText = detail.WriterText,
+            ActorsText = detail.ActorsText,
+            ProductionStatus = detail.ProductionStatus,
+            NetworksText = detail.NetworksText,
+            ProductionCompaniesText = detail.ProductionCompaniesText,
             OriginalLanguage = detail.OriginalLanguage,
             OriginCountries = detail.OriginCountries.ToList(),
             NumberOfSeasons = detail.NumberOfSeasons,

@@ -110,7 +110,7 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             var seasonSummaries = NormalizeSeasonSummaries(seriesDetails.Seasons);
             if (!force
                 && existingSeriesId.HasValue
-                && await HasSeriesSummaryAsync(existingSeriesId.Value, seasonSummaries, cancellationToken).ConfigureAwait(false))
+                && await HasSeriesSummaryAsync(existingSeriesId.Value, seriesDetails, seasonSummaries, cancellationToken).ConfigureAwait(false))
             {
                 result.Skipped = true;
                 result.TvSeriesId = existingSeriesId;
@@ -384,6 +384,7 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
 
     private static async Task<bool> HasSeriesSummaryAsync(
         int tvSeriesId,
+        TmdbTvSeriesDetailResult seriesDetails,
         IReadOnlyCollection<TmdbTvSeasonSummaryItem> seasonSummaries,
         CancellationToken cancellationToken)
     {
@@ -393,6 +394,31 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         }
 
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var localSeries = await dbContext.TvSeries
+            .AsNoTracking()
+            .Where(x => x.Id == tvSeriesId)
+            .Select(x => new
+            {
+                x.DirectorText,
+                x.WriterText,
+                x.ActorsText,
+                x.ProductionStatus,
+                x.NetworksText,
+                x.ProductionCompaniesText
+            })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (localSeries is null
+            || !string.Equals(localSeries.DirectorText ?? string.Empty, Truncate(seriesDetails.DirectorText, 1000) ?? string.Empty, StringComparison.Ordinal)
+            || !string.Equals(localSeries.WriterText ?? string.Empty, Truncate(seriesDetails.WriterText, 1000) ?? string.Empty, StringComparison.Ordinal)
+            || !string.Equals(localSeries.ActorsText ?? string.Empty, Truncate(seriesDetails.ActorsText, 1000) ?? string.Empty, StringComparison.Ordinal)
+            || !string.Equals(localSeries.ProductionStatus ?? string.Empty, Truncate(seriesDetails.ProductionStatus, 120) ?? string.Empty, StringComparison.Ordinal)
+            || !string.Equals(localSeries.NetworksText ?? string.Empty, Truncate(seriesDetails.NetworksText, 1000) ?? string.Empty, StringComparison.Ordinal)
+            || !string.Equals(localSeries.ProductionCompaniesText ?? string.Empty, Truncate(seriesDetails.ProductionCompaniesText, 1000) ?? string.Empty, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         var localSeasons = await dbContext.TvSeasons
             .AsNoTracking()
             .Where(x => x.TvSeriesId == tvSeriesId)
@@ -461,6 +487,12 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         tvSeries.FirstAirDate = ParseDate(details.FirstAirDate);
         tvSeries.FirstAirYear = details.FirstAirYear;
         tvSeries.GenresText = Truncate(details.GenresText, 1000);
+        tvSeries.DirectorText = Truncate(details.DirectorText, 1000);
+        tvSeries.WriterText = Truncate(details.WriterText, 1000);
+        tvSeries.ActorsText = Truncate(details.ActorsText, 1000);
+        tvSeries.ProductionStatus = Truncate(details.ProductionStatus, 120);
+        tvSeries.NetworksText = Truncate(details.NetworksText, 1000);
+        tvSeries.ProductionCompaniesText = Truncate(details.ProductionCompaniesText, 1000);
         tvSeries.UpdatedAt = DateTime.UtcNow;
         return tvSeries;
     }

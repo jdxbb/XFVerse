@@ -412,6 +412,24 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task RemoveSeriesFromLibraryAsync(int tvSeriesId, CancellationToken cancellationToken = default)
+    {
+        List<int> seasonIds;
+        await using (var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create()))
+        {
+            seasonIds = await dbContext.TvSeasons
+                .AsNoTracking()
+                .Where(x => x.TvSeriesId == tvSeriesId)
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        foreach (var seasonId in seasonIds)
+        {
+            await RemoveFromLibraryAsync(seasonId, cancellationToken);
+        }
+    }
+
     public async Task AddSeasonToLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default)
     {
         await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
@@ -962,36 +980,6 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
     {
         episode.IsWatched = isWatched;
         episode.UpdatedAt = now;
-        if (isWatched)
-        {
-            episode.LastPlayedAt ??= now;
-            var durationSeconds = ResolveEpisodeDurationSeconds(episode);
-            if (durationSeconds > 0)
-            {
-                episode.LastPlayPositionSeconds = durationSeconds;
-                episode.DurationWatchedSeconds = Math.Max(episode.DurationWatchedSeconds, durationSeconds);
-            }
-
-            return;
-        }
-
-        episode.LastPlayedAt = null;
-        episode.LastPlayPositionSeconds = 0;
-        episode.DurationWatchedSeconds = 0;
-    }
-
-    private static int ResolveEpisodeDurationSeconds(TvEpisode episode)
-    {
-        var mediaDuration = episode.MediaFiles
-            .Where(x => !x.IsDeleted && x.MediaType == MediaType.Video)
-            .Select(x => x.DurationSeconds)
-            .FirstOrDefault(x => x is > 0);
-        if (mediaDuration is > 0)
-        {
-            return mediaDuration.Value;
-        }
-
-        return episode.RuntimeMinutes is > 0 ? episode.RuntimeMinutes.Value * 60 : 0;
     }
 
     private static async Task<IReadOnlyList<SeasonCollectionRow>> LoadSeasonRowsAsync(

@@ -58,6 +58,8 @@ public sealed class MovieDetailModel
 
     public bool IsWatched { get; set; }
 
+    public bool IsWantToWatch { get; set; }
+
     public bool IsNotInterested { get; set; }
 
     public bool IsVisibleInLibrary { get; set; }

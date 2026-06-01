@@ -109,6 +109,18 @@ public partial class PlayerWindow : Window
             ShowControlBar();
             RestartControlBarTimer();
             _cursorPollTimer.Start();
+            if (!_isFullScreen)
+            {
+                _ = Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        if (!_isFullScreen && IsLoaded)
+                        {
+                            ToggleFullScreen();
+                        }
+                    },
+                    DispatcherPriority.ApplicationIdle);
+            }
         };
         Activated += OnWindowActivated;
         Deactivated += OnWindowDeactivated;
@@ -325,13 +337,7 @@ public partial class PlayerWindow : Window
 
     private void TogglePlayerMaximizeRestore()
     {
-        if (_isFullScreen)
-        {
-            ExitFullScreen();
-            return;
-        }
-
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        ToggleFullScreen();
     }
 
     private void UpdatePlayerMaximizeRestoreButton()

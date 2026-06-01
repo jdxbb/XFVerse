@@ -177,4 +177,46 @@
         <GradientStop Color="#F3D2BF" Offset="0.55" />
         <GradientStop Color="#E5EAF2" Offset="1" />
     </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="BrushGlassSurface" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#F5FFFFFF" Offset="0" />
+        <GradientStop Color="#E5F9FDFF" Offset="0.22" />
+        <GradientStop Color="#D8FFF8F1" Offset="0.62" />
+        <GradientStop Color="#C8E4EDF3" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushGlassSurfaceAlt" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#ECFFFFFF" Offset="0" />
+        <GradientStop Color="#D8F7FBFD" Offset="0.2" />
+        <GradientStop Color="#C8F2EAE2" Offset="0.62" />
+        <GradientStop Color="#B8D9E5EC" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="BrushGlassBorder" Color="#E8FFFFFF" />
+    <LinearGradientBrush x:Key="BrushGlassButton" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#E8FFFFFF" Offset="0" />
+        <GradientStop Color="#CBEAF0F4" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushGlassButtonHover" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFFFFFFF" Offset="0" />
+        <GradientStop Color="#E6DDECF2" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushGlassButtonPressed" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#DED8E8ED" Offset="0" />
+        <GradientStop Color="#C7C5D9E2" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushGlassAccent" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#F05A7A88" Offset="0" />
+        <GradientStop Color="#E64A6675" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushGlassAccentHover" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#F5688996" Offset="0" />
+        <GradientStop Color="#EB547685" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushGlassAccentPressed" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#F04B6976" Offset="0" />
+        <GradientStop Color="#E53E5B69" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushGlassSelected" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#8BC5DBE2" Offset="0" />
+        <GradientStop Color="#6EA8C5CF" Offset="1" />
+    </LinearGradientBrush>
 </ResourceDictionary>

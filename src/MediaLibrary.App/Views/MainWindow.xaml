@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="XFVerse"
@@ -35,6 +36,46 @@
             <ColumnDefinition Width="{Binding DataContext.SidebarColumnWidth, ElementName=RootGrid}" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+
+        <Border x:Name="DetailBackdrop"
+                Grid.ColumnSpan="2"
+                IsHitTestVisible="False"
+                helpers:PosterCachedBackdropBehavior.IsEnabled="True">
+            <Border.Visibility>
+                <Binding Path="IsDetailRouteActive" Converter="{StaticResource BooleanToVisibilityConverter}" />
+            </Border.Visibility>
+        </Border>
+        <Border Grid.ColumnSpan="2"
+                IsHitTestVisible="False">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="#20FFFFFF" />
+                                <GradientStop Offset="0.46" Color="#08000000" />
+                                <GradientStop Offset="1" Color="#16FFFFFF" />
+                            </LinearGradientBrush>
+                        </Setter.Value>
+                    </Setter>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
+        <Image Width="1"
+               Height="1"
+               HorizontalAlignment="Left"
+               VerticalAlignment="Top"
+               IsHitTestVisible="False"
+               Opacity="0"
+               helpers:PosterCacheImageBehavior.DecodePixelWidth="128"
+               helpers:PosterCacheImageBehavior.Source="{Binding DetailBackdropSource}"
+               helpers:PosterPaletteBackdropBehavior.TargetElement="{Binding ElementName=DetailBackdrop}" />
 
         <Border Grid.Column="0"
                 Style="{StaticResource SidebarBorderStyle}">
@@ -466,24 +507,68 @@
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
-                    Style="{StaticResource TopBarBorderStyle}"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
                     MouseLeftButtonUp="TitleBar_MouseLeftButtonUp"
                     MouseMove="TitleBar_MouseMove">
-                <Border.Visibility>
-                    <Binding Path="IsShellChromeVisible" Converter="{StaticResource BooleanToVisibilityConverter}" />
-                </Border.Visibility>
-                <Grid Height="44"
-                      Margin="30,6,2,6">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource TopBarBorderStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                                <Setter Property="Background" Value="#28FFFFFF" />
+                                <Setter Property="BorderBrush" Value="#34FFFFFF" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Height" Value="44" />
+                            <Setter Property="Margin" Value="30,6,2,6" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                                    <Setter Property="Height" Value="42" />
+                                    <Setter Property="Margin" Value="0,0,2,0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
+                    <Button Grid.Column="0"
+                            Margin="10,0,0,0"
+                            HorizontalAlignment="Left"
+                            Command="{Binding CurrentPageViewModel.NavigateBackCommand}"
+                            Content="&#xE72B;">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource WindowCaptionButtonStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
                     <StackPanel Grid.Column="0"
                                 Height="36"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                         <TextBlock Text="{Binding ShellPageTitle}"
                                    VerticalAlignment="Center"
                                    FontSize="22"
@@ -508,17 +593,25 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Margin="0,0,30,0">
+                                 Orientation="Horizontal"
+                                 HorizontalAlignment="Right"
+                                 VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Margin" Value="0,0,30,0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                                        <Setter Property="Margin" Value="0,0,8,0" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                         <Button Command="{Binding ToggleThemeCommand}"
                                 Width="36"
                                 Height="36"
                                 MinWidth="36"
                                 MinHeight="36"
-                                Style="{StaticResource SmallIconButtonStyle}"
-                                ToolTip="{Binding ThemeToggleToolTip}">
+                                Style="{StaticResource SmallIconButtonStyle}">
                             <TextBlock Text="{Binding ThemeToggleIcon}"
                                        Style="{StaticResource ShellIconGlyphTextStyle}"
                                        Foreground="{DynamicResource BrushForegroundSecondary}" />
@@ -533,19 +626,16 @@
                         <Button x:Name="MinimizeButton"
                                 Margin="0"
                                 Content="&#xE921;"
-                                ToolTip="最小化"
                                 Click="MinimizeButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="MaximizeRestoreButton"
                                 Margin="0"
                                 Content="&#xE922;"
-                                ToolTip="最大化"
                                 Click="MaximizeRestoreButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="CloseButton"
                                 Margin="0"
                                 Content="&#xE8BB;"
-                                ToolTip="关闭"
                                 Click="CloseButton_Click"
                                 Style="{StaticResource WindowCaptionCloseButtonStyle}" />
                     </StackPanel>

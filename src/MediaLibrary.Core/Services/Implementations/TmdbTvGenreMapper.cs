@@ -22,6 +22,27 @@ public static class TmdbTvGenreMapper
         [37] = "西部"
     };
 
+    private static readonly IReadOnlyDictionary<string, string> LocalizedGenreNames =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Action & Adventure"] = "动作冒险",
+            ["Animation"] = "动画",
+            ["Comedy"] = "喜剧",
+            ["Crime"] = "犯罪",
+            ["Documentary"] = "纪录片",
+            ["Drama"] = "剧情",
+            ["Family"] = "家庭",
+            ["Kids"] = "儿童",
+            ["Mystery"] = "悬疑",
+            ["News"] = "新闻",
+            ["Reality"] = "真人秀",
+            ["Sci-Fi & Fantasy"] = "科幻奇幻",
+            ["Soap"] = "肥皂剧",
+            ["Talk"] = "脱口秀",
+            ["War & Politics"] = "战争政治",
+            ["Western"] = "西部"
+        };
+
     public static IReadOnlyList<string> GenreLabels { get; } =
     [
         "全部",
@@ -49,6 +70,24 @@ public static class TmdbTvGenreMapper
             .Select(id => GenreNames.TryGetValue(id, out var label) ? label : string.Empty)
             .Where(label => !string.IsNullOrWhiteSpace(label))
             .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        return labels.Count == 0 ? string.Empty : string.Join("、", labels);
+    }
+
+    public static string NormalizeGenreNames(string? genresText)
+    {
+        if (string.IsNullOrWhiteSpace(genresText))
+        {
+            return string.Empty;
+        }
+
+        var labels = genresText
+            .Split(['、', '/', ',', '，', ';', '；', '|', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(label => label.Trim())
+            .Where(label => !string.IsNullOrWhiteSpace(label))
+            .Select(label => LocalizedGenreNames.TryGetValue(label, out var localized) ? localized : label)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return labels.Count == 0 ? string.Empty : string.Join("、", labels);

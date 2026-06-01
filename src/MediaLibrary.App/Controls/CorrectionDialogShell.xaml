@@ -17,7 +17,7 @@
     <Grid Background="#99000000">
         <Border Width="{Binding DialogWidth, ElementName=Root}"
                 MaxHeight="{Binding DialogMaxHeight, ElementName=Root}"
-                Padding="22"
+                Padding="24"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Style="{StaticResource PageCardStyle}">
@@ -26,7 +26,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="16" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="16" />
+                    <RowDefinition Height="{Binding FooterSpacing, ElementName=Root}" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
@@ -36,19 +36,49 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource CardTitleTextStyle}"
+                        <TextBlock FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource BrushForegroundPrimary}"
                                    Text="{Binding Title, ElementName=Root}" />
+                        <ContentPresenter Margin="0,10,0,0"
+                                          Content="{Binding HeaderContent, ElementName=Root}">
+                            <ContentPresenter.Style>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HeaderContent, ElementName=Root}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ContentPresenter.Style>
+                        </ContentPresenter>
                         <TextBlock Margin="0,8,0,0"
-                                   Style="{StaticResource BodyMutedTextStyle}"
                                    Text="{Binding Summary, ElementName=Root}"
-                                   TextWrapping="Wrap" />
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Summary, ElementName=Root}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                     <Button Grid.Column="1"
-                            Width="38"
+                            Width="30"
+                            Height="30"
+                            MinWidth="30"
+                            MinHeight="30"
+                            VerticalAlignment="Top"
                             Command="{Binding CloseCommand, ElementName=Root}"
                             Content="&#xE711;"
-                            Style="{StaticResource DetailBackButtonStyle}"
-                            ToolTip="关闭" />
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="15"
+                            Style="{StaticResource SmallIconButtonStyle}"
+                            ToolTip="{x:Null}" />
                 </Grid>
 
                 <ScrollViewer Grid.Row="2"

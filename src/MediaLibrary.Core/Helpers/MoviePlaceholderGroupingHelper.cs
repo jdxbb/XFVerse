@@ -578,7 +578,7 @@ public static partial class MoviePlaceholderGroupingHelper
     [GeneratedRegex(@"^(?<prefix>.*?[\p{L}\u4e00-\u9fff].*?)[\s._-]*(?<episode>\d{1,4})\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex TitleNumberRegex();
 
-    [GeneratedRegex(@"^\s*(?<episode>\d{1,4})[\s._-]+(?<title>.+?)[\s._-]+(?:[Ss]\d{1,2}|Season[\s._-]*\d{1,2})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s*(?<episode>\d{1,4})[\s._-]+(?<title>.+?)[\s._-]+(?:[Ss]\d{1,4}|Season[\s._-]*\d{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex LeadingNumberTitleRegex();
 
     [GeneratedRegex(@"(?:^|[\s._\-\[\(])(?:cd|disc|disk|part|sample|trailer|teaser|preview|extras?|bonus|featurette)\s*\d*(?:$|[\s._\-\]\)])|\u82b1\u7d6e|\u9884\u544a|\u7279\u5178|\u5e55\u540e|\u8bbf\u8c08|\u6837\u7247|\u7247\u6bb5|(?:^|[\s._\-\[\(])[\u4e0a\u4e0b](?:$|[\s._\-\]\)])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -593,7 +593,7 @@ public static partial class MoviePlaceholderGroupingHelper
     [GeneratedRegex(@"(?:合集|系列|全集|套装|collection|movies?|trilogy|quadrilogy)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex MovieCollectionFolderRegex();
 
-    [GeneratedRegex(@"(?:\b[Ss]\d{1,2}\b|\bSeason\s*\d{1,2}\b|\bEpisode\b|\bEP\d{1,4}\b|\bE\d{1,4}\b|第\s*\d{1,4}\s*[季集话]|剧集|电视剧|TV)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?:\b[Ss]\d{1,4}\b|\bSeason\s*\d{1,4}\b|\bEpisode\b|\bEP\d{1,4}\b|\bE\d{1,4}\b|第\s*\d{1,4}\s*[季集话]|剧集|电视剧|TV)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TvHintRegex();
 }
 

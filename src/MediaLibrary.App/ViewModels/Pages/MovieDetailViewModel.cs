@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Net.Http;
+using System.Windows;
+using System.Windows.Threading;
 using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
@@ -66,7 +68,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private string _playButtonText = "播放默认源";
     private string _favoriteButtonText = "喜爱";
     private string _watchedButtonText = "标记已看";
-    private string _wantToWatchButtonText = "+ 想看";
+    private string _wantToWatchButtonText = "想看";
     private string _notInterestedButtonText = "不想看";
     private string _manualSearchQuery = string.Empty;
     private string _manualSearchYear = string.Empty;
@@ -80,6 +82,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private string _correctionPreviewText = string.Empty;
     private string _correctionSourceFileName = string.Empty;
     private string _correctionSourcePath = string.Empty;
+    private MovieSourceItem? _selectedCorrectionSource;
     private int? _selectedTvCorrectionSeriesTmdbId;
     private string _selectedTvCorrectionSeriesName = string.Empty;
     private int? _selectedTvCorrectionSeasonNumber;
@@ -95,6 +98,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _isTogglingWatched;
     private bool _isTogglingWantToWatch;
     private bool _isTogglingNotInterested;
+    private bool _isTogglingFavorite;
     private bool _isFavorite;
     private bool _isWatched;
     private bool _isWantToWatch;
@@ -134,10 +138,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _mediaProbeService = mediaProbeService;
         _confirmationDialogService = confirmationDialogService;
 
-        SearchCandidatesCommand = new AsyncRelayCommand(SearchCandidatesAsync);
+        SearchCandidatesCommand = new AsyncRelayCommand(SearchCandidatesAsync, CanSearchCandidates);
         ApplyManualMatchCommand = new AsyncRelayCommand(ApplyMovieCandidateCorrectionAsync, CanApplyMovieCandidateCorrection);
         BeginSourceCorrectionCommand = new RelayCommand(BeginSourceCorrection, CanBeginSourceCorrection);
         SelectTvEpisodeCorrectionTargetCommand = new RelayCommand(SelectTvEpisodeCorrectionTarget, CanSelectTvEpisodeCorrectionTarget);
+        ApplyTvEpisodeCorrectionTargetCommand = new AsyncRelayCommand(ApplyTvEpisodeCorrectionTargetAsync, CanSelectTvEpisodeCorrectionTarget);
         PreviewTvEpisodeCorrectionCommand = new AsyncRelayCommand(ApplySelectedTvEpisodeCorrectionAsync, CanApplySelectedTvEpisodeCorrection);
         SearchUnknownSeasonTargetsCommand = new AsyncRelayCommand(SearchUnknownSeasonTargetsAsync, CanSearchUnknownSeasonTargets);
         OpenUnknownSeasonPickerCommand = new AsyncRelayCommand(OpenUnknownSeasonPickerAsync, CanOpenUnknownSeasonPicker);
@@ -150,12 +155,19 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
         OpenPlayerCommand = new AsyncRelayCommand(OpenPlayerAsync, _ => CanOpenPlayer);
-        ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync);
-        ToggleWatchedCommand = new AsyncRelayCommand(ToggleWatchedAsync, () => CanToggleWatched);
-        ToggleWantToWatchCommand = new AsyncRelayCommand(ToggleWantToWatchAsync, () => CanToggleWantToWatch);
-        ToggleNotInterestedCommand = new AsyncRelayCommand(ToggleNotInterestedAsync, () => CanToggleNotInterested);
+        ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, disableWhileExecuting: false);
+        TogglePreferenceCommand = new AsyncRelayCommand(TogglePreferenceAsync, () => CanTogglePreference, disableWhileExecuting: false);
+        ToggleWatchedCommand = new AsyncRelayCommand(ToggleWatchedAsync, () => CanToggleWatched, disableWhileExecuting: false);
+        ToggleWantToWatchCommand = new AsyncRelayCommand(ToggleWantToWatchAsync, () => CanToggleWantToWatch, disableWhileExecuting: false);
+        ToggleNotInterestedCommand = new AsyncRelayCommand(ToggleNotInterestedAsync, () => CanToggleNotInterested, disableWhileExecuting: false);
         AddToLibraryCommand = new AsyncRelayCommand(AddToLibraryAsync, () => CanAddToLibrary);
         AiSuggestSearchCommand = new AsyncRelayCommand(AiSuggestSearchAsync, CanAiSuggestSearch);
+        ClearManualSearchQueryCommand = new RelayCommand(() => ManualSearchQuery = string.Empty);
+        ClearManualSearchYearCommand = new RelayCommand(() => ManualSearchYear = string.Empty);
+        ClearTvCorrectionQueryCommand = new RelayCommand(() => TvCorrectionQuery = string.Empty);
+        ClearCorrectionSeasonNumberCommand = new RelayCommand(() => CorrectionSeasonNumber = string.Empty);
+        ClearCorrectionEpisodeNumberCommand = new RelayCommand(() => CorrectionEpisodeNumber = string.Empty);
+        ClearUnknownSeasonEpisodeNumberCommand = new RelayCommand(() => UnknownSeasonEpisodeNumber = string.Empty);
         RefreshCommand = new AsyncRelayCommand(() => ActivateAsync());
         NavigateBackCommand = new RelayCommand(_navigationStateService.RequestDetailBackToLibrary);
 
@@ -194,6 +206,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public RelayCommand SelectTvEpisodeCorrectionTargetCommand { get; }
 
+    public AsyncRelayCommand ApplyTvEpisodeCorrectionTargetCommand { get; }
+
     public AsyncRelayCommand PreviewTvEpisodeCorrectionCommand { get; }
 
     public AsyncRelayCommand SearchUnknownSeasonTargetsCommand { get; }
@@ -220,6 +234,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public AsyncRelayCommand ToggleFavoriteCommand { get; }
 
+    public AsyncRelayCommand TogglePreferenceCommand { get; }
+
     public AsyncRelayCommand ToggleWatchedCommand { get; }
 
     public AsyncRelayCommand ToggleWantToWatchCommand { get; }
@@ -229,6 +245,18 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public AsyncRelayCommand AddToLibraryCommand { get; }
 
     public AsyncRelayCommand AiSuggestSearchCommand { get; }
+
+    public RelayCommand ClearManualSearchQueryCommand { get; }
+
+    public RelayCommand ClearManualSearchYearCommand { get; }
+
+    public RelayCommand ClearTvCorrectionQueryCommand { get; }
+
+    public RelayCommand ClearCorrectionSeasonNumberCommand { get; }
+
+    public RelayCommand ClearCorrectionEpisodeNumberCommand { get; }
+
+    public RelayCommand ClearUnknownSeasonEpisodeNumberCommand { get; }
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -260,13 +288,49 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string RuntimeText { get => _runtimeText; private set => SetProperty(ref _runtimeText, value); }
 
-    public string GenresText { get => _genresText; private set => SetProperty(ref _genresText, value); }
+    public string GenresText
+    {
+        get => _genresText;
+        private set
+        {
+            if (SetProperty(ref _genresText, value))
+            {
+                OnPropertyChanged(nameof(GenreTags));
+            }
+        }
+    }
 
     public string AiTagsText { get => _aiTagsText; private set => SetProperty(ref _aiTagsText, value); }
 
-    public string EmotionTagsText { get => _emotionTagsText; private set => SetProperty(ref _emotionTagsText, value); }
+    public string EmotionTagsText
+    {
+        get => _emotionTagsText;
+        private set
+        {
+            if (SetProperty(ref _emotionTagsText, value))
+            {
+                OnPropertyChanged(nameof(EmotionTags));
+            }
+        }
+    }
 
-    public string SceneTagsText { get => _sceneTagsText; private set => SetProperty(ref _sceneTagsText, value); }
+    public string SceneTagsText
+    {
+        get => _sceneTagsText;
+        private set
+        {
+            if (SetProperty(ref _sceneTagsText, value))
+            {
+                OnPropertyChanged(nameof(SceneTags));
+            }
+        }
+    }
+
+    public IReadOnlyList<string> GenreTags => SplitDisplayTags(GenresText);
+
+    public IReadOnlyList<string> EmotionTags => SplitDisplayTags(EmotionTagsText);
+
+    public IReadOnlyList<string> SceneTags => SplitDisplayTags(SceneTagsText);
 
     public string IdentificationStatusText { get => _identificationStatusText; private set => SetProperty(ref _identificationStatusText, value); }
 
@@ -291,6 +355,16 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public string WantToWatchButtonText { get => _wantToWatchButtonText; private set => SetProperty(ref _wantToWatchButtonText, value); }
 
     public string NotInterestedButtonText { get => _notInterestedButtonText; private set => SetProperty(ref _notInterestedButtonText, value); }
+
+    public string WatchedButtonIcon => IsWatched ? "\uE711" : "\uE8FB";
+
+    public string PreferenceButtonText => IsWatched ? FavoriteButtonText : WantToWatchButtonText;
+
+    public string PreferenceButtonIcon => IsWatched
+        ? IsFavorite ? "\uEB52" : "\uEB51"
+        : IsWantToWatch ? "\uE738" : "\uE710";
+
+    public string NotInterestedButtonIcon => "\uE814";
 
     public string ManualSearchQuery { get => _manualSearchQuery; set => SetProperty(ref _manualSearchQuery, value); }
 
@@ -349,14 +423,20 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(IsCorrectionTargetUnknownSeason));
                 ClearCandidatesForInactiveCorrectionTarget();
                 ClearSelectedTvCorrectionTarget();
+                SearchCandidatesCommand.RaiseCanExecuteChanged();
                 ApplyManualMatchCommand.RaiseCanExecuteChanged();
                 SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
+                ApplyTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
                 PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
                 SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
                 OpenUnknownSeasonPickerCommand.RaiseCanExecuteChanged();
                 SelectUnknownSeasonTargetCommand.RaiseCanExecuteChanged();
                 ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
                 AiSuggestSearchCommand.RaiseCanExecuteChanged();
+                if (IsCorrectionTargetUnknownSeason)
+                {
+                    _ = SearchUnknownSeasonTargetsAsync();
+                }
             }
         }
     }
@@ -366,6 +446,21 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public string CorrectionSourceFileName { get => _correctionSourceFileName; private set => SetProperty(ref _correctionSourceFileName, value); }
 
     public string CorrectionSourcePath { get => _correctionSourcePath; private set => SetProperty(ref _correctionSourcePath, value); }
+
+    public MovieSourceItem? SelectedCorrectionSource
+    {
+        get => _selectedCorrectionSource;
+        set
+        {
+            if (SetProperty(ref _selectedCorrectionSource, value)
+                && value is not null
+                && IsCorrectionPanelVisible
+                && _correctionMediaFileId != value.MediaFileId)
+            {
+                BeginSourceCorrection(value);
+            }
+        }
+    }
 
     public string CorrectionPreviewText { get => _correctionPreviewText; private set => SetProperty(ref _correctionPreviewText, value); }
 
@@ -429,8 +524,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isCorrectionBusy, value))
             {
+                SearchCandidatesCommand.RaiseCanExecuteChanged();
                 ApplyManualMatchCommand.RaiseCanExecuteChanged();
                 SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
+                ApplyTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
                 PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
                 SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
                 OpenUnknownSeasonPickerCommand.RaiseCanExecuteChanged();
@@ -454,10 +551,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
                 OnPropertyChanged(nameof(HasNoSources));
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
+                OnPropertyChanged(nameof(ShowPreferenceAction));
                 OnPropertyChanged(nameof(ShowNotInterestedAction));
                 OnPropertyChanged(nameof(ShowWatchedAction));
                 OnPropertyChanged(nameof(ShowAddToLibraryAction));
                 RefreshWantToWatchCommandState();
+                RefreshPreferenceCommandState();
                 RefreshNotInterestedCommandState();
                 RefreshWatchedCommandState();
                 RefreshAddToLibraryCommandState();
@@ -479,10 +578,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ShowCollectionActions));
                 OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
+                OnPropertyChanged(nameof(ShowPreferenceAction));
                 OnPropertyChanged(nameof(ShowNotInterestedAction));
                 OnPropertyChanged(nameof(ShowWatchedAction));
                 OnPropertyChanged(nameof(ShowAddToLibraryAction));
                 RefreshWantToWatchCommandState();
+                RefreshPreferenceCommandState();
                 RefreshNotInterestedCommandState();
                 RefreshWatchedCommandState();
                 RefreshAddToLibraryCommandState();
@@ -524,6 +625,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isFavorite, value))
             {
                 FavoriteButtonText = value ? "取消喜爱" : "喜爱";
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
+                RefreshPreferenceCommandState();
             }
         }
     }
@@ -536,7 +640,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isWatched, value))
             {
                 WatchedButtonText = value ? "标记未看" : "标记已看";
+                OnPropertyChanged(nameof(WatchedButtonIcon));
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
                 RefreshWantToWatchCommandState();
+                RefreshPreferenceCommandState();
             }
         }
     }
@@ -548,7 +656,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isWantToWatch, value))
             {
-                WantToWatchButtonText = value ? "取消想看" : "+ 想看";
+                WantToWatchButtonText = value ? "取消想看" : "想看";
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
+                RefreshPreferenceCommandState();
             }
         }
     }
@@ -602,19 +713,19 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public bool ShowExternalWantToWatchAction => HasMovie && !IsLibraryMovie;
 
+    public bool ShowPreferenceAction => HasMovie;
+
     public bool ShowNotInterestedAction => HasMovie;
 
     public bool ShowWatchedAction => HasMovie && (IsLibraryMovie || _externalRecommendation is not null);
 
-    public bool ShowAddToLibraryAction => HasMovie
-                                          && !IsVisibleInLibrary
-                                          && (!IsLibraryMovie || CurrentLibraryVisibilityState == LibraryVisibilityState.Hidden);
+    public bool ShowAddToLibraryAction => HasMovie;
 
     public bool CanAddToLibrary => ShowAddToLibraryAction && !_isAddingToLibrary;
 
-    public string AddToLibraryButtonText => _libraryVisibilityState == LibraryVisibilityState.Hidden
-        ? "恢复到媒体库"
-        : "加入媒体库";
+    public string AddToLibraryButtonText => IsVisibleInLibrary ? "移出媒体库" : "加入媒体库";
+
+    public string AddToLibraryButtonIcon => IsVisibleInLibrary ? "\uE738" : "\uE710";
 
     public bool IsVisibleInLibrary
     {
@@ -624,6 +735,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isVisibleInLibrary, value))
             {
                 OnPropertyChanged(nameof(ShowAddToLibraryAction));
+                OnPropertyChanged(nameof(AddToLibraryButtonIcon));
                 RefreshAddToLibraryCommandState();
             }
         }
@@ -643,14 +755,20 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
     }
 
-    public bool CanToggleWatched => ShowWatchedAction && !_isTogglingWatched;
+    public bool CanToggleWatched => ShowWatchedAction;
 
-    public bool CanToggleWantToWatch => ShowExternalWantToWatchAction
-                                        && !_isTogglingWantToWatch
-                                        && !IsWatched
-                                        && _externalRecommendation is not null;
+    public bool CanToggleWantToWatch => (ShowExternalWantToWatchAction
+                                         && _externalRecommendation is not null
+                                         || IsLibraryMovie
+                                         && _movieId.HasValue)
+                                        && !IsWatched;
 
-    public bool CanToggleNotInterested => ShowNotInterestedAction && !_isTogglingNotInterested;
+    public bool CanTogglePreference => ShowPreferenceAction
+                                       && (IsWatched
+                                           ? IsLibraryMovie && _movieId.HasValue
+                                           : CanToggleWantToWatch);
+
+    public bool CanToggleNotInterested => ShowNotInterestedAction;
 
     public bool ShowRatingsAndTagsTab => ShowLibrarySections
                                          && (_externalRecommendation is not null
@@ -693,7 +811,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             IsLibraryMovie = true;
             IsFavorite = detail.IsFavorite;
             IsWatched = detail.IsWatched;
-            IsWantToWatch = false;
+            IsWantToWatch = detail.IsWantToWatch;
             IsNotInterested = detail.IsNotInterested;
             IsVisibleInLibrary = detail.IsVisibleInLibrary;
             CurrentLibraryVisibilityState = detail.LibraryVisibilityState;
@@ -707,17 +825,19 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             ReleaseDateText = detail.ReleaseDate.HasValue
                 ? detail.ReleaseDate.Value.ToString("yyyy-MM-dd")
                 : detail.ReleaseYear?.ToString() ?? "-";
-            Overview = string.IsNullOrWhiteSpace(detail.Overview) ? "暂无简介。" : detail.Overview;
+            Overview = string.IsNullOrWhiteSpace(detail.Overview) ? "暂无简介" : detail.Overview;
             PosterRemoteUrl = detail.PosterRemoteUrl;
             PosterDisplayUrl = detail.PosterDisplayUrl;
-            Country = string.IsNullOrWhiteSpace(detail.Country) ? "-" : detail.Country;
-            Language = string.IsNullOrWhiteSpace(detail.Language) ? "-" : detail.Language;
+            Country = MovieMetadataDisplayText.LocalizeCountries(detail.Country);
+            Language = MovieMetadataDisplayText.LocalizeLanguages(detail.Language);
             DirectorText = string.IsNullOrWhiteSpace(detail.DirectorText) ? "-" : detail.DirectorText;
             WriterText = string.IsNullOrWhiteSpace(detail.WriterText) ? "-" : detail.WriterText;
             ActorsText = string.IsNullOrWhiteSpace(detail.ActorsText) ? "-" : detail.ActorsText;
             ProductionCompanyText = string.IsNullOrWhiteSpace(detail.ProductionCompanyText) ? "-" : detail.ProductionCompanyText;
-            RuntimeText = detail.RuntimeMinutes.HasValue ? $"{detail.RuntimeMinutes.Value} 分钟" : "-";
-            GenresText = string.IsNullOrWhiteSpace(detail.GenresText) ? "未提供" : detail.GenresText;
+            RuntimeText = FormatRuntimeMinutes(detail.RuntimeMinutes);
+            GenresText = string.IsNullOrWhiteSpace(detail.GenresText)
+                ? detail.IdentificationStatus == IdentificationStatus.Failed ? "-" : "未提供"
+                : detail.GenresText;
             AiTagsText = string.IsNullOrWhiteSpace(detail.AiTagsText) ? "尚未分类" : detail.AiTagsText;
             EmotionTagsText = string.IsNullOrWhiteSpace(detail.EmotionTagsText) ? "尚未分类" : detail.EmotionTagsText;
             SceneTagsText = string.IsNullOrWhiteSpace(detail.SceneTagsText) ? "尚未分类" : detail.SceneTagsText;
@@ -726,9 +846,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             RefreshResetSourceRecognitionCommandState();
             if (_identificationStatus is not (IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed))
             {
-                AiTagsText = string.Empty;
-                EmotionTagsText = string.Empty;
-                SceneTagsText = string.Empty;
+                GenresText = "-";
+                AiTagsText = "-";
+                EmotionTagsText = "-";
+                SceneTagsText = "-";
             }
 
             OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
@@ -759,8 +880,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             AvailabilityText = isUnidentifiedPlaceholder
                 ? "未识别 / 待修正"
                 : hasSources
-                    ? "有播放源 / 已入库"
-                    : "暂无播放源 / 已入库";
+                    ? "有播放源"
+                    : "暂无播放源";
             CanPlay = hasSources;
             PlayButtonText = CanPlay ? "播放默认源" : "暂无可播放源";
             if (detail.TmdbId.HasValue && NeedsMovieCreditsHydration(detail))
@@ -782,6 +903,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 SelectedUnknownSeasonTarget = null;
                 IsUnknownSeasonPickerDialogOpen = false;
                 _correctionMediaFileId = null;
+                _selectedCorrectionSource = null;
+                OnPropertyChanged(nameof(SelectedCorrectionSource));
                 OnPropertyChanged(nameof(IsCorrectionPanelVisible));
                 SelectedDetailTabIndex = 0;
                 SelectedCorrectionTarget = CorrectionTargetMovieText;
@@ -799,6 +922,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             else if (_correctionMediaFileId.HasValue && Sources.All(source => source.MediaFileId != _correctionMediaFileId.Value))
             {
                 _correctionMediaFileId = null;
+                _selectedCorrectionSource = null;
+                OnPropertyChanged(nameof(SelectedCorrectionSource));
                 CorrectionSourceFileName = string.Empty;
                 CorrectionSourcePath = string.Empty;
                 OnPropertyChanged(nameof(IsCorrectionPanelVisible));
@@ -1060,6 +1185,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         CurrentLibraryVisibilityState = recommendation.LibraryVisibilityState;
         SelectedDetailTabIndex = 0;
         _correctionMediaFileId = null;
+        _selectedCorrectionSource = null;
+        OnPropertyChanged(nameof(SelectedCorrectionSource));
         CorrectionSourceFileName = string.Empty;
         CorrectionSourcePath = string.Empty;
         ClearCorrectionPreview();
@@ -1071,9 +1198,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         IsWantToWatch = recommendation.IsWantToWatch;
         IsNotInterested = recommendation.IsNotInterested;
         CanPlay = false;
-        AvailabilityText = IsVisibleInLibrary
-            ? "暂无播放源 / 已入库"
-            : "暂无播放源 / 未加入媒体库";
+        AvailabilityText = "暂无播放源";
         PlayButtonText = "暂无可播放源";
         TitleText = recommendation.Title;
         OriginalTitle = string.IsNullOrWhiteSpace(recommendation.OriginalTitle) ? "-" : recommendation.OriginalTitle;
@@ -1084,13 +1209,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         Overview = string.IsNullOrWhiteSpace(recommendation.Overview) ? recommendation.Reason : recommendation.Overview;
         PosterRemoteUrl = recommendation.PosterRemoteUrl;
         PosterDisplayUrl = recommendation.PosterRemoteUrl;
-        Country = string.IsNullOrWhiteSpace(recommendation.Country) ? "-" : recommendation.Country;
-        Language = string.IsNullOrWhiteSpace(recommendation.Language) ? "-" : recommendation.Language;
+        Country = MovieMetadataDisplayText.LocalizeCountries(recommendation.Country);
+        Language = MovieMetadataDisplayText.LocalizeLanguages(recommendation.Language);
         DirectorText = "-";
         WriterText = "-";
         ActorsText = "-";
         ProductionCompanyText = "-";
-        RuntimeText = recommendation.RuntimeMinutes.HasValue ? $"{recommendation.RuntimeMinutes.Value} 分钟" : "-";
+        RuntimeText = FormatRuntimeMinutes(recommendation.RuntimeMinutes);
         if (shouldAutoClassify)
         {
             ShowExternalAiAnalyzingState(recommendation);
@@ -1099,7 +1224,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
         }
-        IdentificationStatusText = "库外推荐";
+        IdentificationStatusText = "无播放源";
         ConfidenceText = "-";
         TmdbIdText = recommendation.TmdbId?.ToString() ?? "-";
         ImdbIdText = string.IsNullOrWhiteSpace(recommendation.ImdbId) ? "-" : recommendation.ImdbId;
@@ -1108,14 +1233,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             ? "当前电影没有可用播放源，AI 正在分析影片标签。"
             : IsVisibleInLibrary
                 ? "当前电影没有可用播放源。"
-                : "当前电影没有可用播放源，可加入媒体库后保留库内记录。";
+                : "当前电影没有可用播放源，可加入媒体库后保留详情记录。";
         ManualSearchQuery = recommendation.Title;
         ManualSearchYear = recommendation.ReleaseYear?.ToString() ?? string.Empty;
 
-        Ratings.Clear();
+        var recommendationRatings = new List<MovieRatingItem>();
         if (recommendation.TmdbRating.HasValue)
         {
-            Ratings.Add(new MovieRatingItem
+            recommendationRatings.Add(new MovieRatingItem
             {
                 SourceName = "TMDB",
                 ScoreValue = recommendation.TmdbRating.Value,
@@ -1128,7 +1253,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         if (recommendation.OmdbRating is not null)
         {
-            Ratings.Add(ToDisplayRating(recommendation.OmdbRating));
+            recommendationRatings.Add(ToDisplayRating(recommendation.OmdbRating));
+        }
+
+        Ratings.Clear();
+        foreach (var rating in NormalizeDetailRatings(recommendationRatings))
+        {
+            Ratings.Add(rating);
         }
         NotifyRatingStateChanged();
         if (recommendation.TmdbId.HasValue)
@@ -1292,6 +1423,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ToggleWantToWatchCommand?.RaiseCanExecuteChanged();
     }
 
+    private void RefreshPreferenceCommandState()
+    {
+        OnPropertyChanged(nameof(CanTogglePreference));
+        TogglePreferenceCommand?.RaiseCanExecuteChanged();
+    }
+
     private void RefreshNotInterestedCommandState()
     {
         OnPropertyChanged(nameof(CanToggleNotInterested));
@@ -1325,12 +1462,19 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private async Task ToggleFavoriteAsync()
     {
-        if (!IsLibraryMovie || _movieId is null)
+        if (IsStatePersistencePending)
         {
-            StatusMessage = "库外影片不能在此详情页标记喜爱。";
             return;
         }
 
+        if (!IsLibraryMovie || _movieId is null)
+        {
+            StatusMessage = "当前无播放源影片暂不支持在此详情页标记喜爱。";
+            return;
+        }
+
+        var previousFavorite = IsFavorite;
+        var previousNotInterested = IsNotInterested;
         var targetFavorite = !IsFavorite;
         if (targetFavorite && !IsWatched)
         {
@@ -1338,16 +1482,42 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
-        await _movieManagementService.SetFavoriteAsync(_movieId.Value, targetFavorite);
-        IsFavorite = targetFavorite;
-        if (IsFavorite)
+        SetTogglingFavorite(true);
+        try
         {
-            IsNotInterested = false;
+            IsFavorite = targetFavorite;
+            if (IsFavorite)
+            {
+                IsNotInterested = false;
+            }
+
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            await PersistStateInBackgroundAsync(
+                () => _movieManagementService.SetFavoriteAsync(_movieId.Value, targetFavorite));
+            StatusMessage = IsFavorite ? "已标记为喜爱。" : "已取消喜爱。";
+            QueueStateRefresh(collectionChanged: true, recommendationChanged: true);
+        }
+        catch (Exception exception)
+        {
+            IsFavorite = previousFavorite;
+            IsNotInterested = previousNotInterested;
+            StatusMessage = $"喜爱状态更新失败：{DescribeException(exception)}";
+        }
+        finally
+        {
+            SetTogglingFavorite(false);
+        }
+    }
+
+    private async Task TogglePreferenceAsync()
+    {
+        if (IsWatched)
+        {
+            await ToggleFavoriteAsync();
+            return;
         }
 
-        StatusMessage = IsFavorite ? "已标记为喜爱。" : "已取消喜爱。";
-        _dataRefreshService.NotifyCollectionChanged();
-        NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation();
+        await ToggleWantToWatchAsync();
     }
 
     private async Task AddToLibraryAsync()
@@ -1363,7 +1533,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             if (IsLibraryMovie && _movieId.HasValue)
             {
-                if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
+                if (IsVisibleInLibrary)
+                {
+                    await _movieManagementService.RemoveFromLibraryAsync(_movieId.Value);
+                }
+                else if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
                 {
                     await _movieManagementService.RestoreToLibraryAsync(_movieId.Value);
                 }
@@ -1374,7 +1548,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 _dataRefreshService.NotifyLibraryChanged();
                 _dataRefreshService.NotifyCollectionChanged();
                 await LoadMovieAsync(_movieId.Value, CancellationToken.None);
-                StatusMessage = "已恢复到媒体库。";
+                StatusMessage = IsVisibleInLibrary ? "已加入媒体库。" : "已移出媒体库。";
                 return;
             }
 
@@ -1384,25 +1558,33 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 return;
             }
 
-            if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
+            if (IsVisibleInLibrary)
+            {
+                await _userCollectionService.HideFromLibraryAsync(_externalRecommendation, changeSource: "MovieDetail");
+                IsVisibleInLibrary = false;
+                CurrentLibraryVisibilityState = LibraryVisibilityState.Hidden;
+            }
+            else if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
             {
                 await _userCollectionService.RestoreToLibraryAsync(_externalRecommendation, changeSource: "MovieDetail");
+                IsVisibleInLibrary = true;
             }
             else
             {
                 await _userCollectionService.AddToLibraryAsync(_externalRecommendation, changeSource: "MovieDetail");
+                IsVisibleInLibrary = true;
             }
-            IsVisibleInLibrary = true;
-            CurrentLibraryVisibilityState = _libraryVisibilityState == LibraryVisibilityState.Hidden
+            CurrentLibraryVisibilityState = IsVisibleInLibrary
+                && _libraryVisibilityState == LibraryVisibilityState.Hidden
                                      && (IsWatched || IsWantToWatch || IsNotInterested)
                 ? LibraryVisibilityState.Auto
-                : LibraryVisibilityState.Visible;
+                : IsVisibleInLibrary ? LibraryVisibilityState.Visible : LibraryVisibilityState.Hidden;
             _externalRecommendation.IsVisibleInLibrary = IsVisibleInLibrary;
             _externalRecommendation.LibraryVisibilityState = CurrentLibraryVisibilityState;
-            AvailabilityText = "暂无播放源 / 已入库";
+            AvailabilityText = "暂无播放源";
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
-            StatusMessage = "已加入媒体库。";
+            StatusMessage = IsVisibleInLibrary ? "已加入媒体库。" : "已移出媒体库。";
         }
         catch (Exception exception)
         {
@@ -1417,6 +1599,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private async Task ToggleWatchedAsync()
     {
+        if (IsStatePersistencePending)
+        {
+            return;
+        }
+
         if (IsLibraryMovie)
         {
             await ToggleLibraryWatchedAsync();
@@ -1436,26 +1623,32 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         var previousWatched = IsWatched;
         var previousFavorite = IsFavorite;
+        var previousWantToWatch = IsWantToWatch;
         var targetWatched = !previousWatched;
         SetTogglingWatched(true);
         try
         {
             IsWatched = targetWatched;
-            if (!targetWatched)
+            if (targetWatched)
+            {
+                IsWantToWatch = false;
+            }
+            else
             {
                 IsFavorite = false;
             }
 
-            await _movieManagementService.SetWatchedAsync(_movieId.Value, targetWatched);
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            await PersistStateInBackgroundAsync(
+                () => _movieManagementService.SetWatchedAsync(_movieId.Value, targetWatched));
             StatusMessage = IsWatched ? "已标记为已看。" : "已标记为未看。";
-            _dataRefreshService.NotifyMetadataChanged();
-            _dataRefreshService.NotifyCollectionChanged();
-            NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation();
+            QueueStateRefresh(metadataChanged: true, collectionChanged: true, recommendationChanged: true);
         }
         catch (Exception exception)
         {
             IsWatched = previousWatched;
             IsFavorite = previousFavorite;
+            IsWantToWatch = previousWantToWatch;
             StatusMessage = $"观看状态更新失败：{DescribeException(exception)}";
         }
         finally
@@ -1468,7 +1661,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         if (_externalRecommendation is null)
         {
-            StatusMessage = "只有外部候选可以在此切换库外观看状态。";
+            StatusMessage = "当前无播放源影片缺少可保存的候选记录，无法切换观看状态。";
             return;
         }
 
@@ -1486,10 +1679,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 _externalRecommendation.IsWantToWatch = false;
             }
 
-            await _userCollectionService.SetWatchedAsync(_externalRecommendation, targetWatched);
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            await PersistStateInBackgroundAsync(
+                () => _userCollectionService.SetWatchedAsync(_externalRecommendation, targetWatched));
             StatusMessage = targetWatched ? "已标记为已看。" : "已标记为未看。";
-            _dataRefreshService.NotifyCollectionChanged();
-            NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation();
+            QueueStateRefresh(collectionChanged: true, recommendationChanged: true);
         }
         catch (Exception exception)
         {
@@ -1507,9 +1701,21 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private async Task ToggleWantToWatchAsync()
     {
-        if (_externalRecommendation is null || IsLibraryMovie)
+        if (IsStatePersistencePending)
         {
-            StatusMessage = "只有外部候选可以在此切换想看状态。";
+            return;
+        }
+
+        if (IsWatched)
+        {
+            StatusMessage = "已看影片请使用喜爱状态。";
+            return;
+        }
+
+        if ((IsLibraryMovie && !_movieId.HasValue)
+            || (!IsLibraryMovie && _externalRecommendation is null))
+        {
+            StatusMessage = "当前影片缺少稳定记录，无法更新想看状态。";
             return;
         }
 
@@ -1519,30 +1725,48 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         try
         {
             IsWantToWatch = !previousState;
-            _externalRecommendation.IsWantToWatch = IsWantToWatch;
-
-            if (IsWantToWatch)
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            if (IsLibraryMovie)
             {
-                await _userCollectionService.AddWantToWatchAsync(_externalRecommendation);
-                IsNotInterested = false;
-                _externalRecommendation.IsNotInterested = false;
-                StatusMessage = "已加入想看。";
+                await PersistStateInBackgroundAsync(
+                    () => _userCollectionService.SetWantToWatchAsync(_movieId!.Value, IsWantToWatch));
             }
             else
             {
-                await _userCollectionService.RemoveWantToWatchAsync(_externalRecommendation);
-                StatusMessage = "已取消想看。";
+                _externalRecommendation!.IsWantToWatch = IsWantToWatch;
+                if (IsWantToWatch)
+                {
+                    await PersistStateInBackgroundAsync(
+                        () => _userCollectionService.AddWantToWatchAsync(_externalRecommendation));
+                }
+                else
+                {
+                    await PersistStateInBackgroundAsync(
+                        () => _userCollectionService.RemoveWantToWatchAsync(_externalRecommendation));
+                }
             }
 
-            _dataRefreshService.NotifyCollectionChanged();
-            NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation();
+            if (IsWantToWatch)
+            {
+                IsNotInterested = false;
+                if (_externalRecommendation is not null)
+                {
+                    _externalRecommendation.IsNotInterested = false;
+                }
+            }
+
+            StatusMessage = IsWantToWatch ? "已加入想看。" : "已取消想看。";
+            QueueStateRefresh(collectionChanged: true, recommendationChanged: true);
         }
         catch (Exception exception)
         {
             IsWantToWatch = previousState;
             IsNotInterested = previousNotInterested;
-            _externalRecommendation.IsWantToWatch = previousState;
-            _externalRecommendation.IsNotInterested = previousNotInterested;
+            if (_externalRecommendation is not null)
+            {
+                _externalRecommendation.IsWantToWatch = previousState;
+                _externalRecommendation.IsNotInterested = previousNotInterested;
+            }
             StatusMessage = $"想看状态更新失败：{DescribeException(exception)}";
         }
         finally
@@ -1553,9 +1777,21 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private async Task ToggleNotInterestedAsync()
     {
+        if (IsStatePersistencePending)
+        {
+            return;
+        }
+
         if (!HasMovie)
         {
             StatusMessage = "请先选择影片。";
+            return;
+        }
+
+        if ((IsLibraryMovie && !_movieId.HasValue)
+            || (!IsLibraryMovie && _externalRecommendation is null))
+        {
+            StatusMessage = "当前影片缺少稳定记录，无法更新不想看状态。";
             return;
         }
 
@@ -1566,28 +1802,6 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         SetTogglingNotInterested(true);
         try
         {
-            if (IsLibraryMovie)
-            {
-                if (_movieId is null)
-                {
-                    StatusMessage = "请先选择影片。";
-                    return;
-                }
-
-                await _userCollectionService.SetNotInterestedAsync(_movieId.Value, targetNotInterested);
-            }
-            else
-            {
-                if (_externalRecommendation is null)
-                {
-                    StatusMessage = "只有外部候选可以在此切换不想看状态。";
-                    return;
-                }
-
-                await _userCollectionService.SetNotInterestedAsync(_externalRecommendation, targetNotInterested);
-                _externalRecommendation.IsNotInterested = targetNotInterested;
-            }
-
             IsNotInterested = targetNotInterested;
             if (targetNotInterested)
             {
@@ -1599,9 +1813,22 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 }
             }
 
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            if (IsLibraryMovie)
+            {
+                await PersistStateInBackgroundAsync(
+                    () => _userCollectionService.SetNotInterestedAsync(_movieId!.Value, targetNotInterested));
+            }
+            else
+            {
+                var recommendation = _externalRecommendation!;
+                await PersistStateInBackgroundAsync(
+                    () => _userCollectionService.SetNotInterestedAsync(recommendation, targetNotInterested));
+                recommendation.IsNotInterested = targetNotInterested;
+            }
+
             StatusMessage = targetNotInterested ? "已标记为不想看。" : "已取消不想看。";
-            _dataRefreshService.NotifyCollectionChanged();
-            _dataRefreshService.NotifyRecommendationChanged();
+            QueueStateRefresh(collectionChanged: true, forceRecommendationChanged: true);
         }
         catch (Exception exception)
         {
@@ -1655,7 +1882,22 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         _isTogglingWantToWatch = value;
-        RefreshWantToWatchCommandState();
+    }
+
+    private bool IsStatePersistencePending =>
+        _isTogglingFavorite
+        || _isTogglingWatched
+        || _isTogglingWantToWatch
+        || _isTogglingNotInterested;
+
+    private void SetTogglingFavorite(bool value)
+    {
+        if (_isTogglingFavorite == value)
+        {
+            return;
+        }
+
+        _isTogglingFavorite = value;
     }
 
     private void SetTogglingNotInterested(bool value)
@@ -1666,7 +1908,6 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         _isTogglingNotInterested = value;
-        RefreshNotInterestedCommandState();
     }
 
     private void SetTogglingWatched(bool value)
@@ -1677,7 +1918,42 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         _isTogglingWatched = value;
-        RefreshWatchedCommandState();
+    }
+
+    private void QueueStateRefresh(
+        bool metadataChanged = false,
+        bool collectionChanged = false,
+        bool recommendationChanged = false,
+        bool forceRecommendationChanged = false)
+    {
+        void Notify()
+        {
+            if (metadataChanged)
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+            }
+
+            if (collectionChanged)
+            {
+                _dataRefreshService.NotifyCollectionChanged();
+            }
+
+            if (forceRecommendationChanged)
+            {
+                _dataRefreshService.NotifyRecommendationChanged();
+            }
+            else if (recommendationChanged)
+            {
+                NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation();
+            }
+        }
+
+        _ = Task.Run(Notify);
+    }
+
+    private static Task PersistStateInBackgroundAsync(Func<Task> persistenceAction)
+    {
+        return Task.Run(persistenceAction);
     }
 
     private async Task AiSuggestSearchAsync()
@@ -1695,6 +1971,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         try
         {
             IsCorrectionBusy = true;
+            StatusMessage = IsCorrectionTargetTvEpisode
+                ? "正在请求 AI 辅助识别电视剧集，请稍候。"
+                : "正在请求 AI 辅助识别电影，请稍候。";
+            await Task.Yield();
             if (IsCorrectionTargetTvEpisode)
             {
                 await AiSuggestTvSearchAsync();
@@ -1746,7 +2026,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ManualSearchQuery = suggestion.Query;
         ManualSearchYear = suggestion.ReleaseYear?.ToString() ?? string.Empty;
         StatusMessage = FormatAiSearchSuggestionStatus("电影", suggestion);
-        await SearchCandidatesAsync();
+        await SearchCandidatesCoreAsync();
         ScanIdentificationDiagnostics.Write(
             $"event=single-source-correction-ai-assist-succeeded page=movie targetKind=movie mediaFileId={_correctionMediaFileId} status={FormatAiSuggestionStatus(suggestionResult.Status)} candidateCount={SearchCandidates.Count}");
     }
@@ -1800,7 +2080,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         StatusMessage = FormatAiTvSearchSuggestionStatus(suggestion, hasAiSeasonNumber, hasAiEpisodeNumber);
-        await SearchCandidatesAsync();
+        await SearchCandidatesCoreAsync();
         ScanIdentificationDiagnostics.Write(
             $"event=single-source-correction-ai-assist-succeeded page=movie targetKind=tv-episode mediaFileId={_correctionMediaFileId} status={FormatAiSuggestionStatus(suggestionResult.Status)} candidateCount={TvSeriesCandidateGroups.Count}");
     }
@@ -1841,6 +2121,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         _correctionMediaFileId = null;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
+        _selectedCorrectionSource = source;
+        OnPropertyChanged(nameof(SelectedCorrectionSource));
         SelectedCorrectionTarget = CorrectionTargetMovieText;
         CorrectionSourceDisplay = $"{source.SourceTypeText} · {source.FileName}";
         CorrectionSourceFileName = source.FileName;
@@ -1865,18 +2147,22 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         CancelCorrectionCommand.RaiseCanExecuteChanged();
+        SearchCandidatesCommand.RaiseCanExecuteChanged();
         ApplyManualMatchCommand.RaiseCanExecuteChanged();
         SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
+        ApplyTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
         PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
         SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
         ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
         AiSuggestSearchCommand.RaiseCanExecuteChanged();
-        StatusMessage = $"已选择播放源“{source.FileName}”，请搜索目标；点击候选后会直接修正。";
+        StatusMessage = string.Empty;
     }
 
     private void CancelCorrection()
     {
         _correctionMediaFileId = null;
+        _selectedCorrectionSource = null;
+        OnPropertyChanged(nameof(SelectedCorrectionSource));
         CorrectionSourceFileName = string.Empty;
         CorrectionSourcePath = string.Empty;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
@@ -1894,8 +2180,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasSearchCandidates));
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         CancelCorrectionCommand.RaiseCanExecuteChanged();
+        SearchCandidatesCommand.RaiseCanExecuteChanged();
         ApplyManualMatchCommand.RaiseCanExecuteChanged();
         SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
+        ApplyTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
         PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
         SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
         ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
@@ -1903,7 +2191,33 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         StatusMessage = "已取消本次修正，未修改任何数据。";
     }
 
+    private bool CanSearchCandidates()
+    {
+        return !IsCorrectionBusy
+               && CanUseIdentificationCorrection
+               && IsCorrectionPanelVisible
+               && !IsCorrectionTargetUnknownSeason;
+    }
+
     private async Task SearchCandidatesAsync()
+    {
+        if (IsCorrectionBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsCorrectionBusy = true;
+            await SearchCandidatesCoreAsync();
+        }
+        finally
+        {
+            IsCorrectionBusy = false;
+        }
+    }
+
+    private async Task SearchCandidatesCoreAsync()
     {
         if (!CanUseIdentificationCorrection)
         {
@@ -1925,7 +2239,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         if (IsCorrectionTargetUnknownSeason)
         {
-            await SearchUnknownSeasonTargetsAsync();
+            StatusMessage = "请使用“加入已有未识别季”区域选择目标季。";
             return;
         }
 
@@ -1940,11 +2254,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         try
         {
+            StatusMessage = "正在搜索 TMDB 电影，请稍候。";
+            await Task.Yield();
             var releaseYear = int.TryParse(ManualSearchYear, out var parsedYear) ? parsedYear : (int?)null;
             var candidates = await _movieIdentificationService.SearchCandidatesAsync(query, releaseYear);
+            var hydratedCandidates = await HydrateMovieCorrectionCandidatesAsync(candidates);
 
             SearchCandidates.Clear();
-            foreach (var candidate in candidates)
+            foreach (var candidate in hydratedCandidates)
             {
                 candidate.IsCurrentMatchedMovie = _tmdbId.HasValue && candidate.TmdbId == _tmdbId.Value;
                 SearchCandidates.Add(candidate);
@@ -1960,6 +2277,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             SearchCandidates.Clear();
             OnPropertyChanged(nameof(HasSearchCandidates));
             StatusMessage = DescribeTmdbSearchFailure(exception);
+            ScanIdentificationDiagnostics.Write(
+                $"event=single-source-correction-tmdb-search-failed page=movie targetKind=movie reason=search-failed");
         }
     }
 
@@ -1978,15 +2297,19 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         try
         {
+            StatusMessage = "正在搜索 TMDB 电视剧，请稍候。";
+            await Task.Yield();
             var page = await _tmdbService.SearchTvSeriesAsync(query, 1);
             TvSearchCandidates.Clear();
             TvSeriesCandidateGroups.Clear();
             ClearSelectedTvCorrectionTarget();
-            foreach (var candidate in page.Results.Take(12))
+            var candidates = page.Results.Take(12).ToList();
+            var details = await HydrateTvCorrectionCandidatesAsync(candidates);
+            for (var index = 0; index < candidates.Count; index++)
             {
+                var candidate = candidates[index];
                 TvSearchCandidates.Add(candidate);
-                var details = await _tmdbService.GetTvSeriesDetailsAsync(candidate.TmdbId, cancellationToken: CancellationToken.None);
-                TvSeriesCandidateGroups.Add(new TmdbTvSeriesCorrectionSeriesGroup(candidate, details));
+                TvSeriesCandidateGroups.Add(new TmdbTvSeriesCorrectionSeriesGroup(candidate, details[index]));
             }
 
             OnPropertyChanged(nameof(HasTvSearchCandidates));
@@ -2000,6 +2323,84 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             TvSeriesCandidateGroups.Clear();
             OnPropertyChanged(nameof(HasTvSearchCandidates));
             StatusMessage = DescribeTmdbSearchFailure(exception);
+            ScanIdentificationDiagnostics.Write(
+                $"event=single-source-correction-tmdb-search-failed page=movie targetKind=tv-episode reason=search-failed");
+        }
+    }
+
+    private async Task<IReadOnlyList<MetadataSearchCandidate>> HydrateMovieCorrectionCandidatesAsync(
+        IReadOnlyList<MetadataSearchCandidate> candidates)
+    {
+        using var gate = new SemaphoreSlim(4);
+        var tasks = candidates
+            .Select(candidate => HydrateMovieCorrectionCandidateAsync(candidate, gate))
+            .ToArray();
+        return await Task.WhenAll(tasks);
+    }
+
+    private async Task<MetadataSearchCandidate> HydrateMovieCorrectionCandidateAsync(
+        MetadataSearchCandidate candidate,
+        SemaphoreSlim gate)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            var details = await _tmdbService.GetMovieDetailsAsync(candidate.TmdbId, CancellationToken.None);
+            if (details is null)
+            {
+                return LocalizeMovieCorrectionCandidate(candidate);
+            }
+
+            details.Confidence = candidate.Confidence;
+            return LocalizeMovieCorrectionCandidate(details);
+        }
+        catch
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=single-source-correction-movie-detail-fallback page=movie tmdbId={candidate.TmdbId} reason=detail-load-failed");
+            return LocalizeMovieCorrectionCandidate(candidate);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private static MetadataSearchCandidate LocalizeMovieCorrectionCandidate(MetadataSearchCandidate candidate)
+    {
+        candidate.Country = MovieMetadataDisplayText.LocalizeCountries(candidate.Country);
+        candidate.Language = MovieMetadataDisplayText.LocalizeLanguages(candidate.Language);
+        return candidate;
+    }
+
+    private async Task<IReadOnlyList<TmdbTvSeriesDetailResult?>> HydrateTvCorrectionCandidatesAsync(
+        IReadOnlyList<TmdbTvSeriesSearchItem> candidates)
+    {
+        using var gate = new SemaphoreSlim(4);
+        var tasks = candidates
+            .Select(candidate => HydrateTvCorrectionCandidateAsync(candidate, gate))
+            .ToArray();
+        return await Task.WhenAll(tasks);
+    }
+
+    private async Task<TmdbTvSeriesDetailResult?> HydrateTvCorrectionCandidateAsync(
+        TmdbTvSeriesSearchItem candidate,
+        SemaphoreSlim gate)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            return await _tmdbService.GetTvSeriesDetailsAsync(candidate.TmdbId, cancellationToken: CancellationToken.None);
+        }
+        catch
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=single-source-correction-tv-detail-fallback page=movie tmdbSeriesId={candidate.TmdbId} reason=detail-load-failed");
+            return null;
+        }
+        finally
+        {
+            gate.Release();
         }
     }
 
@@ -2035,7 +2436,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private bool CanSelectUnknownSeasonTarget(object? parameter)
     {
-        return IsUnknownSeasonPickerDialogOpen
+        return !IsCorrectionBusy
+               && IsCorrectionPanelVisible
+               && IsCorrectionTargetUnknownSeason
                && parameter is UnknownTvSeasonCorrectionTargetItem;
     }
 
@@ -2047,7 +2450,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         SelectedUnknownSeasonTarget = target;
-        IsUnknownSeasonPickerDialogOpen = false;
+        if (IsUnknownSeasonPickerDialogOpen)
+        {
+            IsUnknownSeasonPickerDialogOpen = false;
+        }
         StatusMessage = $"已选择未识别季：{target.DisplayTitle}。请输入集号后加入。";
     }
 
@@ -2178,6 +2584,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                && IsCorrectionTargetTvEpisode
                && _correctionMediaFileId.HasValue
                && _selectedTvCorrectionSeriesTmdbId.HasValue;
+    }
+
+    private async Task ApplyTvEpisodeCorrectionTargetAsync(object? parameter)
+    {
+        SelectTvEpisodeCorrectionTarget(parameter);
+        await ApplySelectedTvEpisodeCorrectionAsync();
     }
 
     private async Task ApplySelectedTvEpisodeCorrectionAsync()
@@ -2442,6 +2854,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private void ClearCorrectionAfterApply()
     {
         _correctionMediaFileId = null;
+        _selectedCorrectionSource = null;
+        OnPropertyChanged(nameof(SelectedCorrectionSource));
         CorrectionSourceFileName = string.Empty;
         CorrectionSourcePath = string.Empty;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
@@ -2460,6 +2874,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         CancelCorrectionCommand.RaiseCanExecuteChanged();
         SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
+        ApplyTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
         PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
         SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
         ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
@@ -2585,6 +3000,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         SelectedUnknownSeasonTarget = null;
         IsUnknownSeasonPickerDialogOpen = false;
         _correctionMediaFileId = null;
+        _selectedCorrectionSource = null;
+        OnPropertyChanged(nameof(SelectedCorrectionSource));
         CorrectionSourceFileName = string.Empty;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         SelectedDetailTabIndex = 0;
@@ -2775,14 +3192,42 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                || string.IsNullOrWhiteSpace(detail.ProductionCompanyText);
     }
 
+    private static string FormatRuntimeMinutes(int? runtimeMinutes)
+    {
+        return runtimeMinutes.HasValue && runtimeMinutes.Value > 0
+            ? TimeSpan.FromMinutes(runtimeMinutes.Value).ToString(@"hh\:mm\:ss")
+            : "-";
+    }
+
+    private static IReadOnlyList<string> SplitDisplayTags(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        return value
+            .Split([',', '，', '/', '|', '、'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private static IReadOnlyList<MovieRatingItem> NormalizeDetailRatings(IEnumerable<MovieRatingItem> ratings)
     {
-        return ratings
+        var displayRatings = ratings
             .Select(ToDisplayRating)
             .Where(rating => IsDetailRatingSource(rating.SourceName))
             .GroupBy(rating => rating.SourceName, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.OrderByDescending(rating => rating.LastUpdatedAt).First())
-            .OrderBy(rating => GetDetailRatingSourceOrder(rating.SourceName))
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(rating => rating.LastUpdatedAt).First(),
+                StringComparer.OrdinalIgnoreCase);
+
+        return new[] { "TMDB", "IMDb" }
+            .Select(sourceName => displayRatings.TryGetValue(sourceName, out var rating)
+                ? rating
+                : new MovieRatingItem { SourceName = sourceName })
             .ToList();
     }
 
@@ -2810,11 +3255,6 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         return string.Equals(sourceName, "TMDB", StringComparison.OrdinalIgnoreCase)
                || string.Equals(sourceName, "IMDb", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static int GetDetailRatingSourceOrder(string sourceName)
-    {
-        return string.Equals(sourceName, "TMDB", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
     }
 
     private static string DescribeTmdbSearchFailure(Exception exception)

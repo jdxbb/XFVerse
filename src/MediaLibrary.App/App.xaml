@@ -16,6 +16,7 @@
                 <ResourceDictionary Source="Resources/Styles/Buttons.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Inputs.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Navigation.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Glass.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Badges.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Text.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Menus.xaml" />

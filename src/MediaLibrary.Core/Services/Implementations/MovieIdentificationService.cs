@@ -45,6 +45,37 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         return await IdentifyMediaFilesAsync(mediaFileIds, tmdbSearchCache: null, cancellationToken);
     }
 
+    public async Task<bool> EnsureMovieCreditsAsync(
+        int movieId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var movie = await dbContext.Movies
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+        if (movie?.TmdbId is not > 0
+            || !string.IsNullOrWhiteSpace(movie.DirectorText)
+               && !string.IsNullOrWhiteSpace(movie.ActorsText))
+        {
+            return false;
+        }
+
+        var details = await _tmdbService.GetMovieDetailsAsync(movie.TmdbId.Value, cancellationToken);
+        if (details is null)
+        {
+            return false;
+        }
+
+        movie.DirectorText = string.IsNullOrWhiteSpace(details.DirectorText) ? movie.DirectorText : details.DirectorText;
+        movie.WriterText = string.IsNullOrWhiteSpace(details.WriterText) ? movie.WriterText : details.WriterText;
+        movie.ActorsText = string.IsNullOrWhiteSpace(details.ActorsText) ? movie.ActorsText : details.ActorsText;
+        movie.ProductionCompanyText = string.IsNullOrWhiteSpace(details.ProductionCompanyText)
+            ? movie.ProductionCompanyText
+            : details.ProductionCompanyText;
+        movie.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<IdentificationRunResult> IdentifyMediaFilesAsync(
         IReadOnlyCollection<int> mediaFileIds,
         ScanTmdbSearchCache? tmdbSearchCache,
@@ -536,6 +567,9 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         tvSeries.FirstAirDate = null;
         tvSeries.FirstAirYear = null;
         tvSeries.GenresText = null;
+        tvSeries.ProductionStatus = null;
+        tvSeries.NetworksText = null;
+        tvSeries.ProductionCompaniesText = null;
         tvSeries.UpdatedAt = now;
 
         var seasonResolution = await ResolveUnknownSeasonForGroupedRangeAsync(

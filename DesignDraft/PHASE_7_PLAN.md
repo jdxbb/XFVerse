@@ -98,6 +98,7 @@ Design drafts are old visual references. They are useful for atmosphere, spacing
 | 7.3c | Complete | Series / Season detail visual baseline and in-page Season correction overlay. |
 | 7.3d | Complete | Episode detail visual baseline and in-page Episode correction overlay. |
 | 7.3e | Complete | Unified cross-page correction dialog shell for Movie, Season and Episode detail correction surfaces. |
+| 7.3 follow-up polish | Complete | Movie rating / player polish, Series / Season / Episode layout alignment, cached detail backdrop performance fix, placeholder backdrop fallback and layered shared liquid-glass baseline. |
 | 7.3f | Next | Detail regression closeout and 7.2 media-library smoke regression. |
 
 ## Later Phase Plan
@@ -113,6 +114,11 @@ Completed implementation slices:
 - 7.3c Series / Season detail visual baseline;
 - 7.3d Episode detail visual baseline;
 - 7.3e unified correction dialog shell.
+- follow-up polish: compact detail-route title bar, Movie layout feedback closeout, exact Series / Season / Episode alignment against the accepted Movie baseline, cached poster-derived backdrop, async poster effects and shared liquid-glass baseline.
+
+Stable comparison rule:
+
+- once the Movie detail baseline is unchanged and accepted, reuse it as the comparison reference for Series / Season / Episode work; do not repeat runtime screenshots unless a visual blocker, a changed Movie baseline or an explicit verification request makes a new capture necessary.
 
 Scope:
 - MovieDetail, SeriesOverview, TvSeasonDetail and EpisodeDetail visual rebuild;
@@ -197,6 +203,9 @@ Must start with Plan / Audit.
 Scope:
 - global Light / Dark readability and consistency;
 - spacing, cards, chips, menus, dialogs and control states;
+- audit and complete the shared liquid-glass visual baseline already introduced for Home, Library and current detail pages; extend the same ResourceDictionary-driven styles to later rebuilt pages instead of creating page-local variants;
+- keep the liquid-glass treatment restrained and resource-driven: use cached diffuse backgrounds, subtle transparency, soft highlights, low-contrast borders and limited depth cues rather than decorative excess, and verify that text readability and interaction-state clarity remain primary;
+- preserve distinct nested-card levels in both Light and Dark themes with differentiated opacity, edge highlights and shadow depth; keep the blur-like appearance static and cached rather than adding live backdrop blur;
 - loading / empty / error / disabled / no-source consistency;
 - performance and large-list scroll checks;
 - final cross-page regression.

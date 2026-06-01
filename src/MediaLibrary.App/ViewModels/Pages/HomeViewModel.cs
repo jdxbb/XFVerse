@@ -33,6 +33,8 @@ public sealed class HomeViewModel : PageViewModelBase
     private bool _pendingRefresh;
     private bool _hasLoadedDashboard;
     private bool _isContinuingPlayback;
+    private bool _isActive;
+    private bool _refreshPendingOnActivate;
 
     public HomeViewModel(
         IHomeDashboardQueryService dashboardQueryService,
@@ -141,6 +143,13 @@ public sealed class HomeViewModel : PageViewModelBase
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        _isActive = true;
+        if (_refreshPendingOnActivate)
+        {
+            _refreshPendingOnActivate = false;
+            _hasLoadedDashboard = false;
+        }
+
         if (IsRefreshing)
         {
             _pendingRefresh = true;
@@ -172,8 +181,20 @@ public sealed class HomeViewModel : PageViewModelBase
         }
     }
 
+    public override void Deactivate()
+    {
+        _isActive = false;
+        AiRecommendationViewModel.Deactivate();
+    }
+
     private void OnDataChanged(object? sender, AppDataChangedEventArgs e)
     {
+        if (!_isActive)
+        {
+            _refreshPendingOnActivate = true;
+            return;
+        }
+
         var reason = e.Reason;
         _ = Application.Current.Dispatcher.InvokeAsync(() => _ = SafeRefreshByReasonAsync(reason));
     }
@@ -383,24 +404,35 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private static HomeStatusMetricItem BuildStatusMetric(string title, int value, int? delta, string iconGlyph)
     {
-        return new HomeStatusMetricItem(title, value.ToString(), "部", FormatMonthlyTrend(delta), iconGlyph);
+        return new HomeStatusMetricItem(
+            title,
+            value.ToString(),
+            "部",
+            FormatMonthlyTrend(delta),
+            FormatMonthlyTrendArrow(delta),
+            iconGlyph);
     }
 
     private static string FormatMonthlyTrend(int? delta)
     {
         if (!delta.HasValue)
         {
-            return "相比上个月 暂无对比";
+            return "较上月 暂无对比";
         }
 
-        var arrow = delta.Value switch
+        var sign = delta.Value > 0 ? "+" : string.Empty;
+        return $"较上月 {sign}{delta.Value}";
+    }
+
+    private static string FormatMonthlyTrendArrow(int? delta)
+    {
+        return delta switch
         {
             > 0 => "↑",
             < 0 => "↓",
-            _ => "→"
+            0 => "→",
+            _ => string.Empty
         };
-        var sign = delta.Value > 0 ? "+" : string.Empty;
-        return $"相比上个月 {sign}{delta.Value} {arrow}";
     }
 
     private static (string Line1, string Line2) SplitTwoLineStatus(string? value, int maxLineLength)
@@ -638,4 +670,10 @@ public sealed class HomeViewModel : PageViewModelBase
     }
 }
 
-public sealed record HomeStatusMetricItem(string Title, string ValueText, string UnitText, string TrendText, string IconGlyph);
+public sealed record HomeStatusMetricItem(
+    string Title,
+    string ValueText,
+    string UnitText,
+    string TrendText,
+    string TrendArrowText,
+    string IconGlyph);

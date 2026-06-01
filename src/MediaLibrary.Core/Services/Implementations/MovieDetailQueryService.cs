@@ -79,6 +79,7 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
                 x => new
                 {
                     x.LibraryVisibilityState,
+                    x.IsWantToWatch,
                     HasUserState = x.IsWatched || x.IsWantToWatch || x.IsNotInterested
                 })
             .FirstOrDefaultAsync(cancellationToken);
@@ -248,6 +249,7 @@ public sealed class MovieDetailQueryService : IMovieDetailQueryService
             DefaultMediaFileId = effectiveDefaultMediaFileId,
             IsFavorite = movie.IsFavorite,
             IsWatched = movie.IsWatched,
+            IsWantToWatch = collectionState?.IsWantToWatch == true && !movie.IsWatched && !isNotInterested,
             IsNotInterested = isNotInterested,
             IsVisibleInLibrary = isVisibleInLibrary,
             LibraryVisibilityState = libraryVisibilityState,

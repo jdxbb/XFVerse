@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using MediaLibrary.Core.Models.Enums;
 
 namespace MediaLibrary.Core.Models.ReadModels;
@@ -15,6 +18,20 @@ public sealed class TvSeasonDetailModel
     public string SeriesName { get; set; } = string.Empty;
 
     public string SeriesOriginalName { get; set; } = string.Empty;
+
+    public string SeriesCountry { get; set; } = string.Empty;
+
+    public string SeriesLanguage { get; set; } = string.Empty;
+
+    public string SeriesDirectorText { get; set; } = string.Empty;
+
+    public string SeriesWriterText { get; set; } = string.Empty;
+
+    public string SeriesActorsText { get; set; } = string.Empty;
+
+    public string SeriesNetworksText { get; set; } = string.Empty;
+
+    public string SeriesProductionCompaniesText { get; set; } = string.Empty;
 
     public string Name { get; set; } = string.Empty;
 
@@ -64,6 +81,8 @@ public sealed class TvSeasonDetailModel
 
     public string SeasonNumberText => SeasonNumber == 0 ? "特别篇" : $"S{SeasonNumber:D2}";
 
+    public string SeasonTitleText => TvDetailDisplayText.FormatSeasonTitle(SeasonNumber, Name);
+
     public string AirDateText => AirDate.HasValue
         ? AirDate.Value.ToString("yyyy-MM-dd")
         : AirYear?.ToString() ?? "-";
@@ -71,6 +90,10 @@ public sealed class TvSeasonDetailModel
     public string ProgressText => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}";
 
     public string InLibraryText => InLibraryEpisodeCount > 0 ? $"有播放源 {InLibraryEpisodeCount} 集" : "暂无播放源";
+
+    public string EpisodeCountText => $"{InLibraryEpisodeCount} / {TotalEpisodeCount} 集有播放源";
+
+    public string WatchedCountText => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集";
 
     public string IdentificationStatusText => TvDetailDisplayText.FormatIdentificationStatus(IdentificationStatus);
 
@@ -81,8 +104,11 @@ public sealed class TvSeasonDetailModel
     public bool IsSeasonUnwatched => WatchedEpisodeCount == 0;
 }
 
-public sealed class TvSeasonEpisodeListItem
+public sealed class TvSeasonEpisodeListItem : INotifyPropertyChanged
 {
+    private bool _isWatched;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
     public int EpisodeId { get; set; }
 
     public int EpisodeNumber { get; set; }
@@ -95,7 +121,23 @@ public sealed class TvSeasonEpisodeListItem
 
     public int? RuntimeMinutes { get; set; }
 
-    public bool IsWatched { get; set; }
+    public bool IsWatched
+    {
+        get => _isWatched;
+        set
+        {
+            if (_isWatched == value)
+            {
+                return;
+            }
+
+            _isWatched = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(WatchedText));
+            OnPropertyChanged(nameof(WatchedActionText));
+            OnPropertyChanged(nameof(UnwatchedActionText));
+        }
+    }
 
     public DateTime? LastPlayedAt { get; set; }
 
@@ -119,11 +161,17 @@ public sealed class TvSeasonEpisodeListItem
         ? $"{RuntimeMinutes.Value} 分钟"
         : "-";
 
+    public string RuntimeClockText => RuntimeMinutes.HasValue && RuntimeMinutes.Value > 0
+        ? TimeSpan.FromMinutes(RuntimeMinutes.Value).ToString(@"hh\:mm\:ss")
+        : "-";
+
     public string WatchedText => IsWatched ? "已看" : "未看";
 
     public string LastPlayedText => LastPlayedAt.HasValue
         ? LastPlayedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
         : "-";
+
+    public string SourceCountText => $"播放源{ActiveSourceCount}个";
 
     public string PositionText => LastPlayPositionSeconds > 0
         ? TimeSpan.FromSeconds(LastPlayPositionSeconds).ToString(@"hh\:mm\:ss")
@@ -140,6 +188,11 @@ public sealed class TvSeasonEpisodeListItem
     public string UnwatchedActionText => IsWatched ? "标记未看" : "未看";
 
     public bool IsTargetEpisode { get; set; }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }
 
 public sealed class TvSeasonCorrectionSourceItem
@@ -168,6 +221,48 @@ public sealed class TvSeasonCorrectionSourceItem
 
 internal static class TvDetailDisplayText
 {
+    private static readonly Regex GenericSeasonNameRegex = new(@"^S\d{1,4}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex GenericEpisodeNameRegex = new(@"^(E\d{1,4}|第\d{1,4}集)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    public static string FormatSeasonTitle(int seasonNumber, string? name)
+    {
+        var label = seasonNumber == 0 ? "特别篇" : $"第{seasonNumber}季";
+        return ShouldHideSeasonName(label, name) ? label : $"{label}  {name!.Trim()}";
+    }
+
+    public static string FormatEpisodeTitle(int seasonNumber, int episodeNumber, string? title, string? fallbackTitle)
+    {
+        var prefix = $"S{seasonNumber:D2}E{episodeNumber:D2}";
+        var name = FirstNonEmpty(title, fallbackTitle);
+        return ShouldHideEpisodeName(name) ? prefix : $"{prefix}  {name}";
+    }
+
+    public static bool ShouldHideSeasonName(string label, string? name)
+    {
+        var normalizedName = Normalize(name);
+        return string.IsNullOrEmpty(normalizedName)
+               || string.Equals(Normalize(label), normalizedName, StringComparison.OrdinalIgnoreCase)
+               || GenericSeasonNameRegex.IsMatch(normalizedName);
+    }
+
+    private static bool ShouldHideEpisodeName(string? name)
+    {
+        var normalizedName = Normalize(name);
+        return string.IsNullOrEmpty(normalizedName) || GenericEpisodeNameRegex.IsMatch(normalizedName);
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
+    private static string Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : string.Concat(value.Where(character => !char.IsWhiteSpace(character)));
+    }
+
     public static string FormatIdentificationStatus(IdentificationStatus status)
     {
         return status switch

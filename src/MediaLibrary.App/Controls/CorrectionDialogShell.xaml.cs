@@ -56,6 +56,15 @@ public partial class CorrectionDialogShell : UserControl
         set => SetValue(DialogContentProperty, value);
     }
 
+    public static readonly DependencyProperty HeaderContentProperty =
+        DependencyProperty.Register(nameof(HeaderContent), typeof(object), typeof(CorrectionDialogShell), new PropertyMetadata(null));
+
+    public object? HeaderContent
+    {
+        get => GetValue(HeaderContentProperty);
+        set => SetValue(HeaderContentProperty, value);
+    }
+
     public static readonly DependencyProperty FooterContentProperty =
         DependencyProperty.Register(nameof(FooterContent), typeof(object), typeof(CorrectionDialogShell), new PropertyMetadata(null));
 
@@ -117,5 +126,14 @@ public partial class CorrectionDialogShell : UserControl
     {
         get => (double)GetValue(DialogMaxHeightProperty);
         set => SetValue(DialogMaxHeightProperty, value);
+    }
+
+    public static readonly DependencyProperty FooterSpacingProperty =
+        DependencyProperty.Register(nameof(FooterSpacing), typeof(GridLength), typeof(CorrectionDialogShell), new PropertyMetadata(new GridLength(16d)));
+
+    public GridLength FooterSpacing
+    {
+        get => (GridLength)GetValue(FooterSpacingProperty);
+        set => SetValue(FooterSpacingProperty, value);
     }
 }

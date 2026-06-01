@@ -244,7 +244,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         if (!item.MovieId.HasValue)
         {
-            StatusMessage = "库外喜爱暂未接入，无法取消喜爱。";
+            StatusMessage = "无播放源影片的喜爱状态暂未接入，无法取消喜爱。";
             return;
         }
 

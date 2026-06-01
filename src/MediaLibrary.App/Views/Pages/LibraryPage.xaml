@@ -133,7 +133,7 @@
             <Setter Property="Foreground" Value="{StaticResource LibraryMediaCardTextBrush}" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
@@ -182,12 +182,12 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
                                 <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                                 <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
                                 <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                                 <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
                             </Trigger>
@@ -299,7 +299,7 @@
                                    AllowsTransparency="True"
                                    Focusable="False"
                                    IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
-                                   Placement="Right"
+                                   Placement="Custom"
                                    PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                    PopupAnimation="Fade"
                                    VerticalOffset="-7">
@@ -315,12 +315,12 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
                                 <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                                 <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushAccent}" />
                             </Trigger>
                             <Trigger Property="IsSubmenuOpen" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
                                 <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                                 <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushAccent}" />
                             </Trigger>
@@ -348,7 +348,7 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
             <Setter Property="Background" Value="Transparent" />
@@ -363,6 +363,7 @@
                                 MinHeight="{TemplateBinding MinHeight}"
                                 Padding="{TemplateBinding Padding}"
                                 Background="{TemplateBinding Background}"
+                                CornerRadius="6"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter ContentSource="Content"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -372,10 +373,12 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                                <Setter TargetName="TextHitArea" Property="Background" Value="{DynamicResource BrushGlassButtonHover}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter TargetName="TextHitArea" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
@@ -387,7 +390,7 @@
         </Style>
 
         <ItemsPanelTemplate x:Key="LibraryFilterTagGridPanelTemplate">
-            <UniformGrid Columns="4" />
+            <UniformGrid Columns="{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}" />
         </ItemsPanelTemplate>
 
         <DataTemplate x:Key="LibraryFilterTagCheckBoxItemTemplate">
@@ -412,6 +415,7 @@
                     </Style>
                 </Border.Style>
                 <ItemsControl ItemsSource="{Binding Options}"
+                              Tag="{Binding ColumnCount}"
                               ItemsPanel="{StaticResource LibraryFilterTagGridPanelTemplate}"
                               ItemTemplate="{StaticResource LibraryFilterTagCheckBoxItemTemplate}">
                     <ItemsControl.ItemContainerStyle>
@@ -432,7 +436,7 @@
             <Setter Property="VerticalAlignment" Value="Stretch" />
         </Style>
 
-        <Style x:Key="LibraryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallButtonStyle}">
+        <Style x:Key="LibraryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSmallButtonStyle}">
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="10,4" />
             <Setter Property="FontSize" Value="12" />
@@ -450,12 +454,12 @@
             <Setter Property="Padding" Value="12,4" />
         </Style>
 
-        <Style x:Key="LibraryPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+        <Style x:Key="LibraryPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassPrimaryButtonStyle}">
             <Setter Property="Focusable" Value="False" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         </Style>
 
-        <Style x:Key="LibrarySecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+        <Style x:Key="LibrarySecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSecondaryButtonStyle}">
             <Setter Property="Focusable" Value="False" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         </Style>
@@ -512,7 +516,7 @@
             <Setter Property="MinWidth" Value="28" />
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -527,11 +531,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushHoverBackground}" />
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushGlassButtonHover}" />
                                 <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushPressedBackground}" />
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushGlassButtonPressed}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -573,7 +577,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="BatchSelectableCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+        <Style x:Key="BatchSelectableCardStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
                     <Setter Property="Cursor" Value="Hand" />
@@ -591,7 +595,7 @@
         <Style x:Key="LibraryBatchToolbarStyle" TargetType="Border">
             <Setter Property="Padding" Value="10,8" />
             <Setter Property="Margin" Value="0,8,0,0" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
@@ -605,7 +609,7 @@
 
         <Style x:Key="LibraryBatchStatusPillStyle" TargetType="Border">
             <Setter Property="Padding" Value="10,5" />
-            <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSelected}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
@@ -650,7 +654,7 @@
 
         <Style x:Key="LibraryRemovedPanelItemStyle" TargetType="Border">
             <Setter Property="Margin" Value="0,0,0,8" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
@@ -672,7 +676,7 @@
         <Style x:Key="LibraryRemovedPanelChipStyle" TargetType="Border">
             <Setter Property="Padding" Value="6,2" />
             <Setter Property="Margin" Value="0,0,6,0" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurface}" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurface}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="5" />
@@ -756,7 +760,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Padding="14" Style="{StaticResource PageCardStyle}">
+        <Border Padding="14" Style="{StaticResource GlassPageCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -783,6 +787,27 @@
                                      Style="{StaticResource LibrarySearchBoxStyle}"
                                      Padding="10,3,30,3"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Margin="10,0,34,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource BrushForegroundMuted}"
+                                       FontSize="12"
+                                       IsHitTestVisible="False"
+                                       Opacity="0.68"
+                                       Text="请输入需要搜索的影视作品名/导演/演员">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SearchText}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                             <Button HorizontalAlignment="Right"
                                     VerticalAlignment="Center"
                                     Margin="0,0,4,0"
@@ -925,36 +950,51 @@
                         <Button.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
                                          Style="{StaticResource LibraryFilterContextMenuStyle}">
-                                <MenuItem Header="清除标签" Command="{Binding ClearTagFilterCommand}" Style="{StaticResource LibraryFilterMenuItemStyle}" />
-                                <Separator Style="{StaticResource LibraryFilterSeparatorStyle}" />
-                                <MenuItem Header="类型标签" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
+                                <MenuItem Header="全部"
+                                          IsCheckable="True"
+                                          IsChecked="{Binding IsTagFilterAllSelected, Mode=OneWay}"
+                                          Command="{Binding ClearTagFilterCommand}"
+                                          Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="电视剧" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
                                     <MenuItem StaysOpenOnClick="True" Style="{StaticResource LibraryFilterTagPanelMenuItemStyle}">
                                         <MenuItem.Header>
                                             <ScrollViewer Width="420" MaxHeight="360" VerticalScrollBarVisibility="Auto">
-                                                <ItemsControl ItemsSource="{Binding TypeTagOptionRows}"
+                                                <ItemsControl ItemsSource="{Binding TvTagOptionRows}"
                                                               ItemTemplate="{StaticResource LibraryFilterTagRowItemTemplate}" />
                                             </ScrollViewer>
                                         </MenuItem.Header>
                                     </MenuItem>
                                 </MenuItem>
-                                <MenuItem Header="情绪标签" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
-                                    <MenuItem StaysOpenOnClick="True" Style="{StaticResource LibraryFilterTagPanelMenuItemStyle}">
-                                        <MenuItem.Header>
-                                            <ScrollViewer Width="420" MaxHeight="360" VerticalScrollBarVisibility="Auto">
-                                                <ItemsControl ItemsSource="{Binding EmotionTagOptionRows}"
-                                                              ItemTemplate="{StaticResource LibraryFilterTagRowItemTemplate}" />
-                                            </ScrollViewer>
-                                        </MenuItem.Header>
+                                <MenuItem Header="电影" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
+                                    <MenuItem Header="类型标签" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
+                                        <MenuItem StaysOpenOnClick="True" Style="{StaticResource LibraryFilterTagPanelMenuItemStyle}">
+                                            <MenuItem.Header>
+                                                <ScrollViewer Width="420" MaxHeight="360" VerticalScrollBarVisibility="Auto">
+                                                    <ItemsControl ItemsSource="{Binding TypeTagOptionRows}"
+                                                                  ItemTemplate="{StaticResource LibraryFilterTagRowItemTemplate}" />
+                                                </ScrollViewer>
+                                            </MenuItem.Header>
+                                        </MenuItem>
                                     </MenuItem>
-                                </MenuItem>
-                                <MenuItem Header="场景标签" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
-                                    <MenuItem StaysOpenOnClick="True" Style="{StaticResource LibraryFilterTagPanelMenuItemStyle}">
-                                        <MenuItem.Header>
-                                            <ScrollViewer Width="420" MaxHeight="360" VerticalScrollBarVisibility="Auto">
-                                                <ItemsControl ItemsSource="{Binding SceneTagOptionRows}"
-                                                              ItemTemplate="{StaticResource LibraryFilterTagRowItemTemplate}" />
-                                            </ScrollViewer>
-                                        </MenuItem.Header>
+                                    <MenuItem Header="情绪标签" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
+                                        <MenuItem StaysOpenOnClick="True" Style="{StaticResource LibraryFilterTagPanelMenuItemStyle}">
+                                            <MenuItem.Header>
+                                                <ScrollViewer Width="420" MaxHeight="360" VerticalScrollBarVisibility="Auto">
+                                                    <ItemsControl ItemsSource="{Binding EmotionTagOptionRows}"
+                                                                  ItemTemplate="{StaticResource LibraryFilterTagRowItemTemplate}" />
+                                                </ScrollViewer>
+                                            </MenuItem.Header>
+                                        </MenuItem>
+                                    </MenuItem>
+                                    <MenuItem Header="场景标签" Style="{StaticResource LibraryFilterSubmenuItemStyle}">
+                                        <MenuItem StaysOpenOnClick="True" Style="{StaticResource LibraryFilterTagPanelMenuItemStyle}">
+                                            <MenuItem.Header>
+                                                <ScrollViewer Width="420" MaxHeight="360" VerticalScrollBarVisibility="Auto">
+                                                    <ItemsControl ItemsSource="{Binding SceneTagOptionRows}"
+                                                                  ItemTemplate="{StaticResource LibraryFilterTagRowItemTemplate}" />
+                                                </ScrollViewer>
+                                            </MenuItem.Header>
+                                        </MenuItem>
                                     </MenuItem>
                                 </MenuItem>
                             </ContextMenu>
@@ -1067,7 +1107,7 @@
         </Border>
 
         <Grid Grid.Row="2">
-            <Border Style="{StaticResource PageCardStyle}">
+            <Border Style="{StaticResource GlassPageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -1083,7 +1123,7 @@
                                     Style="{StaticResource LibraryToolbarButtonStyle}" />
                             <Border Margin="8,0,0,0"
                                     Padding="2"
-                                    Background="{DynamicResource BrushSurfaceAlt}"
+                                    Background="{DynamicResource BrushGlassSurfaceAlt}"
                                     BorderBrush="{DynamicResource BrushBorder}"
                                     BorderThickness="1"
                                     CornerRadius="10">
@@ -1380,8 +1420,8 @@
                                                     Style="{StaticResource SelectionDotButtonStyle}" />
                                             <StackPanel VerticalAlignment="Bottom" Margin="10">
                                                 <TextBlock Text="{Binding Title}"
-                                                           MaxHeight="36"
-                                                           Style="{StaticResource LibraryMediaTitleTextStyle}" />
+                                                           Style="{StaticResource LibraryMediaTitleTextStyle}"
+                                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}" />
                                                 <TextBlock Margin="0,3,0,0"
                                                            Text="{Binding ReleaseDateText}"
                                                            Style="{StaticResource LibraryMediaMutedTextStyle}" />
@@ -1546,18 +1586,39 @@
                                         </Border>
 
                                         <StackPanel Grid.Column="2" Margin="8,0,6,0" VerticalAlignment="Center">
-                                            <TextBlock ToolTip="{Binding ListTitleLineText}"
-                                                       TextWrapping="NoWrap"
-                                                       Style="{StaticResource LibraryMediaTitleTextStyle}">
-                                                <Run Text="{Binding Title, Mode=OneWay}" />
-                                                <Run Text="{Binding OriginalTitleSeparatorText, Mode=OneWay}" />
-                                                <Run Text="{Binding OriginalTitle, Mode=OneWay}" />
-                                                <Run Text="{Binding ListTitleMetaSpacingText, Mode=OneWay}" />
-                                                <Run Text="{Binding ListTitleMetaText, Mode=OneWay}"
-                                                     FontSize="10.5"
-                                                     FontWeight="Normal"
-                                                     Foreground="{StaticResource LibraryMediaCardMutedTextBrush}" />
-                                            </TextBlock>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="48*" />
+                                                    <ColumnDefinition Width="12" />
+                                                    <ColumnDefinition Width="52*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding ListDisplayTitleText}"
+                                                           VerticalAlignment="Bottom"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           TextWrapping="NoWrap"
+                                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListDisplayTitleText}"
+                                                           Style="{StaticResource LibraryMediaTitleTextStyle}" />
+                                                <Grid Grid.Column="2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="10" />
+                                                        <ColumnDefinition Width="3*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding DirectorText}"
+                                                               VerticalAlignment="Bottom"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap"
+                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding DirectorText}"
+                                                               Style="{StaticResource LibraryMediaMutedTextStyle}" />
+                                                    <TextBlock Grid.Column="2"
+                                                               VerticalAlignment="Bottom"
+                                                               Text="{Binding CastText}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap"
+                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding CastText}"
+                                                               Style="{StaticResource LibraryMediaMutedTextStyle}" />
+                                                </Grid>
+                                            </Grid>
                                             <Border Margin="0,5,0,0"
                                                     helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListTagToolTipText}"
                                                     helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding ListTagLine}"
@@ -1680,7 +1741,7 @@
                     Padding="24"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Style="{StaticResource PageCardStyle}">
+                    Style="{StaticResource GlassPageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -1789,7 +1850,7 @@
                                 <DataTemplate>
                                     <Border Margin="0,0,0,8"
                                             Padding="12"
-                                            Background="{DynamicResource BrushSurfaceAlt}"
+                                            Background="{DynamicResource BrushGlassSurfaceAlt}"
                                             BorderBrush="{DynamicResource BrushBorder}"
                                             BorderThickness="1"
                                             CornerRadius="10">
@@ -1882,7 +1943,7 @@
                     Padding="18"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Style="{StaticResource PageCardStyle}">
+                    Style="{StaticResource GlassPageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />

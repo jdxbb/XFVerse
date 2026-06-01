@@ -104,6 +104,13 @@ public static class PosterCachedShadowBehavior
             typeof(PosterCachedShadowBehavior),
             new PropertyMetadata(false));
 
+    private static readonly DependencyProperty ApplyVersionProperty =
+        DependencyProperty.RegisterAttached(
+            "ApplyVersion",
+            typeof(int),
+            typeof(PosterCachedShadowBehavior),
+            new PropertyMetadata(0));
+
     public static bool GetIsEnabled(DependencyObject target)
     {
         return (bool)target.GetValue(IsEnabledProperty);
@@ -269,7 +276,32 @@ public static class PosterCachedShadowBehavior
         }
 
         var spec = CreateSpec(image);
-        image.SetCurrentValue(Image.SourceProperty, GetOrCreateShadowImage(spec));
+        if (TryGetCachedShadowImage(spec, out var cached))
+        {
+            image.SetCurrentValue(Image.SourceProperty, cached);
+            return;
+        }
+
+        var applyVersion = (int)image.GetValue(ApplyVersionProperty) + 1;
+        image.SetValue(ApplyVersionProperty, applyVersion);
+        _ = ApplyShadowImageAsync(image, spec, applyVersion);
+    }
+
+    private static async Task ApplyShadowImageAsync(Image image, ShadowSpec spec, int applyVersion)
+    {
+        var source = await Task.Run(() => GetOrCreateShadowImage(spec)).ConfigureAwait(false);
+        await image.Dispatcher.InvokeAsync(
+            () =>
+            {
+                if (!GetIsEnabled(image)
+                    || (int)image.GetValue(ApplyVersionProperty) != applyVersion
+                    || CreateSpec(image) != spec)
+                {
+                    return;
+                }
+
+                image.SetCurrentValue(Image.SourceProperty, source);
+            });
     }
 
     private static ShadowSpec CreateSpec(Image image)
@@ -313,6 +345,11 @@ public static class PosterCachedShadowBehavior
         }
 
         return image;
+    }
+
+    private static bool TryGetCachedShadowImage(ShadowSpec spec, out BitmapSource image)
+    {
+        return ShadowImageCache.TryGetValue(spec.ToCacheKey(), out image!);
     }
 
     private static BitmapSource CreateShadowImage(ShadowSpec spec)

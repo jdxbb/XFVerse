@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
@@ -35,7 +36,16 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     private int? _seasonId;
     private int? _defaultMediaFileId;
     private string _seriesName = "-";
+    private string _seriesOriginalName = "-";
     private string _seasonName = "-";
+    private string _countryText = "-";
+    private string _languageText = "-";
+    private string _directorText = "-";
+    private string _writerText = "-";
+    private string _actorsText = "-";
+    private string _networksText = "未提供";
+    private string _productionCompaniesText = "未提供";
+    private string _genreDisplay = "未提供";
     private string _seasonNumberText = "-";
     private string _episodeNumberText = "-";
     private string _titleText = "未选择剧集";
@@ -49,6 +59,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     private string _sourceSummary = "暂无播放源";
     private string _lastPlayedText = "-";
     private string _identificationStatusText = "未加载";
+    private MovieRatingItem _episodeTmdbRating = new() { SourceName = "TMDB" };
     private string _statusMessage = "请先选择一个剧集。";
     private string _manualSearchQuery = string.Empty;
     private string _manualSearchYear = string.Empty;
@@ -110,7 +121,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         ManualProbeSourceCommand = new RelayCommand(parameter => _ = ManualProbeSourceAsync(parameter), CanManualProbeSource);
         SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync, CanSetDefaultSource);
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
-        ToggleWatchedCommand = new AsyncRelayCommand(ToggleWatchedAsync, () => CanToggleWatched);
+        ToggleWatchedCommand = new AsyncRelayCommand(ToggleWatchedAsync, () => CanToggleWatched, disableWhileExecuting: false);
         CorrectionPlaceholderCommand = new RelayCommand(BeginDefaultSourceCorrection, () => HasEpisode && HasSources);
         BeginSourceCorrectionCommand = new RelayCommand(BeginSourceCorrection, CanBeginSourceCorrection);
         SearchCandidatesCommand = new AsyncRelayCommand(SearchCandidatesAsync);
@@ -192,9 +203,51 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     public AsyncRelayCommand RefreshCommand { get; }
 
-    public string SeriesName { get => _seriesName; private set => SetProperty(ref _seriesName, value); }
+    public string SeriesName
+    {
+        get => _seriesName;
+        private set
+        {
+            if (SetProperty(ref _seriesName, value))
+            {
+                OnPropertyChanged(nameof(SeriesAndOriginalNameText));
+            }
+        }
+    }
+
+    public string SeriesOriginalName
+    {
+        get => _seriesOriginalName;
+        private set
+        {
+            if (SetProperty(ref _seriesOriginalName, value))
+            {
+                OnPropertyChanged(nameof(SeriesAndOriginalNameText));
+            }
+        }
+    }
+
+    public string SeriesAndOriginalNameText => string.IsNullOrWhiteSpace(SeriesOriginalName) || SeriesOriginalName == "-"
+        ? SeriesName
+        : $"{SeriesName} | {SeriesOriginalName}";
 
     public string SeasonName { get => _seasonName; private set => SetProperty(ref _seasonName, value); }
+
+    public string CountryText { get => _countryText; private set => SetProperty(ref _countryText, value); }
+
+    public string LanguageText { get => _languageText; private set => SetProperty(ref _languageText, value); }
+
+    public string NetworksText { get => _networksText; private set => SetProperty(ref _networksText, value); }
+
+    public string ProductionCompaniesText { get => _productionCompaniesText; private set => SetProperty(ref _productionCompaniesText, value); }
+
+    public string DirectorText { get => _directorText; private set => SetProperty(ref _directorText, value); }
+
+    public string WriterText { get => _writerText; private set => SetProperty(ref _writerText, value); }
+
+    public string ActorsText { get => _actorsText; private set => SetProperty(ref _actorsText, value); }
+
+    public string GenreDisplay { get => _genreDisplay; private set => SetProperty(ref _genreDisplay, value); }
 
     public string SeasonNumberText { get => _seasonNumberText; private set => SetProperty(ref _seasonNumberText, value); }
 
@@ -225,6 +278,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         get => _identificationStatusText;
         private set => SetProperty(ref _identificationStatusText, value);
     }
+
+    public MovieRatingItem EpisodeTmdbRating { get => _episodeTmdbRating; private set => SetProperty(ref _episodeTmdbRating, value); }
 
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
 
@@ -465,28 +520,23 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isWatched, value))
             {
                 OnPropertyChanged(nameof(WatchedButtonText));
+                OnPropertyChanged(nameof(WatchedButtonIcon));
             }
         }
     }
 
-    public bool CanToggleWatched => HasEpisode && !IsUpdatingWatched;
+    public bool CanToggleWatched => HasEpisode;
 
-    public string WatchedButtonText => IsUpdatingWatched
-        ? "更新中..."
-        : IsWatched
-            ? "取消已看"
-            : "标记已看";
+    public string WatchedButtonText => IsWatched
+        ? "取消已看"
+        : "标记已看";
+
+    public string WatchedButtonIcon => IsWatched ? "\uE711" : "\uE8FB";
 
     public bool IsUpdatingWatched
     {
         get => _isUpdatingWatched;
-        private set
-        {
-            if (SetProperty(ref _isUpdatingWatched, value))
-            {
-                RefreshWatchedCommandState();
-            }
-        }
+        private set => SetProperty(ref _isUpdatingWatched, value);
     }
 
     public bool IsOpeningPlayer
@@ -507,7 +557,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     public string PrimaryPlayButtonText => IsOpeningPlayer || _playerWindowService.IsPlayerOpen
         ? "播放器打开中"
         : HasSources
-            ? "播放"
+            ? "播放默认源"
             : "暂无播放源";
 
     public string SourcePlayButtonText => IsOpeningPlayer || _playerWindowService.IsPlayerOpen
@@ -540,7 +590,16 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             _defaultMediaFileId = model.DefaultMediaFileId;
             HasEpisode = true;
             SeriesName = string.IsNullOrWhiteSpace(model.SeriesName) ? "-" : model.SeriesName;
+            SeriesOriginalName = string.IsNullOrWhiteSpace(model.SeriesOriginalName) ? "-" : model.SeriesOriginalName;
             SeasonName = string.IsNullOrWhiteSpace(model.SeasonName) ? model.SeasonNumberText : model.SeasonName;
+            CountryText = MovieMetadataDisplayText.LocalizeCountries(model.SeriesCountry);
+            LanguageText = MovieMetadataDisplayText.LocalizeLanguages(model.SeriesLanguage);
+            DirectorText = string.IsNullOrWhiteSpace(model.SeriesDirectorText) ? "-" : model.SeriesDirectorText;
+            WriterText = string.IsNullOrWhiteSpace(model.SeriesWriterText) ? "-" : model.SeriesWriterText;
+            ActorsText = string.IsNullOrWhiteSpace(model.SeriesActorsText) ? "-" : model.SeriesActorsText;
+            NetworksText = string.IsNullOrWhiteSpace(model.SeriesNetworksText) ? "未提供" : model.SeriesNetworksText;
+            ProductionCompaniesText = string.IsNullOrWhiteSpace(model.SeriesProductionCompaniesText) ? "未提供" : model.SeriesProductionCompaniesText;
+            GenreDisplay = string.IsNullOrWhiteSpace(model.GenreDisplay) ? "未提供" : model.GenreDisplay;
             SeasonNumberText = model.SeasonNumberText;
             EpisodeNumberText = model.EpisodeNumberText;
             TitleText = model.DisplayTitle;
@@ -626,10 +685,30 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
                 ? $"已加载 {model.EpisodeNumberText}，可从默认源或指定播放源打开播放器。"
                 : $"已加载 {model.EpisodeNumberText}，暂无播放源。";
             ScheduleDetailLazyProbe(model.EpisodeId, model.Sources);
+            _ = LoadTmdbRatingAsync(model.EpisodeId);
         }
         catch (Exception exception)
         {
             Clear($"加载剧集详情失败：{DescribeException(exception)}");
+        }
+    }
+
+    private async Task LoadTmdbRatingAsync(int episodeId)
+    {
+        try
+        {
+            var rating = await _tvDetailQueryService.GetEpisodeTmdbRatingAsync(episodeId);
+            if (_episodeId == episodeId)
+            {
+                EpisodeTmdbRating = rating;
+            }
+        }
+        catch
+        {
+            if (_episodeId == episodeId)
+            {
+                EpisodeTmdbRating = new MovieRatingItem { SourceName = "TMDB" };
+            }
         }
     }
 
@@ -946,21 +1025,30 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     private async Task ToggleWatchedAsync()
     {
+        if (IsUpdatingWatched)
+        {
+            return;
+        }
+
         if (!_episodeId.HasValue)
         {
             StatusMessage = "请先选择剧集。";
             return;
         }
 
+        var previousWatched = IsWatched;
         var targetWatched = !IsWatched;
         IsUpdatingWatched = true;
         try
         {
-            await _tvSeasonCollectionService.SetEpisodeWatchedAsync(
-                _episodeId.Value,
-                targetWatched,
-                CancellationToken.None,
-                "Manual");
+            IsWatched = targetWatched;
+            await Task.Yield();
+            await Task.Run(
+                () => _tvSeasonCollectionService.SetEpisodeWatchedAsync(
+                    _episodeId.Value,
+                    targetWatched,
+                    CancellationToken.None,
+                    "Manual"));
             _dataRefreshService.NotifyPlaybackChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await ActivateAsync();
@@ -968,12 +1056,12 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         }
         catch (Exception exception)
         {
+            IsWatched = previousWatched;
             StatusMessage = $"更新观看状态失败：{DescribeException(exception)}";
         }
         finally
         {
             IsUpdatingWatched = false;
-            RefreshWatchedCommandState();
         }
     }
 
@@ -1879,7 +1967,16 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         _defaultMediaFileId = null;
         HasEpisode = false;
         SeriesName = "-";
+        SeriesOriginalName = "-";
         SeasonName = "-";
+        CountryText = "-";
+        LanguageText = "-";
+        DirectorText = "-";
+        WriterText = "-";
+        ActorsText = "-";
+        NetworksText = "未提供";
+        ProductionCompaniesText = "未提供";
+        GenreDisplay = "未提供";
         SeasonNumberText = "-";
         EpisodeNumberText = "-";
         TitleText = "未选择剧集";
@@ -1893,6 +1990,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         SourceSummary = "暂无播放源";
         LastPlayedText = "-";
         IdentificationStatusText = "未加载";
+        EpisodeTmdbRating = new MovieRatingItem { SourceName = "TMDB" };
         IsUnidentified = false;
         IsWatched = false;
         HasSources = false;

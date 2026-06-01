@@ -121,6 +121,15 @@ internal static class MediaSourceDisplayText
             : FormatRawResolution(effectiveWidth, effectiveHeight);
     }
 
+    public static string FormatRawResolution(int? width, int? height)
+    {
+        var effectiveWidth = width.GetValueOrDefault();
+        var effectiveHeight = height.GetValueOrDefault();
+        return effectiveWidth > 0 && effectiveHeight > 0
+            ? FormatRawResolution(effectiveWidth, effectiveHeight)
+            : UnknownResolution;
+    }
+
     public static string FormatVideoCodec(string? codec)
     {
         if (string.IsNullOrWhiteSpace(codec))
@@ -306,6 +315,20 @@ internal static class MediaSourceDisplayText
             MediaProbeStatus.Failed => "失败（暂未取得媒体信息）",
             MediaProbeStatus.Unavailable => "不可用（缺少 ffprobe）",
             MediaProbeStatus.Skipped => "已跳过（非可探测视频）",
+            _ => Unknown
+        };
+    }
+
+    public static string FormatProbeStatusShort(MediaProbeStatus status)
+    {
+        return status switch
+        {
+            MediaProbeStatus.NotProbed => "待探测",
+            MediaProbeStatus.Pending => "探测中",
+            MediaProbeStatus.Success => "已完成",
+            MediaProbeStatus.Failed => "失败",
+            MediaProbeStatus.Unavailable => "不可用",
+            MediaProbeStatus.Skipped => "已跳过",
             _ => Unknown
         };
     }

@@ -1,12 +1,12 @@
 # Phase 7 Known Issues
 
-Last updated: 2026-05-30
+Last updated: 2026-06-01
 
 This file tracks current blockers, deferred work, risks, noise and user-confirmed non-issues for Phase 7. It should be updated at every Phase 7 substage closeout.
 
 ## Blocker
 
-- None currently known for closing Phase 7.3e.
+- None currently known for the requested detail-page polish closeout.
 
 ## Deferred
 
@@ -21,6 +21,9 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 - 7.3f remains the detail regression closeout stage, including detail entry / return / correction / source-state regression and 7.2 media-library smoke checks.
 - If grouped placeholder detail experience needs deeper polish, handle it in 7.3. Do not treat current grouped placeholder entry as a 7.2 blocker.
 - Full restoration of complex source-page state such as scroll offset, deep filter snapshots or page-specific tab state remains deferred unless an existing page already exposes that state safely. 7.3a only owns reliable page-level origin return and detail hierarchy fallback.
+- Series / Season / Episode rating cards now use existing TMDB / OMDb clients as read-only cached lookups. Persisting TV rating snapshots is deferred unless a later performance audit shows a concrete need.
+- Movie correction candidate detail enrichment is intentionally bounded: Movie loads at most 10 details, TV loads at most 12 details and both use a concurrency limit of 4. Failed detail rows fall back to search-only data instead of blocking the full result list.
+- Delete the commented legacy Movie correction XAML after manual acceptance of the new dialog. It is retained temporarily only as a local source comparison and is not active at runtime.
 
 ### 7.5 Player
 
@@ -44,6 +47,8 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 
 - Local Light / Dark / card polish is deferred to 7.8 or later targeted stages.
 - Global button, spacing, color, menu, dialog, card and empty-state polish remains deferred.
+- Home, Library and current detail pages now use the shared layered liquid-glass ResourceDictionary baseline for rounded content cards, background-bearing buttons and primary selected states. Light and Dark themes use differentiated translucent levels, edge highlights and cached diffuse detail backgrounds; extending the same baseline to later rebuilt pages, navigation items, popups, dialogs, tags and equivalent components remains deferred to their page phases and the 7.8 consistency audit.
+- The shared liquid-glass baseline must preserve readability and clear interaction states. Avoid page-local hardcoded variants, excessive transparency, high-saturation glow and decorative effects that reduce scanability.
 - Final large-list scroll and performance review belongs to 7.8 unless a blocker appears earlier.
 
 ### 7.2 Residual Deferred Items
@@ -57,7 +62,7 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 |---|---|---|
 | WindowChrome / DPI / multi-monitor / maximize edge cases | Shell windows can regress outside standard viewport cases | Recheck in 7.8 and any shell-touching phase. |
 | PlayerWindow + mpv / HwndHost / Popup / fullscreen | Player controls, menus or video host may regress under WPF chrome changes | 7.5 must start with Plan / Audit and include player smoke checks. |
-| ResourceDictionary merge order / StaticResource lookup | Shared styles can fail at build or runtime if introduced in the wrong dictionary | Prefer existing dictionaries and run `dotnet build MediaLibrary.sln` for implementation phases. |
+| ResourceDictionary merge order / StaticResource lookup | Shared styles can fail at runtime if introduced before their base style dictionary, even when build passes | Prefer same-dictionary bases where practical; run `dotnet build MediaLibrary.sln` and a runtime page-load probe for changed lazy-loaded views. |
 | Light / Dark page-level consistency | Some pages may remain readable but visually uneven | Defer broad polish to 7.8; only fix blockers earlier. |
 | Media-library large-list virtualization / scroll performance | Poster/list cards and batch mode can degrade on big libraries | Keep performance checks in 7.2 closeout and 7.8 regression. |
 | Poster shadow bitmap cache | Many unique palette colors can still cause cache churn or memory pressure | Cache is bounded; keep palette color quantization and recheck diagnostics if scroll jank returns. |
@@ -66,13 +71,21 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 | Batch operation semantics | UI wording can imply destructive behavior incorrectly | Keep warning / danger variants and explicit non-file-deletion copy. |
 | Delete-record / move-out wording | User may think real files are deleted | Keep product red lines in page docs and confirmation copy. |
 | Upstream diff includes historical changes | Later audits may misclassify authorized work as current-phase overreach | Use stage logs and current phase boundaries, not upstream diff alone. |
+| Existing databases need the approved TV metadata migration before the new detail fields can persist | Old installations otherwise keep the previous `TvSeries` schema | Apply `AddTvSeriesProductionMetadata` during the normal upgrade path; this implementation does not execute database update. |
+| Existing databases need the approved TV crew migration before creator fields can persist | TV director, writer and actor rows otherwise remain empty after hydration | Apply `AddTvSeriesCrewMetadata` after `AddTvSeriesProductionMetadata` during the normal upgrade path; this implementation does not execute database update. |
+| Live WPF backdrop blur can regress scrolling and detail navigation latency | A literal blur effect on stacked cards would be expensive and can reintroduce UI stalls | Keep the Apple-like blur impression static: cached diffuse background, translucent surfaces, edge highlights and bounded shadows only. |
+| Existing TV rows can still store raw TMDB English genre names | Older hydrated rows can contain values such as `Sci-Fi & Fantasy` | Normalize TV genre names when media-library rows load and when new TMDB TV details are parsed; do not require a migration. |
+| Movie correction detail enrichment adds bounded TMDB fan-out | Candidate rows need real crew / metadata without making the dialog unresponsive | Limit Movie to 10 rows, TV to 12 rows, use concurrency 4, keep busy UI visible and fall back per row on detail failure. |
 
 ## Noise
 
 - LF / CRLF warnings from Git may appear in diff checks; record them only as formatting noise when `git diff --check` has no actual errors.
 - Cumulative upstream diff may include 7.0, 7.1 or older authorized changes.
 - Local button, color, spacing and card details are not all final until 7.8.
+- The current shared liquid-glass colors are a restrained implementation baseline, not the final global palette. Final cross-page color tuning remains owned by 7.8.
 - Old visual drafts may show controls, copy or layouts that were superseded by user decisions.
+- The accepted Movie detail page is the stable TV-detail comparison baseline. Repeating unchanged Movie screenshots is unnecessary noise unless a visual blocker or explicit verification request requires a fresh capture.
+- Existing persistent TMDB TV detail cache rows use the previous schema key. New crew-capable requests use `v3`; old rows remain normal cache-cleanup noise.
 
 ## User-Confirmed Non-Issues
 

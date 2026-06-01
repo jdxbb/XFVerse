@@ -1,0 +1,883 @@
+<UserControl x:Class="MediaLibrary.App.Controls.MovieCorrectionDialogContent"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
+    <UserControl.Resources>
+        <Style x:Key="CorrectionClearButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Content" Value="&#xE711;" />
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+                <Trigger Property="Tag" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CorrectionPlaceholderStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="Margin" Value="12,0,32,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Opacity" Value="0.62" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="">
+                    <Setter Property="Visibility" Value="Visible" />
+                </Trigger>
+                <Trigger Property="Tag" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Visible" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CorrectionToolbarButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource GlassSecondaryButtonStyle}">
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="12,0" />
+        </Style>
+
+        <Style x:Key="CorrectionTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource TextBoxStyle}">
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="CorrectionToolbarIconStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+        </Style>
+
+        <Style x:Key="CorrectionResultItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <Border Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CorrectionModernScrollThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border Width="6"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="3"
+                                Opacity="0.58" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CorrectionModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CorrectionModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="MinWidth" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Width="{TemplateBinding Width}" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Style="{StaticResource CorrectionModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource CorrectionModernScrollThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Style="{StaticResource CorrectionModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="IsMouseCaptureWithin" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}"
+                             Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CorrectionResultListStyle"
+               TargetType="ListBox"
+               BasedOn="{StaticResource SectionListBoxStyle}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource CorrectionResultItemStyle}" />
+        </Style>
+
+        <Style x:Key="CorrectionTrimmedTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="helpers:TrimmedTextToolTipBehavior.FullText"
+                    Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+        </Style>
+
+        <Style x:Key="CorrectionModePanelStyle" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+
+        <Style x:Key="CorrectionRowExpanderStyle" TargetType="Expander">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Expander}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <ToggleButton x:Name="HeaderSite"
+                                          HorizontalContentAlignment="Stretch"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          Content="{TemplateBinding Header}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                        <Grid Background="Transparent">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ContentPresenter HorizontalAlignment="Stretch"
+                                                              Content="{TemplateBinding Content}" />
+                                            <TextBlock x:Name="Arrow"
+                                                       Grid.Column="1"
+                                                       Margin="12,0,2,0"
+                                                       VerticalAlignment="Center"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource BrushForegroundMuted}"
+                                                       RenderTransformOrigin="0.5,0.5"
+                                                       Text="&#xE70D;">
+                                                <TextBlock.RenderTransform>
+                                                    <RotateTransform Angle="0" />
+                                                </TextBlock.RenderTransform>
+                                            </TextBlock>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Arrow" Property="RenderTransform">
+                                                    <Setter.Value>
+                                                        <RotateTransform Angle="90" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ExpandSite"
+                                              Grid.Row="1"
+                                              Visibility="Collapsed"
+                                              ContentSource="Content" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Height="548"
+            Padding="16"
+            Style="{StaticResource GlassInlinePanelStyle}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="12" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="172" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <ComboBox ItemsSource="{Binding CorrectionTargetOptions}"
+                          PreviewMouseWheel="CorrectionTargetComboBox_PreviewMouseWheel"
+                          SelectedItem="{Binding SelectedCorrectionTarget}"
+                          Style="{StaticResource CorrectionDialogComboBoxStyle}" />
+
+                <Grid Grid.Column="2">
+                    <Grid.Style>
+                        <Style TargetType="Grid" BasedOn="{StaticResource CorrectionModePanelStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="0.86*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="178" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="102" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="138" />
+                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                                 Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Tag="{Binding ManualSearchQuery}"
+                                   Text="请输入需要搜索的影片名"
+                                   Style="{StaticResource CorrectionPlaceholderStyle}" />
+                        <Button Margin="0,0,7,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Command="{Binding ClearManualSearchQueryCommand}"
+                                Tag="{Binding ManualSearchQuery}"
+                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                    </Grid>
+                    <Grid Grid.Column="2">
+                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                                 Text="{Binding ManualSearchYear, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Tag="{Binding ManualSearchYear}"
+                                   Text="影片的上映年份（可选）"
+                                   Style="{StaticResource CorrectionPlaceholderStyle}" />
+                        <Button Margin="0,0,7,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Command="{Binding ClearManualSearchYearCommand}"
+                                Tag="{Binding ManualSearchYear}"
+                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                    </Grid>
+                    <Button Grid.Column="4"
+                            Command="{Binding SearchCandidatesCommand}"
+                            Style="{StaticResource CorrectionToolbarButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets"
+                                       RenderTransformOrigin="0.5,0.5"
+                                       Style="{StaticResource CorrectionToolbarIconStyle}"
+                                       Text="&#xE721;">
+                                <TextBlock.RenderTransform>
+                                    <ScaleTransform ScaleX="-1" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <TextBlock Margin="7,0,0,0" Text="TMDB" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="6"
+                            Command="{Binding AiSuggestSearchCommand}"
+                            Style="{StaticResource CorrectionToolbarButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe UI Symbol"
+                                       FontSize="16"
+                                       Style="{StaticResource CorrectionToolbarIconStyle}"
+                                       Text="✦" />
+                            <TextBlock Margin="7,0,0,0" Text="AI辅助识别" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <Grid Grid.Column="2">
+                    <Grid.Style>
+                        <Style TargetType="Grid" BasedOn="{StaticResource CorrectionModePanelStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="0.82*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="88" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="88" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="102" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="138" />
+                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                                 Text="{Binding TvCorrectionQuery, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Tag="{Binding TvCorrectionQuery}"
+                                   Text="请输入需要搜索的电视剧名"
+                                   Style="{StaticResource CorrectionPlaceholderStyle}" />
+                        <Button Margin="0,0,7,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Command="{Binding ClearTvCorrectionQueryCommand}"
+                                Tag="{Binding TvCorrectionQuery}"
+                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                    </Grid>
+                    <Grid Grid.Column="2">
+                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                                 Text="{Binding CorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Tag="{Binding CorrectionSeasonNumber}" Text="季号" Style="{StaticResource CorrectionPlaceholderStyle}" />
+                        <Button Margin="0,0,7,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Command="{Binding ClearCorrectionSeasonNumberCommand}"
+                                Tag="{Binding CorrectionSeasonNumber}"
+                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                    </Grid>
+                    <Grid Grid.Column="4">
+                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                                 Text="{Binding CorrectionEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Tag="{Binding CorrectionEpisodeNumber}" Text="集号" Style="{StaticResource CorrectionPlaceholderStyle}" />
+                        <Button Margin="0,0,7,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Command="{Binding ClearCorrectionEpisodeNumberCommand}"
+                                Tag="{Binding CorrectionEpisodeNumber}"
+                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                    </Grid>
+                    <Button Grid.Column="6"
+                            Command="{Binding SearchCandidatesCommand}"
+                            Style="{StaticResource CorrectionToolbarButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets"
+                                       RenderTransformOrigin="0.5,0.5"
+                                       Style="{StaticResource CorrectionToolbarIconStyle}"
+                                       Text="&#xE721;">
+                                <TextBlock.RenderTransform>
+                                    <ScaleTransform ScaleX="-1" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <TextBlock Margin="7,0,0,0" Text="TMDB" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="8"
+                            Command="{Binding AiSuggestSearchCommand}"
+                            Style="{StaticResource CorrectionToolbarButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe UI Symbol"
+                                       FontSize="16"
+                                       Style="{StaticResource CorrectionToolbarIconStyle}"
+                                       Text="✦" />
+                            <TextBlock Margin="7,0,0,0" Text="AI辅助识别" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <Grid Grid.Column="2">
+                    <Grid.Style>
+                        <Style TargetType="Grid" BasedOn="{StaticResource CorrectionModePanelStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCorrectionTargetUnknownSeason}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="128" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="132" />
+                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <TextBox Style="{StaticResource CorrectionTextBoxStyle}"
+                                 Text="{Binding UnknownSeasonEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Tag="{Binding UnknownSeasonEpisodeNumber}" Text="集号" Style="{StaticResource CorrectionPlaceholderStyle}" />
+                        <Button Margin="0,0,7,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Command="{Binding ClearUnknownSeasonEpisodeNumberCommand}"
+                                Tag="{Binding UnknownSeasonEpisodeNumber}"
+                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                    </Grid>
+                    <Button Grid.Column="2"
+                            Command="{Binding ApplyUnknownSeasonCorrectionCommand}"
+                            Content="加入到该季"
+                            Style="{StaticResource CorrectionToolbarButtonStyle}" />
+                </Grid>
+            </Grid>
+
+            <TextBlock Grid.Row="1"
+                       Margin="0,10,0,0"
+                       Text="{Binding StatusMessage}"
+                       TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StatusMessage}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <Grid Grid.Row="3">
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Text="搜索后会在这里显示电影候选。">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsCorrectionTargetMovie}" Value="True" />
+                                        <Condition Binding="{Binding HasSearchCandidates}" Value="False" />
+                                        <Condition Binding="{Binding IsCorrectionBusy}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <ListBox ItemsSource="{Binding SearchCandidates}">
+                    <ListBox.Style>
+                        <Style TargetType="ListBox" BasedOn="{StaticResource CorrectionResultListStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.Style>
+                    <ListBox.Resources>
+                        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CorrectionModernScrollBarStyle}" />
+                        <Style TargetType="{x:Type ScrollViewer}">
+                            <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
+                        </Style>
+                    </ListBox.Resources>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid MinHeight="144" Margin="0,9,0,9">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="82" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="3*" />
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="82"
+                                        Height="123"
+                                        Background="{DynamicResource BrushGlassSurface}"
+                                        CornerRadius="10"
+                                        ClipToBounds="True"
+                                        Effect="{StaticResource ShadowCard}">
+                                    <Grid>
+                                        <Control IsHitTestVisible="False" Template="{StaticResource PosterPlaceholderTemplate}" />
+                                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="220"
+                                               helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               Stretch="UniformToFill" />
+                                    </Grid>
+                                </Border>
+                                <Grid Grid.Column="2" Margin="0,2,0,2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="7" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource BrushForegroundPrimary}"
+                                                   Text="{Binding Title}" />
+                                        <TextBlock Margin="10,0,0,1"
+                                                   VerticalAlignment="Bottom"
+                                                   Style="{StaticResource BodyMutedTextStyle}"
+                                                   Text="{Binding OriginalTitleDisplayText}" />
+                                    </StackPanel>
+                                    <ScrollViewer Grid.Row="2"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                        <ScrollViewer.Resources>
+                                            <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CorrectionModernScrollBarStyle}" />
+                                        </ScrollViewer.Resources>
+                                        <TextBlock FontSize="12"
+                                                   Foreground="{DynamicResource BrushForegroundSecondary}"
+                                                   TextWrapping="Wrap">
+                                            <Run FontWeight="SemiBold" Text="简介  " />
+                                            <Run Text="{Binding OverviewDisplayText, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </ScrollViewer>
+                                </Grid>
+                                <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
+                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding ReleaseDateText}" />
+                                        <TextBlock Margin="14,0,0,0" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE823;" />
+                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding RuntimeText}" />
+                                    </StackPanel>
+                                    <TextBlock Margin="0,9,0,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding DirectorDisplayText, StringFormat=导演  {0}}" />
+                                    <TextBlock Margin="0,6,0,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding CountryDisplayText, StringFormat=国家/地区  {0}}" />
+                                    <TextBlock Margin="0,6,0,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding LanguageDisplayText, StringFormat=语言  {0}}" />
+                                </StackPanel>
+                                <Button Grid.Column="6"
+                                        MinWidth="92"
+                                        VerticalAlignment="Center"
+                                        Command="{Binding DataContext.ApplyManualMatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource GlassPrimaryButtonStyle}">
+                                            <Setter Property="Content" Value="修正为TA" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrentMatchedMovie}" Value="True">
+                                                    <Setter Property="Content" Value="已为该影片" />
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Text="搜索后会在这里显示电视剧候选。">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True" />
+                                        <Condition Binding="{Binding HasTvSearchCandidates}" Value="False" />
+                                        <Condition Binding="{Binding IsCorrectionBusy}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <ListBox ItemsSource="{Binding TvSeriesCandidateGroups}">
+                    <ListBox.Style>
+                        <Style TargetType="ListBox" BasedOn="{StaticResource CorrectionResultListStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.Style>
+                    <ListBox.Resources>
+                        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CorrectionModernScrollBarStyle}" />
+                        <Style TargetType="{x:Type ScrollViewer}">
+                            <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
+                        </Style>
+                    </ListBox.Resources>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Expander Style="{StaticResource CorrectionRowExpanderStyle}">
+                                <Expander.Header>
+                                    <Grid Margin="0,12,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="7" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock VerticalAlignment="Bottom" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
+                                                <TextBlock Margin="9,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding OriginalSeriesTitleDisplayText}" />
+                                                <Border Width="1"
+                                                        Height="16"
+                                                        Margin="12,0"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource BrushBorder}" />
+                                                <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
+                                                <TextBlock Margin="7,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding FirstAirDateDisplayText}" />
+                                                <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
+                                                <TextBlock Margin="7,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
+                                            </StackPanel>
+                                            <Grid Grid.Row="2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="116" />
+                                                    <ColumnDefinition Width="1.35*" />
+                                                    <ColumnDefinition Width="1*" />
+                                                    <ColumnDefinition Width="0.86*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding DirectorText, StringFormat=导演  {0}}" />
+                                                <TextBlock Grid.Column="1" Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding GenresDisplayText, StringFormat=类型  {0}}" />
+                                                <TextBlock Grid.Column="2" Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding CountryDisplayText, StringFormat=国家/地区  {0}}" />
+                                                <TextBlock Grid.Column="3" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding LanguageDisplayText, StringFormat=语言  {0}}" />
+                                            </Grid>
+                                        </Grid>
+                                        <Button Grid.Column="2"
+                                                Width="96"
+                                                VerticalAlignment="Center"
+                                                Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Content="修正到剧"
+                                                Style="{StaticResource GlassPrimaryButtonStyle}" />
+                                    </Grid>
+                                </Expander.Header>
+                                <ItemsControl Margin="22,0,0,0" ItemsSource="{Binding Seasons}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,9">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="12" />
+                                                    <ColumnDefinition Width="14" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="14" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{DynamicResource BrushForegroundPrimary}" />
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                    <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesAndSeasonTitle}" />
+                                                    <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                                                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
+                                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding AirDateDisplayText}" />
+                                                        <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
+                                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding EpisodeCountText}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <Button Grid.Column="4"
+                                                        Width="96"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="修正到季"
+                                                        Style="{StaticResource GlassPrimaryButtonStyle}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Text="没有可选择的已有未识别季。">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsCorrectionTargetUnknownSeason}" Value="True" />
+                                        <Condition Binding="{Binding HasUnknownSeasonTargets}" Value="False" />
+                                        <Condition Binding="{Binding IsCorrectionBusy}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <ListBox ItemsSource="{Binding UnknownSeasonSeriesGroups}">
+                    <ListBox.Style>
+                        <Style TargetType="ListBox" BasedOn="{StaticResource CorrectionResultListStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCorrectionTargetUnknownSeason}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.Style>
+                    <ListBox.Resources>
+                        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CorrectionModernScrollBarStyle}" />
+                        <Style TargetType="{x:Type ScrollViewer}">
+                            <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
+                        </Style>
+                    </ListBox.Resources>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Expander Style="{StaticResource CorrectionRowExpanderStyle}">
+                                <Expander.Header>
+                                    <StackPanel Margin="0,12,0,12" Orientation="Horizontal">
+                                        <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
+                                        <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
+                                        <TextBlock Margin="7,0,0,1" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
+                                    </StackPanel>
+                                </Expander.Header>
+                                <ItemsControl Margin="22,0,0,0" ItemsSource="{Binding Seasons}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,9">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="12" />
+                                                    <ColumnDefinition Width="14" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="14" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{DynamicResource BrushForegroundPrimary}" />
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                    <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesAndSeasonTitle}" />
+                                                    <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                                                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
+                                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SourceCountText}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <Button Grid.Column="4"
+                                                        Width="96"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding DataContext.SelectUnknownSeasonTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="选择该季"
+                                                        Style="{StaticResource GlassPrimaryButtonStyle}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Border Background="{DynamicResource BrushGlassSurfaceAlt}"
+                        IsHitTestVisible="True">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCorrectionBusy}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Grid Width="34"
+                              Height="34"
+                              HorizontalAlignment="Center">
+                            <Ellipse Stroke="{DynamicResource BrushBorder}"
+                                     StrokeThickness="3" />
+                            <Path Data="M17,2 A15,15 0 0 1 32,17"
+                                  Stroke="{DynamicResource BrushAccent}"
+                                  StrokeThickness="3"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round">
+                                <Path.RenderTransform>
+                                    <RotateTransform CenterX="17"
+                                                     CenterY="17" />
+                                </Path.RenderTransform>
+                                <Path.Triggers>
+                                    <EventTrigger RoutedEvent="Loaded">
+                                        <BeginStoryboard>
+                                            <Storyboard RepeatBehavior="Forever">
+                                                <DoubleAnimation Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
+                                                                 From="0"
+                                                                 To="360"
+                                                                 Duration="0:0:0.9" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Path.Triggers>
+                            </Path>
+                        </Grid>
+                        <TextBlock Margin="0,10,0,0"
+                                   HorizontalAlignment="Center"
+                                   Style="{StaticResource BodyMutedTextStyle}"
+                                   Text="正在处理，请稍候..." />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <StackPanel Grid.Row="4"
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCorrectionTargetTvEpisode}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Button MinWidth="104"
+                        Command="{Binding PreviewTvEpisodeCorrectionCommand}"
+                        Content="确认修正"
+                        Style="{StaticResource GlassPrimaryButtonStyle}" />
+                <Button MinWidth="84"
+                        Margin="10,0,0,0"
+                        Command="{Binding CancelCorrectionCommand}"
+                        Content="取消"
+                        Style="{StaticResource GlassSecondaryButtonStyle}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

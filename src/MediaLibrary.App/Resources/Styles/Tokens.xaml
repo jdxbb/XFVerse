@@ -72,6 +72,12 @@
                       Opacity="0.12"
                       ShadowDepth="4"
                       Color="#000000" />
+    <DropShadowEffect x:Key="ShadowGlassCard"
+                      BlurRadius="24"
+                      Direction="270"
+                      Opacity="0.18"
+                      ShadowDepth="5"
+                      Color="#000000" />
     <DropShadowEffect x:Key="ShadowPopup"
                       BlurRadius="22"
                       Direction="270"

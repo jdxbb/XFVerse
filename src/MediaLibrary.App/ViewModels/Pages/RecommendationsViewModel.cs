@@ -52,6 +52,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private bool _isCustomPreferenceEnabled;
     private bool _isPreferenceDialogOpen;
     private bool _isApplyingPreferenceState;
+    private bool _isActive;
     private string _savedCustomPreferenceText = string.Empty;
     private string _originalCustomPreferenceText = string.Empty;
     private string _draftCustomPreferenceText = string.Empty;
@@ -277,12 +278,23 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        _isActive = true;
         await LoadCustomPreferenceAsync(cancellationToken);
         await RequestReloadAsync(forceRefresh: false, cancellationToken);
     }
 
+    public override void Deactivate()
+    {
+        _isActive = false;
+    }
+
     private void OnDataChanged(object? sender, AppDataChangedEventArgs e)
     {
+        if (!_isActive)
+        {
+            return;
+        }
+
         if (e.Reason == AppDataChangeReason.RecommendationChanged)
         {
             if (_suppressNextRecommendationChangedReload)

@@ -68,6 +68,10 @@ public sealed class LibraryMovieListItem
 
     public string Language { get; set; } = string.Empty;
 
+    public string DirectorText { get; set; } = string.Empty;
+
+    public string ActorsText { get; set; } = string.Empty;
+
     public int? RuntimeMinutes { get; set; }
 
     public string ImdbId { get; set; } = string.Empty;

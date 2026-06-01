@@ -12,6 +12,7 @@ using MediaLibrary.App.ViewModels.Collections;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
+using MediaLibrary.Core.Services.Implementations;
 using MediaLibrary.Core.Services.Interfaces;
 
 namespace MediaLibrary.App.ViewModels.Pages;
@@ -35,6 +36,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string TagCategoryType = "类型标签";
     private const string TagCategoryEmotion = "情绪标签";
     private const string TagCategoryScene = "场景标签";
+    private const string TagCategoryTv = "电视剧标签";
     private const string StatusMatched = "自动匹配";
     private const string StatusNeedsReview = "待人工确认";
     private const string StatusManualConfirmed = "手动确认";
@@ -95,6 +97,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly HashSet<string> _selectedDecadeFilters = new(StringComparer.Ordinal);
     private readonly object _refreshGate = new();
     private readonly HashSet<string> _queuedRefreshReasons = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<int> _attemptedMovieCrewHydrationIds = [];
     private CancellationTokenSource? _refreshDebounceCts;
     private Task? _refreshLoopTask;
     private CancellationTokenSource? _batchIdentifyCancellationTokenSource;
@@ -232,11 +235,15 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public ObservableCollection<TagFilterOption> SceneTagOptions { get; } = [];
 
+    public ObservableCollection<TagFilterOption> TvTagOptions { get; } = [];
+
     public ObservableCollection<TagFilterOptionRow> TypeTagOptionRows { get; } = [];
 
     public ObservableCollection<TagFilterOptionRow> EmotionTagOptionRows { get; } = [];
 
     public ObservableCollection<TagFilterOptionRow> SceneTagOptionRows { get; } = [];
+
+    public ObservableCollection<TagFilterOptionRow> TvTagOptionRows { get; } = [];
 
     public ObservableCollection<string> DecadeFilterOptions { get; } = [];
 
@@ -513,6 +520,8 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public bool IsContentTypeOtherSelected => _selectedContentTypeFilters.Contains(ContentTypeOther);
 
+    public bool IsTagFilterAllSelected => !AllTagOptions().Any(option => option.IsSelected);
+
     public string TagFilterMenuHeader
     {
         get
@@ -521,6 +530,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                 .Concat(TypeTagOptions.Where(option => option.IsSelected).Select(option => $"类型 {option.Label}"))
                 .Concat(EmotionTagOptions.Where(option => option.IsSelected).Select(option => $"情绪 {option.Label}"))
                 .Concat(SceneTagOptions.Where(option => option.IsSelected).Select(option => $"场景 {option.Label}"))
+                .Concat(TvTagOptions.Where(option => option.IsSelected).Select(option => $"电视剧 {option.Label}"))
                 .ToList();
             return selectedTags.Count == 0 ? "标签：全部" : $"标签：{string.Join(" / ", selectedTags)}";
         }
@@ -896,6 +906,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             _allMovies.Clear();
             _allMovies.AddRange(movies);
             ApplyExternalTagCache(_allMovies);
+            NormalizeTvGenreLabels(_allMovies);
+            _ = HydrateMissingMovieCreditsAsync(_allMovies);
 
             var tagDecadeStopwatch = Stopwatch.StartNew();
             RefreshTagOptions();
@@ -964,6 +976,41 @@ public sealed class LibraryViewModel : PageViewModelBase
                     totalStopwatch.ElapsedMilliseconds,
                     extraFields: $"errorType={exception.GetType().Name}"));
             StatusMessage = $"加载媒体库失败：{exception.Message}";
+        }
+    }
+
+    private async Task HydrateMissingMovieCreditsAsync(IReadOnlyCollection<LibraryMovieListItem> items)
+    {
+        var candidates = items
+            .Where(item => item.ItemKind == LibraryMediaItemKind.Movie
+                           && item.MovieId > 0
+                           && item.TmdbId is > 0
+                           && (string.IsNullOrWhiteSpace(item.DirectorText)
+                               || string.IsNullOrWhiteSpace(item.ActorsText)))
+            .Where(item => _attemptedMovieCrewHydrationIds.Add(item.MovieId))
+            .Take(16)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        var changed = false;
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                changed |= await _movieIdentificationService.EnsureMovieCreditsAsync(candidate.MovieId);
+            }
+            catch
+            {
+                // List crew hydration is best-effort and must not block library rendering.
+            }
+        }
+
+        if (changed)
+        {
+            _dataRefreshService.NotifyMetadataChanged();
         }
     }
 
@@ -1797,6 +1844,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         OnPropertyChanged(nameof(TagFilterMenuHeader));
         OnPropertyChanged(nameof(TagFilterButtonText));
+        OnPropertyChanged(nameof(IsTagFilterAllSelected));
         if (applyFilters)
         {
             ApplyFilters();
@@ -1889,11 +1937,21 @@ public sealed class LibraryViewModel : PageViewModelBase
             ReplaceTagOptions(SceneTagOptions, BuildStaticTagOptions(TagCategoryScene, SceneTagLabels));
             ReplaceTagOptionRows(SceneTagOptionRows, SceneTagOptions);
         }
+
+        if (TvTagOptions.Count == 0)
+        {
+            ReplaceTagOptions(
+                TvTagOptions,
+                BuildStaticTagOptions(
+                    TagCategoryTv,
+                    TmdbTvGenreMapper.GenreLabels.Where(label => !string.Equals(label, FilterAll, StringComparison.Ordinal))));
+            ReplaceTagOptionRows(TvTagOptionRows, TvTagOptions, GetBalancedTagColumnCount(TvTagOptions.Count));
+        }
     }
 
     private IEnumerable<TagFilterOption> AllTagOptions()
     {
-        return TypeTagOptions.Concat(EmotionTagOptions).Concat(SceneTagOptions);
+        return TypeTagOptions.Concat(EmotionTagOptions).Concat(SceneTagOptions).Concat(TvTagOptions);
     }
 
     private IReadOnlyList<TagFilterOption> BuildStaticTagOptions(
@@ -1912,8 +1970,28 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        if (option.IsSelected)
+        {
+            _isUpdatingTagSelection = true;
+            try
+            {
+                var optionsToClear = string.Equals(option.Category, TagCategoryTv, StringComparison.Ordinal)
+                    ? MovieTagOptions()
+                    : TvTagOptions;
+                foreach (var otherOption in optionsToClear)
+                {
+                    otherOption.IsSelected = false;
+                }
+            }
+            finally
+            {
+                _isUpdatingTagSelection = false;
+            }
+        }
+
         OnPropertyChanged(nameof(TagFilterMenuHeader));
         OnPropertyChanged(nameof(TagFilterButtonText));
+        OnPropertyChanged(nameof(IsTagFilterAllSelected));
         ApplyFilters();
     }
 
@@ -1954,17 +2032,23 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private static void ReplaceTagOptionRows(
         ObservableCollection<TagFilterOptionRow> target,
-        IReadOnlyList<TagFilterOption> options)
+        IReadOnlyList<TagFilterOption> options,
+        int columnCount = TagFilterColumnCount)
     {
         target.Clear();
-        for (var index = 0; index < options.Count; index += TagFilterColumnCount)
+        for (var index = 0; index < options.Count; index += columnCount)
         {
             var rowOptions = options
                 .Skip(index)
-                .Take(TagFilterColumnCount)
+                .Take(columnCount)
                 .ToArray();
-            target.Add(new TagFilterOptionRow(rowOptions, index + TagFilterColumnCount < options.Count));
+            target.Add(new TagFilterOptionRow(rowOptions, index + columnCount < options.Count, columnCount));
         }
+    }
+
+    private static int GetBalancedTagColumnCount(int optionCount)
+    {
+        return optionCount <= 0 ? 1 : Math.Max(1, (int)Math.Ceiling(Math.Sqrt(optionCount)));
     }
 
     private void ApplyFilters()
@@ -1982,7 +2066,9 @@ public sealed class LibraryViewModel : PageViewModelBase
             var keyword = _submittedSearchText;
             query = query.Where(
                 item => item.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase)
-                        || item.OriginalTitle.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                        || item.OriginalTitle.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                        || item.DirectorText.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                        || item.ActorsText.Contains(keyword, StringComparison.OrdinalIgnoreCase));
         }
 
         if (!string.IsNullOrWhiteSpace(GenreFilterText))
@@ -1998,17 +2084,22 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         foreach (var tag in TypeTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
         {
-            query = query.Where(item => HasSelectedTag(item, TagCategoryType, tag));
+            query = query.Where(item => item.IsMovie && HasSelectedTag(item, TagCategoryType, tag));
         }
 
         foreach (var tag in EmotionTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
         {
-            query = query.Where(item => HasSelectedTag(item, TagCategoryEmotion, tag));
+            query = query.Where(item => item.IsMovie && HasSelectedTag(item, TagCategoryEmotion, tag));
         }
 
         foreach (var tag in SceneTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
         {
-            query = query.Where(item => HasSelectedTag(item, TagCategoryScene, tag));
+            query = query.Where(item => item.IsMovie && HasSelectedTag(item, TagCategoryScene, tag));
+        }
+
+        foreach (var tag in TvTagOptions.Where(option => option.IsSelected).Select(option => option.Label))
+        {
+            query = query.Where(item => (item.IsSeries || item.IsSeason) && HasSelectedTag(item, TagCategoryTv, tag));
         }
 
         if (_selectedDecadeFilters.Count > 0)
@@ -2140,6 +2231,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             TagCategoryType => GetTypeTags(item),
             TagCategoryEmotion => SplitTags(item.EmotionTagsText),
             TagCategoryScene => SplitTags(item.SceneTagsText),
+            TagCategoryTv => SplitTags(TmdbTvGenreMapper.NormalizeGenreNames(item.GenresText)),
             _ => Array.Empty<string>()
         };
 
@@ -2198,6 +2290,19 @@ public sealed class LibraryViewModel : PageViewModelBase
     private static IReadOnlyList<string> GetTypeTags(LibraryMovieListItem item)
     {
         return SplitTags(string.IsNullOrWhiteSpace(item.AiTagsText) ? item.GenresText : item.AiTagsText);
+    }
+
+    private IEnumerable<TagFilterOption> MovieTagOptions()
+    {
+        return TypeTagOptions.Concat(EmotionTagOptions).Concat(SceneTagOptions);
+    }
+
+    private static void NormalizeTvGenreLabels(IEnumerable<LibraryMovieListItem> items)
+    {
+        foreach (var item in items.Where(item => item.IsSeries || item.IsSeason))
+        {
+            item.GenresText = TmdbTvGenreMapper.NormalizeGenreNames(item.GenresText);
+        }
     }
 
     private static IReadOnlyList<string> SplitTags(string? text)
@@ -3899,15 +4004,18 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public sealed class TagFilterOptionRow
     {
-        public TagFilterOptionRow(IReadOnlyList<TagFilterOption> options, bool hasDivider)
+        public TagFilterOptionRow(IReadOnlyList<TagFilterOption> options, bool hasDivider, int columnCount)
         {
             Options = options;
             HasDivider = hasDivider;
+            ColumnCount = columnCount;
         }
 
         public IReadOnlyList<TagFilterOption> Options { get; }
 
         public bool HasDivider { get; }
+
+        public int ColumnCount { get; }
     }
 
     private sealed record BatchItemError(string SelectionKey, string Title, string Message);

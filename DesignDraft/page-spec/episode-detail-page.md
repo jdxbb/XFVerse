@@ -41,7 +41,7 @@ Phase 6.0i 审计确认：当前 `EpisodeDetailPage` 在右侧操作区显示文
 
 Phase 7 目标：
 
-- 单集详情在 Hero 左上角使用与电影、剧、季详情相同的统一返回图标按钮。
+- 单集详情在紧凑详情标题栏左侧使用与电影、剧、季详情相同的统一返回图标按钮。
 - 当前操作区文字按钮 `返回季详情` 不作为最终主返回入口；层级信息需要保留时使用 Tooltip `返回季详情` 或轻量面包屑。
 - 默认 Tooltip 为 `返回上一页`；fallback 到季详情时可显示 `返回季详情`。
 - 有可靠来源时优先返回来源页面。例如从观影历史进入 Episode 相关详情，应返回历史页并恢复日期筛选 / 定位状态。
@@ -61,7 +61,7 @@ Phase 7 目标：
 EpisodeDetailPage
 ├─ UnifiedDetailBackButton
 ├─ EpisodeHero
-│  ├─ Still / Poster
+│  ├─ 16:9 Still / Poster
 │  ├─ SeriesTitle
 │  ├─ SeasonNumber / EpisodeNumber
 │  ├─ EpisodeTitle
@@ -77,8 +77,17 @@ EpisodeDetailPage
       ├─ FileName / SafePathSummary / SourceType
       ├─ Resolution / Duration / FileSize
       ├─ DefaultSource / ProbeStatus
-      └─ Play / Probe / SetDefault / SplitSource / Correct
+      └─ Play / Probe / SetDefault / SplitSource
 ```
+
+已确认布局细则：
+
+- 16:9 图片向右下方扩展到按钮带高度；右侧 Hero 保持较短，按钮带位于 Hero 下方空白区域。
+- 标题元数据行只保留日历图标和播出日期。
+- TMDB 评分卡片与季详情一致，使用短横向三列结构。
+- 右侧 `单集信息` 卡片沿用季详情字段层级，但不展示总集数和已看集数。
+- Hero 下方只保留播放默认源、已看状态、单集识别修正三个均匀分布动作。
+- 播放源列表与电影详情结构一致；逐行修正按钮已移除，修正统一由页级弹窗入口承载。
 
 ---
 
@@ -168,7 +177,7 @@ EpisodeDetailPage
 ## 9. 验收标准
 
 - 季详情可进入单集详情页
-- 单集详情 Hero 左上角显示统一返回图标按钮，不以操作区文字按钮作为最终主入口
+- 单集详情紧凑标题栏左侧显示统一返回图标按钮，不以操作区文字按钮作为最终主入口
 - 有可靠来源时返回进入单集详情的来源状态；缺少来源时 fallback 返回季详情
 - 页面展示 Episode 标题信息、still / 海报、简介、状态和播放源
 - 无播放源、无默认源、metadata-only、loading、error、disabled 均有明确设计状态

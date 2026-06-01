@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using MediaLibrary.App.Models.Enums;
@@ -190,7 +191,18 @@ public sealed class MainWindowViewModel : ViewModelBase
                 return;
             }
 
+            if (_currentPageViewModel is not null)
+            {
+                _currentPageViewModel.PropertyChanged -= OnCurrentPagePropertyChanged;
+            }
+
             SetProperty(ref _currentPageViewModel, value);
+            if (_currentPageViewModel is not null)
+            {
+                _currentPageViewModel.PropertyChanged += OnCurrentPagePropertyChanged;
+            }
+
+            OnPropertyChanged(nameof(DetailBackdropSource));
         }
     }
 
@@ -239,9 +251,29 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public bool IsShellChromeVisible => !IsDetailRouteActive;
 
+    public string DetailBackdropSource => CurrentPageViewModel switch
+    {
+        MovieDetailViewModel movieDetail => movieDetail.PosterDisplayUrl,
+        SeriesOverviewViewModel seriesOverview => seriesOverview.PosterDisplayUrl,
+        TvSeasonDetailViewModel seasonDetail => seasonDetail.PosterDisplayUrl,
+        EpisodeDetailViewModel episodeDetail => episodeDetail.StillDisplayUrl,
+        _ => string.Empty
+    };
+
     public string ShellPageTitle => IsHomePageActive && IsSidebarExpanded
         ? $"欢迎回来，{UserDisplayName} 👋"
         : CurrentPageTitle;
+
+    private void OnCurrentPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MovieDetailViewModel.PosterDisplayUrl)
+            or nameof(SeriesOverviewViewModel.PosterDisplayUrl)
+            or nameof(TvSeasonDetailViewModel.PosterDisplayUrl)
+            or nameof(EpisodeDetailViewModel.StillDisplayUrl))
+        {
+            OnPropertyChanged(nameof(DetailBackdropSource));
+        }
+    }
 
     private async void OnNavigationRequested(object? sender, NavigationRequest request)
     {

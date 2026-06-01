@@ -18,6 +18,22 @@ public sealed class TvEpisodeDetailModel
 
     public string SeriesOriginalName { get; set; } = string.Empty;
 
+    public string SeriesCountry { get; set; } = string.Empty;
+
+    public string SeriesLanguage { get; set; } = string.Empty;
+
+    public string SeriesDirectorText { get; set; } = string.Empty;
+
+    public string SeriesWriterText { get; set; } = string.Empty;
+
+    public string SeriesActorsText { get; set; } = string.Empty;
+
+    public string SeriesNetworksText { get; set; } = string.Empty;
+
+    public string SeriesProductionCompaniesText { get; set; } = string.Empty;
+
+    public string GenreDisplay { get; set; } = string.Empty;
+
     public string SeasonName { get; set; } = string.Empty;
 
     public string Title { get; set; } = string.Empty;
@@ -56,14 +72,14 @@ public sealed class TvEpisodeDetailModel
 
     public string EpisodeNumberText => EpisodeNumber > 0 ? $"E{EpisodeNumber:D2}" : "E--";
 
-    public string DisplayTitle => FirstNonEmpty(Title, FallbackTitle, EpisodeNumberText);
+    public string DisplayTitle => TvDetailDisplayText.FormatEpisodeTitle(SeasonNumber, EpisodeNumber, Title, FallbackTitle);
 
-    public string DisplayOverview => string.IsNullOrWhiteSpace(Overview) ? "暂无简介。" : Overview;
+    public string DisplayOverview => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
 
     public string AirDateText => AirDate.HasValue ? AirDate.Value.ToString("yyyy-MM-dd") : "-";
 
     public string RuntimeText => RuntimeMinutes.HasValue && RuntimeMinutes.Value > 0
-        ? $"{RuntimeMinutes.Value} 分钟"
+        ? TimeSpan.FromMinutes(RuntimeMinutes.Value).ToString(@"hh\:mm\:ss")
         : "-";
 
     public string WatchedText => IsWatched ? "已看" : "未看";
@@ -178,6 +194,12 @@ public sealed class TvEpisodeSourceItem
 
     public string ResolutionShortText => MediaSourceDisplayText.FormatResolutionShortLabel(ResolutionWidth, ResolutionHeight);
 
+    public string ResolutionRawText => MediaSourceDisplayText.FormatRawResolution(ResolutionWidth, ResolutionHeight);
+
+    public string ExtensionDisplayText => string.IsNullOrWhiteSpace(Extension)
+        ? MediaSourceDisplayText.Unknown
+        : Extension.TrimStart('.');
+
     public string VideoCodecText => MediaSourceDisplayText.FormatVideoCodec(VideoCodec);
 
     public string AudioText => MediaSourceDisplayText.FormatAudio(AudioCodec, AudioChannels);
@@ -214,9 +236,14 @@ public sealed class TvEpisodeSourceItem
 
     public string ProbeErrorText => MediaSourceDisplayText.FormatProbeError(MediaProbeError);
 
+    public string ProbeStatusShortText => MediaSourceDisplayText.FormatProbeStatusShort(MediaProbeStatus);
+
     public string LastPlayedText => MediaSourceDisplayText.FormatDateTime(LastPlayedAt);
 
     public string LastPlayPositionText => MediaSourceDisplayText.FormatDuration(LastPlayPositionSeconds);
+
+    public string LastPlayPositionProgressText =>
+        $"{MediaSourceDisplayText.FormatDuration(LastPlayPositionSeconds)} / {DurationText}";
 
     public string DefaultSourceText => IsDefault ? "默认源" : "播放源";
 

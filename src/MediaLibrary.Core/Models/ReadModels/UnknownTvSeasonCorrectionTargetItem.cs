@@ -23,4 +23,8 @@ public sealed class UnknownTvSeasonCorrectionTargetItem
 
     public string DisplaySubtitle =>
         $"S{SeasonNumber:00} · {EpisodeRangeText} · {SourceCount} sources · {SourceKindSummary} · {ContextHint}";
+
+    public string SeriesAndSeasonTitle => $"{SeriesTitle}  {(SeasonNumber == 0 ? "特别篇" : $"第 {SeasonNumber} 季")}";
+
+    public string SourceCountText => $"共 {SourceCount} 个播放源";
 }

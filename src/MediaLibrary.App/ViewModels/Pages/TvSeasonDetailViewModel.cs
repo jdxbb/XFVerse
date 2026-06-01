@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
 using MediaLibrary.Core.Diagnostics;
@@ -29,6 +30,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private int? _seasonId;
     private int? _seriesId;
     private string _seriesName = "-";
+    private string _seriesOriginalName = "-";
+    private string _seasonTitleText = "未选择电视剧季";
     private string _name = "未选择电视剧季";
     private string _overview = "请先选择一个电视剧季。";
     private string _posterDisplayUrl = string.Empty;
@@ -39,6 +42,17 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private string _sourceSummary = "暂无播放源";
     private string _progressText = "已看 0 / 0";
     private string _inLibraryText = "暂无播放源";
+    private string _episodeCountText = "-";
+    private string _totalEpisodeCountText = "-";
+    private string _watchedCountText = "-";
+    private int _totalEpisodeCount;
+    private string _countryText = "-";
+    private string _languageText = "-";
+    private string _directorText = "-";
+    private string _writerText = "-";
+    private string _actorsText = "-";
+    private string _networksText = "未提供";
+    private string _productionCompaniesText = "未提供";
     private string _identificationStatusText = "未加载";
     private string _unidentifiedSummary = string.Empty;
     private string _statusMessage = "请先选择一个电视剧季。";
@@ -55,6 +69,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
     private string _tmdbRatingDisplay = SeasonRatingUnavailableText;
     private string _imdbRatingDisplay = string.Empty;
+    private MovieRatingItem _seasonTmdbRating = new() { SourceName = "TMDB" };
     private bool _isSeasonCorrectionPanelOpen;
     private bool _isSeasonCorrectionBusy;
     private string _seasonCorrectionSearchQuery = string.Empty;
@@ -97,6 +112,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         PlayEpisodeCommand = new AsyncRelayCommand(PlayEpisodeAsync, CanPlayEpisode);
         ToggleFavoriteCommand = new AsyncRelayCommand(() => ToggleFavoriteAsync(), () => HasSeason && (IsFavorite || IsSeasonWatched));
         ToggleWantToWatchCommand = new AsyncRelayCommand(() => ToggleWantToWatchAsync(), () => HasSeason && (IsWantToWatch || IsSeasonUnwatched));
+        TogglePreferenceCommand = new AsyncRelayCommand(TogglePreferenceAsync, () => HasSeason);
         ToggleNotInterestedCommand = new AsyncRelayCommand(() => ToggleNotInterestedAsync(), () => HasSeason);
         MarkSeasonWatchedCommand = new AsyncRelayCommand(() => SetSeasonWatchedAsync(true), () => HasSeason);
         MarkSeasonUnwatchedCommand = new AsyncRelayCommand(() => SetSeasonWatchedAsync(false), () => HasSeason);
@@ -147,6 +163,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public AsyncRelayCommand ToggleWantToWatchCommand { get; }
 
+    public AsyncRelayCommand TogglePreferenceCommand { get; }
+
     public AsyncRelayCommand ToggleNotInterestedCommand { get; }
 
     public AsyncRelayCommand MarkSeasonWatchedCommand { get; }
@@ -185,7 +203,35 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public AsyncRelayCommand ApplySeasonCorrectionCommand { get; }
 
-    public string SeriesName { get => _seriesName; private set => SetProperty(ref _seriesName, value); }
+    public string SeriesName
+    {
+        get => _seriesName;
+        private set
+        {
+            if (SetProperty(ref _seriesName, value))
+            {
+                OnPropertyChanged(nameof(SeriesAndOriginalNameText));
+            }
+        }
+    }
+
+    public string SeriesOriginalName
+    {
+        get => _seriesOriginalName;
+        private set
+        {
+            if (SetProperty(ref _seriesOriginalName, value))
+            {
+                OnPropertyChanged(nameof(SeriesAndOriginalNameText));
+            }
+        }
+    }
+
+    public string SeriesAndOriginalNameText => string.IsNullOrWhiteSpace(SeriesOriginalName) || SeriesOriginalName == "-"
+        ? SeriesName
+        : $"{SeriesName} | {SeriesOriginalName}";
+
+    public string SeasonTitleText { get => _seasonTitleText; private set => SetProperty(ref _seasonTitleText, value); }
 
     public string Name { get => _name; private set => SetProperty(ref _name, value); }
 
@@ -206,6 +252,28 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public string ProgressText { get => _progressText; private set => SetProperty(ref _progressText, value); }
 
     public string InLibraryText { get => _inLibraryText; private set => SetProperty(ref _inLibraryText, value); }
+
+    public string EpisodeCountText { get => _episodeCountText; private set => SetProperty(ref _episodeCountText, value); }
+
+    public string TotalEpisodeCountText { get => _totalEpisodeCountText; private set => SetProperty(ref _totalEpisodeCountText, value); }
+
+    public string WatchedCountText { get => _watchedCountText; private set => SetProperty(ref _watchedCountText, value); }
+
+    public string CountryText { get => _countryText; private set => SetProperty(ref _countryText, value); }
+
+    public string LanguageText { get => _languageText; private set => SetProperty(ref _languageText, value); }
+
+    public string NetworksText { get => _networksText; private set => SetProperty(ref _networksText, value); }
+
+    public string ProductionCompaniesText { get => _productionCompaniesText; private set => SetProperty(ref _productionCompaniesText, value); }
+
+    public string DirectorText { get => _directorText; private set => SetProperty(ref _directorText, value); }
+
+    public string WriterText { get => _writerText; private set => SetProperty(ref _writerText, value); }
+
+    public string ActorsText { get => _actorsText; private set => SetProperty(ref _actorsText, value); }
+
+    public MovieRatingItem SeasonTmdbRating { get => _seasonTmdbRating; private set => SetProperty(ref _seasonTmdbRating, value); }
 
     public string IdentificationStatusText { get => _identificationStatusText; private set => SetProperty(ref _identificationStatusText, value); }
 
@@ -430,6 +498,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isFavorite, value))
             {
                 OnPropertyChanged(nameof(FavoriteButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
                 RaiseSeasonStateCommandCanExecuteChanged();
             }
         }
@@ -443,7 +513,12 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isWantToWatch, value))
             {
                 OnPropertyChanged(nameof(WantToWatchButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
                 RaiseSeasonStateCommandCanExecuteChanged();
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
+                OnPropertyChanged(nameof(WatchedButtonIcon));
             }
         }
     }
@@ -467,6 +542,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isSeasonWatched, value))
             {
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
+                OnPropertyChanged(nameof(WatchedButtonIcon));
                 RaiseSeasonStateCommandCanExecuteChanged();
             }
         }
@@ -479,6 +557,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isSeasonUnwatched, value))
             {
+                OnPropertyChanged(nameof(PreferenceButtonText));
+                OnPropertyChanged(nameof(PreferenceButtonIcon));
                 RaiseSeasonStateCommandCanExecuteChanged();
             }
         }
@@ -487,6 +567,16 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public string FavoriteButtonText => IsFavorite ? "取消喜爱" : "喜爱";
 
     public string WantToWatchButtonText => IsWantToWatch ? "取消想看" : "想看";
+
+    public string PreferenceButtonText => IsSeasonWatched ? FavoriteButtonText : WantToWatchButtonText;
+
+    public string WatchedButtonIcon => IsSeasonWatched ? "\uE711" : "\uE8FB";
+
+    public string PreferenceButtonIcon => IsSeasonWatched
+        ? IsFavorite ? "\uEB52" : "\uEB51"
+        : IsWantToWatch ? "\uE738" : "\uE710";
+
+    public string NotInterestedButtonIcon => "\uE814";
 
     public string NotInterestedButtonText => IsNotInterested ? "取消不想看" : "不想看";
 
@@ -498,16 +588,18 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isVisibleInLibrary, value))
             {
                 OnPropertyChanged(nameof(CanAddSeasonToLibrary));
+                OnPropertyChanged(nameof(AddSeasonToLibraryButtonText));
+                OnPropertyChanged(nameof(AddSeasonToLibraryButtonIcon));
                 AddSeasonToLibraryCommand.RaiseCanExecuteChanged();
             }
         }
     }
 
-    public bool CanAddSeasonToLibrary => HasSeason && !IsVisibleInLibrary;
+    public bool CanAddSeasonToLibrary => HasSeason;
 
-    public string AddSeasonToLibraryButtonText => _libraryVisibilityState == LibraryVisibilityState.Hidden
-        ? "恢复到媒体库"
-        : "加入媒体库";
+    public string AddSeasonToLibraryButtonText => IsVisibleInLibrary ? "移出媒体库" : "加入媒体库";
+
+    public string AddSeasonToLibraryButtonIcon => IsVisibleInLibrary ? "\uE738" : "\uE710";
 
     private LibraryVisibilityState CurrentLibraryVisibilityState
     {
@@ -543,8 +635,10 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             _seriesId = model.SeriesId;
             HasSeason = true;
             SeriesName = model.SeriesName;
+            SeriesOriginalName = string.IsNullOrWhiteSpace(model.SeriesOriginalName) ? "-" : model.SeriesOriginalName;
             Name = model.IsUnidentified ? "未识别电视剧季" : model.Name;
-            Overview = string.IsNullOrWhiteSpace(model.Overview) ? "暂无简介。" : model.Overview;
+            SeasonTitleText = model.IsUnidentified ? "未识别电视剧季" : model.SeasonTitleText;
+            Overview = string.IsNullOrWhiteSpace(model.Overview) ? "暂无简介" : model.Overview;
             PosterDisplayUrl = model.PosterDisplayUrl;
             SeasonNumberText = model.SeasonNumberText;
             AirDateText = model.AirDateText;
@@ -553,6 +647,17 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             SourceSummary = model.SourceSummary;
             ProgressText = model.ProgressText;
             InLibraryText = model.InLibraryText;
+            EpisodeCountText = model.EpisodeCountText;
+            TotalEpisodeCountText = $"{model.TotalEpisodeCount} 集";
+            _totalEpisodeCount = model.TotalEpisodeCount;
+            WatchedCountText = model.WatchedCountText;
+            CountryText = MovieMetadataDisplayText.LocalizeCountries(model.SeriesCountry);
+            LanguageText = MovieMetadataDisplayText.LocalizeLanguages(model.SeriesLanguage);
+            DirectorText = string.IsNullOrWhiteSpace(model.SeriesDirectorText) ? "-" : model.SeriesDirectorText;
+            WriterText = string.IsNullOrWhiteSpace(model.SeriesWriterText) ? "-" : model.SeriesWriterText;
+            ActorsText = string.IsNullOrWhiteSpace(model.SeriesActorsText) ? "-" : model.SeriesActorsText;
+            NetworksText = string.IsNullOrWhiteSpace(model.SeriesNetworksText) ? "未提供" : model.SeriesNetworksText;
+            ProductionCompaniesText = string.IsNullOrWhiteSpace(model.SeriesProductionCompaniesText) ? "未提供" : model.SeriesProductionCompaniesText;
             IdentificationStatusText = model.IdentificationStatusText;
             IsUnidentified = model.IsUnidentified;
             UnidentifiedSummary = model.UnidentifiedSummary;
@@ -668,6 +773,9 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             RefreshSeasonCorrectionMappings(model.CorrectionSources);
             ProgressText = model.ProgressText;
             InLibraryText = model.InLibraryText;
+            EpisodeCountText = model.EpisodeCountText;
+            TotalEpisodeCountText = $"{model.TotalEpisodeCount} 集";
+            WatchedCountText = model.WatchedCountText;
             IsSeasonWatched = model.IsSeasonWatched;
             IsSeasonUnwatched = model.IsSeasonUnwatched;
             IsEpisodeMetadataLoading = false;
@@ -702,6 +810,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         try
         {
             var tmdbRatingDisplay = await _tvDetailQueryService.GetSeasonTmdbRatingDisplayAsync(seasonId, cancellationToken);
+            SeasonTmdbRating = await _tvDetailQueryService.GetSeasonTmdbRatingAsync(seasonId, cancellationToken);
             if (_seasonId == seasonId)
             {
                 SetRatingDisplayParts(
@@ -717,6 +826,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             if (_seasonId == seasonId)
             {
+                SeasonTmdbRating = new MovieRatingItem { SourceName = "TMDB" };
                 SetRatingDisplayParts(SeasonRatingUnavailableText, ImdbRatingLoadingText);
             }
         }
@@ -1288,6 +1398,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         }
     }
 
+    private Task TogglePreferenceAsync()
+    {
+        return IsSeasonWatched ? ToggleFavoriteAsync() : ToggleWantToWatchAsync();
+    }
+
     private async Task ToggleWantToWatchAsync()
     {
         if (!_seasonId.HasValue)
@@ -1335,14 +1450,22 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
         try
         {
-            await _tvSeasonCollectionService.SetWatchedAsync(_seasonId.Value, isWatched, changeSource: "Manual");
+            foreach (var episode in Episodes)
+            {
+                episode.IsWatched = isWatched;
+            }
+
+            RefreshEpisodeAggregateState();
+            await Task.Yield();
+            await Task.Run(
+                () => _tvSeasonCollectionService.SetWatchedAsync(_seasonId.Value, isWatched, changeSource: "Manual"));
             _dataRefreshService.NotifyPlaybackChanged();
             _dataRefreshService.NotifyCollectionChanged();
-            await ActivateAsync();
             StatusMessage = isWatched ? "已标记整季为已看。" : "已标记整季为未看。";
         }
         catch (Exception exception)
         {
+            await ActivateAsync();
             StatusMessage = $"更新整季观看状态失败：{DescribeException(exception)}";
         }
     }
@@ -1356,7 +1479,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
         try
         {
-            if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
+            if (IsVisibleInLibrary)
+            {
+                await _tvSeasonCollectionService.RemoveFromLibraryAsync(_seasonId.Value);
+            }
+            else if (_libraryVisibilityState == LibraryVisibilityState.Hidden)
             {
                 await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(_seasonId.Value);
             }
@@ -1367,7 +1494,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await ActivateAsync();
-            StatusMessage = "已加入媒体库。";
+            StatusMessage = IsVisibleInLibrary ? "已加入媒体库。" : "已移出媒体库。";
         }
         catch (Exception exception)
         {
@@ -1385,14 +1512,18 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
         try
         {
-            await _tvSeasonCollectionService.SetEpisodeWatchedAsync(episode.EpisodeId, isWatched, changeSource: "Manual");
+            episode.IsWatched = isWatched;
+            RefreshEpisodeAggregateState();
+            await Task.Yield();
+            await Task.Run(
+                () => _tvSeasonCollectionService.SetEpisodeWatchedAsync(episode.EpisodeId, isWatched, changeSource: "Manual"));
             _dataRefreshService.NotifyPlaybackChanged();
             _dataRefreshService.NotifyCollectionChanged();
-            await ActivateAsync();
             StatusMessage = $"{episode.EpisodeNumberText} 已标记为{(isWatched ? "已看" : "未看")}。";
         }
         catch (Exception exception)
         {
+            await ActivateAsync();
             StatusMessage = $"更新集观看状态失败：{DescribeException(exception)}";
         }
     }
@@ -1434,6 +1565,26 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             {
                 IsOpeningEpisodePlayer = false;
             }
+        }
+    }
+
+    private void RefreshEpisodeAggregateState()
+    {
+        var watchedCount = Episodes.Count(episode => episode.IsWatched);
+        WatchedCountText = $"{watchedCount}/{_totalEpisodeCount}集";
+        ProgressText = $"已看 {watchedCount} / {_totalEpisodeCount}";
+        IsSeasonWatched = _totalEpisodeCount > 0
+            ? Episodes.Count >= _totalEpisodeCount && watchedCount >= _totalEpisodeCount
+            : Episodes.Count > 0 && watchedCount >= Episodes.Count;
+        IsSeasonUnwatched = watchedCount == 0;
+        if (!IsSeasonWatched)
+        {
+            IsFavorite = false;
+        }
+
+        if (!IsSeasonUnwatched)
+        {
+            IsWantToWatch = false;
         }
     }
 
@@ -1670,6 +1821,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         _seriesId = null;
         HasSeason = false;
         SeriesName = "-";
+        SeriesOriginalName = "-";
+        SeasonTitleText = "未选择电视剧季";
         Name = "未选择电视剧季";
         Overview = "请先选择一个电视剧季。";
         PosterDisplayUrl = string.Empty;
@@ -1682,6 +1835,18 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         SourceSummary = "暂无播放源";
         ProgressText = "已看 0 / 0";
         InLibraryText = "暂无播放源";
+        EpisodeCountText = "-";
+        TotalEpisodeCountText = "-";
+        WatchedCountText = "-";
+        _totalEpisodeCount = 0;
+        CountryText = "-";
+        LanguageText = "-";
+        DirectorText = "-";
+        WriterText = "-";
+        ActorsText = "-";
+        NetworksText = "未提供";
+        ProductionCompaniesText = "未提供";
+        SeasonTmdbRating = new MovieRatingItem { SourceName = "TMDB" };
         IdentificationStatusText = "未加载";
         IsUnidentified = false;
         UnidentifiedSummary = string.Empty;
@@ -1714,6 +1879,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     {
         ToggleFavoriteCommand.RaiseCanExecuteChanged();
         ToggleWantToWatchCommand.RaiseCanExecuteChanged();
+        TogglePreferenceCommand.RaiseCanExecuteChanged();
         ToggleNotInterestedCommand.RaiseCanExecuteChanged();
         MarkSeasonWatchedCommand.RaiseCanExecuteChanged();
         MarkSeasonUnwatchedCommand.RaiseCanExecuteChanged();

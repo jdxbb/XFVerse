@@ -1002,25 +1002,25 @@ public static partial class TvEpisodeFileNameParser
 
     private readonly record struct BracketPart(string Value, int Index, int Length);
 
-    [GeneratedRegex(@"\b[Ss](?<season>\d{1,2})[\s._-]*[Ee](?<episode>\d{1,4})\s*(?:-|~|to)\s*(?:[Ee])?(?<endEpisode>\d{1,3})(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b[Ss](?<season>\d{1,4})[\s._-]*[Ee](?<episode>\d{1,4})\s*(?:-|~|to)\s*(?:[Ee])?(?<endEpisode>\d{1,4})(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex MultiEpisodeTokenRegex();
 
-    [GeneratedRegex(@"\b[Ss](?<season>\d{1,2})[\s._-]*[Ee](?<episode>\d{1,4})[\s._-]*[Ee](?<endEpisode>\d{1,4})(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b[Ss](?<season>\d{1,4})[\s._-]*[Ee](?<episode>\d{1,4})[\s._-]*[Ee](?<endEpisode>\d{1,4})(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex MultiEpisodeCompactRegex();
 
-    [GeneratedRegex(@"\u7b2c\s*(?<season>[0-9一二三四五六七八九十两]{1,4})?\s*\u5b63?\s*\u7b2c?\s*(?<episode>\d{1,4})\s*(?:-|~|\u81f3|\u5230)\s*(?:\u7b2c)?(?<endEpisode>\d{1,3})\s*[\u96c6\u8bdd]", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\u7b2c\s*(?<season>[0-9一二三四五六七八九十两]{1,4})?\s*\u5b63?\s*\u7b2c?\s*(?<episode>\d{1,4})\s*(?:-|~|\u81f3|\u5230)\s*(?:\u7b2c)?(?<endEpisode>\d{1,4})\s*[\u96c6\u8bdd]", RegexOptions.CultureInvariant)]
     private static partial Regex ChineseMultiEpisodeRegex();
 
-    [GeneratedRegex(@"\b[Ss](?<season>\d{1,2})[\s._-]*[Ee](?<episode>\d{1,4})\b", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b[Ss](?<season>\d{1,4})[\s._-]*[Ee](?<episode>\d{1,4})\b", RegexOptions.CultureInvariant)]
     private static partial Regex ExplicitSeasonEpisodeRegex();
 
-    [GeneratedRegex(@"\b(?<season>\d{1,2})x(?<episode>\d{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?<season>\d{1,4})x(?<episode>\d{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex XEpisodeRegex();
 
     [GeneratedRegex(@"\u7b2c\s*(?<season>[0-9一二三四五六七八九十两]{1,4})\s*\u5b63\s*\u7b2c?\s*(?<episode>\d{1,4})\s*[\u96c6\u8bdd]", RegexOptions.CultureInvariant)]
     private static partial Regex ChineseSeasonEpisodeRegex();
 
-    [GeneratedRegex(@"\bSeason\s*(?<season>\d{1,2})\s*Episode\s*(?<episode>\d{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\bSeason\s*(?<season>\d{1,4})\s*Episode\s*(?<episode>\d{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EnglishSeasonEpisodeRegex();
 
     [GeneratedRegex(@"(?:^|[\s._\-\[\(])(?:E|EP)(?<episode>\d{1,4})(?:$|[\s._\-\]\)])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -1038,13 +1038,13 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"^(?=.*[\p{L}\u4e00-\u9fff])(?<title>.+?)(?:[\s._-]+)?(?<episode>\d{1,4})\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex TitleNumberEpisodeRegex();
 
-    [GeneratedRegex(@"^(?=.*[\p{L}\u4e00-\u9fff])(?<title>.+?)\s+(?:[Ss](?<season>\d{1,2})|Season\s*(?<season>\d{1,2}))\s+(?:Pt|Part)\s*(?<part>\d{1,2})\s+(?<episode>\d{1,4})\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(?=.*[\p{L}\u4e00-\u9fff])(?<title>.+?)\s+(?:[Ss](?<season>\d{1,4})|Season\s*(?<season>\d{1,4}))\s+(?:Pt|Part)\s*(?<part>\d{1,2})\s+(?<episode>\d{1,4})\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TitleSeasonPartEpisodeSequenceRegex();
 
     [GeneratedRegex(@"^(?=.*[\p{L}\u4e00-\u9fff])(?<title>.+?)\s+(?:Pt|Part)\s*(?<part>\d{1,2})\s+(?<episode>\d{1,4})\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TitlePartEpisodeSequenceRegex();
 
-    [GeneratedRegex(@"^\s*(?<episode>\d{1,4})[\s._-]+(?<title>.+?)[\s._-]+(?:[Ss](?<season>\d{1,2})|Season[\s._-]*(?<season>\d{1,2}))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s*(?<episode>\d{1,4})[\s._-]+(?<title>.+?)[\s._-]+(?:[Ss](?<season>\d{1,4})|Season[\s._-]*(?<season>\d{1,4}))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex LeadingNumberTitleSequenceRegex();
 
     [GeneratedRegex(@"\b(?:4K|8K|1080P|2160P|720P|480P|UHD|FHD|HDR|HDR10|DV|WEB[-\s]?DL|WEBRIP|BDRIP|BLURAY|HEVC|H\.?265|H\.?264|X264|X265|AAC|AC3|EAC3|DDP\d?|DTS|TRUEHD|ATMOS|FLAC|REMUX|10BIT|8BIT)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -1053,7 +1053,7 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"(?:^|[\s._\-\[\(])(?:cd|disc|disk|part|sample|trailer|teaser|preview|extras?|bonus|featurette)\s*\d*(?:$|[\s._\-\]\)])|\u82b1\u7d6e|\u9884\u544a|\u7279\u5178|\u5e55\u540e|\u8bbf\u8c08|\u6837\u7247|\u7247\u6bb5|(?:^|[\s._\-\[\(])[\u4e0a\u4e0b](?:$|[\s._\-\]\)])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ExcludedEpisodeSequenceTokenRegex();
 
-    [GeneratedRegex(@"\b[Ss](?<season>\d{1,2})\b", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b[Ss](?<season>\d{1,4})\b", RegexOptions.CultureInvariant)]
     private static partial Regex SeasonTokenRegex();
 
     [GeneratedRegex(@"\u7b2c\s*(?<season>[0-9零一二三四五六七八九十两]{1,4})\s*\u5b63(?:\s*\u5168\s*\d{1,3}\s*\u96c6)?", RegexOptions.CultureInvariant)]
@@ -1065,7 +1065,7 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"(?<start>[0-9\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]{1,4})\s*(?:-|~|\u2013|\u2014|\u81f3|\u5230)\s*(?<end>[0-9\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]{1,4})\s*\u5b63", RegexOptions.CultureInvariant)]
     private static partial Regex ChineseSeasonRangeRegex();
 
-    [GeneratedRegex(@"\bSeason\s*(?<season>\d{1,2})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\bSeason\s*(?<season>\d{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EnglishSeasonTokenRegex();
 
     [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|\u3010[^\u3011]+\u3011|\uFF08[^\uFF09]+\uFF09", RegexOptions.CultureInvariant)]
@@ -1092,7 +1092,7 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"(?:字幕组|小组|压制|双语|中字|内封|外挂)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ReleaseNoiseTokenRegex();
 
-    [GeneratedRegex(@"^(?:\u7b2c\s*)?[0-9一二三四五六七八九十两]{1,4}\s*\u5b63(?:\s*\u5168\s*\d{1,3}\s*\u96c6)?$|^(?:Season\s*)?\d{1,2}$|^[Ss]\d{1,2}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(?:\u7b2c\s*)?[0-9一二三四五六七八九十两]{1,4}\s*\u5b63(?:\s*\u5168\s*\d{1,4}\s*\u96c6)?$|^(?:Season\s*)?\d{1,4}$|^[Ss]\d{1,4}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex GenericSeasonOnlyQueryRegex();
 
     [GeneratedRegex(@"^\u5168\s*[0-9\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]{1,4}\s*[\u96c6\u8bdd\u5b63]$", RegexOptions.CultureInvariant)]
@@ -1113,7 +1113,7 @@ public static partial class TvEpisodeFileNameParser
     [GeneratedRegex(@"^(?:part|pt)(?:\d{1,2})?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex StructuralPartTokenRegex();
 
-    [GeneratedRegex(@"^(?:s(?:\d{1,2})?|season(?:\d{1,2})?)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(?:s(?:\d{1,4})?|season(?:\d{1,4})?)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex StructuralSeasonTokenRegex();
 }
 

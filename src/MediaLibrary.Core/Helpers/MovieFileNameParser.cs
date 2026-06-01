@@ -398,7 +398,7 @@ public static partial class MovieFileNameParser
     [GeneratedRegex(@"\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|（[^）]+）|【[^】]+】", RegexOptions.CultureInvariant)]
     private static partial Regex BracketedContentRegex();
 
-    [GeneratedRegex(@"\bS\d{1,2}E\d{1,2}\b|\b\d{1,2}x\d{1,2}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\bS\d{1,4}E\d{1,4}\b|\b\d{1,4}x\d{1,4}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SeasonEpisodeRegex();
 
     [GeneratedRegex(@"-\s*[A-Za-z0-9]+$|\b(?:GROUP|TEAM)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

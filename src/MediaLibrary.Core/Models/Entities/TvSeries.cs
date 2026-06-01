@@ -26,6 +26,18 @@ public sealed class TvSeries
 
     public string? GenresText { get; set; }
 
+    public string? DirectorText { get; set; }
+
+    public string? WriterText { get; set; }
+
+    public string? ActorsText { get; set; }
+
+    public string? ProductionStatus { get; set; }
+
+    public string? NetworksText { get; set; }
+
+    public string? ProductionCompaniesText { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

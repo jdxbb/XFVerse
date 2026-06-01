@@ -64,6 +64,12 @@ public sealed class MovieSourceItem
 
     public string ResolutionShortText => MediaSourceDisplayText.FormatResolutionShortLabel(ResolutionWidth, ResolutionHeight);
 
+    public string ResolutionRawText => MediaSourceDisplayText.FormatRawResolution(ResolutionWidth, ResolutionHeight);
+
+    public string ExtensionDisplayText => string.IsNullOrWhiteSpace(Extension)
+        ? MediaSourceDisplayText.Unknown
+        : Extension.TrimStart('.');
+
     public string VideoCodecText => MediaSourceDisplayText.FormatVideoCodec(VideoCodec);
 
     public string AudioText => MediaSourceDisplayText.FormatAudio(AudioCodec, AudioChannels);
@@ -98,13 +104,20 @@ public sealed class MovieSourceItem
             VideoBitrateKbps,
             AudioBitrateKbps));
 
+    public string ProbeStatusShortText => MediaSourceDisplayText.FormatProbeStatusShort(MediaProbeStatus);
+
     public string ProbeErrorText => MediaSourceDisplayText.FormatProbeError(MediaProbeError);
 
     public string LastPlayedText => MediaSourceDisplayText.FormatDateTime(LastPlayedAt);
 
     public string LastPlayPositionText => MediaSourceDisplayText.FormatDuration(LastPlayPositionSeconds);
 
+    public string LastPlayPositionProgressText =>
+        $"{MediaSourceDisplayText.FormatDuration(LastPlayPositionSeconds)} / {DurationText}";
+
     public string DefaultSourceText => IsDefault ? "默认源" : "播放源";
+
+    public string CorrectionSourceDisplayText => string.IsNullOrWhiteSpace(FilePath) ? FileName : FilePath;
 
     public string PlaybackHistoryText
     {

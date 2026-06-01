@@ -22,6 +22,8 @@ public interface ITvSeasonCollectionService
 
     Task RemoveFromLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default);
 
+    Task RemoveSeriesFromLibraryAsync(int tvSeriesId, CancellationToken cancellationToken = default);
+
     Task AddSeasonToLibraryAsync(int tvSeasonId, CancellationToken cancellationToken = default);
 
     Task AddSeriesToLibraryAsync(int tvSeriesId, CancellationToken cancellationToken = default);

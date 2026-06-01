@@ -633,3 +633,424 @@ Explicit non-goals:
 Suggested commit message:
 
 - `Align movie detail layout with draft`
+
+### 7.3 Follow-up - Movie Detail Structured Layout Polish
+
+Completed:
+
+- Rebuilt the Movie detail top area as a two-column composition: the 2:3 poster remains on the left, while title, original title, release date, runtime, ratings, overview, crew and tags now share one rounded hero background on the right.
+- Kept the poster left edge aligned with the unified back button and aligned the hero background top / bottom edges with the poster.
+- Simplified the title metadata row to original title, `yy-MM-dd` release date and `hh-mm-ss` runtime.
+- Reworked the TMDB / IMDb rating cards into equal-width cards with a source star, centered score / stars area and centered vote-count area.
+- Applied the media-library-style hover-only modern scrollbar to the Movie overview and Movie play-source list.
+- Added hover tooltips for truncated crew values and rendered each genre / emotion / scene tag as an individual rounded chip.
+- Replaced the Movie play-source summary cards with a compact table-like list: fixed headers, centered cells, ellipsis + tooltip fallback, safe path subline, short probe state and per-source last-position / actual-duration display.
+- Reduced each Movie play-source row to one compact separator-delimited line and kept the row actions in one line: play, default, split and probe.
+- Changed the Movie detail primary action area to five evenly distributed buttons spanning from the poster left edge to the hero right edge.
+- Restored a compact detail-route title bar for Movie, Series, Season and Episode detail pages. Detail routes hide the left shell title but keep the right-side theme, minimize, maximize and close buttons.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Full-screen runtime screenshots were captured at `2704x1696` for Movie, Series, Season and Episode detail routes.
+
+Explicit non-goals:
+
+- no scanner, identification, player, subtitle, cache, database schema, migration, database update, commit or push changes;
+- no change to Movie / Episode playback-record synchronization semantics;
+- no change to Series / Season / Episode field semantics beyond restoring the shared compact detail title bar.
+
+Suggested commit message:
+
+- `Polish movie detail layout and detail title bar`
+
+### 7.3 Follow-up - Movie Detail Feedback Closeout
+
+Completed:
+
+- Kept the Movie poster at 2:3 and moved the shared back action into the compact detail title bar for Movie, Series, Season and Episode routes.
+- Slightly increased compact detail title-bar height while preserving caption-button sizes. Removed title-bar hover text from theme, back, minimize, maximize and close actions.
+- Changed Movie release metadata to icon-led `yyyy-MM-dd` and `hh:mm:ss` values.
+- Kept TMDB and IMDb as two fixed rating cards even when a source has no rating. Missing values render as unknown with empty stars.
+- Refined each rating card with a centered source header, a left-side star badge, smaller score / vote typography, a score-vote divider and comma-separated vote counts.
+- Removed the inner border around the Movie overview and widened the right-side crew / tag column.
+- Changed Movie primary actions from equal-width slots to content-sized buttons with more vertical separation from adjacent sections.
+- Moved Movie play-source headers below the section title, removed the video-bitrate column, widened filename and recent-played columns, and kept compact separator-delimited rows.
+- Play-source format now omits the leading dot. Resolution cells render only a short `p` / `K` label while retaining the raw dimensions as the resolution tooltip.
+- Reused `TrimmedTextToolTipBehavior` so Movie crew and ordinary play-source values expose tooltips only when text is actually truncated.
+- Narrowed source-row play, split and probe actions while reserving more width for default-source state.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Full-screen runtime screenshots were captured at `2704x1696` for Movie, Series, Season and Episode detail routes after the title-bar migration.
+
+Explicit non-goals:
+
+- no scanner, identification, player, subtitle, cache, database schema, migration, database update, commit or push changes;
+- no semantic changes to Movie / Episode playback records or default-source selection;
+- no broad Series / Season / Episode visual redesign beyond the shared detail title-bar navigation move.
+
+Suggested commit message:
+
+- `Refine movie detail data layout and title bar navigation`
+
+### 7.3 Follow-up - Detail State Semantics And Episode Layout Closeout
+
+Completed:
+
+- Clarified the product terminology for detail pages: the visible distinction is with-play-source detail versus without-play-source detail. It is not an in-library versus out-of-library distinction. Internal persistence carriers must not leak into UI wording.
+- Reduced Movie detail availability tags to source presence only: with source, no source or unidentified / needs correction. Collection membership remains an independent state.
+- Matched the compact detail title-bar back-button inset to the close-button inset while preserving the shared title-bar behavior on Movie, Series, Season and Episode routes.
+- Narrowed the fixed TMDB / IMDb rating cards, kept equal outer and inner spacing, vertically centered each source title with its star badge and increased the score-vote divider weight.
+- Kept both rating cards visible when values are unavailable. Vote counts use comma grouping.
+- Changed the Movie action row to content-sized, evenly spaced buttons spanning from the poster left edge to the hero-card right edge.
+- Unified the Movie preference action: unwatched records render want / cancel-want, watched records render favorite / cancel-favorite. Watched, want, favorite and not-interested changes retain the documented mutual-exclusion behavior.
+- Updated Movie state glyphs: watched uses check / cross state, favorite uses outline / filled heart state and not-interested uses an exclamation mark.
+- Renamed the Movie and Episode source header to `filename / file path`.
+- Reworked Episode detail against the Movie detail hierarchy while retaining episode-specific fields: 16:9 still image, compact hero information, separate action row and compact source table.
+- Added Episode source short-resolution display, raw-resolution tooltip, short probe state, per-source position / duration text, modern scrollbars, truncated-text tooltips and compact source-row actions.
+- Removed the Episode hero-content overlap found during runtime automation verification by constraining the hero to title, pills, overview and a compact episode-information column.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors after the Episode layout correction.
+- `git diff --check` passed with line-ending warnings only.
+- Migrations diff remained empty.
+- UIAutomation verified Movie compact-title-bar insets, equal Movie action-row spacing, preference-state transitions and Episode content boundaries.
+- UIAutomation verified the Episode overview ended before the standalone action row and the compact source table remained below that row.
+
+Explicit non-goals:
+
+- no scanner, identification, player, subtitle, cache, database schema, migration, database update, commit or push changes;
+- no automatic mapping of internal persistence-carrier differences to visible UI terminology;
+- no schema expansion for favorite persistence on recommendation-only records without a stable Movie carrier.
+
+Known issue:
+
+- A recommendation-only record without a stable Movie carrier can persist want / cancel-want through the existing collection service, but cannot persist favorite after watched without a separate product and schema decision. The UI must not fake that state.
+
+Suggested commit message:
+
+- `Close out detail state semantics and episode layout`
+
+### 7.3 Follow-up - Detail Shell Backdrop And Interaction Polish
+
+Completed:
+
+- Moved the detail ambient treatment from page-local rounded containers to the shared detail-route shell. Movie, Series, Season and Episode details now share one full-window backdrop that covers the compact title bar and content area.
+- Added a cached multi-color poster backdrop pipeline. It samples the current poster or episode still, selects a restrained primary color plus distinct secondary and accent colors, and renders one small static fluid-style bitmap for reuse.
+- Kept the liquid-glass treatment static: the cached bitmap includes soft flow fields and subtle glass highlights, while the compact detail title bar uses a translucent overlay. No frame-by-frame blur, animation or live gradient calculation was added.
+- Removed the page-local ambient rounded backgrounds so the effect no longer reads as another content card.
+- Localized Movie country / region and language display values to Chinese without changing stored metadata.
+- Replaced the Movie not-interested glyph with a Segoe MDL2 exclamation symbol and retained the compact rectangular title / tag chips.
+- Added auto-reveal modern scrollbars for Movie and Episode overview and source lists: scrollbars stay quiet while idle and reveal during scrolling.
+- Kept the Movie action row aligned to the source panel boundaries and preserved equal horizontal spacing.
+- Moved Movie detail state persistence off the UI dispatcher after optimistic state updates. Watched, want-to-watch, favorite and not-interested buttons now provide visible feedback before SQLite persistence finishes, while failures still roll the state back.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Migrations diff remained empty.
+- UIAutomation verified Movie country / region and language display as Chinese, action-row boundary alignment and return-to-home / reopen-detail routing.
+- UIAutomation and a 100 ms post-click capture verified immediate visible feedback for watched, want-to-watch, favorite and not-interested state changes.
+- A full-screen `2704x1696` runtime screenshot verified that the cached detail backdrop covers the title bar and detail content shell rather than creating a page-local rounded background.
+
+Explicit non-goals:
+
+- no live blur, animated background, real-time poster color extraction loop or frame-by-frame gradient calculation;
+- no scanner, identification, player, subtitle, cache schema, database schema, migration, database update, commit or push changes;
+- no broad final UI redesign beyond the detail-route shell and requested Movie / Episode polish.
+
+Suggested commit message:
+
+- `Polish detail shell backdrop and state interactions`
+
+### 7.3 Follow-up - Detail State Cursor Latency Fix And Shared Glass Baseline
+
+Completed:
+
+- Fixed the Movie detail state-button cursor lag after optimistic UI updates. Watched, want-to-watch, favorite and not-interested buttons no longer enter the disabled visual state while their background SQLite persistence is still running.
+- Preserved write safety with a shared in-method persistence guard. Repeated or cross-state clicks during an active state save return immediately instead of issuing concurrent writes.
+- Extended `AsyncRelayCommand` with an opt-in `disableWhileExecuting` switch. Existing commands keep the original disable-while-running behavior by default; only the Movie detail state actions opt out.
+- Added one shared liquid-glass ResourceDictionary baseline with restrained Light / Dark gradients, low-contrast borders, selected-state surfaces and background-bearing button variants.
+- Applied that shared baseline now to Home, Library and the existing Movie, Series, Season and Episode detail pages.
+- Documented the extension rule for later page phases: settings, scan, history, favorites, insights, navigation, popups, dialogs, tags and equivalent rebuilt components must reuse the same shared resources and receive a final Phase 7.8 consistency audit.
+
+Explicit non-goals:
+
+- no broad restyling of pages outside Home, Library and current detail routes;
+- no live blur, animated glass textures or frame-by-frame visual calculations;
+- no database schema, migration, database update, commit or push changes.
+
+Suggested commit message:
+
+- `Add shared glass baseline and fix detail state cursor latency`
+
+### 7.3 Follow-up - TV Detail Alignment And Player Polish
+
+Completed:
+
+- Confirmed that the current liquid-glass palette is an implementation baseline. Final global color balancing remains a Phase 7.8 task.
+- Refined the Movie rating cards: star badge and source title align vertically, score body spacing is slightly lower, the score / vote divider is stronger and hover contrast is clearer.
+- Changed PlayerWindow startup to reuse the existing fullscreen transition path immediately after load. Player caption buttons now match the software title-bar button dimensions.
+- Rebuilt `SeriesOverviewPage` against the Movie detail hierarchy: 2:3 poster, aligned hero card, single-line title / original title, date and season-source summary, fixed TMDB / IMDb cards, scrollable overview and one `电视剧信息` card.
+- Added read-only Series rating lookup through the existing TMDB / OMDb clients. Missing rating values remain visible as unknown values with empty stars.
+- Replaced Series Season cards with compact separator-delimited rows. Each row uses a 2:3 poster, title, overview, date, episode count, progress, source state and detail action.
+- Rebuilt `TvSeasonDetailPage` around a 2:3 poster, single-line title / original title, date / Episode summary, scrollable overview, compact TMDB rating and one `单季信息` card.
+- Moved Season state actions below the hero card and replaced Episode cards with compact separator-delimited rows. Episode rows retain detail and play actions; state mutation remains on the Season-level action row or Episode detail.
+- Reworked `EpisodeDetailPage` with a larger 16:9 still, narrower information card, single-line title, date / runtime metadata, centered compact TMDB rating and a `单集信息` card.
+- Kept Episode play-source rows aligned with the Movie source-table structure and removed the redundant per-source correction action. The page-level correction action remains available.
+- Added read-only TMDB Season and Episode rating lookup using the existing cached TMDB service. No schema or migration change was introduced.
+- Fixed first-open detail interaction latency at the root cause: poster backdrop and poster-shadow cache misses now render off the UI dispatcher, and inactive Home / Recommendation pages no longer refresh hidden data after detail-state persistence.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed repeatedly with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Migrations diff remained empty.
+- Runtime screenshots were intentionally minimized after the Movie detail page became the stable comparison baseline. Final visual acceptance remains manual.
+
+Deferred:
+
+- Series production status, network and production-company values are not stored by the current TV entities. The UI displays unavailable fallback text rather than fabricated data.
+- Final Light / Dark palette tuning, cross-page color balancing and broad liquid-glass consistency audit remain Phase 7.8 work.
+
+Explicit non-goals:
+
+- no database schema, migration, database update, commit or push changes;
+- no scanner, identification, subtitle, recommendation algorithm or cache-management semantic changes;
+- no live blur, animated gradient or frame-by-frame poster-color extraction;
+- no broad player-menu redesign beyond startup fullscreen and caption-button sizing.
+
+Suggested commit message:
+
+- `Align TV detail pages and polish player detail UX`
+
+### 7.3 Follow-up - TV Detail Exact Layout Closeout
+
+Completed:
+
+- Kept the accepted Movie detail page as the stable comparison baseline. Runtime screenshots are no longer repeated when the Movie layout has not changed; new captures are reserved for visual blockers or explicit verification needs.
+- Replaced the Series Season summary rows with the final five-line structure: special / season number, TMDB season name, first-air date, source-bearing episode count and watched summary. Rows keep 2:3 artwork, separator lines, compact detail actions and modern auto-reveal scrolling.
+- Reordered the Series `电视剧信息` card to the final UI hierarchy: production status, production company, broadcast platform, country / region, language, genre, total seasons and total episodes. Missing TV entity fields remain explicit unavailable values.
+- Shortened the Season hero card while keeping the 2:3 poster height. The reserved lower band now contains four evenly distributed Movie-style actions: preference, watched state, not-interested state and season ownership correction.
+- Replaced the Season rating presentation with one short horizontal TMDB card: star / TMDB column, score / stars column and vote-count column separated by stronger dividers.
+- Rebuilt Season Episode rows with a larger episode-number gap, title, two-line overview and fixed-width air-date, source-count, `hh:mm:ss` runtime and last-played fields. Overflow uses trimmed-text tooltips where applicable.
+- Extended the Episode still image to a true 16:9 `520 x 292.5` visual while retaining a shorter `236`-high information card to its right. The lower reserved band now contains the three evenly distributed actions: play default source, watched state and recognition correction.
+- Reused the short horizontal TMDB rating card inside Episode detail, removed the redundant runtime item from the title metadata line and aligned the `单集信息` card with the Season information hierarchy minus aggregate episode counts.
+- Kept Episode playback-source rows structurally aligned with Movie source rows. Per-source correction stays removed; page-level correction remains the single entry.
+- Added only read-only TV presentation fields and cached rating lookups. No scanner, identification, persistence-schema or migration semantics changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Migrations diff remained empty.
+- Static XAML review confirmed the four detail information titles: `电影信息`, `电视剧信息`, `单季信息`, `单集信息`.
+- Runtime screenshots were intentionally not repeated because the accepted Movie detail page remains the comparison baseline and the user requested minimized captures.
+
+Explicit non-goals:
+
+- no live blur, animated gradient or frame-by-frame poster-color extraction;
+- no scanner, identification, subtitle, cache-management or recommendation-algorithm changes;
+- no database schema, migration, database update, commit or push changes.
+
+Suggested commit message:
+
+- `Close out TV detail layouts against movie baseline`
+
+### 7.3 Follow-up - Persisted TV Production Metadata And Library Crew Rows
+
+Completed:
+
+- Added user-approved persisted `TvSeries` metadata for TMDB production status, broadcast platforms / networks and production companies.
+- Added `AddTvSeriesProductionMetadata`; it only adds three nullable `TvSeries` columns and updates the EF snapshot. No database update was executed.
+- Extended TMDB TV Series detail parsing and the existing hydration, scan-identification and unknown-Season correction upsert paths. Placeholder reset paths clear the new values instead of retaining stale identified metadata.
+- Versioned the persistent TMDB TV Series detail cache key to `v2`, so an old cached JSON payload without the new fields cannot suppress the first refresh after upgrade.
+- Updated summary-hydration completeness checks so existing `TvSeries` rows missing the new values are refreshed when the current TMDB payload has them.
+- Replaced Series / Season / Episode detail placeholders with real Series-level production metadata. Season and Episode pages read the owning Series values instead of duplicating them in Season or Episode storage.
+- Updated media-library Movie list rows to read persisted Movie director and actor values. The list title line now separates title from a creator region; inside that region director receives 20% and actors receive 80% of the available width.
+- Director and actor list text uses ellipsis trimming and the existing trimmed-text tooltip behavior. A tooltip appears only when the rendered text is actually truncated.
+
+Not done:
+
+- No TV rating persistence, TV creator / showrunner persistence, new TV detail card, scanner rule change, database update, commit or push was added.
+- No Movie schema change was needed for media-library crew rows because `Movie.DirectorText` and `Movie.ActorsText` already existed.
+
+Validation:
+
+- Pre-migration `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Final `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Migration audit confirmed that `AddTvSeriesProductionMetadata` only adds `NetworksText`, `ProductionCompaniesText` and `ProductionStatus` to `TvSeries`.
+
+Suggested commit message:
+
+- `Persist TV production metadata and show library crew`
+
+### 7.3 Follow-up - Detail Hierarchy, TV State And Layered Glass Closeout
+
+Completed:
+
+- Strengthened the shared liquid-glass baseline for Light and Dark themes with distinct nested-card opacity, edge highlights and bounded static shadows. The blur-like appearance remains resource-driven and cached; no live backdrop blur was added.
+- Made unidentified Movie / Series / Season / Episode details derive their static page backdrop palette from the shared placeholder poster when no real artwork exists. Added larger placeholder labels for detail posters and wide Episode artwork.
+- Corrected Home `片库预览` trend text to `较上月`, kept signs aligned with the actual delta and separated the larger arrow glyph from the value.
+- Aligned rating bodies vertically, split `/` and `10` for baseline alignment and added the sixth Movie action for `加入媒体库 / 移出媒体库`. No-source Movies retain the disabled correction action.
+- Added bounded background Movie-crew hydration for historical library rows missing director / actor metadata. Existing persisted Movie columns are reused; no schema change was introduced.
+- Extended TV-like filename detection from two-digit to four-digit `SxxxxExxxx` compatibility without changing parser priority.
+- Updated Series Season rows to suppress redundant season names, use compact poster depth and avoid focus-driven scroll jumps from the detail button.
+- Updated Season detail so the TMDB card sits above the overview, the right information card scrolls, the action row includes season library visibility, Episode numbers expand for four digits and Episode rows include watched state plus an in-row watched toggle.
+- Fixed manual Season / Episode watched mutation at the service boundary: it no longer writes playback timestamps or progress. Season Episode-row toggles refresh locally instead of clearing and rebuilding the list.
+- Updated Episode detail with a larger 16:9 still, `SxxExx + meaningful title`, series / original-name row, one-line TMDB source header, scrollable production information and the `播放默认源 / 单集识别修正` action wording.
+- Changed series and season library actions to `加入媒体库 / 移出媒体库` toggles using existing hide-only semantics.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed during implementation with 0 warnings and 0 errors.
+- Runtime screenshots were intentionally skipped because the user requested manual visual acceptance and minimized captures.
+
+Explicit non-goals:
+
+- no live blur, animation or frame-by-frame visual calculation;
+- no database update, new migration, commit or push;
+- no player-menu redesign, subtitle change or final cross-page UI rebuild.
+
+Suggested commit message:
+
+- `Polish detail hierarchy and TV state semantics`
+
+### 7.3 Follow-up - Media Library Tag Scope And Search Polish
+
+Completed:
+
+- Reworked the media-library tag menu into `全部 / 电视剧 / 电影`. `全部` clears tag filtering; TV opens its own TMDB genre table; Movie opens the existing type / emotion / scene groups.
+- Added a balanced TV-tag grid layout derived from the actual TV genre count. Tag cells are centered and use visible hover / selected backgrounds.
+- Reused the TMDB TV genre mapping for persisted-name compatibility, including `Sci-Fi & Fantasy -> 科幻奇幻`. Existing media-library rows normalize on load; newly fetched TV details store normalized labels.
+- Added the media-library search placeholder `需要搜索的影视作品名/导演/演员`.
+- Extended submitted media-library search matching from title / original title to persisted director and actor fields.
+
+Not done:
+
+- No schema change, database update, commit or push was added.
+- No fuzzy search, pinyin search or TV cast persistence was added.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Suggested commit message:
+
+- `Polish media library tag filters and search`
+
+### 7.3 Follow-up - Movie Correction Dialog Alignment
+
+Completed:
+
+- Extended the shared `CorrectionDialogShell` with an optional title-adjacent header-content slot. Existing Season / Episode shells keep their page-owned body content; Movie uses the slot for the selected playback source.
+- Rebuilt the Movie correction body as `MovieCorrectionDialogContent`: larger title chrome, file-icon playback-source selector, one rounded correction card, inline status row, clearable placeholder inputs and three target modes.
+- Movie correction results now use compact separator rows with 2:3 poster, internally scrollable overview, compact metadata and `修正为TA / 已为该影片`.
+- TV Episode correction results now use expandable Series / Season rows with right-edge arrows and direct `修正到剧 / 修正到季` actions. The direct actions compose the existing target-selection and existing correction-apply commands; correction service semantics are unchanged.
+- Existing unknown-Season targets now render inline in the same dialog. Selecting a Season and applying the Episode number no longer requires the second picker overlay.
+- Added playback-source switching inside the Movie correction dialog. Opening defaults to the default source when available and switching sources resets candidate state through the existing source-correction entry path.
+
+Known boundary:
+
+- TMDB TV correction candidates do not currently hydrate TV credits, so the TV director field displays `-` rather than fabricated data.
+- The old Movie correction markup remains commented as a short-lived manual comparison reference and should be deleted after acceptance.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- No schema, migration, database update, commit or push change was introduced by this follow-up.
+
+Suggested commit message:
+
+- `Polish movie correction dialog layout`
+
+### 7.3 Follow-up - Detail Regression Fixes And Persisted TV Crew
+
+Completed:
+
+- Brightened the cached multi-color detail backdrop and kept the shared liquid-glass treatment static. No live blur, animated gradient or frame-by-frame palette extraction was added.
+- Versioned poster backdrop and shadow requests. Switching from a recognized detail to an unidentified detail now immediately restores placeholder-poster colors and ignores stale async palette results from the previous poster.
+- Moved large and wide `无海报` detail labels upward while keeping horizontal centering.
+- Unified the Player top-right maximize action with the existing fullscreen route used by the fullscreen button and double click.
+- Delayed Movie / Episode parent `LastPlayedAt` writes until playback progress is actually saved. Opening and closing before progress persistence no longer creates a transient detail-page recent-play value without history.
+- Corrected Movie preference and media-library visibility icons, unidentified Movie tag fallbacks, media-library tag submenu right-side placement and the library search placeholder.
+- Reduced Series Season-list wheel jump by using pixel scrolling, restored Season-row poster depth and aligned Series / Season / Episode detail field groups against the Movie-detail baseline.
+- Fixed Season and Episode-row watched-state local refresh so button text and icons update immediately while persistence runs asynchronously.
+- Added user-approved `TvSeries.DirectorText`, `WriterText` and `ActorsText` persistence with `AddTvSeriesCrewMetadata`.
+- Extended TMDB TV detail requests with `append_to_response=credits`, merged `created_by` and writing crew for writers, persisted the owning-Series crew fields and bumped the TV detail cache schema to `v3`.
+- Projected real TV director / actor values into media-library Series and Season list rows. Existing Movie rows continue to use persisted Movie director / actor values. The list layout now gives director more width and actors less width than the previous 20 / 80 split.
+
+Not done:
+
+- No database update, commit or push was executed.
+- No Season- or Episode-level duplicate crew columns were added.
+- TMDB TV correction-search candidate rows still do not fetch per-result credits; stored Series details are hydrated when entering the recognized detail chain.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors before migration generation.
+- `AddTvSeriesCrewMetadata` only adds nullable `ActorsText`, `DirectorText` and `WriterText` columns to `TvSeries`.
+- `git diff --check` passed with line-ending warnings only.
+
+Suggested commit message:
+
+- `Polish detail regressions and persist TV crew metadata`
+
+### 7.3 Follow-up - Movie Correction Dialog Interaction Closeout
+
+Completed:
+
+- Replaced the movie-correction playback-source font glyph with a vector file icon, so the selector does not depend on a missing symbol font glyph.
+- Aligned the shared correction-dialog close button to the title top edge and increased the close icon size.
+- Applied compact media-library-style input and dropdown sizing to the movie-correction playback-source selector, target selector and query fields.
+- Updated movie and TV query placeholders to `请输入需要搜索的影片名` and `请输入需要搜索的电视剧名`.
+- Mirrored the TMDB search icon horizontally, vertically aligned toolbar icons and replaced the AI lightning glyph with a four-point star.
+- Added one correction busy gate for TMDB and AI-assisted searches. The result area shows a centered spinner while requests are running, TMDB and AI actions cannot run concurrently, and AI requests publish a waiting status before the response arrives.
+- Added bounded candidate-detail enrichment for correction results: Movie loads at most 10 details, TV loads at most 12 details, and both use a concurrency limit of 4. A single detail failure falls back to the search-row projection instead of clearing the whole result list.
+- TV correction candidates now show hydrated director data when available, normalized TV genre text, localized country / region and language text.
+- TV and unknown-Season candidate lists now use pixel scrolling, `特别篇` for Season 0 and the same season-count glyph used by the TV detail pages.
+- Changed Movie-dialog TV result actions from immediate apply to target selection. `确认修正 / 取消` is centered at the bottom only in TV Episode mode.
+- Removed the initial `已选择播放源...` status copy while keeping real request, selection, success and failure status rows.
+- Removed the result-list bottom border so separators only belong to result rows.
+
+Not done:
+
+- No correction-service write semantics, scan rules, schema, migration, database update, commit or push changed in this follow-up.
+- No runtime screenshot was taken; visual acceptance remains manual as requested.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Suggested commit message:
+
+- `Close out movie correction dialog interactions`
+
+### 7.3 Follow-up - Movie Detail Runtime Load Regression Fix
+
+Completed:
+
+- Fixed the Movie-detail runtime XAML crash caused by `CorrectionDialogComboBoxStyle` referencing `ComboBoxStyle` before the later `Inputs.xaml` dictionary had loaded. The correction dropdown now reuses the same `FormComboBoxStyle` base as the media-library compact dropdown.
+- Fixed the Movie-correction candidate overview `Run.Text` binding by making the read-only `OverviewDisplayText` projection explicitly `OneWay`.
+- Added a configurable shared-shell footer gap and set the Movie-correction shell gap to `0`, so a Movie dialog without footer actions keeps the correction card bottom inset aligned with the title top inset.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- A temporary STA runtime probe loaded and laid out `MovieDetailPage` successfully.
+- The same runtime probe loaded and laid out `MovieCorrectionDialogContent` with a Movie candidate successfully, covering the read-only overview binding template.
+
+Not done:
+
+- No correction-service write semantics, scan rules, schema, migration, database update, commit or push changed in this follow-up.
+
+Suggested commit message:
+
+- `Fix movie detail correction runtime load`

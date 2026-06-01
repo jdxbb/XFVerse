@@ -39,7 +39,15 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     x.PosterLocalPath,
                     x.FirstAirDate,
                     x.FirstAirYear,
-                    x.GenresText
+                    x.GenresText,
+                    x.DirectorText,
+                    x.WriterText,
+                    x.ActorsText,
+                    x.ProductionStatus,
+                    x.NetworksText,
+                    x.ProductionCompaniesText,
+                    x.Country,
+                    x.Language
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -59,6 +67,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     x.SeasonNumber,
                     x.TmdbSeasonId,
                     x.Name,
+                    x.Overview,
                     x.PosterRemoteUrl,
                     x.PosterLocalPath,
                     x.AirDate,
@@ -154,6 +163,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         SeasonNumber = season.SeasonNumber,
                         TmdbSeasonId = season.TmdbSeasonId,
                         Name = season.Name,
+                        Overview = season.Overview ?? string.Empty,
                         PosterRemoteUrl = season.PosterRemoteUrl ?? string.Empty,
                         PosterLocalPath = season.PosterLocalPath ?? string.Empty,
                         AirDate = season.AirDate,
@@ -194,9 +204,18 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             FirstAirDate = series.FirstAirDate,
             FirstAirYear = series.FirstAirYear,
             GenresText = series.GenresText ?? string.Empty,
+            DirectorText = series.DirectorText ?? string.Empty,
+            WriterText = series.WriterText ?? string.Empty,
+            ActorsText = series.ActorsText ?? string.Empty,
+            ProductionStatus = series.ProductionStatus ?? string.Empty,
+            NetworksText = series.NetworksText ?? string.Empty,
+            ProductionCompaniesText = series.ProductionCompaniesText ?? string.Empty,
+            Country = series.Country ?? string.Empty,
+            Language = series.Language ?? string.Empty,
             SourceSummary = sourceSummary,
             TotalSeasonCount = seasonItems.Count,
             InLibrarySeasonCount = seasonItems.Count(x => x.InLibraryEpisodeCount > 0),
+            TotalEpisodeCount = seasonItems.Sum(x => x.TotalEpisodeCount),
             Seasons = seasonItems
         };
     }
@@ -226,6 +245,13 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     x.IdentificationStatus,
                     SeriesName = x.Series!.Name,
                     SeriesOriginalName = x.Series.OriginalName,
+                    SeriesCountry = x.Series.Country,
+                    SeriesLanguage = x.Series.Language,
+                    SeriesDirectorText = x.Series.DirectorText,
+                    SeriesWriterText = x.Series.WriterText,
+                    SeriesActorsText = x.Series.ActorsText,
+                    SeriesNetworksText = x.Series.NetworksText,
+                    SeriesProductionCompaniesText = x.Series.ProductionCompaniesText,
                     SeriesTmdbId = x.Series.TmdbSeriesId,
                     SeriesGenresText = x.Series.GenresText,
                     SeriesPosterRemoteUrl = x.Series.PosterRemoteUrl
@@ -353,6 +379,13 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             SeasonNumber = season.SeasonNumber,
             SeriesName = season.SeriesName,
             SeriesOriginalName = season.SeriesOriginalName ?? string.Empty,
+            SeriesCountry = season.SeriesCountry ?? string.Empty,
+            SeriesLanguage = season.SeriesLanguage ?? string.Empty,
+            SeriesDirectorText = season.SeriesDirectorText ?? string.Empty,
+            SeriesWriterText = season.SeriesWriterText ?? string.Empty,
+            SeriesActorsText = season.SeriesActorsText ?? string.Empty,
+            SeriesNetworksText = season.SeriesNetworksText ?? string.Empty,
+            SeriesProductionCompaniesText = season.SeriesProductionCompaniesText ?? string.Empty,
             Name = season.Name,
             Overview = season.Overview ?? string.Empty,
             PosterRemoteUrl = season.PosterRemoteUrl ?? string.Empty,
@@ -412,6 +445,14 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     SeriesId = x.Season.TvSeriesId,
                     SeriesName = x.Season.Series!.Name,
                     SeriesOriginalName = x.Season.Series.OriginalName,
+                    SeriesCountry = x.Season.Series.Country,
+                    SeriesLanguage = x.Season.Series.Language,
+                    SeriesDirectorText = x.Season.Series.DirectorText,
+                    SeriesWriterText = x.Season.Series.WriterText,
+                    SeriesActorsText = x.Season.Series.ActorsText,
+                    SeriesNetworksText = x.Season.Series.NetworksText,
+                    SeriesProductionCompaniesText = x.Season.Series.ProductionCompaniesText,
+                    SeriesGenresText = x.Season.Series.GenresText,
                     SeriesPosterRemoteUrl = x.Season.Series.PosterRemoteUrl
                 })
             .FirstOrDefaultAsync(cancellationToken);
@@ -518,6 +559,14 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             EpisodeNumber = episode.EpisodeNumber,
             SeriesName = episode.SeriesName,
             SeriesOriginalName = episode.SeriesOriginalName ?? string.Empty,
+            SeriesCountry = episode.SeriesCountry ?? string.Empty,
+            SeriesLanguage = episode.SeriesLanguage ?? string.Empty,
+            SeriesDirectorText = episode.SeriesDirectorText ?? string.Empty,
+            SeriesWriterText = episode.SeriesWriterText ?? string.Empty,
+            SeriesActorsText = episode.SeriesActorsText ?? string.Empty,
+            SeriesNetworksText = episode.SeriesNetworksText ?? string.Empty,
+            SeriesProductionCompaniesText = episode.SeriesProductionCompaniesText ?? string.Empty,
+            GenreDisplay = episode.SeriesGenresText ?? string.Empty,
             SeasonName = episode.SeasonName,
             Title = episode.SeasonIdentificationStatus == IdentificationStatus.Failed
                     && IsGenericEpisodeTitle(episode.Title, episode.EpisodeNumber)
@@ -626,6 +675,75 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         {
             return string.Empty;
         }
+    }
+
+    public async Task<IReadOnlyList<MovieRatingItem>> GetSeriesRatingsAsync(
+        int seriesId,
+        CancellationToken cancellationToken = default)
+    {
+        var ratings = new List<MovieRatingItem>();
+        var seriesTmdbId = await LoadSeriesTmdbIdAsync(seriesId, cancellationToken);
+        if (seriesTmdbId is not > 0)
+        {
+            return BuildRatingPair(ratings);
+        }
+
+        var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(seriesTmdbId.Value, cancellationToken: cancellationToken);
+        if (seriesDetails?.TmdbRating is > 0)
+        {
+            ratings.Add(BuildRatingItem("TMDB", seriesDetails.TmdbRating.Value, seriesDetails.TmdbVoteCount));
+        }
+
+        var externalIds = await _tmdbService.GetTvSeriesExternalIdsAsync(seriesTmdbId.Value, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(externalIds?.ImdbId))
+        {
+            var imdbRating = await _omdbService.GetSeriesRatingAsync(externalIds.ImdbId, cancellationToken);
+            if (imdbRating is not null)
+            {
+                ratings.Add(BuildRatingItem("IMDb", imdbRating.ScoreValue, imdbRating.VoteCount, imdbRating.ScoreScale));
+            }
+        }
+
+        return BuildRatingPair(ratings);
+    }
+
+    public async Task<MovieRatingItem> GetSeasonTmdbRatingAsync(
+        int seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        var season = await LoadSeasonRatingKeyAsync(seasonId, cancellationToken);
+        if (season?.SeriesTmdbId is not > 0 || season.SeasonNumber < 0)
+        {
+            return BuildRatingItem("TMDB", 0, null);
+        }
+
+        var details = await _tmdbService.GetTvSeasonDetailsAsync(
+            season.SeriesTmdbId.Value,
+            season.SeasonNumber,
+            cancellationToken: cancellationToken);
+        return details?.TmdbRating is > 0
+            ? BuildRatingItem("TMDB", details.TmdbRating.Value, details.TmdbVoteCount)
+            : BuildRatingItem("TMDB", 0, null);
+    }
+
+    public async Task<MovieRatingItem> GetEpisodeTmdbRatingAsync(
+        int episodeId,
+        CancellationToken cancellationToken = default)
+    {
+        var key = await LoadEpisodeRatingKeyAsync(episodeId, cancellationToken);
+        if (key?.SeriesTmdbId is not > 0 || key.SeasonNumber < 0 || key.EpisodeNumber <= 0)
+        {
+            return BuildRatingItem("TMDB", 0, null);
+        }
+
+        var details = await _tmdbService.GetTvSeasonDetailsAsync(
+            key.SeriesTmdbId.Value,
+            key.SeasonNumber,
+            cancellationToken: cancellationToken);
+        var episode = details?.Episodes.FirstOrDefault(x => x.EpisodeNumber == key.EpisodeNumber);
+        return episode?.TmdbRating is > 0
+            ? BuildRatingItem("TMDB", episode.TmdbRating.Value, episode.TmdbVoteCount)
+            : BuildRatingItem("TMDB", 0, null);
     }
 
     private static bool ResolveIsVisibleInLibrary(
@@ -793,6 +911,57 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    private static async Task<int?> LoadSeriesTmdbIdAsync(int seriesId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        return await dbContext.TvSeries
+            .AsNoTracking()
+            .Where(x => x.Id == seriesId)
+            .Select(x => x.TmdbSeriesId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static async Task<EpisodeRatingKey?> LoadEpisodeRatingKeyAsync(
+        int episodeId,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        return await dbContext.TvEpisodes
+            .AsNoTracking()
+            .Where(x => x.Id == episodeId)
+            .Select(x => new EpisodeRatingKey(
+                x.Season!.Series!.TmdbSeriesId,
+                x.Season.SeasonNumber,
+                x.EpisodeNumber))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static IReadOnlyList<MovieRatingItem> BuildRatingPair(IEnumerable<MovieRatingItem> ratings)
+    {
+        var bySource = ratings
+            .Where(x => !string.IsNullOrWhiteSpace(x.SourceName))
+            .GroupBy(x => x.SourceName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+        return new[] { "TMDB", "IMDb" }
+            .Select(source => bySource.GetValueOrDefault(source) ?? BuildRatingItem(source, 0, null))
+            .ToList();
+    }
+
+    private static MovieRatingItem BuildRatingItem(
+        string sourceName,
+        double scoreValue,
+        int? voteCount,
+        double scoreScale = 10d)
+    {
+        return new MovieRatingItem
+        {
+            SourceName = sourceName,
+            ScoreValue = scoreValue,
+            ScoreScale = scoreScale > 0 ? scoreScale : 10d,
+            VoteCount = voteCount
+        };
+    }
+
     private async Task<string> BuildSeasonTmdbRatingDisplayAsync(
         int? seriesTmdbId,
         int seasonNumber,
@@ -896,4 +1065,6 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
     }
 
     private sealed record SeasonRatingKey(int? SeriesTmdbId, int SeasonNumber);
+
+    private sealed record EpisodeRatingKey(int? SeriesTmdbId, int SeasonNumber, int EpisodeNumber);
 }

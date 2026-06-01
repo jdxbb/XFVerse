@@ -132,6 +132,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.Overview,
                     x.Country,
                     x.Language,
+                    x.DirectorText,
+                    x.ActorsText,
                     x.RuntimeMinutes,
                     x.ImdbId,
                     x.IdentificationStatus,
@@ -261,6 +263,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Overview = x.Overview ?? string.Empty,
                         Country = x.Country ?? string.Empty,
                         Language = x.Language ?? string.Empty,
+                        DirectorText = x.DirectorText ?? string.Empty,
+                        ActorsText = x.ActorsText ?? string.Empty,
                         RuntimeMinutes = x.RuntimeMinutes,
                         ImdbId = x.ImdbId ?? string.Empty,
                         IdentificationStatus = x.IdentificationStatus,
@@ -588,6 +592,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     GenresText = x.Series.GenresText ?? string.Empty,
                     Country = x.Series.Country ?? string.Empty,
                     Language = x.Series.Language ?? string.Empty,
+                    DirectorText = x.Series.DirectorText ?? string.Empty,
+                    ActorsText = x.Series.ActorsText ?? string.Empty,
                     AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
@@ -629,6 +635,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Overview = season.Overview,
                         Country = season.Country,
                         Language = season.Language,
+                        DirectorText = season.DirectorText,
+                        ActorsText = season.ActorsText,
                         IdentificationStatus = season.IdentificationStatus,
                         SourceCount = metrics.SourceCount,
                         ActiveSourceCount = metrics.SourceCount,
@@ -912,6 +920,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.GenresText,
                     x.Country,
                     x.Language,
+                    x.DirectorText,
+                    x.ActorsText,
                     x.CreatedAt,
                     x.UpdatedAt
                 })
@@ -1072,6 +1082,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Overview = series.Overview ?? string.Empty,
                         Country = series.Country ?? string.Empty,
                         Language = series.Language ?? string.Empty,
+                        DirectorText = series.DirectorText ?? string.Empty,
+                        ActorsText = series.ActorsText ?? string.Empty,
                         IdentificationStatus = seasons.Any(x => x.IdentificationStatus == IdentificationStatus.Failed)
                             ? IdentificationStatus.Failed
                             : IdentificationStatus.Matched,
@@ -1130,6 +1142,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     GenresText = x.Series.GenresText ?? string.Empty,
                     Country = x.Series.Country ?? string.Empty,
                     Language = x.Series.Language ?? string.Empty,
+                    DirectorText = x.Series.DirectorText ?? string.Empty,
+                    ActorsText = x.Series.ActorsText ?? string.Empty,
                     AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
@@ -1198,6 +1212,8 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Overview = season.Overview,
                         Country = season.Country,
                         Language = season.Language,
+                        DirectorText = season.DirectorText,
+                        ActorsText = season.ActorsText,
                         IdentificationStatus = season.IdentificationStatus,
                         SourceCount = metrics.SourceCount,
                         ActiveSourceCount = metrics.SourceCount,
@@ -1675,6 +1691,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public string Country { get; set; } = string.Empty;
 
         public string Language { get; set; } = string.Empty;
+
+        public string DirectorText { get; set; } = string.Empty;
+
+        public string ActorsText { get; set; } = string.Empty;
 
         public DateTime? AirDate { get; set; }
 
