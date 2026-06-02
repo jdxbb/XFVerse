@@ -207,6 +207,8 @@ public sealed class TvSeasonCorrectionSourceItem
 
     public string FileName { get; set; } = string.Empty;
 
+    public string FilePath { get; set; } = string.Empty;
+
     public string SourceSummary { get; set; } = string.Empty;
 
     public string EpisodeNumberText => $"E{EpisodeNumber:D2}";
@@ -219,6 +221,8 @@ public sealed class TvSeasonCorrectionSourceItem
             return string.IsNullOrWhiteSpace(name) ? $"MediaFile {MediaFileId}" : name;
         }
     }
+
+    public string SafeFilePath => string.IsNullOrWhiteSpace(FilePath) ? SafeFileName : FilePath;
 }
 
 internal static class TvDetailDisplayText

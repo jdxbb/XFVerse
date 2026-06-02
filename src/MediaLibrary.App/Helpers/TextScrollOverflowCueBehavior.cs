@@ -55,6 +55,7 @@ public static class TextScrollOverflowCueBehavior
             viewer.Loaded += OnViewerLoaded;
             viewer.SizeChanged += OnViewerSizeChanged;
             viewer.ScrollChanged += OnViewerScrollChanged;
+            viewer.LayoutUpdated += OnViewerLayoutUpdated;
             if (viewer.IsLoaded)
             {
                 QueueRefresh(viewer);
@@ -65,6 +66,7 @@ public static class TextScrollOverflowCueBehavior
             viewer.Loaded -= OnViewerLoaded;
             viewer.SizeChanged -= OnViewerSizeChanged;
             viewer.ScrollChanged -= OnViewerScrollChanged;
+            viewer.LayoutUpdated -= OnViewerLayoutUpdated;
             RestoreOriginalClip(viewer);
         }
     }
@@ -93,11 +95,19 @@ public static class TextScrollOverflowCueBehavior
         }
     }
 
+    private static void OnViewerLayoutUpdated(object? sender, EventArgs e)
+    {
+        if (sender is ScrollViewer viewer)
+        {
+            ApplyCue(viewer);
+        }
+    }
+
     private static void QueueRefresh(ScrollViewer viewer)
     {
         _ = viewer.Dispatcher.BeginInvoke(
             () => ApplyCue(viewer),
-            DispatcherPriority.Loaded);
+            DispatcherPriority.Render);
     }
 
     private static void ApplyCue(ScrollViewer viewer)
@@ -114,10 +124,11 @@ public static class TextScrollOverflowCueBehavior
 
         var hasMoreBelow = viewer.ScrollableHeight > 0.5d
                            && viewer.VerticalOffset < viewer.ScrollableHeight - 0.5d;
-        var cueClipHeight = ResolveCueClipHeight(content);
+        var cueVisibleHeight = ResolveCueVisibleHeight(content, viewer);
         var showCue = hasMoreBelow
                       && !ScrollBarAutoRevealBehavior.GetIsRevealed(viewer)
-                      && viewer.ViewportHeight > cueClipHeight;
+                      && cueVisibleHeight > 0d
+                      && viewer.ViewportHeight > cueVisibleHeight;
         if (!showCue)
         {
             RestoreOriginalClip(viewer);
@@ -129,20 +140,24 @@ public static class TextScrollOverflowCueBehavior
                 0d,
                 viewer.VerticalOffset,
                 Math.Max(0d, viewer.ViewportWidth),
-                Math.Max(0d, viewer.ViewportHeight - cueClipHeight)));
+                cueVisibleHeight));
     }
 
-    private static double ResolveCueClipHeight(UIElement content)
+    private static double ResolveCueVisibleHeight(UIElement content, ScrollViewer viewer)
     {
         if (content is not TextBlock textBlock)
         {
-            return DefaultCueClipHeight;
+            return Math.Max(0d, viewer.ViewportHeight - DefaultCueClipHeight);
         }
 
         var lineHeight = double.IsNaN(textBlock.LineHeight)
             ? textBlock.FontFamily.LineSpacing * textBlock.FontSize
             : textBlock.LineHeight;
-        return Math.Max(1d, lineHeight * 0.5d);
+        var halfLineHeight = Math.Max(1d, lineHeight * 0.5d);
+        var visibleBottom = viewer.VerticalOffset + viewer.ViewportHeight;
+        var alignedVisibleBottom =
+            Math.Floor((visibleBottom - halfLineHeight) / lineHeight) * lineHeight + halfLineHeight;
+        return Math.Max(0d, alignedVisibleBottom - viewer.VerticalOffset);
     }
 
     private static void RestoreOriginalClip(ScrollViewer viewer)

@@ -328,7 +328,8 @@
                             <ScrollViewer Grid.Row="2"
                                           HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto"
-                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                          helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                 <ScrollViewer.Resources>
                                     <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SeriesDetailModernScrollBarStyle}" />
                                 </ScrollViewer.Resources>
@@ -420,7 +421,7 @@
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
                          VirtualizingPanel.ScrollUnit="Pixel"
-                         Margin="0,0,-6,0">
+                         Margin="-12,0,-6,0">
                     <ListBox.Resources>
                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SeriesDetailModernScrollBarStyle}" />
                     </ListBox.Resources>
@@ -463,7 +464,7 @@
                             <Grid MinHeight="138" Margin="0,8,14,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="88" />
-                                    <ColumnDefinition Width="4" />
+                                    <ColumnDefinition Width="14" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="110" />
                                 </Grid.ColumnDefinitions>
@@ -489,8 +490,18 @@
                                                helpers:PosterCachedShadowBehavior.ShadowDepth="5"
                                                Stretch="Fill" />
                                     </Canvas>
-                                    <Border Background="{DynamicResource BrushGlassSurface}" CornerRadius="10" ClipToBounds="True" Effect="{StaticResource ShadowCard}">
-                                        <Grid>
+                                    <Border Background="{DynamicResource BrushGlassSurface}"
+                                            CornerRadius="10"
+                                            Effect="{StaticResource ShadowCard}" />
+                                    <Border x:Name="SeasonRowPosterClipMask"
+                                            Background="White"
+                                            CornerRadius="10"
+                                            IsHitTestVisible="False" />
+                                    <Grid>
+                                        <Grid.OpacityMask>
+                                            <VisualBrush Visual="{Binding ElementName=SeasonRowPosterClipMask}" />
+                                        </Grid.OpacityMask>
+                                        <Border Background="{DynamicResource BrushGlassSurface}" />
                                             <Control IsHitTestVisible="False" Template="{StaticResource PosterPlaceholderTemplate}" />
                                             <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="160"
                                                    helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
@@ -510,8 +521,7 @@
                                                     </LinearGradientBrush>
                                                 </Border.Background>
                                             </Border>
-                                        </Grid>
-                                    </Border>
+                                    </Grid>
                                 </Grid>
                                 <StackPanel Grid.Column="2"
                                             Margin="0,2,18,2"

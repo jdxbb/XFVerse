@@ -26,7 +26,10 @@
         <Style x:Key="CorrectionToolbarButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource GlassSecondaryButtonStyle}">
+            <Setter Property="MinHeight" Value="36" />
             <Setter Property="Height" Value="36" />
+            <Setter Property="MaxHeight" Value="36" />
+            <Setter Property="Margin" Value="0" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
@@ -46,13 +49,41 @@
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
         </Style>
 
+        <Style x:Key="CorrectionResultActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource GlassPrimaryButtonStyle}">
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MaxHeight" Value="36" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="CorrectionInlineMetaIconStyle" TargetType="TextBlock">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="-1" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="CorrectionResultItemStyle" TargetType="ListBoxItem">
-            <Setter Property="Padding" Value="0" />
+            <Setter Property="Padding" Value="0,0,10,0" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderThickness" Value="0,1,0,1" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ListBoxItem}">
@@ -138,11 +169,25 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Margin" Value="0,0,-16,0" />
             <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Visible" />
             <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
             <Setter Property="ItemContainerStyle" Value="{StaticResource CorrectionResultItemStyle}" />
+        </Style>
+
+        <Style x:Key="CorrectionMovieResultItemStyle"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource CorrectionResultItemStyle}">
+            <Setter Property="Padding" Value="20,0,10,0" />
+        </Style>
+
+        <Style x:Key="CorrectionMovieResultListStyle"
+               TargetType="ListBox"
+               BasedOn="{StaticResource CorrectionResultListStyle}">
+            <Setter Property="Margin" Value="-20,0,-16,0" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource CorrectionMovieResultItemStyle}" />
         </Style>
 
         <Style x:Key="CorrectionTrimmedTextStyle"
@@ -168,7 +213,7 @@
 
         <Style x:Key="CorrectionNestedRowBorderStyle" TargetType="Border">
             <Setter Property="BorderBrush" Value="{DynamicResource BrushDivider}" />
-            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
         </Style>
 
         <Style x:Key="CorrectionModePanelStyle" TargetType="Grid">
@@ -194,13 +239,13 @@
                                         <Grid Background="Transparent">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="18" />
                                             </Grid.ColumnDefinitions>
                                             <ContentPresenter HorizontalAlignment="Stretch"
                                                               Content="{TemplateBinding Content}" />
                                             <TextBlock x:Name="Arrow"
                                                        Grid.Column="1"
-                                                       Margin="12,0,2,0"
+                                                       HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
                                                        FontFamily="Segoe MDL2 Assets"
                                                        FontSize="12"
@@ -233,6 +278,7 @@
 
     <Border Height="548"
             Padding="16"
+            IsEnabled="{Binding IsCorrectionInteractionEnabled}"
             Style="{StaticResource GlassInlinePanelStyle}">
         <Grid>
             <Grid.RowDefinitions>
@@ -492,7 +538,7 @@
 
                 <ListBox ItemsSource="{Binding SearchCandidates}">
                     <ListBox.Style>
-                        <Style TargetType="ListBox" BasedOn="{StaticResource CorrectionResultListStyle}">
+                        <Style TargetType="ListBox" BasedOn="{StaticResource CorrectionMovieResultListStyle}">
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsCorrectionTargetMovie}" Value="True">
@@ -519,17 +565,42 @@
                                     <ColumnDefinition Width="14" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                 <Border Width="82"
-                                         Height="123"
-                                         VerticalAlignment="Center"
-                                         Background="{DynamicResource BrushGlassSurface}"
-                                         CornerRadius="10"
-                                         ClipToBounds="True"
-                                        Effect="{StaticResource ShadowCard}">
+                                 <Grid Width="82"
+                                       Height="123"
+                                       VerticalAlignment="Center">
+                                    <Canvas ClipToBounds="False" IsHitTestVisible="False">
+                                        <Image x:Name="MovieCandidatePosterPaletteShadowHost"
+                                               Width="122"
+                                               Height="163"
+                                               Canvas.Left="-20"
+                                               Canvas.Top="-20"
+                                               helpers:PosterCachedShadowBehavior.BlurRadius="18"
+                                               helpers:PosterCachedShadowBehavior.CardHeight="123"
+                                               helpers:PosterCachedShadowBehavior.CardWidth="82"
+                                               helpers:PosterCachedShadowBehavior.CornerRadius="10"
+                                               helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                                               helpers:PosterCachedShadowBehavior.Opacity="0.32"
+                                               helpers:PosterCachedShadowBehavior.Padding="20"
+                                               helpers:PosterCachedShadowBehavior.QuantizeColor="True"
+                                               helpers:PosterCachedShadowBehavior.ShadowDepth="5"
+                                               Stretch="Fill" />
+                                    </Canvas>
+                                    <Border Background="{DynamicResource BrushGlassSurface}"
+                                            CornerRadius="10"
+                                            Effect="{StaticResource ShadowCard}" />
+                                    <Border x:Name="MovieCandidatePosterClipMask"
+                                            Background="White"
+                                            CornerRadius="10"
+                                            IsHitTestVisible="False" />
                                     <Grid>
+                                        <Grid.OpacityMask>
+                                            <VisualBrush Visual="{Binding ElementName=MovieCandidatePosterClipMask}" />
+                                        </Grid.OpacityMask>
                                         <Control IsHitTestVisible="False" Template="{StaticResource PosterPlaceholderTemplate}" />
                                          <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="220"
                                                 helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=MovieCandidatePosterPaletteShadowHost}"
+                                                helpers:PosterPaletteShadowBehavior.TargetName="MovieCandidatePosterPaletteShadowHost"
                                                 RenderOptions.BitmapScalingMode="HighQuality"
                                                 Stretch="UniformToFill" />
                                         <Border BorderBrush="#42FFFFFF"
@@ -544,7 +615,7 @@
                                             </Border.Background>
                                         </Border>
                                      </Grid>
-                                 </Border>
+                                 </Grid>
                                  <Grid Grid.Column="2"
                                        Height="123"
                                        VerticalAlignment="Center">
@@ -590,7 +661,7 @@
                                      </StackPanel>
                                      <Grid Margin="0,9,0,0">
                                          <Grid.ColumnDefinitions>
-                                             <ColumnDefinition Width="64" />
+                                             <ColumnDefinition Width="82" />
                                              <ColumnDefinition Width="*" />
                                          </Grid.ColumnDefinitions>
                                          <Grid.RowDefinitions>
@@ -683,44 +754,49 @@
                                                 <RowDefinition Height="7" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
-                                             <StackPanel Orientation="Horizontal">
-                                                 <TextBlock VerticalAlignment="Bottom" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
-                                                 <TextBlock Margin="9,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding OriginalSeriesTitleDisplayText}" />
+                                             <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                                 <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
+                                                 <TextBlock Margin="9,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding OriginalSeriesTitleDisplayText}" />
                                                  <Border Width="1"
                                                          Height="14"
                                                          Margin="12,2,12,0"
                                                          VerticalAlignment="Center"
                                                          Background="{DynamicResource BrushBorder}" />
-                                                 <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
-                                                 <TextBlock Margin="7,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding FirstAirDateDisplayText}" />
-                                                 <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
-                                                 <TextBlock Margin="7,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
+                                                 <Grid Width="16" Height="16" VerticalAlignment="Center">
+                                                     <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE787;" />
+                                                 </Grid>
+                                                 <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding FirstAirDateDisplayText}" />
+                                                 <Grid Width="16" Height="16" Margin="14,0,0,0" VerticalAlignment="Center">
+                                                     <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                                 </Grid>
+                                                 <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
                                              </StackPanel>
                                              <Grid Grid.Row="2">
                                                  <Grid.ColumnDefinitions>
-                                                     <ColumnDefinition Width="130" />
-                                                     <ColumnDefinition Width="1.35*" />
-                                                     <ColumnDefinition Width="1*" />
-                                                     <ColumnDefinition Width="0.86*" />
+                                                        <ColumnDefinition Width="300" />
+                                                        <ColumnDefinition Width="1.74*" />
+                                                        <ColumnDefinition Width="0.58*" />
+                                                        <ColumnDefinition Width="0.58*" />
                                                 </Grid.ColumnDefinitions>
-                                                 <TextBlock Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding DirectorText, StringFormat=导演  {0}}" />
-                                                 <TextBlock Grid.Column="1" Margin="0,0,10,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding GenresDisplayText, StringFormat=类型  {0}}" />
-                                                 <TextBlock Grid.Column="2" Margin="0,0,5,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding CountryDisplayText, StringFormat=国家/地区  {0}}" />
+                                                 <TextBlock Margin="0,0,28,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding DirectorText, StringFormat=导演  {0}}" />
+                                                 <TextBlock Grid.Column="1" Margin="0,0,24,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding GenresDisplayText, StringFormat=类型  {0}}" />
+                                                 <TextBlock Grid.Column="2" Margin="0,0,2,0" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding CountryDisplayText, StringFormat=国家/地区  {0}}" />
                                                  <TextBlock Grid.Column="3" Style="{StaticResource CorrectionTrimmedTextStyle}" Text="{Binding LanguageDisplayText, StringFormat=语言  {0}}" />
                                              </Grid>
                                         </Grid>
                                         <Button Grid.Column="2"
                                                 Width="96"
+                                                Margin="0,0,26,0"
                                                 VerticalAlignment="Center"
                                                 Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Content="修正到剧"
-                                                Style="{StaticResource GlassPrimaryButtonStyle}" />
+                                                Style="{StaticResource CorrectionResultActionButtonStyle}" />
                                     </Grid>
                                 </Expander.Header>
-                                <Border Margin="22,0,26,0"
+                                <Border Margin="22,0,44,0"
                                         BorderBrush="{DynamicResource BrushDivider}"
-                                        BorderThickness="0,1,0,0">
+                                        BorderThickness="0">
                                     <ItemsControl ItemsSource="{Binding Seasons}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -737,10 +813,14 @@
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesAndSeasonTitle}" />
                                                     <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                                                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
-                                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding AirDateDisplayText}" />
-                                                        <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
-                                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding EpisodeCountText}" />
+                                                        <Grid Width="16" Height="16" VerticalAlignment="Center">
+                                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE787;" />
+                                                        </Grid>
+                                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding AirDateDisplayText}" />
+                                                        <Grid Width="16" Height="16" Margin="14,0,0,0" VerticalAlignment="Center">
+                                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                                        </Grid>
+                                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding EpisodeCountText}" />
                                                     </StackPanel>
                                                 </StackPanel>
                                                 <Button Grid.Column="4"
@@ -749,7 +829,7 @@
                                                         Command="{Binding DataContext.SelectTvEpisodeCorrectionTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Content="修正到季"
-                                                        Style="{StaticResource GlassPrimaryButtonStyle}" />
+                                                        Style="{StaticResource CorrectionResultActionButtonStyle}" />
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
@@ -805,14 +885,16 @@
                                     <StackPanel Margin="0,12,0,12"
                                                 VerticalAlignment="Center"
                                                 Orientation="Horizontal">
-                                        <TextBlock VerticalAlignment="Bottom" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
-                                        <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
-                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Bottom" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
+                                        <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
+                                        <Grid Width="16" Height="16" Margin="14,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                        </Grid>
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
                                     </StackPanel>
                                 </Expander.Header>
                                 <Border Margin="22,0,26,0"
                                         BorderBrush="{DynamicResource BrushDivider}"
-                                        BorderThickness="0,1,0,0">
+                                        BorderThickness="0">
                                     <ItemsControl ItemsSource="{Binding Seasons}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -829,8 +911,10 @@
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesAndSeasonTitle}" />
                                                     <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                                                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE8B2;" />
-                                                        <TextBlock Margin="7,0,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SourceCountText}" />
+                                                        <Grid Width="16" Height="16" VerticalAlignment="Center">
+                                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                                        </Grid>
+                                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SourceCountText}" />
                                                     </StackPanel>
                                                 </StackPanel>
                                                 <Button Grid.Column="4"
@@ -839,7 +923,7 @@
                                                         Command="{Binding DataContext.SelectUnknownSeasonTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Content="选择该季"
-                                                        Style="{StaticResource GlassPrimaryButtonStyle}" />
+                                                        Style="{StaticResource CorrectionResultActionButtonStyle}" />
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>

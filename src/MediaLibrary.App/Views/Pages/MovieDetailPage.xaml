@@ -870,7 +870,7 @@
                                         DialogWidth="1180"
                                         DialogMaxHeight="760"
                                         FooterSpacing="0"
-                                        CloseCommand="{Binding CancelCorrectionCommand}"
+                                        CloseCommand="{Binding CloseCorrectionCommand}"
                                         CancelCommand="{Binding CancelCorrectionCommand}">
             <controls:CorrectionDialogShell.HeaderContent>
                 <Grid>
@@ -931,10 +931,16 @@
                         </Canvas>
                     </Viewbox>
                     <ComboBox Grid.Column="2"
+                              IsEnabled="{Binding IsCorrectionInteractionEnabled}"
                               ItemsSource="{Binding Sources}"
                               SelectedItem="{Binding SelectedCorrectionSource, Mode=TwoWay}"
-                              DisplayMemberPath="CorrectionSourceDisplayText"
-                              Style="{StaticResource CorrectionDialogComboBoxStyle}" />
+                              Style="{StaticResource CorrectionDialogComboBoxStyle}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding CorrectionSourceDisplayText}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </Grid>
             </controls:CorrectionDialogShell.HeaderContent>
             <controls:CorrectionDialogShell.DialogContent>
@@ -1273,7 +1279,7 @@
         </controls:CorrectionDialogShell>
 
         <Border Grid.RowSpan="5"
-                Background="#99000000">
+                Background="Transparent">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />

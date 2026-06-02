@@ -33,18 +33,22 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{StaticResource RadiusInput}">
+                            CornerRadius="{StaticResource RadiusInput}"
+                            Padding="{TemplateBinding Padding}">
                         <Grid>
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                            <ScrollViewer x:Name="PART_ContentHost" />
                             <TextBlock x:Name="PlaceholderText"
-                                       Margin="{TemplateBinding Padding}"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource BrushForegroundMuted}"
                                        FontSize="{TemplateBinding FontSize}"
                                        IsHitTestVisible="False"
                                        Opacity="0.68"
                                        Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(helpers:TextBoxPlaceholderBehavior.PlaceholderText)}"
-                                       Visibility="Collapsed" />
+                                       Visibility="Collapsed">
+                                <TextBlock.RenderTransform>
+                                    <TranslateTransform X="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(helpers:TextBoxPlaceholderBehavior.PlaceholderHorizontalOffset)}" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -154,6 +158,7 @@
         <Setter Property="MinHeight" Value="30" />
         <Setter Property="Padding" Value="10,6" />
         <Setter Property="Margin" Value="3,1" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -197,6 +202,7 @@
         <Setter Property="Padding" Value="10,5" />
         <Setter Property="Margin" Value="0" />
         <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="ItemContainerStyle" Value="{StaticResource CorrectionDialogComboBoxItemStyle}" />
         <Setter Property="Template">
@@ -205,7 +211,7 @@
                     <Grid>
                         <Border x:Name="InputChrome"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderBrush="{DynamicResource BrushInputBorder}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12">
                             <Grid>
@@ -229,7 +235,13 @@
                         <ToggleButton Background="Transparent"
                                       BorderThickness="0"
                                       Focusable="False"
-                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                    <Border Background="Transparent" />
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
                         <Popup AllowsTransparency="True"
                                IsOpen="{TemplateBinding IsDropDownOpen}"
                                Placement="Bottom"
@@ -250,12 +262,6 @@
                         </Popup>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="InputChrome" Property="BorderBrush" Value="{DynamicResource BrushInputFocusBorder}" />
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="InputChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="InputChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
                             <Setter TargetName="InputChrome" Property="BorderBrush" Value="{DynamicResource BrushDisabledBorder}" />

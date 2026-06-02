@@ -17,6 +17,7 @@ public sealed class SeasonCorrectionSourceMappingRowViewModel : ObservableObject
         OriginalEpisodeNumber = source.EpisodeNumber;
         OriginalEpisodeNumberText = source.EpisodeNumberText;
         FileName = source.SafeFileName;
+        FilePathDisplay = source.SafeFilePath;
         SourceSummary = source.SourceSummary;
         _targetEpisodeNumberText = source.EpisodeNumber.ToString();
     }
@@ -28,6 +29,8 @@ public sealed class SeasonCorrectionSourceMappingRowViewModel : ObservableObject
     public string OriginalEpisodeNumberText { get; }
 
     public string FileName { get; }
+
+    public string FilePathDisplay { get; }
 
     public string SourceSummary { get; }
 

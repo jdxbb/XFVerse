@@ -1,17 +1,23 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace MediaLibrary.App.Controls;
 
 public partial class CorrectionDialogShell : UserControl
 {
+    private Window? _ownerWindow;
+    private UIElement? _ownerTitleBar;
+    private bool _ownerTitleBarWasHitTestVisible;
+
     public CorrectionDialogShell()
     {
         InitializeComponent();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        LostMouseCapture += OnLostMouseCapture;
     }
 
     public static readonly DependencyProperty IsOpenProperty =
@@ -144,106 +150,175 @@ public partial class CorrectionDialogShell : UserControl
         set => SetValue(FooterSpacingProperty, value);
     }
 
-    private Window? _ownerWindow;
-
     private static void OnIsOpenChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
         if (target is CorrectionDialogShell shell)
         {
-            shell.UpdateModalState((bool)e.NewValue);
+            shell.UpdateOwnerWindowInputBlocker();
         }
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (IsOpen)
-        {
-            UpdateModalState(true);
-        }
+        UpdateOwnerWindowInputBlocker();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
-        DetachOwnerWindow();
+        DetachOwnerWindowInputBlocker();
     }
 
-    private void UpdateModalState(bool isOpen)
+    private void UpdateOwnerWindowInputBlocker()
     {
-        if (!IsLoaded)
+        if (!IsOpen || !IsLoaded)
+        {
+            DetachOwnerWindowInputBlocker();
+            return;
+        }
+
+        var ownerWindow = Window.GetWindow(this);
+        if (ReferenceEquals(ownerWindow, _ownerWindow))
         {
             return;
         }
 
-        if (!isOpen)
-        {
-            DetachOwnerWindow();
-            return;
-        }
-
-        AttachOwnerWindow(Window.GetWindow(this));
-        UpdateOverlayPlacement();
-        _ = Dispatcher.BeginInvoke(
-            () =>
-            {
-                UpdateOverlayPlacement();
-                DialogCard.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
-            },
-            DispatcherPriority.Loaded);
-    }
-
-    private void AttachOwnerWindow(Window? ownerWindow)
-    {
-        if (ReferenceEquals(_ownerWindow, ownerWindow))
-        {
-            return;
-        }
-
-        DetachOwnerWindow();
+        DetachOwnerWindowInputBlocker();
         _ownerWindow = ownerWindow;
         if (_ownerWindow is null)
         {
             return;
         }
 
-        _ownerWindow.LocationChanged += OnOwnerWindowBoundsChanged;
-        _ownerWindow.SizeChanged += OnOwnerWindowBoundsChanged;
-        _ownerWindow.StateChanged += OnOwnerWindowStateChanged;
+        _ownerWindow.AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(OnOwnerWindowPreviewMouseDown), true);
+        _ownerWindow.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(OnOwnerWindowPreviewMouseUp), true);
+        _ownerWindow.AddHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(OnOwnerWindowPreviewMouseMove), true);
+        _ownerWindow.AddHandler(UIElement.PreviewTouchDownEvent, new EventHandler<TouchEventArgs>(OnOwnerWindowPreviewTouchDown), true);
+        _ownerWindow.AddHandler(UIElement.PreviewTouchUpEvent, new EventHandler<TouchEventArgs>(OnOwnerWindowPreviewTouchUp), true);
+        BlockOwnerTitleBarInput();
+        TryCaptureDialogMouse();
+        QueueDialogMouseCapture();
     }
 
-    private void DetachOwnerWindow()
+    private void DetachOwnerWindowInputBlocker()
     {
         if (_ownerWindow is null)
         {
             return;
         }
 
-        _ownerWindow.LocationChanged -= OnOwnerWindowBoundsChanged;
-        _ownerWindow.SizeChanged -= OnOwnerWindowBoundsChanged;
-        _ownerWindow.StateChanged -= OnOwnerWindowStateChanged;
+        _ownerWindow.RemoveHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(OnOwnerWindowPreviewMouseDown));
+        _ownerWindow.RemoveHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(OnOwnerWindowPreviewMouseUp));
+        _ownerWindow.RemoveHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(OnOwnerWindowPreviewMouseMove));
+        _ownerWindow.RemoveHandler(UIElement.PreviewTouchDownEvent, new EventHandler<TouchEventArgs>(OnOwnerWindowPreviewTouchDown));
+        _ownerWindow.RemoveHandler(UIElement.PreviewTouchUpEvent, new EventHandler<TouchEventArgs>(OnOwnerWindowPreviewTouchUp));
+        if (Mouse.Captured is DependencyObject captured && IsDescendantOf(captured, this))
+        {
+            Mouse.Capture(null);
+        }
+
+        RestoreOwnerTitleBarInput();
         _ownerWindow = null;
     }
 
-    private void OnOwnerWindowBoundsChanged(object? sender, EventArgs e)
+    private void BlockOwnerTitleBarInput()
     {
-        UpdateOverlayPlacement();
-    }
-
-    private void OnOwnerWindowStateChanged(object? sender, EventArgs e)
-    {
-        UpdateOverlayPlacement();
-    }
-
-    private void UpdateOverlayPlacement()
-    {
-        if (_ownerWindow is null)
+        if (_ownerWindow?.FindName("ShellTitleBar") is not UIElement titleBar)
         {
             return;
         }
 
-        OverlayPopup.PlacementTarget = _ownerWindow;
-        OverlayPopup.HorizontalOffset = 0d;
-        OverlayPopup.VerticalOffset = 0d;
-        OverlayLayer.Width = Math.Max(1d, _ownerWindow.ActualWidth);
-        OverlayLayer.Height = Math.Max(1d, _ownerWindow.ActualHeight);
+        _ownerTitleBar = titleBar;
+        _ownerTitleBarWasHitTestVisible = titleBar.IsHitTestVisible;
+        titleBar.IsHitTestVisible = false;
+        Mouse.Synchronize();
+        Mouse.UpdateCursor();
+    }
+
+    private void RestoreOwnerTitleBarInput()
+    {
+        if (_ownerTitleBar is null)
+        {
+            return;
+        }
+
+        _ownerTitleBar.IsHitTestVisible = _ownerTitleBarWasHitTestVisible;
+        _ownerTitleBar = null;
+        Mouse.Synchronize();
+        Mouse.UpdateCursor();
+    }
+
+    private void OnOwnerWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        BlockInputOutsideDialog(e);
+    }
+
+    private void OnOwnerWindowPreviewMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        BlockInputOutsideDialog(e);
+    }
+
+    private void OnOwnerWindowPreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        BlockInputOutsideDialog(e);
+    }
+
+    private void OnLostMouseCapture(object sender, MouseEventArgs e)
+    {
+        _ = Dispatcher.BeginInvoke(TryCaptureDialogMouse, DispatcherPriority.Background);
+    }
+
+    private void QueueDialogMouseCapture()
+    {
+        _ = Dispatcher.BeginInvoke(TryCaptureDialogMouse, DispatcherPriority.Loaded);
+        _ = Dispatcher.BeginInvoke(TryCaptureDialogMouse, DispatcherPriority.Input);
+    }
+
+    private void TryCaptureDialogMouse()
+    {
+        if (IsOpen && IsLoaded && Mouse.Captured is null)
+        {
+            if (Mouse.Capture(this, CaptureMode.SubTree))
+            {
+                Mouse.Synchronize();
+            }
+        }
+    }
+
+    private void OnOwnerWindowPreviewTouchDown(object? sender, TouchEventArgs e)
+    {
+        BlockInputOutsideDialog(e);
+    }
+
+    private void OnOwnerWindowPreviewTouchUp(object? sender, TouchEventArgs e)
+    {
+        BlockInputOutsideDialog(e);
+    }
+
+    private void BlockInputOutsideDialog(RoutedEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source || !IsDescendantOf(source, this))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private static bool IsDescendantOf(DependencyObject source, DependencyObject ancestor)
+    {
+        for (var current = source; current is not null; current = GetParent(current))
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetParent(DependencyObject current)
+    {
+        return current is Visual
+            ? VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current)
+            : LogicalTreeHelper.GetParent(current);
     }
 }

@@ -288,6 +288,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                 {
                     x.Id,
                     x.EpisodeNumber,
+                    x.DefaultMediaFileId,
                     x.Title,
                     x.Overview,
                     x.AirDate,
@@ -336,17 +337,11 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             .OrderBy(x => x.EpisodeNumber)
             .ThenBy(x => x.Id)
             .SelectMany(
-                episode => (sourceRowsByEpisode.GetValueOrDefault(episode.Id) ?? [])
-                    .OrderBy(x => x.MediaFileId)
-                    .Select(
-                        source => new TvSeasonCorrectionSourceItem
-                        {
-                            MediaFileId = source.MediaFileId,
-                            EpisodeId = episode.Id,
-                            EpisodeNumber = episode.EpisodeNumber,
-                            FileName = source.FileName,
-                            SourceSummary = TvDetailDisplayText.FormatSourceSummary([source.ProtocolType])
-                        }))
+                episode => BuildSeasonCorrectionSourceItems(
+                    episode.Id,
+                    episode.EpisodeNumber,
+                    episode.DefaultMediaFileId,
+                    sourceRowsByEpisode.GetValueOrDefault(episode.Id) ?? []))
             .ToList();
 
         var totalEpisodeCount = ResolveSeasonProgressTotalEpisodeCount(
@@ -866,6 +861,41 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     ProtocolType = x.SourceConnection!.ProtocolType
                 })
             .ToListAsync(cancellationToken);
+    }
+
+    private static IReadOnlyList<TvSeasonCorrectionSourceItem> BuildSeasonCorrectionSourceItems(
+        int episodeId,
+        int episodeNumber,
+        int? storedDefaultMediaFileId,
+        IReadOnlyList<SourceRow> sources)
+    {
+        var effectiveDefaultMediaFileId = EpisodeSourceSelectionHelper.ResolveDefaultMediaFileId(
+            sources,
+            storedDefaultMediaFileId,
+            preferredMediaFileId: null,
+            source => source.MediaFileId,
+            source => source.ProtocolType,
+            source => source.FilePath,
+            source => source.FileName,
+            _ => null,
+            _ => 0);
+        var source = effectiveDefaultMediaFileId.HasValue
+            ? sources.FirstOrDefault(item => item.MediaFileId == effectiveDefaultMediaFileId.Value)
+            : null;
+        return source is null
+            ? []
+            :
+            [
+                new TvSeasonCorrectionSourceItem
+                {
+                    MediaFileId = source.MediaFileId,
+                    EpisodeId = episodeId,
+                    EpisodeNumber = episodeNumber,
+                    FileName = source.FileName,
+                    FilePath = source.FilePath,
+                    SourceSummary = TvDetailDisplayText.FormatSourceSummary([source.ProtocolType])
+                }
+            ];
     }
 
     private static string FirstNonEmpty(params string?[] values)

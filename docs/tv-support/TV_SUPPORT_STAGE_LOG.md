@@ -69,6 +69,113 @@ Verification:
 - STA runtime instantiation passed for Movie, Series, Season, and Episode detail pages.
 - Current migrations diff remained empty.
 
+### TV Detail Visual Regression Follow-up
+
+Completed:
+
+- Reverted the shared correction shell from a cross-window `Popup` overlay to the stable detail-page overlay after manual UI feedback showed abnormal correction-window rendering.
+- Series detail Season-row posters now clip real posters and placeholders through a rounded mask while preserving left/top shadow space. The visible poster edge remains aligned with the `Season` heading.
+- Season detail single-season information now uses the same overflow cue as other hidden-scrollbar text surfaces.
+- Episode detail air-date icon and text now share the series-name baseline and color; the icon is vertically centered inside a date-line-height container.
+
+Not done:
+
+- No TV matching rule, correction transaction, scan rule, schema migration, database update, commit, or push was changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+- Current migrations diff remained empty.
+
+### TV Detail Follow-up - Season and Episode correction dialog closeout
+
+Completed:
+
+- Episode correction now reuses the same modern correction content as Movie correction while keeping Episode-specific correction commands and data semantics. Its dialog title is `单集修正识别`.
+- Added a dedicated modern Season correction content surface titled `单季修正识别`. It provides only `修正为季` and `加入到已有未识别季`, removes the per-file header row, and keeps Season correction transactions on the existing service boundary.
+- Added the `目标集号映射` child dialog for both Season correction modes. The transparent child-dialog blocker disables the underlying Season-correction form for both mouse and keyboard input while preserving the mapping inputs. The list uses modern auto-reveal scrollbars, separator-only rows aligned to the child-dialog content bounds, current Episode number, trimmed full source path with overflow-only tooltip, target Episode number input, and evenly distributed confirm / cancel actions.
+- Mapping edits are transactional at the child-dialog level: confirm keeps the edited Episode-number mapping, while cancel and the top-right close action restore the snapshot captured when the mapping dialog opened.
+- Season correction source projection now resolves one effective default source per Episode. A stored usable default source wins; otherwise the existing stable source-selection helper provides a deterministic fallback. The Season dialog does not expose per-Episode source selection.
+- Movie, Episode, and Season correction AI assist requests now have detachable cancellation tokens. Closing an active dialog cancels and detaches its AI request before clearing dialog state, preventing stale loading state or stale completion messages from leaking into a reopened dialog.
+- AI cancellation is also propagated through the follow-up TMDB candidate search and detail hydration path. Candidate collections recheck cancellation before UI write-back so a detached request cannot repopulate a closed or reopened dialog.
+- AI loading disables correction inputs, dropdowns, and in-dialog cancel actions while leaving the top-right close action available for cancellation. Season busy-state changes explicitly notify the interaction-enabled binding so the disable state is applied immediately.
+- No schema migration, database update, commit, or push was performed.
+
+Not done:
+
+- No correction transaction semantics, scan recognition threshold, automatic binding rule, Watch Insights input, recommendation input, or media-library projection semantics were broadened.
+- Runtime UI acceptance was intentionally not executed in this pass; only static inspection and build verification were performed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` reported no whitespace errors; only existing CRLF conversion warnings remain.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` remained empty.
+
+Known Issues:
+
+- Blocker: none found by static inspection and build verification.
+- Deferred: runtime visual acceptance remains required for pixel-level alignment, initial title-bar hover blocking, and immediate close / reopen behavior while an AI request is active.
+- Noise: Windows line-ending warnings remain in `git diff --check`.
+
+### TV Detail Visual Regression Follow-up 2
+
+Completed:
+
+- Series and season overview text cues now align their idle clip to a half-line boundary, while the single-season information card keeps the same overflow cue behavior.
+- Series detail Season rows keep the poster body aligned with the `Season` heading while increasing the gap between the poster right edge and the metadata column.
+- Correction dialogs now use an invisible interaction-blocking layer instead of a tinted overlay.
+- TV episode and existing unknown-season correction result groups keep stable expand-arrow positions, use non-overlapping nested separators, and align metadata icons with their adjacent text.
+- Switching the active correction playback source preserves TV episode and existing unknown-season search results and keeps the active correction mode.
+
+Not done:
+
+- No correction transaction, TV scan recognition rule, schema migration, database update, commit, or push was added.
+- Runtime UI acceptance was not executed in this pass.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` reported no whitespace errors; existing CRLF conversion warnings remain.
+- Current migrations diff remained empty.
+
+### TV Detail Visual Regression Follow-up 3
+
+Completed:
+
+- The season information card no longer uses the half-line overflow cue. The upper season-detail hero area gained one text-line of height and moved upward by half of that increment; the overview card grows with it and keeps the overflow cue.
+- Correction dialogs block host-window title-bar mouse and touch input while open without drawing a tinted overlay. Immediate and deferred subtree capture now synchronize WPF mouse state after capture, and the dialog shell uses an explicit neutral arrow cursor, so title-bar hover visuals and gestures from the opening frame are cleared.
+- TV episode and existing unknown-season correction result lists reserve a transparent scrollbar slot so expanding a group does not shift arrows or action buttons.
+- Result rows draw their own top and bottom separators. TV group and nested-row icons use fixed-height containers with centered glyphs, and group / nested actions share the same right alignment baseline.
+- Switching the active correction playback source preserves the current status text in addition to preserving the active mode and candidate collections.
+
+Not done:
+
+- No correction transaction, TV scan recognition rule, schema migration, database update, commit, or push was added.
+- Runtime UI acceptance was not executed in this pass.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` reported no whitespace errors; existing CRLF conversion warnings remain.
+- Current migrations diff remained empty.
+- No final application runtime UI acceptance was performed. The earlier overlay diagnostic entry point was stopped and removed.
+
+### TV Detail Visual Regression Follow-up 4
+
+Completed:
+
+- Increased the Season-detail Hero region by one complete metadata row. The right single-season information card and the left overview region now grow together by 20 px and shift upward together by 10 px, while the overview keeps its half-line overflow cue.
+- Standardized correction-result TV metadata icons in fixed 16 px containers with a small visual baseline correction. Date, season-count, and source-count text keep their bottom alignment.
+- Expanded the TV correction director and genre columns so country / region and language metadata start farther to the right.
+- Standardized `修正到剧`, `修正到季`, and `选择该季` action heights at 36 px. The nested TV season rows compensate for the fixed arrow lane so the series and season action right edges align.
+- Preserved poster-position invariants for movie correction candidates: the new left shadow safe area expands the list lane and offsets its content by the same amount, so the poster body does not move.
+
+Not done:
+
+- No recognition rule, correction transaction, media-library semantic, schema migration, database update, commit, or push was added.
+
 ### Movie Correction Dialog Follow-up - Bounded TV Candidate Details
 
 Completed:
@@ -3792,3 +3899,26 @@ Not done:
 Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+### Phase 4 TV correction dialog visual closure
+
+Completed:
+
+- Kept the Season detail Hero outer height and poster baselines unchanged. Only the symmetric vertical inner padding is reduced so the single-Season information area can show its complete rows without applying the half-line text cue.
+- Added explicit host title-bar hit-test suppression while a correction dialog is open, with restoration on close. This complements subtree mouse capture and prevents stale title-bar hover and cursor visuals on first open.
+- Removed the remaining tinted legacy unknown-Season picker overlay from Movie detail; correction overlays now keep transparent input blockers.
+- Applied a fixed `-1px` visual baseline correction to TV candidate calendar and media glyphs in Movie, Episode, and Season correction content.
+- Expanded the TV candidate director column and shifted the genre column right to preserve a clearer director-to-genre gap.
+- Confirmed Movie, Episode, and Season AI correction flows cancel active requests before close and disable form interaction while AI work is active.
+- Confirmed Episode correction reuses the Movie correction visual content, while Season correction keeps one default source per episode and uses the shared target episode mapping dialog for both supported modes.
+
+Not done:
+
+- No runtime UI test was executed in this pass.
+- No scan rule, media-library semantic, correction transaction boundary, schema migration, database update, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with existing CRLF conversion notices only.
+- Current migrations diff remained empty.

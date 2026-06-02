@@ -186,6 +186,8 @@ public sealed class TvEpisodeSourceItem
 
     public string LocationText => MediaSourceDisplayText.FormatSafeLocation(ProtocolType, FilePath, RemoteUri);
 
+    public string CorrectionSourceDisplayText => string.IsNullOrWhiteSpace(FilePath) ? DisplayFileName : FilePath;
+
     public string FormattedFileSize => MediaSourceDisplayText.FormatFileSize(FileSize);
 
     public string DurationText => MediaSourceDisplayText.FormatDuration(DurationSeconds);

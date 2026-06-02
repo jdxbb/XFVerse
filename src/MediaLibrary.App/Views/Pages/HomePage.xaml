@@ -1095,7 +1095,9 @@
                                                               HorizontalScrollBarVisibility="Disabled"
                                                               Loaded="ReasonScrollViewer_Loaded"
                                                               Unloaded="ReasonScrollViewer_Unloaded"
-                                                              ScrollChanged="ReasonScrollViewer_ScrollChanged">
+                                                              ScrollChanged="ReasonScrollViewer_ScrollChanged"
+                                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                                              helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                                     <ScrollViewer.Resources>
                                                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource HomeReasonScrollBarStyle}" />
                                                     </ScrollViewer.Resources>

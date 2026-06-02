@@ -194,7 +194,7 @@
                     <RowDefinition Height="44" />
                 </Grid.RowDefinitions>
 
-                <Border Style="{StaticResource HeroCardStyle}">
+                <Border Padding="28,14" Style="{StaticResource HeroCardStyle}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -202,7 +202,7 @@
                             <ColumnDefinition Width="390" />
                         </Grid.ColumnDefinitions>
 
-                        <Grid>
+                        <Grid Margin="0,2" VerticalAlignment="Stretch">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="10" />
@@ -290,7 +290,7 @@
                             </Grid>
                         </Grid>
 
-                        <Border Grid.Column="2" Padding="10" Style="{StaticResource GlassPageCardStyle}">
+                        <Border Grid.Column="2" Margin="0,2" Padding="10" VerticalAlignment="Stretch" Style="{StaticResource GlassPageCardStyle}">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
@@ -594,13 +594,16 @@
         </Border>
 
         <controls:CorrectionDialogShell Grid.RowSpan="3"
-                                        DialogWidth="880"
-                                        DialogMaxHeight="700"
+                                        DialogWidth="1180"
+                                        DialogMaxHeight="760"
                                         IsOpen="{Binding IsSeasonCorrectionPanelOpen}"
-                                        Title="季级识别修正"
-                                        Summary="修正只移动当前季已有播放源，不删除本地文件、WebDAV 文件或真实媒体源，也不会自动补空集。"
-                                        CloseCommand="{Binding CancelSeasonCorrectionCommand}"
+                                        Title="单季修正识别"
+                                        Summary=""
+                                        StatusText=""
+                                        FooterSpacing="0"
+                                        CloseCommand="{Binding CloseSeasonCorrectionCommand}"
                                         UseDefaultActions="False">
+            <!-- Legacy footer retained temporarily as a source comparison during manual UI acceptance.
             <controls:CorrectionDialogShell.FooterContent>
                 <WrapPanel HorizontalAlignment="Right">
                     <Button Margin="0,0,8,0"
@@ -612,8 +615,11 @@
                             Style="{StaticResource GlassSecondaryButtonStyle}" />
                 </WrapPanel>
             </controls:CorrectionDialogShell.FooterContent>
+            -->
             <controls:CorrectionDialogShell.DialogContent>
                 <Grid>
+                    <controls:SeasonCorrectionDialogContent />
+                    <!-- Legacy correction content retained temporarily as a source comparison during manual UI acceptance.
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="330" />
                                 <ColumnDefinition Width="22" />
@@ -754,11 +760,12 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
+                    -->
                 </Grid>
             </controls:CorrectionDialogShell.DialogContent>
         </controls:CorrectionDialogShell>
 
-        <Border Grid.RowSpan="3" Background="#99000000">
+        <Border Grid.RowSpan="3" Visibility="Collapsed" Background="Transparent">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -903,7 +910,7 @@
             </Border>
         </Border>
 
-        <Border Grid.RowSpan="3" Background="#99000000">
+        <Border Grid.RowSpan="3" Visibility="Collapsed" Background="Transparent">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />

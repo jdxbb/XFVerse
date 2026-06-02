@@ -7,6 +7,8 @@ namespace MediaLibrary.App.Helpers;
 
 public static class TextBoxPlaceholderBehavior
 {
+    private const double DefaultPlaceholderHorizontalOffset = 2d;
+
     public static readonly DependencyProperty IsEnabledProperty =
         DependencyProperty.RegisterAttached(
             "IsEnabled",
@@ -30,6 +32,16 @@ public static class TextBoxPlaceholderBehavior
 
     public static readonly DependencyProperty IsPlaceholderVisibleProperty =
         IsPlaceholderVisiblePropertyKey.DependencyProperty;
+
+    private static readonly DependencyPropertyKey PlaceholderHorizontalOffsetPropertyKey =
+        DependencyProperty.RegisterAttachedReadOnly(
+            "PlaceholderHorizontalOffset",
+            typeof(double),
+            typeof(TextBoxPlaceholderBehavior),
+            new PropertyMetadata(DefaultPlaceholderHorizontalOffset));
+
+    public static readonly DependencyProperty PlaceholderHorizontalOffsetProperty =
+        PlaceholderHorizontalOffsetPropertyKey.DependencyProperty;
 
     private static readonly DependencyProperty IsImeCompositionActiveProperty =
         DependencyProperty.RegisterAttached(
@@ -63,6 +75,11 @@ public static class TextBoxPlaceholderBehavior
         return (bool)target.GetValue(IsPlaceholderVisibleProperty);
     }
 
+    public static double GetPlaceholderHorizontalOffset(DependencyObject target)
+    {
+        return (double)target.GetValue(PlaceholderHorizontalOffsetProperty);
+    }
+
     private static void OnIsEnabledChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
         if (target is not TextBox textBox)
@@ -73,21 +90,43 @@ public static class TextBoxPlaceholderBehavior
         if ((bool)e.NewValue)
         {
             textBox.TextChanged += OnTextChanged;
+            textBox.Loaded += OnLoaded;
+            textBox.SizeChanged += OnSizeChanged;
             textBox.LostKeyboardFocus += OnLostKeyboardFocus;
             textBox.PreviewTextInput += OnPreviewTextInput;
             TextCompositionManager.AddPreviewTextInputStartHandler(textBox, OnPreviewTextInputStart);
             TextCompositionManager.AddPreviewTextInputUpdateHandler(textBox, OnPreviewTextInputUpdate);
             UpdatePlaceholderVisibility(textBox);
+            QueuePlaceholderAlignment(textBox);
         }
         else
         {
             textBox.TextChanged -= OnTextChanged;
+            textBox.Loaded -= OnLoaded;
+            textBox.SizeChanged -= OnSizeChanged;
             textBox.LostKeyboardFocus -= OnLostKeyboardFocus;
             textBox.PreviewTextInput -= OnPreviewTextInput;
             TextCompositionManager.RemovePreviewTextInputStartHandler(textBox, OnPreviewTextInputStart);
             TextCompositionManager.RemovePreviewTextInputUpdateHandler(textBox, OnPreviewTextInputUpdate);
             textBox.ClearValue(IsImeCompositionActiveProperty);
             textBox.ClearValue(IsPlaceholderVisiblePropertyKey);
+            textBox.ClearValue(PlaceholderHorizontalOffsetPropertyKey);
+        }
+    }
+
+    private static void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            QueuePlaceholderAlignment(textBox);
+        }
+    }
+
+    private static void OnSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            QueuePlaceholderAlignment(textBox);
         }
     }
 
@@ -143,6 +182,28 @@ public static class TextBoxPlaceholderBehavior
                 UpdatePlaceholderVisibility(textBox);
             },
             DispatcherPriority.Input);
+    }
+
+    private static void QueuePlaceholderAlignment(TextBox textBox)
+    {
+        _ = textBox.Dispatcher.BeginInvoke(
+            () => UpdatePlaceholderAlignment(textBox),
+            DispatcherPriority.Loaded);
+    }
+
+    private static void UpdatePlaceholderAlignment(TextBox textBox)
+    {
+        if (!textBox.IsLoaded)
+        {
+            return;
+        }
+
+        var caretRect = textBox.GetRectFromCharacterIndex(0);
+        var contentInset = textBox.BorderThickness.Left + textBox.Padding.Left;
+        var horizontalOffset = caretRect.IsEmpty
+            ? DefaultPlaceholderHorizontalOffset
+            : Math.Max(0d, caretRect.Left - contentInset);
+        textBox.SetValue(PlaceholderHorizontalOffsetPropertyKey, horizontalOffset);
     }
 
     private static void UpdatePlaceholderVisibility(TextBox textBox)

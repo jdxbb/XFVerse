@@ -506,7 +506,8 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0"
+            <Border x:Name="ShellTitleBar"
+                    Grid.Row="0"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
                     MouseLeftButtonUp="TitleBar_MouseLeftButtonUp"
                     MouseMove="TitleBar_MouseMove">

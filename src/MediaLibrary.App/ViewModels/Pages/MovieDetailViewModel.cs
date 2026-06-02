@@ -108,6 +108,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _hasCorrectionPreview;
     private bool _isCorrectionBusy;
     private bool _isUnknownSeasonPickerDialogOpen;
+    private CancellationTokenSource? _correctionAiCancellation;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
 
     public MovieDetailViewModel(
@@ -149,7 +150,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         CloseUnknownSeasonPickerCommand = new RelayCommand(CloseUnknownSeasonPicker, () => IsUnknownSeasonPickerDialogOpen);
         SelectUnknownSeasonTargetCommand = new RelayCommand(SelectUnknownSeasonTarget, CanSelectUnknownSeasonTarget);
         ApplyUnknownSeasonCorrectionCommand = new AsyncRelayCommand(ApplyUnknownSeasonCorrectionAsync, CanApplyUnknownSeasonCorrection);
-        CancelCorrectionCommand = new RelayCommand(CancelCorrection, () => IsCorrectionPanelVisible);
+        CancelCorrectionCommand = new RelayCommand(CancelCorrection, () => IsCorrectionPanelVisible && !IsCorrectionBusy);
+        CloseCorrectionCommand = new RelayCommand(CloseCorrection, () => IsCorrectionPanelVisible);
         OpenCorrectionDialogCommand = new RelayCommand(OpenDefaultSourceCorrection, () => CanUseIdentificationCorrection);
         SetDefaultSourceCommand = new AsyncRelayCommand(SetDefaultSourceAsync);
         ResetSourceRecognitionCommand = new AsyncRelayCommand(ResetSourceRecognitionAsync, CanResetSourceRecognition);
@@ -221,6 +223,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     public AsyncRelayCommand ApplyUnknownSeasonCorrectionCommand { get; }
 
     public RelayCommand CancelCorrectionCommand { get; }
+
+    public RelayCommand CloseCorrectionCommand { get; }
 
     public RelayCommand OpenCorrectionDialogCommand { get; }
 
@@ -534,9 +538,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 SelectUnknownSeasonTargetCommand.RaiseCanExecuteChanged();
                 ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
                 AiSuggestSearchCommand.RaiseCanExecuteChanged();
+                CancelCorrectionCommand.RaiseCanExecuteChanged();
+                CloseCorrectionCommand.RaiseCanExecuteChanged();
+                OnPropertyChanged(nameof(IsCorrectionInteractionEnabled));
             }
         }
     }
+
+    public bool IsCorrectionInteractionEnabled => !IsCorrectionBusy;
 
     public bool HasMovie
     {
@@ -1994,8 +2003,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         var targetKind = IsCorrectionTargetTvEpisode ? "tv-episode" : "movie";
+        var mediaFileId = _correctionMediaFileId;
+        CancelCorrectionAiRequest();
+        var cancellation = new CancellationTokenSource();
+        _correctionAiCancellation = cancellation;
         ScanIdentificationDiagnostics.Write(
-            $"event=single-source-correction-ai-assist-started page=movie targetKind={targetKind} mediaFileId={_correctionMediaFileId}");
+            $"event=single-source-correction-ai-assist-started page=movie targetKind={targetKind} mediaFileId={mediaFileId}");
 
         try
         {
@@ -2006,32 +2019,48 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             await Task.Yield();
             if (IsCorrectionTargetTvEpisode)
             {
-                await AiSuggestTvSearchAsync();
+                await AiSuggestTvSearchAsync(cancellation.Token);
             }
             else
             {
-                await AiSuggestMovieSearchAsync();
+                await AiSuggestMovieSearchAsync(cancellation.Token);
             }
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "AI 辅助搜索已取消。";
+            if (ReferenceEquals(_correctionAiCancellation, cancellation) && IsCorrectionPanelVisible)
+            {
+                StatusMessage = "AI 辅助搜索已取消。";
+            }
             ScanIdentificationDiagnostics.Write(
-                $"event=single-source-correction-ai-assist-failed page=movie targetKind={targetKind} mediaFileId={_correctionMediaFileId} reason=cancelled");
+                $"event=single-source-correction-ai-assist-failed page=movie targetKind={targetKind} mediaFileId={mediaFileId} reason=cancelled");
         }
         catch (Exception exception)
         {
-            StatusMessage = $"AI 辅助搜索失败：{DescribeException(exception)}";
+            if (ReferenceEquals(_correctionAiCancellation, cancellation))
+            {
+                StatusMessage = $"AI 辅助搜索失败：{DescribeException(exception)}";
+            }
             ScanIdentificationDiagnostics.Write(
-                $"event=single-source-correction-ai-assist-failed page=movie targetKind={targetKind} mediaFileId={_correctionMediaFileId} reason=exception");
+                $"event=single-source-correction-ai-assist-failed page=movie targetKind={targetKind} mediaFileId={mediaFileId} reason=exception");
         }
         finally
         {
-            IsCorrectionBusy = false;
+            var isCurrentRequest = ReferenceEquals(_correctionAiCancellation, cancellation);
+            if (isCurrentRequest)
+            {
+                _correctionAiCancellation = null;
+            }
+
+            cancellation.Dispose();
+            if (isCurrentRequest)
+            {
+                IsCorrectionBusy = false;
+            }
         }
     }
 
-    private async Task AiSuggestMovieSearchAsync()
+    private async Task AiSuggestMovieSearchAsync(CancellationToken cancellationToken)
     {
         var releaseYear = int.TryParse(ManualSearchYear, out var parsedYear) ? parsedYear : (int?)null;
         var suggestionResult = await _aiClassificationService.SuggestMovieCorrectionSearchQueryAsync(
@@ -2039,7 +2068,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             _correctionSourceFileName,
             releaseYear,
             Overview,
-            _correctionSourcePath);
+            _correctionSourcePath,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (suggestionResult.Status != AiSearchSuggestionStatus.Success)
         {
             StatusMessage = string.IsNullOrWhiteSpace(suggestionResult.Message)
@@ -2055,12 +2086,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ManualSearchQuery = suggestion.Query;
         ManualSearchYear = suggestion.ReleaseYear?.ToString() ?? string.Empty;
         StatusMessage = FormatAiSearchSuggestionStatus("电影", suggestion);
-        await SearchCandidatesCoreAsync();
+        await SearchCandidatesCoreAsync(cancellationToken);
         ScanIdentificationDiagnostics.Write(
             $"event=single-source-correction-ai-assist-succeeded page=movie targetKind=movie mediaFileId={_correctionMediaFileId} status={FormatAiSuggestionStatus(suggestionResult.Status)} candidateCount={SearchCandidates.Count}");
     }
 
-    private async Task AiSuggestTvSearchAsync()
+    private async Task AiSuggestTvSearchAsync(CancellationToken cancellationToken)
     {
         var suggestionResult = await _aiClassificationService.SuggestTvEpisodeCorrectionSearchQueryAsync(
             TitleText,
@@ -2069,7 +2100,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             seasonNumber: TryParsePositiveOrZero(CorrectionSeasonNumber),
             episodeNumber: TryParsePositive(CorrectionEpisodeNumber),
             overview: Overview,
-            sourcePath: _correctionSourcePath);
+            sourcePath: _correctionSourcePath,
+            cancellationToken: cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (suggestionResult.Status != AiSearchSuggestionStatus.Success)
         {
             StatusMessage = string.IsNullOrWhiteSpace(suggestionResult.Message)
@@ -2109,7 +2142,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         StatusMessage = FormatAiTvSearchSuggestionStatus(suggestion, hasAiSeasonNumber, hasAiEpisodeNumber);
-        await SearchCandidatesCoreAsync();
+        await SearchCandidatesCoreAsync(cancellationToken);
         ScanIdentificationDiagnostics.Write(
             $"event=single-source-correction-ai-assist-succeeded page=movie targetKind=tv-episode mediaFileId={_correctionMediaFileId} status={FormatAiSuggestionStatus(suggestionResult.Status)} candidateCount={TvSeriesCandidateGroups.Count}");
     }
@@ -2148,6 +2181,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
+        if (IsCorrectionPanelVisible)
+        {
+            SwitchCorrectionSource(source);
+            return;
+        }
+
         _correctionMediaFileId = null;
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         _selectedCorrectionSource = source;
@@ -2176,6 +2215,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         CancelCorrectionCommand.RaiseCanExecuteChanged();
+        CloseCorrectionCommand.RaiseCanExecuteChanged();
         SearchCandidatesCommand.RaiseCanExecuteChanged();
         ApplyManualMatchCommand.RaiseCanExecuteChanged();
         SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
@@ -2187,8 +2227,27 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         StatusMessage = string.Empty;
     }
 
+    private void SwitchCorrectionSource(MovieSourceItem source)
+    {
+        _selectedCorrectionSource = source;
+        OnPropertyChanged(nameof(SelectedCorrectionSource));
+        _correctionMediaFileId = source.MediaFileId;
+        CorrectionSourceDisplay = $"{source.SourceTypeText} · {source.FileName}";
+        CorrectionSourceFileName = source.FileName;
+        CorrectionSourcePath = source.FilePath;
+        ClearCorrectionPreview();
+        ApplyManualMatchCommand.RaiseCanExecuteChanged();
+        ApplyTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
+        PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+        ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
+    }
+
     private void CancelCorrection()
     {
+        if (CancelCorrectionAiRequest())
+        {
+            IsCorrectionBusy = false;
+        }
         _correctionMediaFileId = null;
         _selectedCorrectionSource = null;
         OnPropertyChanged(nameof(SelectedCorrectionSource));
@@ -2209,6 +2268,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasSearchCandidates));
         OnPropertyChanged(nameof(HasTvSearchCandidates));
         CancelCorrectionCommand.RaiseCanExecuteChanged();
+        CloseCorrectionCommand.RaiseCanExecuteChanged();
         SearchCandidatesCommand.RaiseCanExecuteChanged();
         ApplyManualMatchCommand.RaiseCanExecuteChanged();
         SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
@@ -2218,6 +2278,28 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
         AiSuggestSearchCommand.RaiseCanExecuteChanged();
         StatusMessage = "已取消本次修正，未修改任何数据。";
+    }
+
+    private void CloseCorrection()
+    {
+        if (_correctionAiCancellation is not null)
+        {
+            CancelCorrection();
+            return;
+        }
+
+        if (!IsCorrectionBusy)
+        {
+            CancelCorrection();
+        }
+    }
+
+    private bool CancelCorrectionAiRequest()
+    {
+        var cancellation = _correctionAiCancellation;
+        _correctionAiCancellation = null;
+        cancellation?.Cancel();
+        return cancellation is not null;
     }
 
     private bool CanSearchCandidates()
@@ -2246,7 +2328,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
     }
 
-    private async Task SearchCandidatesCoreAsync()
+    private async Task SearchCandidatesCoreAsync(CancellationToken cancellationToken = default)
     {
         if (!CanUseIdentificationCorrection)
         {
@@ -2262,7 +2344,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         if (IsCorrectionTargetTvEpisode)
         {
-            await SearchTvCandidatesAsync();
+            await SearchTvCandidatesAsync(cancellationToken);
             return;
         }
 
@@ -2286,8 +2368,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             StatusMessage = "正在搜索 TMDB 电影，请稍候。";
             await Task.Yield();
             var releaseYear = int.TryParse(ManualSearchYear, out var parsedYear) ? parsedYear : (int?)null;
-            var candidates = await _movieIdentificationService.SearchCandidatesAsync(query, releaseYear);
-            var hydratedCandidates = await HydrateMovieCorrectionCandidatesAsync(candidates);
+            var candidates = await _movieIdentificationService.SearchCandidatesAsync(query, releaseYear, cancellationToken);
+            var hydratedCandidates = await HydrateMovieCorrectionCandidatesAsync(candidates, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             SearchCandidates.Clear();
             foreach (var candidate in hydratedCandidates)
@@ -2301,6 +2384,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 ? "没有找到符合条件的 TMDB 结果。"
                 : $"已找到 {SearchCandidates.Count} 个候选结果。";
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             SearchCandidates.Clear();
@@ -2311,7 +2398,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
     }
 
-    private async Task SearchTvCandidatesAsync()
+    private async Task SearchTvCandidatesAsync(CancellationToken cancellationToken = default)
     {
         var query = string.IsNullOrWhiteSpace(TvCorrectionQuery) ? TitleText : TvCorrectionQuery.Trim();
         if (string.IsNullOrWhiteSpace(query))
@@ -2328,12 +2415,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             StatusMessage = "正在搜索 TMDB 电视剧，请稍候。";
             await Task.Yield();
-            var page = await _tmdbService.SearchTvSeriesAsync(query, 1);
+            var page = await _tmdbService.SearchTvSeriesAsync(query, 1, cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             TvSearchCandidates.Clear();
             TvSeriesCandidateGroups.Clear();
             ClearSelectedTvCorrectionTarget();
             var candidates = page.Results.Take(12).ToList();
-            var details = await HydrateTvCorrectionCandidatesAsync(candidates);
+            var details = await HydrateTvCorrectionCandidatesAsync(candidates, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             for (var index = 0; index < candidates.Count; index++)
             {
                 var candidate = candidates[index];
@@ -2345,6 +2434,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             StatusMessage = TvSeriesCandidateGroups.Count == 0
                 ? "没有找到符合条件的 TMDB 电视剧结果。"
                 : $"已找到 {TvSeriesCandidateGroups.Count} 个电视剧候选；可展开选择季，或直接修正到剧并使用输入的季号/集号。";
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -2358,23 +2451,25 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     }
 
     private async Task<IReadOnlyList<MetadataSearchCandidate>> HydrateMovieCorrectionCandidatesAsync(
-        IReadOnlyList<MetadataSearchCandidate> candidates)
+        IReadOnlyList<MetadataSearchCandidate> candidates,
+        CancellationToken cancellationToken)
     {
         using var gate = new SemaphoreSlim(4);
         var tasks = candidates
-            .Select(candidate => HydrateMovieCorrectionCandidateAsync(candidate, gate))
+            .Select(candidate => HydrateMovieCorrectionCandidateAsync(candidate, gate, cancellationToken))
             .ToArray();
         return await Task.WhenAll(tasks);
     }
 
     private async Task<MetadataSearchCandidate> HydrateMovieCorrectionCandidateAsync(
         MetadataSearchCandidate candidate,
-        SemaphoreSlim gate)
+        SemaphoreSlim gate,
+        CancellationToken cancellationToken)
     {
-        await gate.WaitAsync();
+        await gate.WaitAsync(cancellationToken);
         try
         {
-            var details = await _tmdbService.GetMovieDetailsAsync(candidate.TmdbId, CancellationToken.None);
+            var details = await _tmdbService.GetMovieDetailsAsync(candidate.TmdbId, cancellationToken);
             if (details is null)
             {
                 return LocalizeMovieCorrectionCandidate(candidate);
@@ -2382,6 +2477,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
             details.Confidence = candidate.Confidence;
             return LocalizeMovieCorrectionCandidate(details);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
@@ -2403,23 +2502,29 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     }
 
     private async Task<IReadOnlyList<TmdbTvSeriesDetailResult?>> HydrateTvCorrectionCandidatesAsync(
-        IReadOnlyList<TmdbTvSeriesSearchItem> candidates)
+        IReadOnlyList<TmdbTvSeriesSearchItem> candidates,
+        CancellationToken cancellationToken)
     {
         using var gate = new SemaphoreSlim(4);
         var tasks = candidates
-            .Select(candidate => HydrateTvCorrectionCandidateAsync(candidate, gate))
+            .Select(candidate => HydrateTvCorrectionCandidateAsync(candidate, gate, cancellationToken))
             .ToArray();
         return await Task.WhenAll(tasks);
     }
 
     private async Task<TmdbTvSeriesDetailResult?> HydrateTvCorrectionCandidateAsync(
         TmdbTvSeriesSearchItem candidate,
-        SemaphoreSlim gate)
+        SemaphoreSlim gate,
+        CancellationToken cancellationToken)
     {
-        await gate.WaitAsync();
+        await gate.WaitAsync(cancellationToken);
         try
         {
-            return await _tmdbService.GetTvSeriesDetailsAsync(candidate.TmdbId, cancellationToken: CancellationToken.None);
+            return await _tmdbService.GetTvSeriesDetailsAsync(candidate.TmdbId, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {

@@ -14,24 +14,17 @@
         </Style>
     </UserControl.Style>
 
-    <Popup x:Name="OverlayPopup"
-           AllowsTransparency="True"
-           IsOpen="{Binding IsOpen, ElementName=Root}"
-           Placement="Relative"
-           StaysOpen="True">
-        <Grid x:Name="OverlayLayer"
-              Background="#99000000"
-              Focusable="True"
-              IsHitTestVisible="True">
-            <Border x:Name="DialogCard"
+    <Grid Background="Transparent"
+          Focusable="True"
+          IsHitTestVisible="True">
+        <Border Background="Transparent"
+                Cursor="Arrow" />
+        <Border
                 Width="{Binding DialogWidth, ElementName=Root}"
                 MaxHeight="{Binding DialogMaxHeight, ElementName=Root}"
                 Padding="24"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Focusable="True"
-                KeyboardNavigation.ControlTabNavigation="Cycle"
-                KeyboardNavigation.TabNavigation="Cycle"
                 Style="{StaticResource PageCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -138,7 +131,6 @@
                     </Button>
                 </Grid>
             </Grid>
-            </Border>
-        </Grid>
-    </Popup>
+        </Border>
+    </Grid>
 </UserControl>

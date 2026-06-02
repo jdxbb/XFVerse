@@ -223,16 +223,39 @@
                                            TextTrimming="CharacterEllipsis"
                                            TextWrapping="NoWrap"
                                            helpers:TrimmedTextToolTipBehavior.FullText="{Binding TitleText}" />
-                                <StackPanel Margin="0,2,0,0" Orientation="Horizontal">
-                                    <TextBlock FontSize="17"
+                                <Grid Margin="0,2,0,0"
+                                      VerticalAlignment="Bottom">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Bottom"
+                                               FontSize="17"
                                                Foreground="{DynamicResource BrushForegroundMuted}"
                                                Text="{Binding SeriesAndOriginalNameText}"
                                                TextTrimming="CharacterEllipsis"
                                                TextWrapping="NoWrap"
                                                helpers:TrimmedTextToolTipBehavior.FullText="{Binding SeriesAndOriginalNameText}" />
-                                    <TextBlock Margin="18,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource BrushForegroundSecondary}" Text="&#xE787;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Bottom" FontSize="14" Foreground="{DynamicResource BrushForegroundSecondary}" Text="{Binding AirDateText}" />
-                                </StackPanel>
+                                    <Grid Grid.Column="1"
+                                          Width="14"
+                                          Height="17"
+                                          Margin="18,0,0,0"
+                                          VerticalAlignment="Bottom">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="14"
+                                                   Foreground="{DynamicResource BrushForegroundMuted}"
+                                                   Text="&#xE787;" />
+                                    </Grid>
+                                    <TextBlock Grid.Column="2"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Bottom"
+                                               FontSize="14"
+                                               Foreground="{DynamicResource BrushForegroundMuted}"
+                                               Text="{Binding AirDateText}" />
+                                </Grid>
                             </StackPanel>
 
                             <Border Grid.Row="2" Width="294" Padding="8" HorizontalAlignment="Center" Background="{DynamicResource BrushGlassSurfaceAlt}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
@@ -294,7 +317,8 @@
                                 <ScrollViewer Grid.Row="2"
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto"
-                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                              helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                     <ScrollViewer.Resources>
                                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource EpisodeDetailModernScrollBarStyle}" />
                                     </ScrollViewer.Resources>
@@ -557,12 +581,90 @@
 
         <controls:CorrectionDialogShell Grid.RowSpan="3"
                                         IsOpen="{Binding IsCorrectionPanelVisible}"
-                                        Title="单集识别修正"
-                                        Summary="{Binding CorrectionSourceDisplay}"
-                                        StatusText="{Binding StatusMessage}"
-                                        CloseCommand="{Binding CancelCorrectionCommand}"
+                                        Title="单集修正识别"
+                                        Summary=""
+                                        StatusText=""
+                                        UseDefaultActions="False"
+                                        DialogWidth="1180"
+                                        DialogMaxHeight="760"
+                                        FooterSpacing="0"
+                                        CloseCommand="{Binding CloseCorrectionCommand}"
                                         CancelCommand="{Binding CancelCorrectionCommand}">
+            <controls:CorrectionDialogShell.HeaderContent>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Viewbox Width="20"
+                             Height="20"
+                             VerticalAlignment="Center">
+                        <Canvas Width="20" Height="20">
+                            <Ellipse Canvas.Left="1.2"
+                                     Canvas.Top="1.2"
+                                     Width="15.6"
+                                     Height="15.6"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.4" />
+                            <Ellipse Canvas.Left="7.1"
+                                     Canvas.Top="7.1"
+                                     Width="3.8"
+                                     Height="3.8"
+                                     Fill="{DynamicResource BrushForegroundMuted}" />
+                            <Ellipse Canvas.Left="7.3"
+                                     Canvas.Top="3.3"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Ellipse Canvas.Left="11.2"
+                                     Canvas.Top="7.2"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Ellipse Canvas.Left="7.3"
+                                     Canvas.Top="11.1"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Ellipse Canvas.Left="3.4"
+                                     Canvas.Top="7.2"
+                                     Width="3.4"
+                                     Height="3.4"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushForegroundMuted}"
+                                     StrokeThickness="1.1" />
+                            <Path Data="M13.5,15.1 C15.6,17 17.3,17.8 19,17.8"
+                                  Fill="Transparent"
+                                  Stroke="{DynamicResource BrushForegroundMuted}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeThickness="1.4" />
+                        </Canvas>
+                    </Viewbox>
+                    <ComboBox Grid.Column="2"
+                              IsEnabled="{Binding IsCorrectionInteractionEnabled}"
+                              ItemsSource="{Binding Sources}"
+                              SelectedItem="{Binding SelectedCorrectionSource, Mode=TwoWay}"
+                              Style="{StaticResource CorrectionDialogComboBoxStyle}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding CorrectionSourceDisplayText}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
+            </controls:CorrectionDialogShell.HeaderContent>
             <controls:CorrectionDialogShell.DialogContent>
+                <Grid>
+                    <controls:MovieCorrectionDialogContent />
+                    <!-- Legacy correction content retained temporarily as a source comparison during manual UI acceptance.
                 <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="350" />
@@ -839,10 +941,12 @@
                                 </ListBox>
                             </StackPanel>
                 </Grid>
+                    -->
+                </Grid>
             </controls:CorrectionDialogShell.DialogContent>
         </controls:CorrectionDialogShell>
 
-        <Border Grid.RowSpan="3" Background="#99000000">
+        <Border Grid.RowSpan="3" Visibility="Collapsed" Background="Transparent">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
