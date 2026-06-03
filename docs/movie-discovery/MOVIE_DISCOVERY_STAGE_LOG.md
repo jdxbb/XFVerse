@@ -913,3 +913,43 @@
 - Rechecked the Phase 4.15 media-library performance work from the active worktree and latest aggregate logs. Movie / no-source / placeholder cards still use the same projection and display semantics while benefiting from refresh coalescing, query diagnostics, poster decode tuning, collection range reset, and poster-view virtualization.
 - Latest sampled media-library logs show aggregate refresh / render / virtualization evidence only, including `items=165` and `realized=8` on the poster first viewport. They do not log movie titles, full local paths, WebDAV URLs, account names, tokens, passwords, or API keys.
 - Movie Discovery ranking, search, no-source detail semantics, recommendation inputs, Watch Insights, AI recommendations, scan matching rules, schema, migrations, database update, commit, and push remain unchanged by the Phase 4.15 closure pass.
+
+# Phase 7.4a Discovery Search Toolbar / Layout
+
+Completed:
+
+- Discovery search now keeps the search-method selector visible for both Movie and TV.
+- Search placeholder / tooltip text is dynamic:
+  - Movie title search: `输入需要搜索的电影`
+  - TV title search: `输入需要搜索的电视剧名`
+  - Person search: `输入需要搜索的导演/演员`
+- TV person search is now supported in Discovery search by resolving the first TMDB person result and reading `person/{id}/tv_credits`.
+- TV person search results stay as `DiscoveryTvSeriesCardViewModel` rows and are not converted to Movie rows or AI recommendation candidates.
+- Discovery search layout switching now toggles baseline poster/list result containers instead of showing a placeholder status. Full visual alignment for the search toolbar, filters, summary and result areas remains 7.4b.
+- Discovery search layout memory is stored in `discovery-preferences.json`, separate from the media-library layout preference file.
+- Search status copy now follows active media type and search method for loading, empty, loaded and clear-filter states.
+
+Acceptance:
+
+- Movie / TV switching remains available.
+- Movie and TV title/person search methods are selectable.
+- The three required placeholder strings are bound through the existing placeholder behavior.
+- Search filters retain the existing Discovery Movie / TV field sets.
+- Poster/list layout switch works for Movie and TV search results.
+- TV person search does not feed TV data into Movie AI recommendations, Watch Insights, profile/persona inputs or fingerprints.
+- No `已移出媒体库` search-card action was added.
+
+Business logic changes:
+
+- Scoped Discovery search change only: `ITmdbService.SearchTvSeriesByPersonAsync` and `GetPersonTvCreditsAsync` add TV person credits lookup.
+- UI preference change only: Discovery search layout is persisted through an App-layer JSON preference file.
+- Recommendation algorithms, prompts, candidate generation, scan logic, correction semantics, player behavior, schema and migrations are unchanged.
+
+Non-stage page changes:
+
+- None. No Home, Media Library, Recommendation, Detail, Player or Settings page was edited.
+- Shared DI registration was updated for the new Discovery preference service.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.

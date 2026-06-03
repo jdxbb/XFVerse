@@ -144,16 +144,28 @@ Not in scope:
 
 ### 7.4 Discovery
 
+Detailed execution plan:
+- `docs/movie-discovery/PHASE_7_4_DISCOVERY_PLAN.md`
+
 Scope:
 - movie search, ranking and AI recommendation tab visual alignment;
 - Movie / TV card consistency;
 - source labels and external candidate states;
 - recommendation preference UI if already supported by current services.
 
+Substages:
+- 7.4a search toolbar, modes, filters and layout state;
+- 7.4b full search UI visual alignment: toolbar, filter controls, result summary, poster/list containers and cards;
+- 7.4c ranking tab visual consistency;
+- 7.4d AI recommendation tab and preference dialog polish;
+- 7.4e Discovery regression closeout.
+
 Not in scope:
 - changing recommendation algorithms;
 - expanding TV recommendation or watch-insight semantics;
 - account system.
+
+7.4 must preserve TV exclusion from Movie AI recommendations, Watch Insights, profile/persona inputs and recommendation fingerprints. If TV person search is implemented for the user-confirmed search-method requirement, it is limited to Discovery search and must be documented as a scoped search behavior change.
 
 ### 7.5 Player
 

@@ -54,6 +54,19 @@ public interface ITmdbService
         string language = "zh-CN",
         CancellationToken cancellationToken = default);
 
+    Task<TmdbTvSeriesSearchPage> GetPersonTvCreditsAsync(
+        int personId,
+        int page,
+        string personName = "",
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeriesSearchPage> SearchTvSeriesByPersonAsync(
+        string query,
+        int page,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
     Task<TmdbTvSeriesDetailResult?> GetTvSeriesDetailsAsync(
         int seriesId,
         string language = "zh-CN",

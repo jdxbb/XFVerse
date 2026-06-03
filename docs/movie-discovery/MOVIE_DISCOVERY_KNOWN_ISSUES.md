@@ -247,3 +247,20 @@ Noise:
 
 - Unrecognized Movie placeholders being visible in `Other` is expected and does not mean Movie Discovery ranking/search changed.
 - TV scan logs may mention Movie fallback blocking or placeholder grouping; those are scan diagnostics and are not Movie Discovery recommendation inputs.
+
+## Phase 7.4a Notes
+
+Blocker:
+
+- None after the Discovery search toolbar / layout implementation and build validation.
+
+Deferred:
+
+- Final Discovery search UI visual alignment remains 7.4b, including media-library-like toolbar/filter styling, result summary layout, scroll/density polish, poster/list result containers, list-row top-right want action, type/source tag placement, rating badge treatment and poster-card visual alignment.
+- Ranking visual consistency remains 7.4c.
+- AI recommendation tab and preference dialog polish remain 7.4d.
+
+Noise:
+
+- TV person search is a Discovery search feature only. It uses TMDB `person/{id}/tv_credits` and does not add TV recommendation, Watch Insights, profile/persona inputs or fingerprint behavior.
+- Discovery search layout memory is App-layer JSON preference state in `discovery-preferences.json`; it is not a database schema change.

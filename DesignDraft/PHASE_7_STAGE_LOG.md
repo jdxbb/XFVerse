@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Stage Log
 
-Last updated: 2026-05-30
+Last updated: 2026-06-04
 
 This is the living Phase 7 handoff log. Keep entries concise and stage-oriented. Do not turn this into a full code diff.
 
@@ -1054,3 +1054,79 @@ Not done:
 Suggested commit message:
 
 - `Fix movie detail correction runtime load`
+
+## Phase 7.4 - Discovery Plan / Audit
+
+Completed:
+
+- Read the current Phase 7 plan, Phase 7 known issues, movie-discovery product docs, page specs, relevant Discovery / Recommendation / Home / Media Library XAML and ViewModel code, shared UI rule docs, and the referenced Discovery / Media Library screenshots.
+- Added the single Phase 7.4 execution plan at `docs/movie-discovery/PHASE_7_4_DISCOVERY_PLAN.md`.
+- Split 7.4 into search toolbar/modes/filters/layout state, search result cards, ranking tab, AI recommendation tab/preference dialog, and Discovery regression closeout.
+- Captured the user-confirmed search requirements: media-library-like search/filter UI, no search-card progress bar, top-left Movie/TV tag, top-right `+ 想看`, rating badge reuse from Home AI recommendation, Discovery-specific result copy, no `已移出媒体库` button, TV search-method option, dynamic placeholders, and list-row upper-right want action.
+- Added per-substage required-reading lists, reusable component references, similar-page references, UI-rule references, output requirements, acceptance criteria, business-logic accounting and non-stage-page accounting.
+- Linked the detailed plan from `DesignDraft/PHASE_7_PLAN.md`.
+
+Not done:
+
+- No implementation code, UI resources, business services, database schema, migration, database update, commit or push was changed in this planning pass.
+- No build was run because the change is documentation-only.
+
+Validation:
+
+- Documentation scope only. Implementation validation is deferred to the relevant 7.4 substages and the 7.4e closeout.
+
+Suggested commit message:
+
+- `Plan Phase 7.4 discovery work`
+
+### 7.4a - Search Toolbar, Modes, Filters And Layout State
+
+Completed:
+
+- Replaced the Discovery search layout placeholder command with a real poster / list layout toggle.
+- Added Discovery-specific file-backed layout memory through `IDiscoveryPreferencesService` and `discovery-preferences.json`; this does not share `library-preferences.json`.
+- Changed the search-method selector to stay visible for both Movie and TV search.
+- Changed the search-method first option to the media-neutral `按片名搜`.
+- Added dynamic search placeholder and tooltip text:
+  - Movie title search: `输入需要搜索的电影`
+  - TV title search: `输入需要搜索的电视剧名`
+  - Person search: `输入需要搜索的导演/演员`
+- Added TV person search for Discovery only through TMDB person search plus `person/{id}/tv_credits`, projecting results into `DiscoveryTvSeriesCardViewModel`.
+- Updated Discovery search loading, empty, loaded and clear-filter status copy to follow the active media type and search method.
+- Added functional baseline list containers for Movie and TV search results. Full search UI visual alignment remains 7.4b, including toolbar/filter styling, result summary layout, poster/list containers and cards.
+
+Acceptance:
+
+- Movie / TV media switching remains available.
+- Movie and TV both expose title/person search methods.
+- The three required placeholder strings are bound through `TextBoxPlaceholderBehavior`.
+- Search filters continue to use the existing Discovery filter controls and field sets.
+- Layout toggle switches between poster and list containers and persists through an App-layer preference file without database fields.
+- TV person search produces TV Series discovery rows only; it does not create Movie recommendation candidates or Watch Insights inputs.
+- Loading / empty / error status text remains page-local and does not show multiple competing status layers.
+
+Business logic changes:
+
+- Scoped Discovery search change: `ITmdbService.SearchTvSeriesByPersonAsync` and `GetPersonTvCreditsAsync` were added and are used only by `MovieDiscoveryViewModel` when TV + person search is selected.
+- UI preference change: Discovery search layout is persisted in `discovery-preferences.json`.
+- No recommendation algorithm, prompt, candidate generation, profile/persona/fingerprint, Watch Insights, scan, correction, player, schema, migration or database update behavior changed.
+
+Non-stage page changes:
+
+- No Home, Media Library, Recommendation, Detail, Player or Settings pages were edited.
+- Shared DI registration was updated for the new Discovery preference service.
+- Core TMDB service/interface gained the TV person credits method used by Discovery search.
+
+Not done:
+
+- 7.4b full search UI visual alignment is not complete: toolbar/filter styling, result summary layout, scroll/density polish, final poster/list card badge placement, top-right want action in list rows and Home AI rating badge reuse remain next-stage work.
+- Ranking tab and AI recommendation tab were not changed.
+- No database update, commit or push was executed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Suggested commit message:
+
+- `Implement discovery search layout and TV person search`

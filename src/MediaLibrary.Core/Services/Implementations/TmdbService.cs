@@ -601,6 +601,108 @@ public sealed class TmdbService : ITmdbService
             cancellationToken);
     }
 
+    public async Task<TmdbTvSeriesSearchPage> GetPersonTvCreditsAsync(
+        int personId,
+        int page,
+        string personName = "",
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        if (personId <= 0)
+        {
+            return CreateEmptyTvSeriesPage(page, "未找到相关人物，可尝试英文名或原名。");
+        }
+
+        var options = await GetRequestOptionsAsync(cancellationToken);
+        if (!options.HasCredential)
+        {
+            return CreateEmptyTvSeriesPage(page, "未配置 TMDB API。");
+        }
+
+        var safePage = Math.Max(1, page);
+        var safeLanguage = NormalizeLanguage(language);
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            using var creditsResponse = await SendGetAsync(
+                $"person/{personId}/tv_credits?language={Uri.EscapeDataString(safeLanguage)}",
+                options,
+                "tmdb-person-tv-credits",
+                cancellationToken);
+            EnsureSuccessStatusCode(creditsResponse);
+
+            await using var creditsStream = await creditsResponse.Content.ReadAsStreamAsync(cancellationToken);
+            using var creditsDocument = await JsonDocument.ParseAsync(creditsStream, cancellationToken: cancellationToken);
+            var allCredits = BuildPersonTvCredits(creditsDocument.RootElement);
+            var totalResults = allCredits.Count;
+            var totalPages = totalResults == 0 ? 0 : (int)Math.Ceiling(totalResults / (double)DiscoveryPageSize);
+            var pageItems = allCredits
+                .Skip((safePage - 1) * DiscoveryPageSize)
+                .Take(DiscoveryPageSize)
+                .ToList();
+
+            var displayName = string.IsNullOrWhiteSpace(personName) ? "该人物" : personName.Trim();
+            return new TmdbTvSeriesSearchPage
+            {
+                Results = pageItems,
+                Page = safePage,
+                TotalPages = totalPages,
+                TotalResults = totalResults,
+                ResultMessage = totalResults == 0
+                    ? "未找到相关电视剧。"
+                    : $"按人物“{displayName}”匹配到相关电视剧。"
+            };
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-person-tv-credits", requestStopwatch.Elapsed, isError);
+        }
+    }
+
+    public async Task<TmdbTvSeriesSearchPage> SearchTvSeriesByPersonAsync(
+        string query,
+        int page,
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return CreateEmptyTvSeriesPage(page);
+        }
+
+        var safePage = Math.Max(1, page);
+        var requestStopwatch = Stopwatch.StartNew();
+        var isError = false;
+        try
+        {
+            var people = await SearchPeopleAsync(query, 1, cancellationToken);
+            var person = people.Results.FirstOrDefault();
+            if (person is null)
+            {
+                return CreateEmptyTvSeriesPage(safePage, "未找到相关人物，可尝试英文名或原名。");
+            }
+
+            return await GetPersonTvCreditsAsync(person.TmdbId, safePage, person.Name, language, cancellationToken);
+        }
+        catch
+        {
+            isError = true;
+            throw;
+        }
+        finally
+        {
+            requestStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-discovery-tv-person-search", requestStopwatch.Elapsed, isError);
+        }
+    }
+
     public async Task<TmdbTvSeriesDetailResult?> GetTvSeriesDetailsAsync(
         int seriesId,
         string language = TmdbLanguage,
@@ -1764,12 +1866,72 @@ public sealed class TmdbService : ITmdbService
         }
     }
 
+    private static IReadOnlyList<TmdbTvSeriesSearchItem> BuildPersonTvCredits(JsonElement root)
+    {
+        var candidates = new List<PersonTvCreditCandidate>();
+        AddPersonTvCredits(root, "cast", rolePriority: 0, candidates);
+        AddPersonTvCredits(root, "crew", rolePriority: 1, candidates);
+
+        return candidates
+            .GroupBy(candidate => candidate.Series.TmdbId)
+            .Select(
+                group => group
+                    .OrderBy(candidate => candidate.RolePriority)
+                    .ThenBy(candidate => candidate.Order)
+                    .ThenByDescending(candidate => candidate.Series.Popularity ?? 0d)
+                    .ThenByDescending(candidate => candidate.Series.TmdbVoteCount ?? 0)
+                    .First())
+            .OrderByDescending(candidate => candidate.Series.Popularity ?? 0d)
+            .ThenByDescending(candidate => candidate.Series.TmdbVoteCount ?? 0)
+            .ThenByDescending(candidate => candidate.Series.FirstAirYear ?? 0)
+            .Select(candidate => candidate.Series)
+            .ToList();
+    }
+
+    private static void AddPersonTvCredits(
+        JsonElement root,
+        string propertyName,
+        int rolePriority,
+        ICollection<PersonTvCreditCandidate> candidates)
+    {
+        if (!root.TryGetProperty(propertyName, out var array) || array.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var item in array.EnumerateArray())
+        {
+            if (BuildTvSeriesSearchItem(item) is not { } series)
+            {
+                continue;
+            }
+
+            var order = GetInt(item, "order") ?? int.MaxValue;
+            if (rolePriority > 0)
+            {
+                var job = GetString(item, "job");
+                order = IsPrimaryTvCrewJob(job) ? 0 : 50;
+            }
+
+            candidates.Add(new PersonTvCreditCandidate(series, rolePriority, order));
+        }
+    }
+
     private static bool IsPrimaryCrewJob(string job)
     {
         return string.Equals(job, "Director", StringComparison.OrdinalIgnoreCase)
                || string.Equals(job, "Writer", StringComparison.OrdinalIgnoreCase)
                || string.Equals(job, "Screenplay", StringComparison.OrdinalIgnoreCase)
                || string.Equals(job, "Story", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPrimaryTvCrewJob(string job)
+    {
+        return string.Equals(job, "Director", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Writer", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Screenplay", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Story", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Creator", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<MetadataSearchCandidate> CloneCandidates(IEnumerable<MetadataSearchCandidate> candidates)
@@ -2171,6 +2333,8 @@ public sealed class TmdbService : ITmdbService
     private sealed record TmdbExternalIdsPersistentPayload(string ImdbId);
 
     private sealed record PersonCreditCandidate(TmdbMovieDiscoveryItem Movie, int RolePriority, int Order);
+
+    private sealed record PersonTvCreditCandidate(TmdbTvSeriesSearchItem Series, int RolePriority, int Order);
 
     private sealed record TmdbRequestOptions(string ApiBaseUrl, string ReadAccessToken, string ApiKey)
     {

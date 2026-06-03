@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
+using MediaLibrary.App.Models.Discovery;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
@@ -19,7 +20,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const int AiRecommendationTabIndex = 2;
     private const string DiscoveryMediaTypeMovie = "电影";
     private const string DiscoveryMediaTypeTv = "电视剧";
-    private const string SearchTypeMovie = "按影片搜";
+    private const string SearchTypeMovie = "按片名搜";
     private const string SearchTypePerson = "按人物搜";
     private const string RankingTypePopular = "热门榜";
     private const string RankingTypeTopRated = "高分榜";
@@ -41,6 +42,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const string DirectionAscending = "升序";
     private const string DecadeAll = "全部";
     private const string DecadeEarlier = "更早";
+    private const string SearchLayoutPoster = "poster";
+    private const string SearchLayoutList = "list";
     private const int OmdbResolveConcurrency = 2;
     private const int TvDetailResolveConcurrency = 3;
     private const int SearchTmdbPageSize = 20;
@@ -107,6 +110,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IConfirmationDialogService _confirmationDialogService;
+    private readonly IDiscoveryPreferencesService _discoveryPreferencesService;
     private readonly List<DiscoveryMovieCardViewModel> _searchResultPool = [];
     private readonly HashSet<int> _searchTmdbIds = [];
     private readonly Dictionary<int, TmdbMovieDiscoveryPage> _searchSourcePageCache = [];
@@ -128,6 +132,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private string _searchText = string.Empty;
     private string _selectedSearchMediaType = DiscoveryMediaTypeMovie;
     private string _selectedSearchType = SearchTypeMovie;
+    private bool _isSearchPosterLayout = true;
+    private bool _isDiscoveryPreferencesLoaded;
     private string _selectedGenreFilter = FilterAll;
     private string _selectedRegionFilter = FilterAll;
     private string _selectedWatchStatusFilter = FilterAll;
@@ -135,7 +141,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private string _selectedSortDirection = DirectionDescending;
     private string _selectedDecadeFilter = DecadeAll;
     private string _selectedLanguageFilter = FilterAll;
-    private string _searchStatusMessage = "请输入关键词搜索 TMDB 影片。";
+    private string _searchStatusMessage = "输入电影名后搜索 TMDB 电影。";
     private string _searchSummaryText = string.Empty;
     private bool _isSearchLoading;
     private bool _suppressFilterApply;
@@ -148,7 +154,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private int _nextSearchOrder;
     private bool _searchSourceExhausted;
     private bool _canGoToNextSearchPage;
-    private string _tvSearchStatusMessage = "请输入关键词搜索 TMDB 电视剧。";
+    private string _tvSearchStatusMessage = "输入电视剧名后搜索 TMDB 电视剧。";
     private string _tvSearchSummaryText = string.Empty;
     private bool _isTvSearchLoading;
     private bool _suppressTvFilterApply;
@@ -214,7 +220,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         IUserCollectionService userCollectionService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
-        IConfirmationDialogService confirmationDialogService)
+        IConfirmationDialogService confirmationDialogService,
+        IDiscoveryPreferencesService discoveryPreferencesService)
         : base("影片发现", "搜索、榜单和 AI 推荐集中在这里。")
     {
         _aiRecommendationViewModel = aiRecommendationViewModel;
@@ -228,6 +235,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _confirmationDialogService = confirmationDialogService;
+        _discoveryPreferencesService = discoveryPreferencesService;
 
         SearchMediaTypeOptions = [DiscoveryMediaTypeMovie, DiscoveryMediaTypeTv];
         SearchTypeOptions = [SearchTypeMovie, SearchTypePerson];
@@ -249,7 +257,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         GoPreviousSearchPageCommand = new AsyncRelayCommand(GoPreviousSearchPageAsync, () => CanGoPreviousActiveSearchPage);
         GoNextSearchPageCommand = new AsyncRelayCommand(GoNextSearchPageAsync, () => CanGoNextActiveSearchPage);
         ClearSearchFiltersCommand = new RelayCommand(ClearSearchFilters);
-        ShowLayoutSwitchPlaceholderCommand = new RelayCommand(() => SearchStatusMessage = "切布局将在后续视觉阶段接入。");
+        SwitchSearchLayoutCommand = new RelayCommand(SwitchSearchLayout);
         OpenSearchMovieCommand = new AsyncRelayCommand(OpenSearchMovieAsync);
         ToggleSearchWantToWatchCommand = new AsyncRelayCommand(ToggleSearchWantToWatchAsync);
         AddSearchMovieToLibraryCommand = new AsyncRelayCommand(AddSearchMovieToLibraryAsync);
@@ -314,7 +322,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public RelayCommand ClearSearchFiltersCommand { get; }
 
-    public RelayCommand ShowLayoutSwitchPlaceholderCommand { get; }
+    public RelayCommand SwitchSearchLayoutCommand { get; }
 
     public AsyncRelayCommand OpenSearchMovieCommand { get; }
 
@@ -376,6 +384,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _selectedSearchMediaType, value))
             {
                 RefreshSearchModeProperties();
+                RefreshActiveSearchPromptIfIdle();
             }
         }
     }
@@ -383,6 +392,40 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public bool IsMovieSearchSelected => string.Equals(SelectedSearchMediaType, DiscoveryMediaTypeMovie, StringComparison.Ordinal);
 
     public bool IsTvSearchSelected => string.Equals(SelectedSearchMediaType, DiscoveryMediaTypeTv, StringComparison.Ordinal);
+
+    public bool IsSearchPersonSelected => string.Equals(SelectedSearchType, SearchTypePerson, StringComparison.Ordinal);
+
+    public string SearchPlaceholderText => IsSearchPersonSelected
+        ? "输入需要搜索的导演/演员"
+        : IsTvSearchSelected
+            ? "输入需要搜索的电视剧名"
+            : "输入需要搜索的电影";
+
+    public string SearchInputToolTip => SearchPlaceholderText;
+
+    public bool IsSearchPosterLayout
+    {
+        get => _isSearchPosterLayout;
+        private set
+        {
+            if (SetProperty(ref _isSearchPosterLayout, value))
+            {
+                OnPropertyChanged(nameof(IsSearchListLayout));
+                OnPropertyChanged(nameof(SearchLayoutToggleText));
+                OnPropertyChanged(nameof(SearchLayoutStatusText));
+                if (_isDiscoveryPreferencesLoaded)
+                {
+                    _ = SaveDiscoveryPreferencesAsync();
+                }
+            }
+        }
+    }
+
+    public bool IsSearchListLayout => !IsSearchPosterLayout;
+
+    public string SearchLayoutToggleText => IsSearchPosterLayout ? "列表布局" : "海报布局";
+
+    public string SearchLayoutStatusText => IsSearchPosterLayout ? "当前海报布局" : "当前列表布局";
 
     public string SelectedTvGenreFilter
     {
@@ -475,7 +518,15 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedSearchType, value))
             {
-                ResetSearchFromFilterChange();
+                RefreshSearchTypeProperties();
+                if (IsTvSearchSelected)
+                {
+                    ResetTvSearchFromFilterChange();
+                }
+                else
+                {
+                    ResetSearchFromFilterChange();
+                }
             }
         }
     }
@@ -1095,23 +1146,38 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _openAiRecommendationsOnNextActivation = true;
     }
 
-    public override Task ActivateAsync(CancellationToken cancellationToken = default)
+    public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        await EnsureDiscoveryPreferencesLoadedAsync(cancellationToken);
+
         if (_openAiRecommendationsOnNextActivation)
         {
             _openAiRecommendationsOnNextActivation = false;
             SelectedTabIndex = AiRecommendationTabIndex;
-            return Task.CompletedTask;
+            return;
         }
 
         SelectedTabIndex = SearchTabIndex;
-        return Task.CompletedTask;
     }
 
     public override void Deactivate()
     {
         _searchCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource?.Cancel();
+    }
+
+    private void SwitchSearchLayout()
+    {
+        IsSearchPosterLayout = !IsSearchPosterLayout;
+        var message = IsSearchPosterLayout ? "已切换为海报布局。" : "已切换为列表布局。";
+        if (IsTvSearchSelected)
+        {
+            TvSearchStatusMessage = message;
+        }
+        else
+        {
+            SearchStatusMessage = message;
+        }
     }
 
     private async Task SearchAsync()
@@ -1129,7 +1195,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             SearchPageIndex = 1;
             SearchTotalPages = 0;
             _canGoToNextSearchPage = false;
-            SearchStatusMessage = "请输入关键词。";
+            SearchStatusMessage = BuildMissingSearchKeywordMessage();
             SearchSummaryText = string.Empty;
             RefreshSearchVisibility();
             RefreshSearchCommandState();
@@ -1190,7 +1256,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             TvSearchPageIndex = 1;
             TvSearchTotalPages = 0;
             _canGoToNextTvSearchPage = false;
-            TvSearchStatusMessage = "请输入关键词。";
+            TvSearchStatusMessage = BuildMissingSearchKeywordMessage();
             TvSearchSummaryText = string.Empty;
             RefreshTvSearchVisibility();
             RefreshSearchCommandState();
@@ -1232,7 +1298,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         var requestVersion = ++_tvSearchRequestVersion;
         IsTvSearchLoading = true;
-        TvSearchStatusMessage = displayPage <= 1 ? "正在搜索电视剧..." : $"正在加载第 {displayPage} 页...";
+        TvSearchStatusMessage = displayPage <= 1 ? BuildTvSearchLoadingMessage() : $"正在加载第 {displayPage} 页...";
 
         try
         {
@@ -1254,12 +1320,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SearchTvSeries.Count == 0)
             {
                 TvSearchStatusMessage = _tvSearchResultPool.Count == 0
-                    ? "未找到相关电视剧。"
+                    ? BuildTvSearchNoResultsMessage()
                     : "当前筛选条件下无电视剧结果。";
             }
             else
             {
-                TvSearchStatusMessage = "电视剧搜索结果已加载。";
+                TvSearchStatusMessage = BuildTvSearchLoadedMessage();
                 _ = EnrichTvSeriesDetailsAsync(visibleItems, requestVersion, isRankingRequest: false);
             }
         }
@@ -1339,7 +1405,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         var page = _tvSearchSourceNextPage;
         if (!_tvSearchSourcePageCache.TryGetValue(page, out var response))
         {
-            response = await _tmdbService.SearchTvSeriesAsync(SearchText, page, cancellationToken: cancellationToken);
+            response = IsSearchPersonSelected
+                ? await _tmdbService.SearchTvSeriesByPersonAsync(SearchText, page, cancellationToken: cancellationToken)
+                : await _tmdbService.SearchTvSeriesAsync(SearchText, page, cancellationToken: cancellationToken);
             _tvSearchSourcePageCache[page] = response;
         }
 
@@ -1573,7 +1641,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         var requestVersion = ++_searchRequestVersion;
         IsSearchLoading = true;
-        SearchStatusMessage = displayPage <= 1 ? "正在搜索..." : $"正在加载第 {displayPage} 页...";
+        SearchStatusMessage = displayPage <= 1 ? BuildMovieSearchLoadingMessage() : $"正在加载第 {displayPage} 页...";
 
         try
         {
@@ -1596,12 +1664,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SearchMovies.Count == 0)
             {
                 SearchStatusMessage = _searchResultPool.Count == 0
-                    ? "未找到相关影片。"
-                    : "当前筛选条件下无结果。";
+                    ? BuildMovieSearchNoResultsMessage()
+                    : "当前筛选条件下无电影结果。";
             }
             else
             {
-                SearchStatusMessage = $"{SelectedSearchType}结果已加载。";
+                SearchStatusMessage = BuildMovieSearchLoadedMessage();
                 _ = EnrichOmdbRatingsAsync(visibleItems, requestVersion);
             }
         }
@@ -1987,7 +2055,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
 
         OnPropertyChanged(nameof(CanGoNextSearchPage));
+        OnPropertyChanged(nameof(CanGoNextActiveSearchPage));
         OnPropertyChanged(nameof(SearchPageStatusText));
+        OnPropertyChanged(nameof(ActiveSearchPageStatusText));
     }
 
     private string BuildSearchSummaryText(int filteredCount)
@@ -2035,7 +2105,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText))
         {
             RebuildSearchDisplay();
-            SearchStatusMessage = "筛选已清除。请输入关键词搜索 TMDB 影片。";
+            SearchStatusMessage = $"筛选已清除。{BuildSearchPromptMessage()}";
             return;
         }
 
@@ -2058,7 +2128,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText))
         {
             RebuildTvSearchDisplay();
-            TvSearchStatusMessage = "筛选已清除。请输入关键词搜索 TMDB 电视剧。";
+            TvSearchStatusMessage = $"筛选已清除。{BuildSearchPromptMessage()}";
             return;
         }
 
@@ -3356,6 +3426,45 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
     }
 
+    private async Task EnsureDiscoveryPreferencesLoadedAsync(CancellationToken cancellationToken)
+    {
+        if (_isDiscoveryPreferencesLoaded)
+        {
+            return;
+        }
+
+        var preferences = await _discoveryPreferencesService.LoadAsync(cancellationToken);
+        IsSearchPosterLayout = !string.Equals(
+            preferences.SearchLayoutMode,
+            SearchLayoutList,
+            StringComparison.OrdinalIgnoreCase);
+        _isDiscoveryPreferencesLoaded = true;
+    }
+
+    private async Task SaveDiscoveryPreferencesAsync()
+    {
+        try
+        {
+            await _discoveryPreferencesService.SaveAsync(CreateDiscoveryPreferencesSnapshot());
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            AiPerfDiagnostics.WriteEvent(
+                $"discovery-preferences-save-failed errorType={exception.GetType().Name}");
+        }
+    }
+
+    private DiscoveryPreferencesModel CreateDiscoveryPreferencesSnapshot()
+    {
+        return new DiscoveryPreferencesModel
+        {
+            SearchLayoutMode = IsSearchPosterLayout ? SearchLayoutPoster : SearchLayoutList
+        };
+    }
+
     private void ResetSearchBuffers()
     {
         _searchResultPool.Clear();
@@ -3481,6 +3590,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(IsMovieSearchSelected));
         OnPropertyChanged(nameof(IsTvSearchSelected));
+        RefreshSearchTypeProperties();
         OnPropertyChanged(nameof(IsActiveSearchLoading));
         OnPropertyChanged(nameof(ActiveSearchStatusMessage));
         OnPropertyChanged(nameof(ActiveSearchSummaryText));
@@ -3490,6 +3600,34 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(CanGoNextActiveSearchPage));
         OnPropertyChanged(nameof(ActiveSearchPageStatusText));
         RefreshSearchCommandState();
+    }
+
+    private void RefreshSearchTypeProperties()
+    {
+        OnPropertyChanged(nameof(IsSearchPersonSelected));
+        OnPropertyChanged(nameof(SearchPlaceholderText));
+        OnPropertyChanged(nameof(SearchInputToolTip));
+        RefreshActiveSearchPromptIfIdle();
+    }
+
+    private void RefreshActiveSearchPromptIfIdle()
+    {
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            return;
+        }
+
+        if (IsTvSearchSelected)
+        {
+            if (!HasSearchTvSeries && !IsTvSearchLoading)
+            {
+                TvSearchStatusMessage = BuildSearchPromptMessage();
+            }
+        }
+        else if (!HasSearchMovies && !IsSearchLoading)
+        {
+            SearchStatusMessage = BuildSearchPromptMessage();
+        }
     }
 
     private void RefreshRankingModeProperties()
@@ -3652,6 +3790,74 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                 .Split(['、', '/', ',', '，', ';', '；', '|', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .ToList();
+    }
+
+    private string BuildSearchPromptMessage()
+    {
+        if (IsSearchPersonSelected)
+        {
+            return IsTvSearchSelected
+                ? "输入导演/演员后搜索 TMDB 电视剧。"
+                : "输入导演/演员后搜索 TMDB 电影。";
+        }
+
+        return IsTvSearchSelected
+            ? "输入电视剧名后搜索 TMDB 电视剧。"
+            : "输入电影名后搜索 TMDB 电影。";
+    }
+
+    private string BuildMissingSearchKeywordMessage()
+    {
+        if (IsSearchPersonSelected)
+        {
+            return "请输入需要搜索的导演/演员。";
+        }
+
+        return IsTvSearchSelected
+            ? "请输入需要搜索的电视剧名。"
+            : "请输入需要搜索的电影。";
+    }
+
+    private string BuildMovieSearchLoadingMessage()
+    {
+        return IsSearchPersonSelected
+            ? "正在按导演/演员搜索电影..."
+            : "正在搜索电影...";
+    }
+
+    private string BuildTvSearchLoadingMessage()
+    {
+        return IsSearchPersonSelected
+            ? "正在按导演/演员搜索电视剧..."
+            : "正在搜索电视剧...";
+    }
+
+    private string BuildMovieSearchNoResultsMessage()
+    {
+        return IsSearchPersonSelected
+            ? "未找到该人物相关电影。"
+            : "未找到相关电影。";
+    }
+
+    private string BuildTvSearchNoResultsMessage()
+    {
+        return IsSearchPersonSelected
+            ? "未找到该人物相关电视剧。"
+            : "未找到相关电视剧。";
+    }
+
+    private string BuildMovieSearchLoadedMessage()
+    {
+        return IsSearchPersonSelected
+            ? "电影人物搜索结果已加载。"
+            : "电影搜索结果已加载。";
+    }
+
+    private string BuildTvSearchLoadedMessage()
+    {
+        return IsSearchPersonSelected
+            ? "电视剧人物搜索结果已加载。"
+            : "电视剧搜索结果已加载。";
     }
 
     private static string FormatTotalResults(int totalResults)

@@ -1,14 +1,26 @@
 # Phase 7 Known Issues
 
-Last updated: 2026-06-01
+Last updated: 2026-06-04
 
 This file tracks current blockers, deferred work, risks, noise and user-confirmed non-issues for Phase 7. It should be updated at every Phase 7 substage closeout.
 
 ## Blocker
 
-- None currently known for the requested detail-page polish closeout.
+- None currently known after the Phase 7.4a Discovery search toolbar / layout implementation.
 
 ## Deferred
+
+### 7.4 Discovery
+
+- Dedicated 7.4 plan is tracked in `docs/movie-discovery/PHASE_7_4_DISCOVERY_PLAN.md`.
+- 7.4a completed Discovery search toolbar, shared Movie / TV search modes, dynamic placeholders, result status copy, baseline poster / list layout switching and Discovery-specific file-backed layout memory.
+- 7.4a added TV person search as a scoped Discovery search behavior through TMDB `person/{id}/tv_credits`; TV remains excluded from Movie AI recommendations, Watch Insights, profile/persona inputs and recommendation fingerprints.
+- 7.4b owns the full Discovery search UI visual alignment, including media-library-like toolbar/filter styling, result summary layout, scroll/density polish, poster/list containers and final result cards. Card requirements include no progress bar, top-left Movie/TV tag, top-right want-state action, rating badge treatment and no `已移出媒体库` button.
+- 7.4c owns ranking visual consistency only. TMDB ranking order, ranking source inclusion and paging semantics must remain unchanged unless explicitly documented as a blocker fix.
+- 7.4d owns the embedded AI recommendation tab and custom preference dialog polish only. Movie recommendation algorithms, prompts, profile/persona inputs, fingerprints and TV exclusion remain out of scope.
+- 7.4e owns Discovery regression closeout, docs updates and cross-page impact accounting.
+- 7.4a search UI is a functional baseline only. Full media-library-like visual alignment for the search toolbar, filters, summary, poster/list result areas, final list-row top-right want action, type/source tag placement and rating badge reuse remains 7.4b.
+- Discovery layout memory uses an App-layer preference file and must continue to avoid database fields or migrations.
 
 ### 7.3 Details
 
@@ -76,6 +88,9 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 | Live WPF backdrop blur can regress scrolling and detail navigation latency | A literal blur effect on stacked cards would be expensive and can reintroduce UI stalls | Keep the Apple-like blur impression static: cached diffuse background, translucent surfaces, edge highlights and bounded shadows only. |
 | Existing TV rows can still store raw TMDB English genre names | Older hydrated rows can contain values such as `Sci-Fi & Fantasy` | Normalize TV genre names when media-library rows load and when new TMDB TV details are parsed; do not require a migration. |
 | Movie correction detail enrichment adds bounded TMDB fan-out | Candidate rows need real crew / metadata without making the dialog unresponsive | Limit Movie to 10 rows, TV to 12 rows, use concurrency 4, keep busy UI visible and fall back per row on detail failure. |
+| 7.4 TV person search can accidentally cross recommendation boundaries | Person-based TV search is a Discovery feature but TV must stay out of Movie AI / Watch Insights / profiles | If added, use TV-capable TMDB credits only for Discovery result projection and document the business change in 7.4a / 7.4e closeout. |
+| 7.4 shared style extraction can regress Home / Media Library / Recommendation pages | Reusing cards, buttons and badges can alter accepted pages indirectly | Every substage must list touched non-stage pages/resources and verify visible impact before closeout. |
+| 7.4 Discovery layout memory can be overbuilt | Layout preference should not require schema or migration work | Use file-backed UI preference patterns only; keep migration diff empty. |
 
 ## Noise
 
