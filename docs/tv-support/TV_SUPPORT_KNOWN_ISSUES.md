@@ -752,3 +752,18 @@ Deferred:
 Noise:
 
 - Existing persistent TMDB TV detail cache rows use the previous schema key. New requests use `v3`; old cache rows remain for normal cache cleanup.
+
+## Phase 4 Detail / Correction Retest Known Issues
+
+Blocker:
+
+- None after build verification.
+
+Deferred:
+
+- Runtime visual acceptance is still required for the revised Movie/Episode/Season correction dialogs, especially long playback-source names, unknown-Season target lists, and target-episode mapping edits.
+- The Season target-episode mapping dialog now exposes per-row playback-source selection from the current detail query. Rows are still limited to episodes with movable playback sources; source-less episodes are not converted into empty mapping rows in this pass.
+
+Noise:
+
+- Manual probe can now be retried when a stored source remains in `Pending`; the button still disables while the current page is actively probing the same media file.

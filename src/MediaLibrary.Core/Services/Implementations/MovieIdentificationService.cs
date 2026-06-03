@@ -76,6 +76,160 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         return true;
     }
 
+    public async Task<bool> EnsureMovieListMetadataAsync(
+        int movieId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var movie = await dbContext.Movies
+            .Include(x => x.RatingSources)
+            .FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+        if (movie?.TmdbId is not > 0 || !IsStableIdentifiedMovie(movie))
+        {
+            return false;
+        }
+
+        var needsTmdbDetails = string.IsNullOrWhiteSpace(movie.DirectorText)
+                               || string.IsNullOrWhiteSpace(movie.ActorsText)
+                               || string.IsNullOrWhiteSpace(movie.GenresText)
+                               || string.IsNullOrWhiteSpace(movie.Overview)
+                               || string.IsNullOrWhiteSpace(movie.PosterRemoteUrl)
+                               || string.IsNullOrWhiteSpace(movie.ImdbId)
+                               || !movie.RuntimeMinutes.HasValue
+                               || !HasUsefulRating(movie, "TMDB");
+        var needsOmdbRating = !HasUsefulRating(movie, "OMDb");
+        if (!needsTmdbDetails && !needsOmdbRating)
+        {
+            return false;
+        }
+
+        MetadataSearchCandidate? details = null;
+        if (needsTmdbDetails || string.IsNullOrWhiteSpace(movie.ImdbId))
+        {
+            details = await _tmdbService.GetMovieDetailsAsync(movie.TmdbId.Value, cancellationToken);
+        }
+
+        var changed = false;
+        if (details is not null)
+        {
+            if (string.IsNullOrWhiteSpace(movie.OriginalTitle) && !string.IsNullOrWhiteSpace(details.OriginalTitle))
+            {
+                movie.OriginalTitle = details.OriginalTitle;
+                changed = true;
+            }
+
+            if (!movie.ReleaseDate.HasValue && details.ReleaseDate.HasValue)
+            {
+                movie.ReleaseDate = details.ReleaseDate;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.Overview) && !string.IsNullOrWhiteSpace(details.Overview))
+            {
+                movie.Overview = details.Overview;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.PosterRemoteUrl) && !string.IsNullOrWhiteSpace(details.PosterRemoteUrl))
+            {
+                movie.PosterRemoteUrl = details.PosterRemoteUrl;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.Country) && !string.IsNullOrWhiteSpace(details.Country))
+            {
+                movie.Country = details.Country;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.Language) && !string.IsNullOrWhiteSpace(details.Language))
+            {
+                movie.Language = details.Language;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.DirectorText) && !string.IsNullOrWhiteSpace(details.DirectorText))
+            {
+                movie.DirectorText = details.DirectorText;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.WriterText) && !string.IsNullOrWhiteSpace(details.WriterText))
+            {
+                movie.WriterText = details.WriterText;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.ActorsText) && !string.IsNullOrWhiteSpace(details.ActorsText))
+            {
+                movie.ActorsText = details.ActorsText;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.ProductionCompanyText) && !string.IsNullOrWhiteSpace(details.ProductionCompanyText))
+            {
+                movie.ProductionCompanyText = details.ProductionCompanyText;
+                changed = true;
+            }
+
+            if (!movie.RuntimeMinutes.HasValue && details.RuntimeMinutes.HasValue)
+            {
+                movie.RuntimeMinutes = details.RuntimeMinutes;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.ImdbId) && !string.IsNullOrWhiteSpace(details.ImdbId))
+            {
+                movie.ImdbId = details.ImdbId;
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.GenresText) && !string.IsNullOrWhiteSpace(details.GenresText))
+            {
+                movie.GenresText = details.GenresText;
+                changed = true;
+            }
+
+            if (!HasUsefulRating(movie, "TMDB") && details.TmdbRating.HasValue)
+            {
+                UpsertRating(movie, "TMDB", details.TmdbRating, 10d, details.TmdbVoteCount, $"https://www.themoviedb.org/movie/{details.TmdbId}");
+                changed = true;
+            }
+        }
+
+        if (needsOmdbRating && !string.IsNullOrWhiteSpace(movie.ImdbId))
+        {
+            try
+            {
+                var omdbRating = await _omdbService.GetRatingAsync(movie.ImdbId, cancellationToken);
+                if (omdbRating is not null)
+                {
+                    UpsertRating(
+                        movie,
+                        omdbRating.SourceName,
+                        omdbRating.ScoreValue,
+                        omdbRating.ScoreScale,
+                        omdbRating.VoteCount,
+                        omdbRating.SourceUrl);
+                    changed = true;
+                }
+            }
+            catch
+            {
+                // List hydration is best-effort; detail pages can retry later.
+            }
+        }
+
+        if (!changed)
+        {
+            return false;
+        }
+
+        movie.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<IdentificationRunResult> IdentifyMediaFilesAsync(
         IReadOnlyCollection<int> mediaFileIds,
         ScanTmdbSearchCache? tmdbSearchCache,
@@ -1994,6 +2148,14 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         rating.VoteCount = voteCount;
         rating.SourceUrl = string.IsNullOrWhiteSpace(sourceUrl) ? null : sourceUrl;
         rating.LastUpdatedAt = DateTime.UtcNow;
+    }
+
+    private static bool HasUsefulRating(Movie movie, string sourceName)
+    {
+        return movie.RatingSources.Any(
+            rating => string.Equals(rating.SourceName, sourceName, StringComparison.OrdinalIgnoreCase)
+                      && rating.ScoreValue > 0
+                      && rating.ScoreScale > 0);
     }
 
     private async Task UpsertFailurePlaceholderAsync(

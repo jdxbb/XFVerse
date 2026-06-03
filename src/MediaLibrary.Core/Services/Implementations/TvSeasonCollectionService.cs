@@ -67,7 +67,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                         : ResolveTotalEpisodeCount(season);
                     var watchedEpisodeCount = season?.WatchedEpisodeCount ?? 0;
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, season?.EpisodeCount ?? 0, totalEpisodeCount);
-                    var isUnwatched = watchedEpisodeCount == 0;
+                    var isUnwatched = !isWatched;
                     var isFavorite = item.IsFavorite && isWatched;
                     var isWantToWatch = item.IsWantToWatch && isUnwatched;
                     return new CollectionMovieItem
@@ -689,7 +689,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         var aggregateEpisodes = FilterCountableSeasonEpisodes(season, episodes);
         var totalEpisodeCount = ResolveTotalEpisodeCount(season, aggregateEpisodes);
         var isSeasonWatched = IsAggregateWatched(aggregateEpisodes.Count(x => x.IsWatched), aggregateEpisodes.Count, totalEpisodeCount);
-        var isSeasonUnwatched = aggregateEpisodes.All(x => !x.IsWatched);
+        var isSeasonUnwatched = !isSeasonWatched;
 
         if (stateType == StateFavorite && newValue && !isSeasonWatched)
         {

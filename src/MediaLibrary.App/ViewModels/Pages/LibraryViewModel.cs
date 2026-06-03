@@ -54,10 +54,13 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string RefreshReasonBatchDeleteRecords = "operation-batch-delete-records";
     private const string RefreshReasonManualAggregation = "operation-manual-aggregation";
     private const string RefreshReasonBatchAiExitBatchMode = "operation-batch-ai-exit-batch-mode";
+    private const string RefreshReasonBatchAiProgress = "operation-batch-ai-progress";
     private const string RefreshReasonBatchAiResult = "operation-batch-ai-result";
     private const int TagFilterColumnCount = 4;
     private const string LibraryLayoutPoster = "poster";
     private const string LibraryLayoutList = "list";
+    private const int ListHydrationMaxAttempts = 3;
+    private const int ListHydrationConcurrency = 4;
     private static readonly TimeSpan RefreshDebounceDelay = TimeSpan.FromMilliseconds(200);
     private static readonly string[] TypeTagLabels =
     [
@@ -88,6 +91,9 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly IUserCollectionService _userCollectionService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IManualUnknownSeasonAggregationService _manualUnknownSeasonAggregationService;
+    private readonly ITvMetadataHydrationService _tvMetadataHydrationService;
+    private readonly ITvDetailQueryService _tvDetailQueryService;
+    private readonly IAiClassificationService _aiClassificationService;
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly ILibraryPreferencesService _libraryPreferencesService;
     private readonly List<LibraryMovieListItem> _allMovies = [];
@@ -98,9 +104,12 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly object _refreshGate = new();
     private readonly HashSet<string> _queuedRefreshReasons = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _attemptedMovieCrewHydrationIds = [];
+    private readonly Dictionary<string, int> _listHydrationAttempts = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _refreshDebounceCts;
+    private CancellationTokenSource? _listHydrationCts;
     private Task? _refreshLoopTask;
     private CancellationTokenSource? _batchIdentifyCancellationTokenSource;
+    private bool _isBatchAiIdentificationRunning;
     private bool _isActive;
     private bool _isRefreshRunning;
     private bool _pendingRefresh;
@@ -131,6 +140,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private bool _isRemovedLibraryPanelOpen;
     private bool _isRemovedLibraryLoading;
     private bool _isManualAggregationDialogOpen;
+    private bool _preserveRemovedLibraryPanelOnDeactivate;
     private bool _isManualAggregationBusy;
     private string _statusMessage = "正在加载媒体库...";
     private string _batchResultSummary = string.Empty;
@@ -151,6 +161,9 @@ public sealed class LibraryViewModel : PageViewModelBase
         ITvSeasonCollectionService tvSeasonCollectionService,
         IManualUnknownSeasonAggregationService manualUnknownSeasonAggregationService,
         ILibraryPreferencesService libraryPreferencesService,
+        ITvMetadataHydrationService tvMetadataHydrationService,
+        ITvDetailQueryService tvDetailQueryService,
+        IAiClassificationService aiClassificationService,
         IConfirmationDialogService confirmationDialogService)
         : base("媒体库", "查看你的影片资源")
     {
@@ -164,6 +177,9 @@ public sealed class LibraryViewModel : PageViewModelBase
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _manualUnknownSeasonAggregationService = manualUnknownSeasonAggregationService;
         _libraryPreferencesService = libraryPreferencesService;
+        _tvMetadataHydrationService = tvMetadataHydrationService;
+        _tvDetailQueryService = tvDetailQueryService;
+        _aiClassificationService = aiClassificationService;
         _confirmationDialogService = confirmationDialogService;
         _dataRefreshService.DataChanged += OnDataChanged;
 
@@ -193,7 +209,9 @@ public sealed class LibraryViewModel : PageViewModelBase
         OpenMovieCommand = new RelayCommand(OpenMovie);
         OpenOrToggleSelectionCommand = new RelayCommand(OpenOrToggleSelection);
         ToggleItemSelectionCommand = new RelayCommand(ToggleItemSelection);
-        ToggleBatchSelectionModeCommand = new RelayCommand(ToggleBatchSelectionMode, () => !IsBatchOperationRunning);
+        ToggleBatchSelectionModeCommand = new RelayCommand(
+            ExecuteBatchSelectionButton,
+            () => !IsBatchOperationRunning || CanCancelBatchOperation);
         SelectVisibleItemsCommand = new RelayCommand(SelectVisibleItems, () => CanSelectVisibleItems);
         ClearBatchSelectionCommand = new RelayCommand(ClearBatchSelection, () => CanClearBatchSelection);
         BatchMarkWatchedCommand = new AsyncRelayCommand(() => BatchSetWatchedAsync(true), () => CanBatchMarkWatched);
@@ -622,6 +640,15 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isBatchOperationRunning, value))
             {
+                if (value)
+                {
+                    CancelVisibleListFieldHydration();
+                }
+                else
+                {
+                    ScheduleVisibleListFieldHydrationFromCurrentItems();
+                }
+
                 RefreshBatchCommandState();
             }
         }
@@ -641,6 +668,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             if (SetProperty(ref _batchResultSummary, value))
             {
                 OnPropertyChanged(nameof(HasBatchResultSummary));
+                OnPropertyChanged(nameof(BatchStatusLineText));
+                OnPropertyChanged(nameof(HasBatchStatusLine));
             }
         }
     }
@@ -692,7 +721,32 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public bool HasSelection => SelectedCount > 0;
 
-    public string BatchSelectionButtonText => IsBatchSelectionMode ? "完成" : "批量选择";
+    public string BatchSelectionButtonText => CanCancelBatchOperation
+        ? "取消识别"
+        : IsBatchSelectionMode ? "完成" : "批量选择";
+
+    public bool AreAllVisibleItemsSelected => Movies.Count > 0
+                                              && Movies.All(movie => _selectedItemKeys.Contains(movie.SelectionKey));
+
+    public string SelectVisibleItemsButtonText => AreAllVisibleItemsSelected ? "取消全选" : "全选";
+
+    public string BatchStatusLineText
+    {
+        get
+        {
+            if (!IsBatchSelectionMode)
+            {
+                return BatchResultSummary;
+            }
+
+            var selectedText = $"已选 {SelectedCount} 项";
+            return string.IsNullOrWhiteSpace(BatchResultSummary)
+                ? selectedText
+                : $"{selectedText} · {BatchResultSummary}";
+        }
+    }
+
+    public bool HasBatchStatusLine => IsBatchSelectionMode || !string.IsNullOrWhiteSpace(BatchResultSummary);
 
     public bool CanSelectVisibleItems => IsBatchSelectionMode && Movies.Count > 0 && !IsBatchOperationRunning;
 
@@ -855,6 +909,10 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public override Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        CancelVisibleListFieldHydration();
+        _listHydrationAttempts.Clear();
+        _attemptedMovieCrewHydrationIds.Clear();
+
         lock (_refreshGate)
         {
             _isActive = true;
@@ -870,11 +928,13 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public override void Deactivate()
     {
-        if (IsRemovedLibraryPanelOpen)
+        if (IsRemovedLibraryPanelOpen && !_preserveRemovedLibraryPanelOnDeactivate)
         {
             CloseRemovedLibrary();
         }
 
+        _preserveRemovedLibraryPanelOnDeactivate = false;
+        CancelVisibleListFieldHydration();
         lock (_refreshGate)
         {
             _isActive = false;
@@ -907,7 +967,6 @@ public sealed class LibraryViewModel : PageViewModelBase
             _allMovies.AddRange(movies);
             ApplyExternalTagCache(_allMovies);
             NormalizeTvGenreLabels(_allMovies);
-            _ = HydrateMissingMovieCreditsAsync(_allMovies);
 
             var tagDecadeStopwatch = Stopwatch.StartNew();
             RefreshTagOptions();
@@ -979,39 +1038,376 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
     }
 
-    private async Task HydrateMissingMovieCreditsAsync(IReadOnlyCollection<LibraryMovieListItem> items)
+    private void ScheduleVisibleListFieldHydration(
+        IReadOnlyList<LibraryMovieListItem> filteredItems,
+        IReadOnlyList<LibraryMovieItemViewModel> viewModels)
     {
-        var candidates = items
-            .Where(item => item.ItemKind == LibraryMediaItemKind.Movie
-                           && item.MovieId > 0
-                           && item.TmdbId is > 0
-                           && (string.IsNullOrWhiteSpace(item.DirectorText)
-                               || string.IsNullOrWhiteSpace(item.ActorsText)))
-            .Where(item => _attemptedMovieCrewHydrationIds.Add(item.MovieId))
-            .Take(16)
-            .ToList();
+        CancelVisibleListFieldHydration();
+        if (IsPosterView || IsBatchOperationRunning || filteredItems.Count == 0 || !_isActive)
+        {
+            if (!IsPosterView && filteredItems.Count > 0)
+            {
+                WriteLibraryRefreshEvent(
+                    "library-list-field-hydration-skipped",
+                    $"reason=not-eligible active={_isActive.ToString().ToLowerInvariant()} batchOperation={IsBatchOperationRunning.ToString().ToLowerInvariant()} visibleCount={filteredItems.Count}");
+            }
+
+            return;
+        }
+
+        var candidates = BuildVisibleListHydrationCandidates(filteredItems, viewModels).ToList();
         if (candidates.Count == 0)
+        {
+            WriteLibraryRefreshEvent(
+                "library-list-field-hydration-skipped",
+                $"reason=no-candidates visibleCount={filteredItems.Count}");
+            return;
+        }
+
+        WriteLibraryRefreshEvent(
+            "library-list-field-hydration-scheduled",
+            $"visibleCount={filteredItems.Count} candidateCount={candidates.Count} movieMeta={CountListHydrationCandidates(candidates, "movie-meta:")} movieTags={CountListHydrationCandidates(candidates, "movie-tags:")} tvMeta={CountListHydrationCandidates(candidates, "tv-meta:")} tvRating={CountListHydrationCandidates(candidates, "tv-rating:")} concurrency={ListHydrationConcurrency} maxAttempts={ListHydrationMaxAttempts}");
+        var cts = new CancellationTokenSource();
+        _listHydrationCts = cts;
+        _ = HydrateVisibleListFieldsAsync(candidates, cts.Token);
+    }
+
+    private void ScheduleVisibleListFieldHydrationFromCurrentItems()
+    {
+        ScheduleVisibleListFieldHydration(
+            Movies.Select(item => item.Movie).ToArray(),
+            Movies.ToArray());
+    }
+
+    private void CancelVisibleListFieldHydration()
+    {
+        var cts = _listHydrationCts;
+        _listHydrationCts = null;
+        if (cts is null || cts.IsCancellationRequested)
         {
             return;
         }
 
-        var changed = false;
-        foreach (var candidate in candidates)
+        cts.Cancel();
+    }
+
+    private static int CountListHydrationCandidates(
+        IEnumerable<ListFieldHydrationCandidate> candidates,
+        string prefix)
+    {
+        return candidates.Count(candidate => candidate.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IReadOnlyList<ListFieldHydrationCandidate> BuildVisibleListHydrationCandidates(
+        IReadOnlyList<LibraryMovieListItem> filteredItems,
+        IReadOnlyList<LibraryMovieItemViewModel> viewModels)
+    {
+        var viewModelsByKey = viewModels.ToDictionary(item => item.SelectionKey, StringComparer.OrdinalIgnoreCase);
+        var candidates = new List<ListFieldHydrationCandidate>();
+        var scheduledKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in filteredItems)
         {
-            try
+            var selectionKey = BuildSelectionKey(item);
+            viewModelsByKey.TryGetValue(selectionKey, out var viewModel);
+
+            TryAddListFieldHydrationCandidate(
+                candidates,
+                scheduledKeys,
+                NeedsMovieListMetadata(item),
+                $"movie-meta:{item.MovieId}",
+                token => _movieIdentificationService.EnsureMovieListMetadataAsync(item.MovieId, token));
+
+            TryAddListFieldHydrationCandidate(
+                candidates,
+                scheduledKeys,
+                NeedsMovieAiTags(item),
+                $"movie-tags:{item.MovieId}",
+                async token =>
+                {
+                    await _aiClassificationService.ClassifyMovieAsync(item.MovieId, token);
+                    return true;
+                });
+
+            TryAddListFieldHydrationCandidate(
+                candidates,
+                scheduledKeys,
+                NeedsTvListMetadata(item),
+                $"tv-meta:{item.SeriesId}",
+                token => HydrateTvListMetadataAsync(item, token));
+
+            if (viewModel is not null
+                && NeedsTvListRating(item))
             {
-                changed |= await _movieIdentificationService.EnsureMovieCreditsAsync(candidate.MovieId);
-            }
-            catch
-            {
-                // List crew hydration is best-effort and must not block library rendering.
+                TryAddListFieldHydrationCandidate(
+                    candidates,
+                    scheduledKeys,
+                    shouldAdd: true,
+                    BuildTvRatingHydrationKey(item),
+                    token => HydrateTvListRatingAsync(item, viewModel, token));
             }
         }
 
-        if (changed)
+        return candidates;
+    }
+
+    private bool TryAddListFieldHydrationCandidate(
+        ICollection<ListFieldHydrationCandidate> candidates,
+        ISet<string> scheduledKeys,
+        bool shouldAdd,
+        string key,
+        Func<CancellationToken, Task<bool>> hydrateAsync)
+    {
+        if (!shouldAdd
+            || string.IsNullOrWhiteSpace(key)
+            || !scheduledKeys.Add(key)
+            || !TryReserveListHydrationAttempt(key))
+        {
+            return false;
+        }
+
+        candidates.Add(new ListFieldHydrationCandidate(key, hydrateAsync));
+        return true;
+    }
+
+    private bool TryReserveListHydrationAttempt(string key)
+    {
+        _listHydrationAttempts.TryGetValue(key, out var attempts);
+        if (attempts >= ListHydrationMaxAttempts)
+        {
+            return false;
+        }
+
+        _listHydrationAttempts[key] = attempts + 1;
+        return true;
+    }
+
+    private async Task HydrateVisibleListFieldsAsync(
+        IReadOnlyList<ListFieldHydrationCandidate> candidates,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var changedCount = 0;
+        WriteLibraryRefreshEvent(
+            "library-list-field-hydration-started",
+            $"candidateCount={candidates.Count} concurrency={ListHydrationConcurrency}");
+        using var gate = new SemaphoreSlim(ListHydrationConcurrency, ListHydrationConcurrency);
+        var tasks = candidates.Select(
+            async candidate =>
+            {
+                await gate.WaitAsync(cancellationToken);
+                try
+                {
+                    if (await HydrateListFieldCandidateWithRetryAsync(candidate, cancellationToken))
+                    {
+                        Interlocked.Increment(ref changedCount);
+                    }
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            }).ToArray();
+
+        try
+        {
+            await Task.WhenAll(tasks);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            stopwatch.Stop();
+            WriteLibraryRefreshEvent(
+                "library-list-field-hydration-cancelled",
+                $"candidateCount={candidates.Count} changed={changedCount} elapsedMs={stopwatch.ElapsedMilliseconds}");
+            if (changedCount > 0)
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+            }
+
+            return;
+        }
+
+        stopwatch.Stop();
+        WriteLibraryRefreshEvent(
+            "library-list-field-hydration-completed",
+            $"candidateCount={candidates.Count} changed={changedCount} elapsedMs={stopwatch.ElapsedMilliseconds}");
+
+        if (changedCount > 0 && !cancellationToken.IsCancellationRequested)
         {
             _dataRefreshService.NotifyMetadataChanged();
         }
+    }
+
+    private async Task<bool> HydrateListFieldCandidateWithRetryAsync(
+        ListFieldHydrationCandidate candidate,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= ListHydrationMaxAttempts; attempt++)
+        {
+            try
+            {
+                return await candidate.HydrateAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (attempt < ListHydrationMaxAttempts)
+            {
+                WriteLibraryRefreshEvent(
+                    "library-list-field-hydration-retry",
+                    $"key={ScanIdentificationDiagnostics.FormatValue(candidate.Key)} attempt={attempt} errorType={exception.GetType().Name}");
+                await Task.Delay(TimeSpan.FromMilliseconds(350 * attempt), cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                WriteLibraryRefreshEvent(
+                    "library-list-field-hydration-failed",
+                    $"key={ScanIdentificationDiagnostics.FormatValue(candidate.Key)} attempts={attempt} errorType={exception.GetType().Name}");
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task<bool> HydrateTvListMetadataAsync(LibraryMovieListItem item, CancellationToken cancellationToken)
+    {
+        if (item.SeriesId <= 0)
+        {
+            return false;
+        }
+
+        var result = await _tvMetadataHydrationService.EnsureHydratedBySeriesIdAsync(
+            item.SeriesId,
+            force: false,
+            cancellationToken);
+        return !result.Skipped && result.HasMetadata;
+    }
+
+    private async Task<bool> HydrateTvListRatingAsync(
+        LibraryMovieListItem item,
+        LibraryMovieItemViewModel viewModel,
+        CancellationToken cancellationToken)
+    {
+        if (item.SeriesId <= 0)
+        {
+            return false;
+        }
+
+        var ratings = new List<MovieRatingItem>();
+        if (item.IsSeason && item.SeasonId > 0)
+        {
+            var seasonTmdbRating = await _tvDetailQueryService.GetSeasonTmdbRatingAsync(item.SeasonId, cancellationToken);
+            if (IsValidRating(seasonTmdbRating))
+            {
+                ratings.Add(seasonTmdbRating);
+            }
+
+            var seriesRatings = await _tvDetailQueryService.GetSeriesRatingsAsync(item.SeriesId, cancellationToken);
+            ratings.AddRange(seriesRatings.Where(rating => string.Equals(rating.SourceName, "IMDb", StringComparison.OrdinalIgnoreCase)));
+        }
+        else
+        {
+            ratings.AddRange(await _tvDetailQueryService.GetSeriesRatingsAsync(item.SeriesId, cancellationToken));
+        }
+
+        var weightedRating = BuildWeightedRating(ratings);
+        if (!weightedRating.HasValue)
+        {
+            return false;
+        }
+
+        await Application.Current.Dispatcher.InvokeAsync(
+            () => viewModel.ApplyRatingOverride(weightedRating.Value, "TMDB/IMDb"));
+        return false;
+    }
+
+    private static bool NeedsMovieListMetadata(LibraryMovieListItem item)
+    {
+        return item.IsMovie
+               && item.MovieId > 0
+               && item.TmdbId is > 0
+               && item.IdentificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed
+               && (string.IsNullOrWhiteSpace(item.DirectorText)
+                   || string.IsNullOrWhiteSpace(item.ActorsText)
+                   || string.IsNullOrWhiteSpace(item.GenresText)
+                   || string.IsNullOrWhiteSpace(item.Overview)
+                   || string.IsNullOrWhiteSpace(item.PosterRemoteUrl)
+                   || string.IsNullOrWhiteSpace(item.ImdbId)
+                   || !item.RuntimeMinutes.HasValue
+                   || !item.PrimaryRatingValue.HasValue);
+    }
+
+    private static bool NeedsMovieAiTags(LibraryMovieListItem item)
+    {
+        return item.IsMovie
+               && item.MovieId > 0
+               && item.TmdbId is > 0
+               && item.IdentificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed
+               && (string.IsNullOrWhiteSpace(item.AiTagsText)
+                   || string.IsNullOrWhiteSpace(item.EmotionTagsText)
+                   || string.IsNullOrWhiteSpace(item.SceneTagsText));
+    }
+
+    private static bool NeedsTvListMetadata(LibraryMovieListItem item)
+    {
+        return (item.IsSeries || item.IsSeason)
+               && item.SeriesId > 0
+               && item.TmdbId is > 0
+               && (string.IsNullOrWhiteSpace(item.GenresText)
+                   || string.IsNullOrWhiteSpace(item.Country)
+                   || string.IsNullOrWhiteSpace(item.Language)
+                   || string.IsNullOrWhiteSpace(item.DirectorText)
+                   || string.IsNullOrWhiteSpace(item.ActorsText)
+                   || string.IsNullOrWhiteSpace(item.Overview)
+                   || string.IsNullOrWhiteSpace(item.PosterRemoteUrl));
+    }
+
+    private static bool NeedsTvListRating(LibraryMovieListItem item)
+    {
+        return (item.IsSeries || item.IsSeason)
+               && item.SeriesId > 0
+               && item.TmdbId is > 0;
+    }
+
+    private static string BuildTvRatingHydrationKey(LibraryMovieListItem item)
+    {
+        return item.IsSeason && item.SeasonId > 0
+            ? $"tv-rating:season:{item.SeasonId}"
+            : $"tv-rating:series:{item.SeriesId}";
+    }
+
+    private static double? BuildWeightedRating(IEnumerable<MovieRatingItem> ratings)
+    {
+        const int voteWeightCap = 100_000;
+        var normalizedRatings = ratings
+            .Where(IsValidRating)
+            .Select(
+                rating => new
+                {
+                    Rating = NormalizeRatingToTen(rating.ScoreValue, rating.ScoreScale),
+                    Votes = Math.Min(Math.Max(rating.VoteCount ?? 0, 0), voteWeightCap)
+                })
+            .ToList();
+        if (normalizedRatings.Count == 0)
+        {
+            return null;
+        }
+
+        var totalVotes = normalizedRatings.Sum(x => x.Votes);
+        return totalVotes > 0
+            ? normalizedRatings.Sum(x => x.Rating * x.Votes) / totalVotes
+            : normalizedRatings.Average(x => x.Rating);
+    }
+
+    private static bool IsValidRating(MovieRatingItem rating)
+    {
+        return rating.ScoreValue > 0 && rating.ScoreScale > 0;
+    }
+
+    private static double NormalizeRatingToTen(double scoreValue, double scoreScale)
+    {
+        return Math.Clamp(scoreValue / scoreScale * 10d, 0d, 10d);
     }
 
     private Task RequestLibraryRefreshAsync(
@@ -1855,6 +2251,13 @@ public sealed class LibraryViewModel : PageViewModelBase
     {
         _hasUserChangedLayoutThisSession = true;
         IsPosterView = isPosterView;
+        if (isPosterView)
+        {
+            CancelVisibleListFieldHydration();
+            return;
+        }
+
+        ScheduleVisibleListFieldHydrationFromCurrentItems();
     }
 
     private async Task LoadLibraryPreferencesAsync()
@@ -1975,6 +2378,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             _isUpdatingTagSelection = true;
             try
             {
+                EnsureContentTypeIncludesTagCategory(option.Category);
                 var optionsToClear = string.Equals(option.Category, TagCategoryTv, StringComparison.Ordinal)
                     ? MovieTagOptions()
                     : TvTagOptions;
@@ -1993,6 +2397,26 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(TagFilterButtonText));
         OnPropertyChanged(nameof(IsTagFilterAllSelected));
         ApplyFilters();
+    }
+
+    private void EnsureContentTypeIncludesTagCategory(string tagCategory)
+    {
+        if (_selectedContentTypeFilters.Count == 0)
+        {
+            return;
+        }
+
+        var requiredContentType = string.Equals(tagCategory, TagCategoryTv, StringComparison.Ordinal)
+            ? ContentTypeTv
+            : ContentTypeMovie;
+        if (_selectedContentTypeFilters.Contains(requiredContentType))
+        {
+            return;
+        }
+
+        _selectedContentTypeFilters.Clear();
+        _selectedContentTypeFilters.Add(requiredContentType);
+        RefreshContentTypeFilterState(applyFilters: false);
     }
 
     private void RefreshDecadeOptions()
@@ -2166,6 +2590,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             })
             .ToList();
         Movies.ReplaceAll(viewModels);
+        ScheduleVisibleListFieldHydration(filtered, viewModels);
 
         OnPropertyChanged(nameof(HasMovies));
         OnPropertyChanged(nameof(ShowLibraryInitialLoading));
@@ -2530,6 +2955,17 @@ public sealed class LibraryViewModel : PageViewModelBase
         _ = RequestLibraryRefreshAsync(RefreshReasonBatchModeChanged, debounce: false, allowWhenInactive: true);
     }
 
+    private void ExecuteBatchSelectionButton()
+    {
+        if (CanCancelBatchOperation)
+        {
+            CancelBatchOperation();
+            return;
+        }
+
+        ToggleBatchSelectionMode();
+    }
+
     private void OpenOrToggleSelection(object? parameter)
     {
         if (parameter is not LibraryMovieItemViewModel item)
@@ -2581,13 +3017,27 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        if (AreAllVisibleItemsSelected)
+        {
+            foreach (var item in Movies)
+            {
+                _selectedItemKeys.Remove(item.SelectionKey);
+                item.IsSelected = false;
+            }
+
+            BatchResultSummary = "已取消全选。";
+            WriteLibraryBatchEvent($"event=library-cancel-select-visible-items count={Movies.Count}");
+            RefreshBatchCommandState();
+            return;
+        }
+
         foreach (var item in Movies)
         {
             _selectedItemKeys.Add(item.SelectionKey);
             item.IsSelected = true;
         }
 
-        BatchResultSummary = $"\u5DF2\u9009\u4E2D\u5F53\u524D\u5217\u8868 {Movies.Count} \u9879\u3002";
+        BatchResultSummary = $"已全选当前列表 {Movies.Count} 项。";
         WriteLibraryBatchEvent($"event=library-select-visible-items count={Movies.Count}");
         RefreshBatchCommandState();
     }
@@ -3168,6 +3618,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             .Select(BuildBatchAiCorrectionSelection)
             .ToArray();
         _batchIdentifyCancellationTokenSource = new CancellationTokenSource();
+        SetBatchAiIdentificationRunning(true);
         IsBatchOperationRunning = true;
         ClearSelection();
         IsBatchSelectionMode = false;
@@ -3186,7 +3637,22 @@ public sealed class LibraryViewModel : PageViewModelBase
             WriteBatch2Event($"event=batch2-ai-identify-initial-refresh-complete elapsedMs={initialRefreshStopwatch.ElapsedMilliseconds}");
             BatchResultSummary = $"正在批量 AI 辅助识别 0 / {selectedItems.Count}：正在创建处理单元。";
 
-            var progress = new Progress<BatchAiCorrectionProgress>(UpdateBatchAutoIdentifyProgress);
+            var refreshedSuccessCount = 0;
+            var progress = new Progress<BatchAiCorrectionProgress>(
+                progressValue =>
+                {
+                    UpdateBatchAutoIdentifyProgress(progressValue);
+                    if (progressValue.SuccessCount <= refreshedSuccessCount)
+                    {
+                        return;
+                    }
+
+                    refreshedSuccessCount = progressValue.SuccessCount;
+                    _ = RequestLibraryRefreshAsync(
+                        RefreshReasonBatchAiProgress,
+                        debounce: true,
+                        allowWhenInactive: true);
+                });
             var result = await _batchAiCorrectionService.CorrectAsync(selections, progress, cancellationToken);
             var retainedItems = BuildRetainedBatchAiItems(result);
 
@@ -3221,6 +3687,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             _batchIdentifyCancellationTokenSource.Dispose();
             _batchIdentifyCancellationTokenSource = null;
+            SetBatchAiIdentificationRunning(false);
             IsBatchOperationRunning = false;
             RefreshBatchCommandState();
         }
@@ -3248,6 +3715,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         var cancelledCount = 0;
         var retainedItems = new List<BatchItemError>();
         _batchIdentifyCancellationTokenSource = new CancellationTokenSource();
+        SetBatchAiIdentificationRunning(true);
         IsBatchOperationRunning = true;
         var batchStopwatch = Stopwatch.StartNew();
         WriteBatch2Event($"event=batch2-ai-identify-batch-start count={selectedItems.Count}");
@@ -3285,6 +3753,10 @@ public sealed class LibraryViewModel : PageViewModelBase
                 {
                     case AutoIdentifyStatus.Success:
                         successCount++;
+                        _ = RequestLibraryRefreshAsync(
+                            RefreshReasonBatchAiProgress,
+                            debounce: true,
+                            allowWhenInactive: true);
                         break;
                     case AutoIdentifyStatus.NoResult:
                         noResultCount++;
@@ -3340,6 +3812,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         {
             _batchIdentifyCancellationTokenSource.Dispose();
             _batchIdentifyCancellationTokenSource = null;
+            SetBatchAiIdentificationRunning(false);
             IsBatchOperationRunning = false;
             RefreshBatchCommandState();
         }
@@ -3354,8 +3827,20 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         _batchIdentifyCancellationTokenSource.Cancel();
+        WriteBatch2Event("event=batch2-ai-identify-cancel-requested source=batch-selection-button");
         BatchResultSummary = "正在取消批量 AI 辅助识别，当前项结束后停止后续项。";
         RefreshBatchCommandState();
+    }
+
+    private void SetBatchAiIdentificationRunning(bool isRunning)
+    {
+        if (_isBatchAiIdentificationRunning == isRunning)
+        {
+            return;
+        }
+
+        _isBatchAiIdentificationRunning = isRunning;
+        _navigationStateService.SetDetailNavigationBlocked(isRunning);
     }
 
     private IReadOnlyList<LibraryMovieItemViewModel> GetSelectedVisibleItems()
@@ -3523,6 +4008,10 @@ public sealed class LibraryViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(AreAllVisibleItemsSelected));
+        OnPropertyChanged(nameof(SelectVisibleItemsButtonText));
+        OnPropertyChanged(nameof(BatchStatusLineText));
+        OnPropertyChanged(nameof(HasBatchStatusLine));
         OnPropertyChanged(nameof(CanSelectVisibleItems));
         OnPropertyChanged(nameof(CanClearBatchSelection));
         OnPropertyChanged(nameof(CanBatchMarkWatched));
@@ -3607,6 +4096,12 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private async Task OpenMovieAsync(object? parameter)
     {
+        if (_isBatchAiIdentificationRunning)
+        {
+            return;
+        }
+
+        var preserveRemovedLibraryPanel = IsRemovedLibraryDetailParameter(parameter);
         if (parameter is RemovedLibraryGroupViewModel { IsTvGroup: true } removedGroup)
         {
             var seriesId = removedGroup.Items
@@ -3614,6 +4109,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                 .FirstOrDefault(id => id > 0);
             if (seriesId > 0)
             {
+                PreserveRemovedLibraryPanelOnNextDeactivate(preserveRemovedLibraryPanel);
                 _navigationStateService.RequestTvSeriesOverview(seriesId);
                 return;
             }
@@ -3636,7 +4132,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         if (movie.IsOther && movie.OrphanMediaFileId > 0)
         {
-            await OpenOrphanUnknownMovieDetailAsync(movie.OrphanMediaFileId);
+            await OpenOrphanUnknownMovieDetailAsync(movie.OrphanMediaFileId, preserveRemovedLibraryPanel);
             return;
         }
 
@@ -3649,18 +4145,21 @@ public sealed class LibraryViewModel : PageViewModelBase
         if ((movie.IsSeries || (movie.IsOther && movie.SeriesId > 0 && movie.SeasonId == 0))
             && movie.SeriesId > 0)
         {
+            PreserveRemovedLibraryPanelOnNextDeactivate(preserveRemovedLibraryPanel);
             _navigationStateService.RequestTvSeriesOverview(movie.SeriesId);
             return;
         }
 
         if ((movie.IsSeason || movie.IsOther) && movie.SeasonId > 0)
         {
+            PreserveRemovedLibraryPanelOnNextDeactivate(preserveRemovedLibraryPanel);
             _navigationStateService.RequestTvSeasonDetail(movie.SeasonId);
             return;
         }
 
         if (movie.MovieId > 0)
         {
+            PreserveRemovedLibraryPanelOnNextDeactivate(preserveRemovedLibraryPanel);
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movie.MovieId);
             return;
         }
@@ -3671,21 +4170,38 @@ public sealed class LibraryViewModel : PageViewModelBase
             return;
         }
 
+        PreserveRemovedLibraryPanelOnNextDeactivate(preserveRemovedLibraryPanel);
         _navigationStateService.RequestExternalMovieDetail(BuildRecommendationItem(movie));
     }
 
-    private async Task OpenOrphanUnknownMovieDetailAsync(int mediaFileId)
+    private async Task OpenOrphanUnknownMovieDetailAsync(int mediaFileId, bool preserveRemovedLibraryPanel)
     {
         try
         {
             StatusMessage = "正在打开未识别文件详情。";
             var movieId = await _movieManagementService.EnsureUnidentifiedMoviePlaceholderForMediaFileAsync(mediaFileId);
             _dataRefreshService.NotifyLibraryChanged();
+            PreserveRemovedLibraryPanelOnNextDeactivate(preserveRemovedLibraryPanel);
             _navigationStateService.RequestNavigation(NavigationPageKey.MovieDetail, movieId);
         }
         catch (Exception exception)
         {
             StatusMessage = $"打开未识别文件详情失败：{DescribeException(exception)}";
+        }
+    }
+
+    private bool IsRemovedLibraryDetailParameter(object? parameter)
+    {
+        return IsRemovedLibraryPanelOpen
+               && (parameter is RemovedLibraryGroupViewModel
+                   || parameter is LibraryMovieItemViewModel item && RemovedLibraryItems.Contains(item));
+    }
+
+    private void PreserveRemovedLibraryPanelOnNextDeactivate(bool preserve)
+    {
+        if (preserve)
+        {
+            _preserveRemovedLibraryPanelOnDeactivate = true;
         }
     }
 
@@ -4017,6 +4533,10 @@ public sealed class LibraryViewModel : PageViewModelBase
 
         public int ColumnCount { get; }
     }
+
+    private sealed record ListFieldHydrationCandidate(
+        string Key,
+        Func<CancellationToken, Task<bool>> HydrateAsync);
 
     private sealed record BatchItemError(string SelectionKey, string Title, string Message);
 }

@@ -353,7 +353,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         var isSeasonWatched = totalEpisodeCount > 0
             ? episodeItems.Count >= totalEpisodeCount && watchedEpisodeCount >= totalEpisodeCount
             : episodeItems.Count > 0 && watchedEpisodeCount >= episodeItems.Count;
-        var isSeasonUnwatched = watchedEpisodeCount == 0;
+        var isSeasonUnwatched = !isSeasonWatched;
         var sourceSummary = TvDetailDisplayText.FormatSourceSummary(
             sourceRows.Select(x => x.ProtocolType).Distinct().ToArray());
         var posterDisplayUrl = FirstNonEmpty(season.PosterRemoteUrl, season.SeriesPosterRemoteUrl);
@@ -882,6 +882,11 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         var source = effectiveDefaultMediaFileId.HasValue
             ? sources.FirstOrDefault(item => item.MediaFileId == effectiveDefaultMediaFileId.Value)
             : null;
+        source ??= sources
+            .OrderBy(item => item.ProtocolType == ProtocolType.Local ? 0 : 1)
+            .ThenBy(item => item.FileName)
+            .ThenBy(item => item.MediaFileId)
+            .FirstOrDefault();
         return source is null
             ? []
             :
@@ -893,7 +898,22 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     EpisodeNumber = episodeNumber,
                     FileName = source.FileName,
                     FilePath = source.FilePath,
-                    SourceSummary = TvDetailDisplayText.FormatSourceSummary([source.ProtocolType])
+                    SourceSummary = TvDetailDisplayText.FormatSourceSummary([source.ProtocolType]),
+                    SourceOptions = sources
+                        .OrderByDescending(item => effectiveDefaultMediaFileId.HasValue && item.MediaFileId == effectiveDefaultMediaFileId.Value)
+                        .ThenBy(item => item.ProtocolType == ProtocolType.Local ? 0 : 1)
+                        .ThenBy(item => item.FileName)
+                        .ThenBy(item => item.MediaFileId)
+                        .Select(
+                            item => new TvSeasonCorrectionPlaybackSourceItem
+                            {
+                                MediaFileId = item.MediaFileId,
+                                FileName = item.FileName,
+                                FilePath = item.FilePath,
+                                ProtocolType = item.ProtocolType,
+                                IsDefault = effectiveDefaultMediaFileId.HasValue && item.MediaFileId == effectiveDefaultMediaFileId.Value
+                            })
+                        .ToList()
                 }
             ];
     }

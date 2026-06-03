@@ -491,13 +491,17 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var sourceCount = movie?.SourceCount ?? 0;
                     return new LibraryMovieListItem
                     {
-                        ItemKind = ResolveMovieItemKind(movie?.IdentificationStatus ?? IdentificationStatus.Pending),
-                        MovieId = movie?.Id ?? row.MovieId.GetValueOrDefault(),
+                        ItemKind = movie is null
+                            ? LibraryMediaItemKind.Movie
+                            : ResolveMovieItemKind(movie.IdentificationStatus),
+                        MovieId = movie?.Id ?? 0,
                         TmdbId = movie?.TmdbId ?? row.TmdbId,
-                        Title = ResolveUnidentifiedMovieDisplayTitle(
-                            movie?.IdentificationStatus ?? IdentificationStatus.Pending,
-                            FirstNonEmpty(movie?.Title, row.Title),
-                            movie?.DefaultMediaFileName),
+                        Title = movie is null
+                            ? row.Title
+                            : ResolveUnidentifiedMovieDisplayTitle(
+                                movie.IdentificationStatus,
+                                FirstNonEmpty(movie.Title, row.Title),
+                                movie.DefaultMediaFileName),
                         OriginalTitle = FirstNonEmpty(movie?.OriginalTitle, row.OriginalTitle),
                         ReleaseYear = movie?.ReleaseYear ?? row.ReleaseYear,
                         ReleaseDate = movie?.ReleaseDate ?? row.ReleaseDate,
@@ -511,7 +515,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         Language = FirstNonEmpty(movie?.Language, row.Language),
                         RuntimeMinutes = movie?.RuntimeMinutes ?? row.RuntimeMinutes,
                         ImdbId = FirstNonEmpty(movie?.ImdbId, row.ImdbId),
-                        IdentificationStatus = movie?.IdentificationStatus ?? IdentificationStatus.Pending,
+                        IdentificationStatus = movie?.IdentificationStatus ?? IdentificationStatus.ManualConfirmed,
                         IdentifiedConfidence = movie?.IdentifiedConfidence,
                         PrimaryRatingSourceName = row.OmdbScoreValue.HasValue ? "IMDb" : row.TmdbRating.HasValue ? "TMDB" : string.Empty,
                         PrimaryRatingValue = row.OmdbScoreValue ?? row.TmdbRating,
@@ -649,7 +653,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasUserState = state?.IsFavorite == true || state?.IsWantToWatch == true || state?.IsNotInterested == true || watchedEpisodeCount > 0,
                         IsInLibrary = metrics.SourceCount > 0,
                         IsFavorite = state?.IsFavorite == true && isWatched,
-                        IsWantToWatch = state?.IsWantToWatch == true && watchedEpisodeCount == 0,
+                        IsWantToWatch = state?.IsWantToWatch == true && !isWatched,
                         IsNotInterested = state?.IsNotInterested == true,
                         IsWatched = isWatched,
                         WatchedEpisodeCount = watchedEpisodeCount,
@@ -1190,7 +1194,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var totalEpisodeCount = metrics.TotalEpisodeCount;
                     var watchedEpisodeCount = metrics.WatchedEpisodeCount;
                     var isWatched = IsAggregateWatched(watchedEpisodeCount, countableEpisodeCount, totalEpisodeCount);
-                    var isUnwatched = watchedEpisodeCount == 0;
+                    var isUnwatched = !isWatched;
                     var hasUserState = state?.HasUserState == true || watchedEpisodeCount > 0;
                     var hasActiveSource = metrics.SourceCount > 0;
                     var visibilityState = state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;

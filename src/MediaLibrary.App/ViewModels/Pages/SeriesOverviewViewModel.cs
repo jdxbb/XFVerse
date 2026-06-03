@@ -36,6 +36,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     private string _statusMessage = "请先选择一部电视剧。";
     private bool _hasSeries;
     private bool _canAddSeriesToLibrary;
+    private double _seasonListScrollOffset;
 
     public SeriesOverviewViewModel(
         INavigationStateService navigationStateService,
@@ -67,6 +68,19 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     public AsyncRelayCommand AddSeriesToLibraryCommand { get; }
 
     public AsyncRelayCommand RefreshCommand { get; }
+
+    public double SeasonListScrollOffset
+    {
+        get => _seasonListScrollOffset;
+        set
+        {
+            _seasonListScrollOffset = value;
+            if (_seriesId.HasValue)
+            {
+                _navigationStateService.SetSeriesSeasonListScrollOffset(_seriesId.Value, value);
+            }
+        }
+    }
 
     public string Name { get => _name; private set => SetProperty(ref _name, value); }
 
@@ -171,6 +185,12 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
 
         try
         {
+            if (_seriesId.HasValue && _seriesId.Value != selectedSeriesId.Value)
+            {
+                PosterDisplayUrl = string.Empty;
+                await Task.Yield();
+            }
+
             var model = await _tvDetailQueryService.GetSeriesOverviewAsync(selectedSeriesId.Value, cancellationToken);
             if (model is null)
             {
@@ -178,11 +198,14 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 return;
             }
 
-            ApplyModel(model);
+            ApplyModel(model, cancellationToken);
             if (model.TmdbSeriesId.HasValue)
             {
                 _ = HydrateAndRefreshAsync(model.SeriesId, cancellationToken);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
@@ -212,7 +235,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 return;
             }
 
-            ApplyModel(model);
+            ApplyModel(model, cancellationToken);
             StatusMessage = result.Skipped
                 ? $"已加载 {Seasons.Count} 个 Season。"
                 : result.BuildStatusMessage();
@@ -229,9 +252,11 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         }
     }
 
-    private void ApplyModel(TvSeriesOverviewModel model)
+    private void ApplyModel(TvSeriesOverviewModel model, CancellationToken cancellationToken = default)
     {
         _seriesId = model.SeriesId;
+        _seasonListScrollOffset = _navigationStateService.GetSeriesSeasonListScrollOffset(model.SeriesId);
+        OnPropertyChanged(nameof(SeasonListScrollOffset));
         HasSeries = true;
         Name = model.Name;
         OriginalName = string.IsNullOrWhiteSpace(model.OriginalName) ? "-" : model.OriginalName;
@@ -266,18 +291,21 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         StatusMessage = Seasons.Count == 0
             ? "该剧暂无 Season metadata。"
             : $"已加载 {Seasons.Count} 个 Season。";
-        _ = LoadRatingsAsync(model.SeriesId);
+        _ = LoadRatingsAsync(model.SeriesId, cancellationToken);
     }
 
-    private async Task LoadRatingsAsync(int seriesId)
+    private async Task LoadRatingsAsync(int seriesId, CancellationToken cancellationToken)
     {
         try
         {
-            var ratings = await _tvDetailQueryService.GetSeriesRatingsAsync(seriesId);
+            var ratings = await _tvDetailQueryService.GetSeriesRatingsAsync(seriesId, cancellationToken);
             if (_seriesId == seriesId)
             {
                 ApplyRatings(ratings);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch
         {
@@ -336,10 +364,10 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
             }
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
-            var model = await _tvDetailQueryService.GetSeriesOverviewAsync(_seriesId.Value);
+            var model = await _tvDetailQueryService.GetSeriesOverviewAsync(_seriesId.Value, CancellationToken.None);
             if (model is not null)
             {
-                ApplyModel(model);
+                ApplyModel(model, CancellationToken.None);
             }
 
             StatusMessage = Seasons.All(x => x.IsVisibleInLibrary) ? "已加入媒体库。" : "已移出媒体库。";

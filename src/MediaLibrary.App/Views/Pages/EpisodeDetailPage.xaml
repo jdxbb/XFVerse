@@ -152,7 +152,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Grid Width="600" Height="338" Margin="0,14,0,0">
+            <Grid Width="600" Height="338" Margin="-18,14,0,0">
                 <Border x:Name="EpisodeStillClipMask"
                         Background="White"
                         CornerRadius="20"
@@ -182,7 +182,8 @@
                     <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
                     <Control IsHitTestVisible="False"
                              Template="{StaticResource PosterPlaceholderWideTemplate}" />
-                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="640"
+                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="620"
+                           helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w500"
                            helpers:PosterCacheImageBehavior.Source="{Binding StillDisplayUrl}"
                            helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=EpisodeStillPaletteShadowHost}"
                            helpers:PosterPaletteShadowBehavior.TargetName="EpisodeStillPaletteShadowHost"
@@ -368,7 +369,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0" Command="{Binding OpenPlayerCommand}" Content="{Binding PrimaryPlayButtonText}" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanOpenPlayer}" Style="{StaticResource GlassPrimaryButtonStyle}" Tag="&#xE768;" />
+                    <Button Grid.Column="0" Command="{Binding OpenPlayerCommand}" Content="{Binding PrimaryPlayButtonText}" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanOpenPlayer}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="&#xE768;" />
                     <Button Grid.Column="2" Command="{Binding ToggleWatchedCommand}" Content="{Binding WatchedButtonText}" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanToggleWatched}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="{Binding WatchedButtonIcon}" />
                     <Button Grid.Column="4" Command="{Binding CorrectionPlaceholderCommand}" Content="单集识别修正" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanUseIdentificationCorrection}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="&#xE70F;" />
                 </Grid>
@@ -484,10 +485,10 @@
                                                helpers:TrimmedTextToolTipBehavior.FullText="{Binding DisplayFileName}" />
                                     <TextBlock Margin="0,2,0,0"
                                                Style="{StaticResource MonospacePathTextStyle}"
-                                               Text="{Binding LocationText}"
+                                               Text="{Binding FilePath}"
                                                TextAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
-                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding LocationText}" />
+                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding FilePath}" />
                                 </StackPanel>
 
                                 <TextBlock Grid.Column="1" Style="{StaticResource EpisodeDetailSourceCellTextStyle}" Text="{Binding ExtensionDisplayText}" />
@@ -655,7 +656,10 @@
                               Style="{StaticResource CorrectionDialogComboBoxStyle}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding CorrectionSourceDisplayText}" />
+                                <TextBlock Text="{Binding CorrectionSourceDisplayText}"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding CorrectionSourceDisplayText}" />
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>

@@ -35,3 +35,21 @@
 - Cached image extension set observed: `.jpg`.
 - Total observed poster cache bytes: about 8.1 MB.
 - Latest observed poster cache write time: 2026-05-13 during manual acceptance.
+
+## 2026-06-02 Detail Image Quality Follow-up
+
+Goal: improve detail-page poster/still clarity without changing list thumbnail behavior.
+
+Changed behavior:
+
+- Added a detail-only poster-cache request option that rewrites TMDB image URLs from fixed `w*` / `h*` sizes to `original` before downloading.
+- Increased detail decode widths for Movie, Series, Season, and Episode detail hero images.
+- Kept media-library poster/list thumbnails and Series detail Season-list thumbnails on the existing thumbnail-size path to avoid extra list scrolling cost.
+
+Boundaries kept:
+
+- No cache schema, database field, migration, cleanup policy, settings UI, scan rule, or metadata-write behavior changed.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.

@@ -214,6 +214,26 @@ Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
 
+### Phase 4 Media Library List Hydration Follow-up
+
+Completed:
+
+- TV list rows can request missing list metadata through the existing TV hydration service when list layout is active.
+- TV list rating display now uses the visible-row hydration path to combine TV TMDB and IMDb rating data where available.
+- The list-field hydration queue is cancelled when the Library page deactivates or a batch operation starts, and retry counters reset when the page activates again.
+- Hydration is bounded to max concurrency 4 and max 3 attempts per item key, matching the existing small-batch external-request style.
+- Tag filtering now switches the content-type filter to TV when a TV tag is selected while TV is not included.
+
+Not done:
+
+- No TV identification threshold, scan fallback rule, correction transaction boundary, schema migration, database update, commit, or push was added.
+- Source-less recognized Movie rows created before a later TV correction are currently preserved by product decision.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
 ### TV Detail Follow-up - Persisted Series Crew Metadata
 
 Completed:
@@ -3921,4 +3941,28 @@ Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - `git diff --check` passed with existing CRLF conversion notices only.
+- Current migrations diff remained empty.
+
+### Phase 4 Detail / Correction Retest Fixes
+
+Completed:
+
+- Detail-page TMDB images now request original-size TMDB assets at the detail-poster/still level while keeping list and season-card thumbnails on their existing cached sizes.
+- Series and Season detail list scroll offsets are retained when navigating into Season / Episode detail and returning.
+- Season aggregate watched text is kept in the stable `已看 x / y 集` format after single-Episode watched-state edits.
+- Season-level want-to-watch now remains available unless the full Season is watched; partially watched Seasons are no longer treated as fully unwatched-only for this action.
+- Episode watched/unwatched commands no longer disable the shared command for every row during one row update.
+- Season, Episode, and Movie default-play buttons now use the same secondary glass treatment as neighboring action buttons.
+- Episode and Movie manual probe buttons are disabled only while the current page is actively probing that source, not merely because the persisted probe status is `Pending`.
+- Movie/Episode correction content now has explicit labels for Movie, TV episode, and unknown-Season forms, input padding that avoids clear-button overlap, separate per-target status text, and busy-state spinner coverage for TMDB search, AI assist, unknown-Season loading, and apply operations.
+- Season correction content now has explicit recognized-Season labels, per-target status text, busy-state spinner coverage, transparent mapping overlay behavior, and a target-episode mapping dialog with per-row playback-source selection.
+
+Not done:
+
+- No scan identification rule, confidence threshold, transaction boundary, schema migration, database update, commit, or push was added.
+- Runtime visual acceptance for every correction-dialog edge case is still manual.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.

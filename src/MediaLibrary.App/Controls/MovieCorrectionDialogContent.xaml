@@ -39,7 +39,7 @@
                BasedOn="{StaticResource TextBoxStyle}">
             <Setter Property="MinHeight" Value="36" />
             <Setter Property="Height" Value="36" />
-            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Padding" Value="10,5,28,5" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="FontSize" Value="12" />
         </Style>
@@ -278,7 +278,6 @@
 
     <Border Height="548"
             Padding="16"
-            IsEnabled="{Binding IsCorrectionInteractionEnabled}"
             Style="{StaticResource GlassInlinePanelStyle}">
         <Grid>
             <Grid.RowDefinitions>
@@ -289,7 +288,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid>
+            <Grid IsEnabled="{Binding IsCorrectionInteractionEnabled}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="172" />
                     <ColumnDefinition Width="12" />
@@ -312,39 +311,59 @@
                         </Style>
                     </Grid.Style>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="0.86*" />
+                        <ColumnDefinition Width="0.62*" />
                         <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="178" />
+                        <ColumnDefinition Width="260" />
                         <ColumnDefinition Width="8" />
                         <ColumnDefinition Width="102" />
                         <ColumnDefinition Width="8" />
                         <ColumnDefinition Width="138" />
                     </Grid.ColumnDefinitions>
                     <Grid>
-                        <TextBox x:Name="MovieSearchTextBox"
-                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
-                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入需要搜索的影片名"
-                                 Style="{StaticResource CorrectionTextBoxStyle}"
-                                 Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Margin="0,0,7,0"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Command="{Binding ClearManualSearchQueryCommand}"
-                                Tag="{Binding ManualSearchQuery}"
-                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource CorrectionInfoLabelStyle}"
+                                   Text="电影名称" />
+                        <Grid Grid.Column="2">
+                            <TextBox x:Name="MovieSearchTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                     helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入电影名称"
+                                     Style="{StaticResource CorrectionTextBoxStyle}"
+                                     Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Margin="0,0,4,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding ClearManualSearchQueryCommand}"
+                                    Tag="{Binding ManualSearchQuery}"
+                                    Style="{StaticResource CorrectionClearButtonStyle}" />
+                        </Grid>
                     </Grid>
                     <Grid Grid.Column="2">
-                        <TextBox x:Name="MovieYearTextBox"
-                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
-                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="影片的上映年份（可选）"
-                                 Style="{StaticResource CorrectionTextBoxStyle}"
-                                 Text="{Binding ManualSearchYear, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Margin="0,0,7,0"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Command="{Binding ClearManualSearchYearCommand}"
-                                Tag="{Binding ManualSearchYear}"
-                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource CorrectionInfoLabelStyle}"
+                                   Text="上映年份（可选）" />
+                        <Grid Grid.Column="2">
+                            <TextBox x:Name="MovieYearTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                     helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入上映年份"
+                                     Style="{StaticResource CorrectionTextBoxStyle}"
+                                     Text="{Binding ManualSearchYear, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Margin="0,0,4,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding ClearManualSearchYearCommand}"
+                                    Tag="{Binding ManualSearchYear}"
+                                    Style="{StaticResource CorrectionClearButtonStyle}" />
+                        </Grid>
                     </Grid>
                     <Button Grid.Column="4"
                             Command="{Binding SearchCandidatesCommand}"
@@ -385,54 +404,84 @@
                         </Style>
                     </Grid.Style>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="0.82*" />
+                        <ColumnDefinition Width="0.54*" />
                         <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="88" />
+                        <ColumnDefinition Width="176" />
                         <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="88" />
+                        <ColumnDefinition Width="176" />
                         <ColumnDefinition Width="8" />
                         <ColumnDefinition Width="102" />
                         <ColumnDefinition Width="8" />
                         <ColumnDefinition Width="138" />
                     </Grid.ColumnDefinitions>
                     <Grid>
-                        <TextBox x:Name="TvSearchTextBox"
-                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
-                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入需要搜索的电视剧名"
-                                 Style="{StaticResource CorrectionTextBoxStyle}"
-                                 Text="{Binding TvCorrectionQuery, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Margin="0,0,7,0"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Command="{Binding ClearTvCorrectionQueryCommand}"
-                                Tag="{Binding TvCorrectionQuery}"
-                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource CorrectionInfoLabelStyle}"
+                                   Text="电视剧名称" />
+                        <Grid Grid.Column="2">
+                            <TextBox x:Name="TvSearchTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                     helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入电视剧名称"
+                                     Style="{StaticResource CorrectionTextBoxStyle}"
+                                     Text="{Binding TvCorrectionQuery, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Margin="0,0,4,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding ClearTvCorrectionQueryCommand}"
+                                    Tag="{Binding TvCorrectionQuery}"
+                                    Style="{StaticResource CorrectionClearButtonStyle}" />
+                        </Grid>
                     </Grid>
                     <Grid Grid.Column="2">
-                        <TextBox x:Name="SeasonNumberTextBox"
-                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
-                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="季号"
-                                 Style="{StaticResource CorrectionTextBoxStyle}"
-                                 Text="{Binding CorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Margin="0,0,7,0"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Command="{Binding ClearCorrectionSeasonNumberCommand}"
-                                Tag="{Binding CorrectionSeasonNumber}"
-                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource CorrectionInfoLabelStyle}"
+                                   Text="季号" />
+                        <Grid Grid.Column="2">
+                            <TextBox x:Name="SeasonNumberTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                     helpers:TextBoxPlaceholderBehavior.PlaceholderText="季号"
+                                     Style="{StaticResource CorrectionTextBoxStyle}"
+                                     Text="{Binding CorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Margin="0,0,4,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding ClearCorrectionSeasonNumberCommand}"
+                                    Tag="{Binding CorrectionSeasonNumber}"
+                                    Style="{StaticResource CorrectionClearButtonStyle}" />
+                        </Grid>
                     </Grid>
                     <Grid Grid.Column="4">
-                        <TextBox x:Name="EpisodeNumberTextBox"
-                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
-                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="集号"
-                                 Style="{StaticResource CorrectionTextBoxStyle}"
-                                 Text="{Binding CorrectionEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Margin="0,0,7,0"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Command="{Binding ClearCorrectionEpisodeNumberCommand}"
-                                Tag="{Binding CorrectionEpisodeNumber}"
-                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource CorrectionInfoLabelStyle}"
+                                   Text="集号" />
+                        <Grid Grid.Column="2">
+                            <TextBox x:Name="EpisodeNumberTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                     helpers:TextBoxPlaceholderBehavior.PlaceholderText="集号"
+                                     Style="{StaticResource CorrectionTextBoxStyle}"
+                                     Text="{Binding CorrectionEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Margin="0,0,4,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding ClearCorrectionEpisodeNumberCommand}"
+                                    Tag="{Binding CorrectionEpisodeNumber}"
+                                    Style="{StaticResource CorrectionClearButtonStyle}" />
+                        </Grid>
                     </Grid>
                     <Button Grid.Column="6"
                             Command="{Binding SearchCandidatesCommand}"
@@ -473,22 +522,32 @@
                         </Style>
                     </Grid.Style>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="128" />
+                        <ColumnDefinition Width="192" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="158" />
                     </Grid.ColumnDefinitions>
                     <Grid>
-                        <TextBox x:Name="UnknownSeasonEpisodeNumberTextBox"
-                                 helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
-                                 helpers:TextBoxPlaceholderBehavior.PlaceholderText="集号"
-                                 Style="{StaticResource CorrectionTextBoxStyle}"
-                                 Text="{Binding UnknownSeasonEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Margin="0,0,7,0"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Command="{Binding ClearUnknownSeasonEpisodeNumberCommand}"
-                                Tag="{Binding UnknownSeasonEpisodeNumber}"
-                                Style="{StaticResource CorrectionClearButtonStyle}" />
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource CorrectionInfoLabelStyle}"
+                                   Text="集号" />
+                        <Grid Grid.Column="2">
+                            <TextBox x:Name="UnknownSeasonEpisodeNumberTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                     helpers:TextBoxPlaceholderBehavior.PlaceholderText="集号"
+                                     Style="{StaticResource CorrectionTextBoxStyle}"
+                                     Text="{Binding UnknownSeasonEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Margin="0,0,4,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding ClearUnknownSeasonEpisodeNumberCommand}"
+                                    Tag="{Binding UnknownSeasonEpisodeNumber}"
+                                    Style="{StaticResource CorrectionClearButtonStyle}" />
+                        </Grid>
                     </Grid>
                     <Button Grid.Column="2"
                             Height="36"
@@ -935,7 +994,10 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <Border Background="{DynamicResource BrushGlassSurfaceAlt}"
+                <Border Grid.Row="0"
+                        Grid.RowSpan="5"
+                        Panel.ZIndex="20"
+                        Background="Transparent"
                         IsHitTestVisible="True">
                     <Border.Style>
                         <Style TargetType="Border">
@@ -988,6 +1050,7 @@
             <StackPanel Grid.Row="4"
                         Margin="0,12,0,0"
                         HorizontalAlignment="Center"
+                        IsEnabled="{Binding IsCorrectionInteractionEnabled}"
                         Orientation="Horizontal">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">

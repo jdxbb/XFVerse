@@ -7,6 +7,8 @@ namespace MediaLibrary.App.Services.Implementations;
 public sealed class NavigationStateService : INavigationStateService
 {
     private readonly Stack<NavigationRequest> _detailBackStack = [];
+    private readonly Dictionary<int, double> _seriesSeasonListScrollOffsets = [];
+    private readonly Dictionary<int, double> _seasonEpisodeListScrollOffsets = [];
     private NavigationRequest? _currentRequest;
 
     public int? SelectedMovieId { get; private set; }
@@ -20,6 +22,8 @@ public sealed class NavigationStateService : INavigationStateService
     public AiRecommendationItem? SelectedExternalRecommendation { get; private set; }
 
     public DateTime? SelectedWatchHistoryDate { get; private set; }
+
+    public bool IsDetailNavigationBlocked { get; private set; }
 
     public event EventHandler<NavigationRequest>? NavigationRequested;
 
@@ -66,6 +70,11 @@ public sealed class NavigationStateService : INavigationStateService
         Request(new NavigationRequest(NavigationPageKey.MovieDetail, externalRecommendation: recommendation));
     }
 
+    public void SetDetailNavigationBlocked(bool isBlocked)
+    {
+        IsDetailNavigationBlocked = isBlocked;
+    }
+
     public void RequestDetailBackToLibrary()
     {
         RequestDetailBack(new NavigationRequest(NavigationPageKey.Library));
@@ -92,6 +101,26 @@ public sealed class NavigationStateService : INavigationStateService
         return targetDate;
     }
 
+    public double GetSeriesSeasonListScrollOffset(int tvSeriesId)
+    {
+        return _seriesSeasonListScrollOffsets.GetValueOrDefault(tvSeriesId);
+    }
+
+    public void SetSeriesSeasonListScrollOffset(int tvSeriesId, double offset)
+    {
+        SetScrollOffset(_seriesSeasonListScrollOffsets, tvSeriesId, offset);
+    }
+
+    public double GetSeasonEpisodeListScrollOffset(int tvSeasonId)
+    {
+        return _seasonEpisodeListScrollOffsets.GetValueOrDefault(tvSeasonId);
+    }
+
+    public void SetSeasonEpisodeListScrollOffset(int tvSeasonId, double offset)
+    {
+        SetScrollOffset(_seasonEpisodeListScrollOffsets, tvSeasonId, offset);
+    }
+
     private void RequestDetailBack(NavigationRequest fallbackRequest)
     {
         var request = _detailBackStack.Count > 0
@@ -103,6 +132,11 @@ public sealed class NavigationStateService : INavigationStateService
 
     private void Request(NavigationRequest request, bool captureDetailOrigin = true)
     {
+        if (IsDetailNavigationBlocked && IsDetailPage(request.PageKey))
+        {
+            return;
+        }
+
         if (captureDetailOrigin)
         {
             CaptureDetailOrigin(request);
@@ -142,6 +176,17 @@ public sealed class NavigationStateService : INavigationStateService
             or NavigationPageKey.SeriesOverview
             or NavigationPageKey.TvSeasonDetail
             or NavigationPageKey.EpisodeDetail;
+    }
+
+    private static void SetScrollOffset(Dictionary<int, double> offsets, int key, double offset)
+    {
+        if (offset <= 0)
+        {
+            offsets.Remove(key);
+            return;
+        }
+
+        offsets[key] = offset;
     }
 
     private static bool AreSameRequest(NavigationRequest left, NavigationRequest right)

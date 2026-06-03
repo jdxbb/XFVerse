@@ -51,9 +51,11 @@ public partial class PlayerWindow : Window
     private POINT? _lastCursorPosition;
     private PlayerWindowViewModel? _viewModel;
     private WindowState _previousState;
+    private WindowState _lastWindowState = WindowState.Normal;
     private WindowStyle _previousStyle;
     private ResizeMode _previousResizeMode;
     private bool _isFullScreen;
+    private bool _isRestoringMaximizedForDrag;
     private bool _isSourceMenuOpen;
     private bool _isSubtitleMenuOpen;
     private bool _isAudioTrackMenuOpen;
@@ -288,7 +290,17 @@ public partial class PlayerWindow : Window
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
     {
+        var previousState = _lastWindowState;
+        _lastWindowState = WindowState;
         UpdatePlayerMaximizeRestoreButton();
+        if (!_isFullScreen
+            && !_isRestoringMaximizedForDrag
+            && previousState == WindowState.Maximized
+            && WindowState == WindowState.Normal)
+        {
+            CenterWindowOnCurrentMonitor();
+            _ = Dispatcher.BeginInvoke(CenterWindowOnCurrentMonitor, DispatcherPriority.Loaded);
+        }
     }
 
     private void BeginWindowDrag(MouseButtonEventArgs e)
@@ -319,13 +331,29 @@ public partial class PlayerWindow : Window
             mousePosition = source.CompositionTarget.TransformFromDevice.Transform(mousePosition);
         }
 
-        WindowState = WindowState.Normal;
-        Left = mousePosition.X - (restoreBounds.Width * 0.5);
-        Top = Math.Max(SystemParameters.VirtualScreenTop, mousePosition.Y - 12);
+        _isRestoringMaximizedForDrag = true;
+        try
+        {
+            WindowState = WindowState.Normal;
+            Left = mousePosition.X - (restoreBounds.Width * 0.5);
+            Top = Math.Max(SystemParameters.VirtualScreenTop, mousePosition.Y - 12);
+        }
+        finally
+        {
+            _isRestoringMaximizedForDrag = false;
+        }
     }
 
     private void TogglePlayerMaximizeRestore()
     {
+        if (!_isFullScreen && WindowState == WindowState.Maximized)
+        {
+            WindowState = WindowState.Normal;
+            CenterWindowOnCurrentMonitor();
+            _ = Dispatcher.BeginInvoke(CenterWindowOnCurrentMonitor, DispatcherPriority.Loaded);
+            return;
+        }
+
         ToggleFullScreen();
     }
 
@@ -636,6 +664,7 @@ public partial class PlayerWindow : Window
             return;
         }
 
+        var keepChromeHidden = false;
         switch (e.Key)
         {
             case Key.Space:
@@ -668,6 +697,7 @@ public partial class PlayerWindow : Window
 
                 _viewModel.ToggleMute();
                 ShowVolumeFeedback();
+                keepChromeHidden = ShouldKeepHiddenChromeForPassiveInput();
                 e.Handled = true;
                 break;
             case Key.Left:
@@ -677,6 +707,7 @@ public partial class PlayerWindow : Window
                 }
 
                 _viewModel.SeekBySeconds(HasOnlyControlModifier() ? -30 : -5);
+                keepChromeHidden = ShouldKeepHiddenChromeForPassiveInput();
                 e.Handled = true;
                 break;
             case Key.Right:
@@ -686,6 +717,7 @@ public partial class PlayerWindow : Window
                 }
 
                 _viewModel.SeekBySeconds(HasOnlyControlModifier() ? 30 : 5);
+                keepChromeHidden = ShouldKeepHiddenChromeForPassiveInput();
                 e.Handled = true;
                 break;
             case Key.Up:
@@ -696,6 +728,7 @@ public partial class PlayerWindow : Window
 
                 _viewModel.AdjustVolume(5);
                 ShowVolumeFeedback();
+                keepChromeHidden = ShouldKeepHiddenChromeForPassiveInput();
                 e.Handled = true;
                 break;
             case Key.Down:
@@ -706,14 +739,14 @@ public partial class PlayerWindow : Window
 
                 _viewModel.AdjustVolume(-5);
                 ShowVolumeFeedback();
+                keepChromeHidden = ShouldKeepHiddenChromeForPassiveInput();
                 e.Handled = true;
                 break;
         }
 
         if (e.Handled)
         {
-            ShowControlBar();
-            RestartControlBarTimer();
+            RefreshControlBarAfterKeyboardInput(keepChromeHidden);
         }
     }
 
@@ -1233,8 +1266,12 @@ public partial class PlayerWindow : Window
             ShowVolumeFeedback();
         }
 
-        ShowControlBar();
-        RestartControlBarTimer();
+        if (!ShouldKeepHiddenChromeForPassiveInput())
+        {
+            ShowControlBar();
+            RestartControlBarTimer();
+        }
+
         return true;
     }
 
@@ -1434,7 +1471,9 @@ public partial class PlayerWindow : Window
         _isFullScreenChromeVisible = true;
         WindowStyle = _previousStyle;
         ResizeMode = _previousResizeMode;
-        WindowState = _previousState;
+        WindowState = WindowState.Normal;
+        CenterWindowOnCurrentMonitor();
+        _ = Dispatcher.BeginInvoke(CenterWindowOnCurrentMonitor, DispatcherPriority.Loaded);
         UpdatePlayerChromeVisibility();
         UpdatePlayerMaximizeRestoreButton();
         _controlBarTimer.Stop();
@@ -1442,6 +1481,24 @@ public partial class PlayerWindow : Window
         MarkControlBarActivity();
         ShowControlBar();
         RestartControlBarTimer();
+    }
+
+    private void RefreshControlBarAfterKeyboardInput(bool keepChromeHidden)
+    {
+        if (keepChromeHidden)
+        {
+            return;
+        }
+
+        ShowControlBar();
+        RestartControlBarTimer();
+    }
+
+    private bool ShouldKeepHiddenChromeForPassiveInput()
+    {
+        return _isFullScreen
+               && !_isFullScreenChromeVisible
+               && !ControlBarPopup.IsOpen;
     }
 
     private void RestartControlBarTimer()
@@ -1480,6 +1537,52 @@ public partial class PlayerWindow : Window
         UpdateControlBarPopupPlacement();
         ControlBar.Opacity = 1d;
         ControlBar.IsHitTestVisible = true;
+    }
+
+    private void CenterWindowOnCurrentMonitor()
+    {
+        var handle = _windowSource?.Handle ?? new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var monitor = MonitorFromWindow(handle, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var monitorInfo = new MONITORINFO
+        {
+            Size = Marshal.SizeOf<MONITORINFO>()
+        };
+
+        if (!GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            return;
+        }
+
+        var source = PresentationSource.FromVisual(this);
+        var topLeft = new Point(monitorInfo.WorkArea.Left, monitorInfo.WorkArea.Top);
+        var bottomRight = new Point(monitorInfo.WorkArea.Right, monitorInfo.WorkArea.Bottom);
+        if (source?.CompositionTarget is not null)
+        {
+            topLeft = source.CompositionTarget.TransformFromDevice.Transform(topLeft);
+            bottomRight = source.CompositionTarget.TransformFromDevice.Transform(bottomRight);
+        }
+
+        var workAreaWidth = Math.Max(0d, bottomRight.X - topLeft.X);
+        var workAreaHeight = Math.Max(0d, bottomRight.Y - topLeft.Y);
+        var windowWidth = ActualWidth > 0 ? ActualWidth : Width;
+        var windowHeight = ActualHeight > 0 ? ActualHeight : Height;
+        if (double.IsNaN(windowWidth) || windowWidth <= 0 || double.IsNaN(windowHeight) || windowHeight <= 0)
+        {
+            return;
+        }
+
+        Left = topLeft.X + Math.Max(0d, (workAreaWidth - windowWidth) / 2d);
+        Top = topLeft.Y + Math.Max(0d, (workAreaHeight - windowHeight) / 2d);
     }
 
     private void HideControlBar()

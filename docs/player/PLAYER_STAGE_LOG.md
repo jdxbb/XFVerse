@@ -898,3 +898,21 @@ Evidence:
 Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Manual runtime regression is still required for Movie playback with an automatically selected slow or unavailable WebDAV subtitle.
+
+## 2026-06-03 Player Passive Input / Restore Centering Follow-up
+
+Goal: keep hidden fullscreen chrome hidden for passive playback controls and center the player after leaving maximize/fullscreen.
+
+Changed behavior:
+- Left/right seek, up/down volume, `M` mute, and mouse-wheel volume/brightness no longer reshow the hidden fullscreen title bar or bottom bar.
+- The scope is intentionally limited to those passive inputs; play/pause, menus, fullscreen toggles, and pointer movement keep the existing chrome behavior.
+- Exiting fullscreen now recenters the restored player window on the current monitor.
+- Restoring from normal maximized state also recenters the window, while drag-restore from a maximized title bar keeps the drag-position behavior.
+
+Boundaries kept:
+- No playback engine, mpv, subtitle, watch-history, cache, or data-model changes.
+- No migration, database update, commit, or push.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual runtime validation is still required for all restore paths: fullscreen button, `F`, `Esc`, video double-click, caption restore, and OS maximize restore.

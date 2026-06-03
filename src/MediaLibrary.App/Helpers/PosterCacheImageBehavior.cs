@@ -32,6 +32,20 @@ public static class PosterCacheImageBehavior
             typeof(PosterCacheImageBehavior),
             new PropertyMetadata(0));
 
+    public static readonly DependencyProperty UseOriginalTmdbSizeProperty =
+        DependencyProperty.RegisterAttached(
+            "UseOriginalTmdbSize",
+            typeof(bool),
+            typeof(PosterCacheImageBehavior),
+            new PropertyMetadata(false, OnImageRequestOptionChanged));
+
+    public static readonly DependencyProperty PreferredTmdbImageSizeProperty =
+        DependencyProperty.RegisterAttached(
+            "PreferredTmdbImageSize",
+            typeof(string),
+            typeof(PosterCacheImageBehavior),
+            new PropertyMetadata(string.Empty, OnImageRequestOptionChanged));
+
     private static readonly DependencyProperty RequestVersionProperty =
         DependencyProperty.RegisterAttached(
             "RequestVersion",
@@ -66,6 +80,26 @@ public static class PosterCacheImageBehavior
         target.SetValue(DecodePixelWidthProperty, value);
     }
 
+    public static bool GetUseOriginalTmdbSize(DependencyObject target)
+    {
+        return (bool)target.GetValue(UseOriginalTmdbSizeProperty);
+    }
+
+    public static void SetUseOriginalTmdbSize(DependencyObject target, bool value)
+    {
+        target.SetValue(UseOriginalTmdbSizeProperty, value);
+    }
+
+    public static string GetPreferredTmdbImageSize(DependencyObject target)
+    {
+        return (string)target.GetValue(PreferredTmdbImageSizeProperty);
+    }
+
+    public static void SetPreferredTmdbImageSize(DependencyObject target, string value)
+    {
+        target.SetValue(PreferredTmdbImageSizeProperty, value);
+    }
+
     public static void ClearMemoryCache()
     {
         MemoryCache.Clear();
@@ -84,11 +118,27 @@ public static class PosterCacheImageBehavior
             return;
         }
 
+        ApplySource(image, e.NewValue as string);
+    }
+
+    private static void OnImageRequestOptionChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
+    {
+        if (target is Image image)
+        {
+            ApplySource(image, GetSource(image));
+        }
+    }
+
+    private static void ApplySource(Image image, string? requestedSource)
+    {
         CancelPreviousRequest(image);
         var version = GetRequestVersion(image) + 1;
         SetRequestVersion(image, version);
 
-        var source = e.NewValue as string;
+        var source = NormalizeRequestSource(
+            requestedSource,
+            GetUseOriginalTmdbSize(image),
+            GetPreferredTmdbImageSize(image));
         if (string.IsNullOrWhiteSpace(source))
         {
             PosterCacheDiagnostics.Write("source-empty", $"version={version}");
@@ -124,7 +174,7 @@ public static class PosterCacheImageBehavior
         PosterImageLoadResult loadResult;
         try
         {
-            loadResult = await GetOrCreateImageSourceAsync(source, decodePixelWidth);
+            loadResult = await GetOrCreateImageSourceAsync(source, decodePixelWidth, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -159,7 +209,10 @@ public static class PosterCacheImageBehavior
         image.SetCurrentValue(Image.SourceProperty, imageSource);
     }
 
-    private static async Task<PosterImageLoadResult> GetOrCreateImageSourceAsync(string source, int decodePixelWidth)
+    private static async Task<PosterImageLoadResult> GetOrCreateImageSourceAsync(
+        string source,
+        int decodePixelWidth,
+        CancellationToken cancellationToken)
     {
         var key = BuildMemoryCacheKey(source, decodePixelWidth);
         if (MemoryCache.TryGetValue(key, out var cachedImageSource))
@@ -178,7 +231,7 @@ public static class PosterCacheImageBehavior
             {
                 created = true;
                 return new Lazy<Task<PosterImageLoadResult>>(
-                    () => LoadImageSourceAsync(source, decodePixelWidth, generation),
+                    () => LoadImageSourceAsync(source, decodePixelWidth, generation, cancellationToken),
                     LazyThreadSafetyMode.ExecutionAndPublication);
             });
         PosterCacheDiagnostics.Write(
@@ -187,7 +240,7 @@ public static class PosterCacheImageBehavior
 
         try
         {
-            return await loader.Value.ConfigureAwait(false);
+            return await loader.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -204,7 +257,8 @@ public static class PosterCacheImageBehavior
     private static async Task<PosterImageLoadResult> LoadImageSourceAsync(
         string requestedSource,
         int decodePixelWidth,
-        int generation)
+        int generation,
+        CancellationToken cancellationToken)
     {
         string displaySource;
         var resolveStartedAt = Stopwatch.GetTimestamp();
@@ -213,8 +267,8 @@ public static class PosterCacheImageBehavior
         {
             var posterCacheService = AppServiceProvider.GetRequiredService<IPosterCacheService>();
             displaySource = await Task.Run(
-                    () => posterCacheService.GetCachedOrFallbackAsync(requestedSource, CancellationToken.None),
-                    CancellationToken.None)
+                    () => posterCacheService.GetCachedOrFallbackAsync(requestedSource, cancellationToken),
+                    cancellationToken)
                 .ConfigureAwait(false);
             resolveElapsed = Stopwatch.GetElapsedTime(resolveStartedAt);
         }
@@ -247,7 +301,7 @@ public static class PosterCacheImageBehavior
         try
         {
             var decodeStartedAt = Stopwatch.GetTimestamp();
-            var imageSource = await Task.Run(() => LoadLocalBitmap(uri, decodePixelWidth), CancellationToken.None)
+            var imageSource = await Task.Run(() => LoadLocalBitmap(uri, decodePixelWidth), cancellationToken)
                 .ConfigureAwait(false);
             var decodeElapsed = Stopwatch.GetElapsedTime(decodeStartedAt);
             TryAddMemoryCachedSource(requestedSource, decodePixelWidth, imageSource, generation);
@@ -361,6 +415,94 @@ public static class PosterCacheImageBehavior
     private static int NormalizeDecodePixelWidth(int decodePixelWidth)
     {
         return decodePixelWidth > 0 ? decodePixelWidth : DefaultDecodePixelWidth;
+    }
+
+    private static string? NormalizeRequestSource(
+        string? source,
+        bool useOriginalTmdbSize,
+        string? preferredTmdbImageSize)
+    {
+        if ((!useOriginalTmdbSize && string.IsNullOrWhiteSpace(preferredTmdbImageSize))
+            || string.IsNullOrWhiteSpace(source))
+        {
+            return source;
+        }
+
+        var trimmed = source.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || !string.Equals(uri.Host, "image.tmdb.org", StringComparison.OrdinalIgnoreCase))
+        {
+            return source;
+        }
+
+        const string tmdbImagePrefix = "/t/p/";
+        var path = uri.AbsolutePath;
+        if (!path.StartsWith(tmdbImagePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return source;
+        }
+
+        var sizeStart = tmdbImagePrefix.Length;
+        var sizeEnd = path.IndexOf('/', sizeStart);
+        if (sizeEnd <= sizeStart)
+        {
+            return source;
+        }
+
+        var sizeSegment = path[sizeStart..sizeEnd];
+        if (!IsTmdbResizableImageSize(sizeSegment)
+            && !string.Equals(sizeSegment, "original", StringComparison.OrdinalIgnoreCase))
+        {
+            return source;
+        }
+
+        var targetSizeSegment = NormalizePreferredTmdbImageSize(preferredTmdbImageSize);
+        if (string.IsNullOrWhiteSpace(targetSizeSegment))
+        {
+            targetSizeSegment = useOriginalTmdbSize ? "original" : sizeSegment;
+        }
+
+        if (string.Equals(sizeSegment, targetSizeSegment, StringComparison.OrdinalIgnoreCase))
+        {
+            return source;
+        }
+
+        var builder = new UriBuilder(uri)
+        {
+            Path = $"{path[..sizeStart]}{targetSizeSegment}{path[sizeEnd..]}"
+        };
+        return builder.Uri.AbsoluteUri;
+    }
+
+    private static string NormalizePreferredTmdbImageSize(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        return string.Equals(trimmed, "original", StringComparison.OrdinalIgnoreCase) || IsTmdbResizableImageSize(trimmed)
+            ? trimmed
+            : string.Empty;
+    }
+
+    private static bool IsTmdbResizableImageSize(string value)
+    {
+        if (value.Length < 2 || value[0] is not ('w' or 'h'))
+        {
+            return false;
+        }
+
+        for (var index = 1; index < value.Length; index++)
+        {
+            if (!char.IsDigit(value[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void CancelPreviousRequest(Image image)

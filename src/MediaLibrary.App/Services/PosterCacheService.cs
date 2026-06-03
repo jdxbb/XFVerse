@@ -15,6 +15,7 @@ namespace MediaLibrary.App.Services;
 public sealed class PosterCacheService : IPosterCacheService, IDisposable
 {
     private const int MaxConcurrentDownloads = 4;
+    private const int MaxDownloadAttempts = 4;
     private const int BufferSize = 1024 * 64;
     private const string ItemsDirectoryName = "items";
     private const string SettingsFileName = "settings.json";
@@ -251,14 +252,6 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
             return existingCachePath;
         }
 
-        if (!forceRefresh && IsInFailureCooldown(hash))
-        {
-            PosterCacheDiagnostics.Write(
-                "failure-cooldown",
-                $"source={PosterCacheDiagnostics.SourceId(normalizedSource)} hash={ShortHash(hash)}");
-            return normalizedSource;
-        }
-
         var fallback = forceRefresh && !string.IsNullOrWhiteSpace(existingCachePath)
             ? existingCachePath
             : normalizedSource;
@@ -272,15 +265,19 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
                 return new Lazy<Task<string>>(
                     () =>
                     {
+                        var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                            _disposeCts.Token,
+                            cancellationToken);
                         var task = DownloadAndCacheAsync(
                             remoteUri,
                             hash,
                             fallback,
                             forceRefresh,
-                            _disposeCts.Token);
+                            linkedCancellation.Token);
                         _ = task.ContinueWith(
                             _ =>
                             {
+                                linkedCancellation.Dispose();
                                 _downloadsByKey.TryRemove(downloadKey, out var removedDownload);
                                 PosterCacheDiagnostics.Write(
                                     "download-task-remove",
@@ -325,76 +322,123 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
                         return existingCachePath;
                     }
 
-                    if (IsInFailureCooldown(hash))
+                }
+
+                for (var attempt = 1; attempt <= MaxDownloadAttempts; attempt++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        var itemDirectory = GetItemDirectory(hash);
+                        Directory.CreateDirectory(itemDirectory);
+                        tempPath = Path.Combine(itemDirectory, $"{hash}.{Guid.NewGuid():N}{TemporaryExtension}");
+
+                        using var request = new HttpRequestMessage(HttpMethod.Get, remoteUri);
+                        using var response = await _httpClient.SendAsync(
+                            request,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            cancellationToken);
+
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var isTransient = IsTransientStatusCode(response.StatusCode);
+                            if (isTransient && attempt < MaxDownloadAttempts)
+                            {
+                                PosterCacheDiagnostics.Write(
+                                    "download-http-retry",
+                                    $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} status={(int)response.StatusCode} attempt={attempt} maxAttempts={MaxDownloadAttempts}");
+                                DeleteFileIfExists(tempPath);
+                                tempPath = string.Empty;
+                                await DelayBeforeRetryAsync(attempt, cancellationToken);
+                                continue;
+                            }
+
+                            var cooldown = isTransient
+                                ? TransientFailureCooldown
+                                : PermanentFailureCooldown;
+                            MarkFailure(hash, cooldown);
+                            PosterCacheDiagnostics.Write(
+                                "download-http-failed",
+                                $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} status={(int)response.StatusCode} attempt={attempt} cooldownSeconds={cooldown.TotalSeconds:0}");
+                            return fallback;
+                        }
+
+                        var contentType = response.Content.Headers.ContentType;
+                        if (!IsImageContentType(contentType))
+                        {
+                            MarkFailure(hash, PermanentFailureCooldown);
+                            PosterCacheDiagnostics.Write(
+                                "download-content-type-failed",
+                                $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} contentType={(contentType?.MediaType ?? "none").Replace(' ', '_')} attempt={attempt} cooldownSeconds={PermanentFailureCooldown.TotalSeconds:0}");
+                            return fallback;
+                        }
+
+                        await using (var remoteStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                        await using (var localStream = CreateTemporaryCacheFileStream(itemDirectory, tempPath))
+                        {
+                            await remoteStream.CopyToAsync(localStream, BufferSize, cancellationToken);
+                            await localStream.FlushAsync(cancellationToken);
+                        }
+
+                        if (!File.Exists(tempPath) || new FileInfo(tempPath).Length == 0)
+                        {
+                            if (attempt < MaxDownloadAttempts)
+                            {
+                                PosterCacheDiagnostics.Write(
+                                    "download-empty-retry",
+                                    $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} attempt={attempt} maxAttempts={MaxDownloadAttempts}");
+                                DeleteFileIfExists(tempPath);
+                                tempPath = string.Empty;
+                                await DelayBeforeRetryAsync(attempt, cancellationToken);
+                                continue;
+                            }
+
+                            MarkFailure(hash, TransientFailureCooldown);
+                            PosterCacheDiagnostics.Write(
+                                "download-empty",
+                                $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} attempt={attempt} cooldownSeconds={TransientFailureCooldown.TotalSeconds:0}");
+                            return fallback;
+                        }
+
+                        var extension = ResolveImageExtension(remoteUri, contentType);
+                        var contentPath = Path.Combine(itemDirectory, $"{hash}{extension}");
+                        Directory.CreateDirectory(itemDirectory);
+                        File.Move(tempPath, contentPath, overwrite: true);
+                        tempPath = string.Empty;
+                        DeleteSiblingCacheFiles(hash, contentPath);
+                        _failureCooldownUntilUtcByHash.TryRemove(hash, out _);
+                        Touch(contentPath);
+                        await TrimToConfiguredLimitBestEffortAsync(contentPath, cancellationToken);
+                        PosterCacheDiagnostics.Write(
+                            "download-success",
+                            $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} attempt={attempt} extension={extension}");
+                        return contentPath;
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception) when (attempt < MaxDownloadAttempts)
                     {
                         PosterCacheDiagnostics.Write(
-                            "failure-cooldown-after-wait",
-                            $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)}");
+                            "download-error-retry",
+                            $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} attempt={attempt} maxAttempts={MaxDownloadAttempts} error={exception.GetType().Name}");
+                        DeleteFileIfExists(tempPath);
+                        tempPath = string.Empty;
+                        await DelayBeforeRetryAsync(attempt, cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        MarkFailure(hash, TransientFailureCooldown);
+                        PosterCacheDiagnostics.Write(
+                            "download-error",
+                            $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} attempt={attempt} error={exception.GetType().Name} cooldownSeconds={TransientFailureCooldown.TotalSeconds:0}");
                         return fallback;
                     }
                 }
 
-                var itemDirectory = GetItemDirectory(hash);
-                Directory.CreateDirectory(itemDirectory);
-                tempPath = Path.Combine(itemDirectory, $"{hash}.{Guid.NewGuid():N}{TemporaryExtension}");
-
-                using var request = new HttpRequestMessage(HttpMethod.Get, remoteUri);
-                using var response = await _httpClient.SendAsync(
-                    request,
-                    HttpCompletionOption.ResponseHeadersRead,
-                    cancellationToken);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var cooldown = IsTransientStatusCode(response.StatusCode)
-                        ? TransientFailureCooldown
-                        : PermanentFailureCooldown;
-                    MarkFailure(hash, cooldown);
-                    PosterCacheDiagnostics.Write(
-                        "download-http-failed",
-                        $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} status={(int)response.StatusCode} cooldownSeconds={cooldown.TotalSeconds:0}");
-                    return fallback;
-                }
-
-                var contentType = response.Content.Headers.ContentType;
-                if (!IsImageContentType(contentType))
-                {
-                    MarkFailure(hash, PermanentFailureCooldown);
-                    PosterCacheDiagnostics.Write(
-                        "download-content-type-failed",
-                        $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} contentType={(contentType?.MediaType ?? "none").Replace(' ', '_')} cooldownSeconds={PermanentFailureCooldown.TotalSeconds:0}");
-                    return fallback;
-                }
-
-                await using (var remoteStream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                await using (var localStream = CreateTemporaryCacheFileStream(itemDirectory, tempPath))
-                {
-                    await remoteStream.CopyToAsync(localStream, BufferSize, cancellationToken);
-                    await localStream.FlushAsync(cancellationToken);
-                }
-
-                if (!File.Exists(tempPath) || new FileInfo(tempPath).Length == 0)
-                {
-                    MarkFailure(hash, TransientFailureCooldown);
-                    PosterCacheDiagnostics.Write(
-                        "download-empty",
-                        $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} cooldownSeconds={TransientFailureCooldown.TotalSeconds:0}");
-                    return fallback;
-                }
-
-                var extension = ResolveImageExtension(remoteUri, contentType);
-                var contentPath = Path.Combine(itemDirectory, $"{hash}{extension}");
-                Directory.CreateDirectory(itemDirectory);
-                File.Move(tempPath, contentPath, overwrite: true);
-                tempPath = string.Empty;
-                DeleteSiblingCacheFiles(hash, contentPath);
-                _failureCooldownUntilUtcByHash.TryRemove(hash, out _);
-                Touch(contentPath);
-                await TrimToConfiguredLimitBestEffortAsync(contentPath, cancellationToken);
-                PosterCacheDiagnostics.Write(
-                    "download-success",
-                    $"source={PosterCacheDiagnostics.SourceId(remoteUri.AbsoluteUri)} hash={ShortHash(hash)} extension={extension}");
-                return contentPath;
+                return fallback;
             }
             finally
             {
@@ -560,6 +604,17 @@ public sealed class PosterCacheService : IPosterCacheService, IDisposable
     private void MarkFailure(string hash, TimeSpan cooldown)
     {
         _failureCooldownUntilUtcByHash[hash] = DateTime.UtcNow.Add(cooldown);
+    }
+
+    private static Task DelayBeforeRetryAsync(int attempt, CancellationToken cancellationToken)
+    {
+        var delayMilliseconds = attempt switch
+        {
+            <= 1 => 250,
+            2 => 600,
+            _ => 1200
+        };
+        return Task.Delay(delayMilliseconds, cancellationToken);
     }
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)

@@ -78,6 +78,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private string _unknownSeasonSearchQuery = string.Empty;
     private string _unknownSeasonEpisodeNumber = "1";
     private string _selectedCorrectionTarget = CorrectionTargetMovieText;
+    private string _movieCorrectionStatusMessage = string.Empty;
+    private string _tvEpisodeCorrectionStatusMessage = string.Empty;
+    private string _unknownSeasonCorrectionStatusMessage = string.Empty;
     private string _correctionSourceDisplay = "请选择一个播放源。";
     private string _correctionPreviewText = string.Empty;
     private string _correctionSourceFileName = string.Empty;
@@ -107,6 +110,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _isAddingToLibrary;
     private bool _hasCorrectionPreview;
     private bool _isCorrectionBusy;
+    private bool _isRestoringCorrectionStatus;
     private bool _isUnknownSeasonPickerDialogOpen;
     private CancellationTokenSource? _correctionAiCancellation;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
@@ -346,7 +350,17 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string DefaultSourceDisplay { get => _defaultSourceDisplay; private set => SetProperty(ref _defaultSourceDisplay, value); }
 
-    public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        private set
+        {
+            if (SetProperty(ref _statusMessage, value))
+            {
+                StoreCorrectionStatusForSelectedTarget(value);
+            }
+        }
+    }
 
     public string AvailabilityText { get => _availabilityText; private set => SetProperty(ref _availabilityText, value); }
 
@@ -425,8 +439,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(IsCorrectionTargetMovie));
                 OnPropertyChanged(nameof(IsCorrectionTargetTvEpisode));
                 OnPropertyChanged(nameof(IsCorrectionTargetUnknownSeason));
-                ClearCandidatesForInactiveCorrectionTarget();
                 ClearSelectedTvCorrectionTarget();
+                RestoreCorrectionStatusForSelectedTarget();
+                OnPropertyChanged(nameof(HasSearchCandidates));
+                OnPropertyChanged(nameof(HasTvSearchCandidates));
                 SearchCandidatesCommand.RaiseCanExecuteChanged();
                 ApplyManualMatchCommand.RaiseCanExecuteChanged();
                 SelectTvEpisodeCorrectionTargetCommand.RaiseCanExecuteChanged();
@@ -437,7 +453,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 SelectUnknownSeasonTargetCommand.RaiseCanExecuteChanged();
                 ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
                 AiSuggestSearchCommand.RaiseCanExecuteChanged();
-                if (IsCorrectionTargetUnknownSeason)
+                if (IsCorrectionTargetUnknownSeason && UnknownSeasonSeriesGroups.Count == 0)
                 {
                     _ = SearchUnknownSeasonTargetsAsync();
                 }
@@ -801,6 +817,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         await LoadMovieAsync(selectedMovieId.Value, cancellationToken);
     }
 
+    public override void Deactivate()
+    {
+        _probingMediaFileIds.Clear();
+        _lazyProbeCheckedMediaFileIds.Clear();
+        _isProbeCompletionRefreshQueued = false;
+        ManualProbeSourceCommand.RaiseCanExecuteChanged();
+    }
+
     public void PrepareForActivation()
     {
         var selectedExternalRecommendation = _navigationStateService.SelectedExternalRecommendation;
@@ -908,6 +932,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 Sources.Add(source);
             }
             NotifySourceStateChanged();
+            SyncProbeBusyStateFromSources();
             RefreshResetSourceRecognitionCommandState();
 
             var hasSources = Sources.Count > 0;
@@ -995,7 +1020,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 IdentificationStatus.Failed => "该影片尚未识别成功，可使用人工修正或 AI 辅助识别。",
                 _ => "详情已加载。"
             };
-            ScheduleDetailLazyProbe(detail.MovieId, detail.Sources);
+            ScheduleDetailLazyProbe(detail.MovieId, detail.Sources, cancellationToken);
 
             if (NeedsAutoClassification(detail))
             {
@@ -1011,13 +1036,19 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
         catch (Exception exception)
         {
             ClearMovieState($"加载影片详情失败：{DescribeException(exception)}");
         }
     }
 
-    private void ScheduleDetailLazyProbe(int movieId, IReadOnlyCollection<MovieSourceItem> sources)
+    private void ScheduleDetailLazyProbe(
+        int movieId,
+        IReadOnlyCollection<MovieSourceItem> sources,
+        CancellationToken cancellationToken)
     {
         var mediaFileIds = sources
             .Select(source => source.MediaFileId)
@@ -1028,10 +1059,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
-        _ = RunDetailLazyProbeAsync(movieId, mediaFileIds);
+        _ = RunDetailLazyProbeAsync(movieId, mediaFileIds, cancellationToken);
     }
 
-    private async Task RunDetailLazyProbeAsync(int movieId, IReadOnlyCollection<int> mediaFileIds)
+    private async Task RunDetailLazyProbeAsync(
+        int movieId,
+        IReadOnlyCollection<int> mediaFileIds,
+        CancellationToken cancellationToken)
     {
         var requestedMediaFileIds = mediaFileIds
             .Where(mediaFileId => mediaFileId > 0)
@@ -1044,7 +1078,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 requestedMediaFileIds,
                 "movie",
                 movieId,
-                cancellationToken: CancellationToken.None);
+                cancellationToken: cancellationToken);
             var activeProbeMediaFileIds = result.ProbeMediaFileIds.ToHashSet();
             SetProbeBusyState(
                 requestedMediaFileIds.Where(mediaFileId => !activeProbeMediaFileIds.Contains(mediaFileId)),
@@ -1056,6 +1090,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
             ScanIdentificationDiagnostics.Write(
                 $"event=media-probe-detail-lazy-refresh contentKind=movie queuedCount={result.QueuedCount} refreshStrategy=probe-status-changed-event");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            SetProbeBusyState(requestedMediaFileIds, isBusy: false);
+            ScanIdentificationDiagnostics.Write(
+                "event=media-probe-detail-lazy-refresh contentKind=movie skippedReason=page-cancelled");
         }
         catch (Exception exception)
         {
@@ -1147,6 +1187,33 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private void UpdateProbeBusyState(MediaProbeStatusChangedEventArgs e)
     {
         SetProbeBusyState([e.MediaFileId], e.Status == MediaProbeStatus.Pending);
+    }
+
+    private void SyncProbeBusyStateFromSources()
+    {
+        var pendingMediaFileIds = Sources
+            .Where(source => source.MediaProbeStatus == MediaProbeStatus.Pending)
+            .Select(source => source.MediaFileId)
+            .ToHashSet();
+        var changed = false;
+
+        foreach (var mediaFileId in _probingMediaFileIds.ToArray())
+        {
+            if (!pendingMediaFileIds.Contains(mediaFileId))
+            {
+                changed |= _probingMediaFileIds.Remove(mediaFileId);
+            }
+        }
+
+        foreach (var mediaFileId in pendingMediaFileIds)
+        {
+            changed |= _probingMediaFileIds.Add(mediaFileId);
+        }
+
+        if (changed)
+        {
+            ManualProbeSourceCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private void SetProbeBusyState(IEnumerable<int> mediaFileIds, bool isBusy)
@@ -2317,14 +2384,34 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
+        CancelCorrectionAiRequest();
+        var cancellation = new CancellationTokenSource();
+        _correctionAiCancellation = cancellation;
         try
         {
             IsCorrectionBusy = true;
-            await SearchCandidatesCoreAsync();
+            await SearchCandidatesCoreAsync(cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            if (ReferenceEquals(_correctionAiCancellation, cancellation) && IsCorrectionPanelVisible)
+            {
+                StatusMessage = "TMDB 搜索已取消。";
+            }
         }
         finally
         {
-            IsCorrectionBusy = false;
+            var isCurrentRequest = ReferenceEquals(_correctionAiCancellation, cancellation);
+            if (isCurrentRequest)
+            {
+                _correctionAiCancellation = null;
+            }
+
+            cancellation.Dispose();
+            if (isCurrentRequest)
+            {
+                IsCorrectionBusy = false;
+            }
         }
     }
 
@@ -2599,17 +2686,30 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
+        CancelCorrectionAiRequest();
+        var cancellation = new CancellationTokenSource();
+        _correctionAiCancellation = cancellation;
         try
         {
             IsCorrectionBusy = true;
+            StatusMessage = "正在加载已有未识别季，请稍候。";
+            await Task.Yield();
             var targets = await _singleSourceCorrectionService.SearchUnknownSeasonTargetsAsync(
                 null,
-                CancellationToken.None);
+                cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
 
             SetUnknownSeasonTargets(targets);
             StatusMessage = UnknownSeasonTargets.Count == 0
-                ? "没有找到可加入的 no-TMDB / 未识别季。"
+                ? "没有可选择的已有未识别季。"
                 : $"已找到 {UnknownSeasonTargets.Count} 个可加入的未识别季。";
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            if (ReferenceEquals(_correctionAiCancellation, cancellation) && IsCorrectionPanelVisible)
+            {
+                StatusMessage = "加载未识别季已取消。";
+            }
         }
         catch (Exception exception)
         {
@@ -2618,7 +2718,17 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
         finally
         {
-            IsCorrectionBusy = false;
+            var isCurrentRequest = ReferenceEquals(_correctionAiCancellation, cancellation);
+            if (isCurrentRequest)
+            {
+                _correctionAiCancellation = null;
+            }
+
+            cancellation.Dispose();
+            if (isCurrentRequest)
+            {
+                IsCorrectionBusy = false;
+            }
         }
     }
 
@@ -2941,6 +3051,51 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasSelectedTvCorrectionTarget));
         OnPropertyChanged(nameof(SelectedTvCorrectionTargetDisplay));
         PreviewTvEpisodeCorrectionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void StoreCorrectionStatusForSelectedTarget(string statusMessage)
+    {
+        if (_isRestoringCorrectionStatus || !IsCorrectionPanelVisible)
+        {
+            return;
+        }
+
+        if (IsCorrectionTargetUnknownSeason)
+        {
+            _unknownSeasonCorrectionStatusMessage = statusMessage;
+        }
+        else if (IsCorrectionTargetTvEpisode)
+        {
+            _tvEpisodeCorrectionStatusMessage = statusMessage;
+        }
+        else
+        {
+            _movieCorrectionStatusMessage = statusMessage;
+        }
+    }
+
+    private void RestoreCorrectionStatusForSelectedTarget()
+    {
+        if (!IsCorrectionPanelVisible)
+        {
+            return;
+        }
+
+        var statusMessage = IsCorrectionTargetUnknownSeason
+            ? _unknownSeasonCorrectionStatusMessage
+            : IsCorrectionTargetTvEpisode
+                ? _tvEpisodeCorrectionStatusMessage
+                : _movieCorrectionStatusMessage;
+
+        _isRestoringCorrectionStatus = true;
+        try
+        {
+            StatusMessage = statusMessage;
+        }
+        finally
+        {
+            _isRestoringCorrectionStatus = false;
+        }
     }
 
     private static int? TryParsePositive(string value)

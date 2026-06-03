@@ -263,3 +263,79 @@ Boundaries kept:
 
 Build:
 - `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
+
+## 2026-06-02 Batch Selection / Removed Library Retest Fixes
+
+Goal: address batch-selection toolbar layout issues and make removed-library rows resilient when their stored Movie link is stale.
+
+Changed behavior:
+
+- Batch mode selection count is now shown in the existing status line below the result count, not as a new left-side toolbar pill.
+- The temporary batch-action row uses a top separator and no outer frame.
+- Batch-action buttons use an equal-width row; the select button toggles between `全选` and `取消全选`.
+- Poster/list selection dots use a glass-highlight style, with the list-view dot slightly smaller than the poster-view dot.
+- Hidden movie collection rows whose linked Movie record no longer exists are projected without the stale MovieId and remain Movie-kind rows, allowing detail, restore, and collection-record delete paths to fall back to TMDB/IMDb/title-year snapshot identity.
+
+Boundaries kept:
+
+- No physical local file or WebDAV file deletion.
+- No scan rule, identification rule, database field, migration, database update, commit, or push.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
+
+## 2026-06-03 Library List Hydration Diagnostics / Batch AI Cancel Follow-up
+
+Goal: make the media-library list-field auto-request path verifiable from sanitized logs, and let the main batch-selection button cancel a running batch AI identification.
+
+Changed behavior:
+
+- Existing logs were checked. They showed list-view library refreshes and related metadata request activity, but had no direct `library-list-field-hydration-*` events, so the old logs could not precisely prove that the visible-list auto-request mechanism itself ran.
+- The visible-list auto-request path now writes sanitized scheduled / started / completed / cancelled / skipped events. Logs include visible item count, candidate count, candidate type counts, concurrency, max attempts, changed count, and elapsed time; no local path, WebDAV URL, query text, or title is logged.
+- Retest logs confirmed the visible-list auto-request path is active: scheduled / started events were recorded for movie metadata, movie AI tags, TV metadata, and TV rating candidates, and completed events recorded successful field changes.
+- The completed path already refreshed automatically through `NotifyMetadataChanged`. A cancellation edge case was fixed so a cancelled hydration run that has already written fields also raises the same metadata refresh notification instead of waiting for the next manual / activation refresh.
+- The top `批量选择` button now changes to `取消识别` while batch AI identification can be cancelled. Clicking it cancels the current batch AI cancellation token, which is shared by active and not-yet-started AI requests, then the button returns to the normal `批量选择` state.
+- The existing dedicated batch-toolbar cancel command is still available; this follow-up only makes the previously disabled top button useful during batch AI.
+
+Boundaries kept:
+
+- No database fields, migration, database update, commit, or push.
+- No physical local file or WebDAV file deletion.
+- No change to source-less recognized movie retention.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
+
+## 2026-06-03 Library Interaction / Batch AI Guard Follow-up
+
+Goal: tighten media-library interactions found during manual retest without changing delete semantics or scan ownership.
+
+Changed behavior:
+
+- Poster and list batch-selection dots keep the glass look while unselected; selected dots are now solid accent-filled circles with no check mark overlay.
+- The main library status text and manual aggregation status text are visually clamped to two lines with ellipsis; the existing trimmed-text tooltip behavior only shows full text when the visible text is actually truncated.
+- Non-tag filter menu items now use the same hand cursor affordance as tag-filter options.
+- Selecting a TV tag automatically switches the content-type filter to TV when TV is not currently included. Selecting a movie tag automatically switches the content-type filter to Movie when Movie is not currently included.
+- List layout now schedules best-effort list-field hydration for visible items only. It is cancelled on page deactivation or when batch operations start, and retry counters reset when the page is activated again.
+- List-field hydration uses a max concurrency of 4 and at most 3 attempts per item key. The batch includes movie TMDB/OMDb/list metadata, movie AI tags, TV metadata, and TV TMDB/IMDb display rating requests.
+- TV list rating can be overlaid from TV TMDB and IMDb data after hydration, so visible list rows do not need to wait for a full page reload.
+- Batch AI identification now requests a debounced library refresh after each new successful binding instead of waiting only for the whole run to finish.
+- During batch AI identification, detail navigation is blocked both at the library open path and in `NavigationStateService`. Batch operations that would correct, aggregate, split, delete, remove, or otherwise bind playback sources remain command-disabled through `IsBatchOperationRunning`.
+- Detail entry is intentionally a no-op during batch AI identification; there is no visual disabled-state change for cards or rows.
+
+Investigated and intentionally not changed:
+
+- A source-less automatically matched movie can remain after its original playback source is later corrected to a TV episode. The confirmed chain was: movie scan auto-matched a TV episode-style filename to a TMDB movie, batch AI later corrected the same media file to a TV episode, and the previous movie row was left without active sources.
+- Current product decision is to preserve such source-less movies rather than auto-delete or auto-hide them. No cleanup migration or database update was added.
+
+Boundaries kept:
+
+- No physical local file or WebDAV file deletion.
+- No database fields, migration, database update, commit, or push.
+- No change to the decision to preserve source-less recognized movies after later correction.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.

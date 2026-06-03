@@ -18,6 +18,8 @@ public interface INavigationStateService
 
     DateTime? SelectedWatchHistoryDate { get; }
 
+    bool IsDetailNavigationBlocked { get; }
+
     event EventHandler<NavigationRequest>? NavigationRequested;
 
     void NotifyPageActivated(NavigationRequest request);
@@ -32,11 +34,21 @@ public interface INavigationStateService
 
     void RequestExternalMovieDetail(AiRecommendationItem recommendation);
 
+    void SetDetailNavigationBlocked(bool isBlocked);
+
     void RequestDetailBackToLibrary();
 
     void RequestDetailBackToSeries(int tvSeriesId);
 
     void RequestDetailBackToSeason(int tvSeasonId, int? tvEpisodeId = null);
+
+    double GetSeriesSeasonListScrollOffset(int tvSeriesId);
+
+    void SetSeriesSeasonListScrollOffset(int tvSeriesId, double offset);
+
+    double GetSeasonEpisodeListScrollOffset(int tvSeasonId);
+
+    void SetSeasonEpisodeListScrollOffset(int tvSeasonId, double offset);
 
     DateTime? ConsumeWatchHistoryTargetDate();
 }

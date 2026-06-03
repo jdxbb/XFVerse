@@ -163,7 +163,8 @@
                         </Grid.OpacityMask>
                         <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
                         <Control IsHitTestVisible="False" Template="{StaticResource PosterPlaceholderLargeTemplate}" />
-                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="420"
+                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="560"
+                               helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w500"
                                helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
                                helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=SeriesPosterPaletteShadowHost}"
                                helpers:PosterPaletteShadowBehavior.TargetName="SeriesPosterPaletteShadowHost"
@@ -412,11 +413,13 @@
                     </Button>
                 </Grid>
 
-                <ListBox Grid.Row="2"
+                <ListBox x:Name="SeasonListBox"
+                         Grid.Row="2"
                          ItemsSource="{Binding Seasons}"
                          Background="Transparent"
                          BorderBrush="{DynamicResource BrushBorder}"
                          BorderThickness="0,1,0,0"
+                         ScrollViewer.ScrollChanged="OnSeasonListScrollChanged"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"

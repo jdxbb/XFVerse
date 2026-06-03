@@ -158,6 +158,7 @@
             <Setter Property="Margin" Value="0,1" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Cursor" Value="Hand" />
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                                 <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -547,9 +548,9 @@
             <Setter Property="Width" Value="22" />
             <Setter Property="Height" Value="22" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="Background" Value="#24FFFFFF" />
+            <Setter Property="BorderBrush" Value="#8AFFFFFF" />
+            <Setter Property="BorderThickness" Value="1.2" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Visibility" Value="Collapsed" />
             <Setter Property="Focusable" Value="False" />
@@ -557,10 +558,97 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="11" />
+                        <Grid>
+                            <Ellipse Margin="-2"
+                                     Fill="#22000000">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="10"
+                                                      ShadowDepth="0"
+                                                      Opacity="0.34"
+                                                      Color="#000000" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <Border x:Name="ButtonChrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="11">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="9"
+                                                      ShadowDepth="0"
+                                                      Opacity="0.22"
+                                                      Color="#000000" />
+                                </Border.Effect>
+                            </Border>
+                            <Ellipse x:Name="InnerRing"
+                                     Margin="1.5"
+                                     Stroke="#66FFFFFF"
+                                     StrokeThickness="1"
+                                     Opacity="0.82" />
+                            <Border x:Name="GlassHighlight"
+                                    Height="9"
+                                    Margin="3,2,3,0"
+                                    VerticalAlignment="Top"
+                                    CornerRadius="6"
+                                    Opacity="0.58">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0.5,0"
+                                                         EndPoint="0.5,1">
+                                        <GradientStop Color="#D8FFFFFF"
+                                                      Offset="0" />
+                                        <GradientStop Color="#2EFFFFFF"
+                                                      Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Border x:Name="BottomHighlight"
+                                    Height="7"
+                                    Margin="4,0,4,3"
+                                    VerticalAlignment="Bottom"
+                                    CornerRadius="6"
+                                    Opacity="0.26">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0.5,0"
+                                                         EndPoint="0.5,1">
+                                        <GradientStop Color="#00FFFFFF"
+                                                      Offset="0" />
+                                        <GradientStop Color="#8FFFFFFF"
+                                                      Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Ellipse x:Name="LiquidCore"
+                                     Width="12"
+                                     Height="12"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"
+                                     Fill="{DynamicResource BrushAccent}"
+                                     Opacity="0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="LiquidCore" Property="Opacity" Value="0" />
+                                <Setter TargetName="GlassHighlight" Property="Opacity" Value="0" />
+                                <Setter TargetName="BottomHighlight" Property="Opacity" Value="0" />
+                                <Setter TargetName="InnerRing" Property="Opacity" Value="0" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="GlassHighlight" Property="Opacity" Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="GlassHighlight" Property="Opacity" Value="0.24" />
+                            </Trigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsSelected}" Value="True" />
+                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="GlassHighlight" Property="Opacity" Value="0" />
+                                <Setter TargetName="BottomHighlight" Property="Opacity" Value="0" />
+                                <Setter TargetName="InnerRing" Property="Opacity" Value="0" />
+                            </MultiDataTrigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -576,6 +664,12 @@
                     <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SelectionDotListButtonStyle" TargetType="Button" BasedOn="{StaticResource SelectionDotButtonStyle}">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
         <Style x:Key="BatchSelectableCardStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
             <Style.Triggers>
@@ -593,12 +687,12 @@
         </Style>
 
         <Style x:Key="LibraryBatchToolbarStyle" TargetType="Border">
-            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Padding" Value="0,10,0,0" />
             <Setter Property="Margin" Value="0,8,0,0" />
-            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
+            <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="CornerRadius" Value="0" />
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
@@ -607,27 +701,27 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="LibraryBatchStatusPillStyle" TargetType="Border">
-            <Setter Property="Padding" Value="10,5" />
-            <Setter Property="Background" Value="{DynamicResource BrushGlassSelected}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
+        <Style x:Key="LibraryBatchActionButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Margin" Value="4,0" />
+            <Setter Property="Padding" Value="8,4" />
         </Style>
 
-        <Style x:Key="LibraryBatchInfoButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+        <Style x:Key="LibraryBatchInfoButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryBatchActionButtonStyle}">
             <Setter Property="Background" Value="{DynamicResource BrushInfo}" />
             <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushInfo}" />
         </Style>
 
-        <Style x:Key="LibraryBatchWarningButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+        <Style x:Key="LibraryBatchWarningButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryBatchActionButtonStyle}">
             <Setter Property="Background" Value="{DynamicResource BrushWarning}" />
             <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushWarning}" />
         </Style>
 
-        <Style x:Key="LibraryBatchDangerButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+        <Style x:Key="LibraryBatchDangerButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryBatchActionButtonStyle}">
             <Setter Property="Background" Value="{DynamicResource BrushDanger}" />
             <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushDanger}" />
@@ -779,7 +873,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Margin="16,0,0,0">
+                    <StackPanel Grid.Column="0">
                         <TextBlock Text="搜索媒体" Visibility="Collapsed" Style="{StaticResource BodyMutedTextStyle}" />
                         <Grid>
                             <TextBox x:Name="SearchTextBox"
@@ -860,8 +954,7 @@
                 </Grid>
 
                 <Grid x:Name="ToolbarSecondRowGrid"
-                      Grid.Row="2"
-                      Margin="16,0,0,0">
+                      Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -1023,66 +1116,48 @@
                 </Grid>
 
                 <Border Grid.Row="4" Style="{StaticResource LibraryBatchToolbarStyle}">
-                    <DockPanel LastChildFill="True">
-                        <WrapPanel DockPanel.Dock="Right"
-                                   HorizontalAlignment="Right"
-                                   VerticalAlignment="Center">
-                            <Button Margin="0,0,6,0"
-                                    Content="全选当前列表"
-                                    Command="{Binding SelectVisibleItemsCommand}"
-                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
-                            <Button Margin="0,0,6,0"
-                                    Content="清空选择"
-                                    Command="{Binding ClearBatchSelectionCommand}"
-                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
-                            <Button Margin="0,0,6,0"
-                                    Content="标记已看"
-                                    Command="{Binding BatchMarkWatchedCommand}"
-                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
-                            <Button Margin="0,0,6,0"
-                                    Content="标记未看"
-                                    Command="{Binding BatchMarkUnwatchedCommand}"
-                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
-                            <Button Margin="0,0,6,0"
-                                    Content="AI 辅助识别"
-                                    Command="{Binding BatchAutoIdentifyCommand}"
-                                    Style="{StaticResource LibraryBatchInfoButtonStyle}" />
-                            <Button Margin="0,0,6,0"
-                                    Content="取消"
-                                    Command="{Binding CancelBatchOperationCommand}">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CanCancelBatchOperation}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                            <Button Margin="0,0,6,0"
-                                    Content="移出媒体库"
-                                    Command="{Binding BatchRemoveFromLibraryCommand}"
-                                    Style="{StaticResource LibraryBatchWarningButtonStyle}" />
-                            <Button Margin="0,0,6,0"
-                                    Content="删除记录"
-                                    Command="{Binding BatchDeleteMovieRecordsCommand}"
-                                    Style="{StaticResource LibraryBatchDangerButtonStyle}" />
-                            <Button Content="人工聚合为季"
-                                    Command="{Binding OpenManualAggregationCommand}"
-                                    Style="{StaticResource LibraryToolbarButtonStyle}" />
-                        </WrapPanel>
-
-                        <StackPanel Margin="0,0,16,0"
-                                    VerticalAlignment="Center">
-                            <Border Style="{StaticResource LibraryBatchStatusPillStyle}">
-                                <TextBlock Text="{Binding SelectedCount, StringFormat=已选 {0} 项}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource BrushTextPrimary}" />
-                            </Border>
-                        </StackPanel>
-                    </DockPanel>
+                    <UniformGrid Rows="1"
+                                 Columns="9"
+                                 Margin="-4,0"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Center">
+                        <Button Margin="4,0"
+                                Content="{Binding SelectVisibleItemsButtonText}"
+                                Command="{Binding SelectVisibleItemsCommand}"
+                                Style="{StaticResource LibraryBatchActionButtonStyle}" />
+                        <Button Content="清空选择"
+                                Margin="4,0"
+                                Command="{Binding ClearBatchSelectionCommand}"
+                                Style="{StaticResource LibraryBatchActionButtonStyle}" />
+                        <Button Content="标记已看"
+                                Margin="4,0"
+                                Command="{Binding BatchMarkWatchedCommand}"
+                                Style="{StaticResource LibraryBatchActionButtonStyle}" />
+                        <Button Content="标记未看"
+                                Margin="4,0"
+                                Command="{Binding BatchMarkUnwatchedCommand}"
+                                Style="{StaticResource LibraryBatchActionButtonStyle}" />
+                        <Button Content="AI 辅助识别"
+                                Margin="4,0"
+                                Command="{Binding BatchAutoIdentifyCommand}"
+                                Style="{StaticResource LibraryBatchInfoButtonStyle}" />
+                        <Button Content="取消"
+                                Margin="4,0"
+                                Command="{Binding CancelBatchOperationCommand}"
+                                Style="{StaticResource LibraryBatchActionButtonStyle}" />
+                        <Button Content="移出媒体库"
+                                Margin="4,0"
+                                Command="{Binding BatchRemoveFromLibraryCommand}"
+                                Style="{StaticResource LibraryBatchWarningButtonStyle}" />
+                        <Button Content="删除记录"
+                                Margin="4,0"
+                                Command="{Binding BatchDeleteMovieRecordsCommand}"
+                                Style="{StaticResource LibraryBatchDangerButtonStyle}" />
+                        <Button Margin="4,0"
+                                Content="人工聚合为季"
+                                Command="{Binding OpenManualAggregationCommand}"
+                                Style="{StaticResource LibraryBatchActionButtonStyle}" />
+                    </UniformGrid>
                 </Border>
             </Grid>
         </Border>
@@ -1148,15 +1223,28 @@
 
                         <StackPanel Margin="20,0,0,0"
                                     VerticalAlignment="Center">
-                            <TextBlock FontSize="12" Text="{Binding StatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
+                            <TextBlock FontSize="12"
+                                       LineHeight="18"
+                                       LineStackingStrategy="BlockLineHeight"
+                                       MaxHeight="36"
+                                       Text="{Binding StatusMessage}"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="Wrap"
+                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding StatusMessage}"
+                                       Style="{StaticResource BodyMutedTextStyle}" />
                             <TextBlock Margin="0,4,0,0"
-                                       Text="{Binding BatchResultSummary}"
+                                       LineHeight="{StaticResource LineHeightBody}"
+                                       LineStackingStrategy="BlockLineHeight"
+                                       MaxHeight="44"
+                                       Text="{Binding BatchStatusLineText}"
+                                       TextTrimming="CharacterEllipsis"
+                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding BatchStatusLineText}"
                                        TextWrapping="Wrap">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding HasBatchResultSummary}" Value="True">
+                                            <DataTrigger Binding="{Binding HasBatchStatusLine}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -1538,7 +1626,7 @@
                                                 VerticalAlignment="Center"
                                                 Command="{Binding DataContext.ToggleItemSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
-                                                Style="{StaticResource SelectionDotButtonStyle}" />
+                                                Style="{StaticResource SelectionDotListButtonStyle}" />
 
                                         <Border Grid.Column="1"
                                                 Width="42"
@@ -1939,8 +2027,13 @@
                         </StackPanel>
                         <TextBlock Margin="0,0,18,0"
                                    VerticalAlignment="Center"
+                                   LineHeight="{StaticResource LineHeightMetadata}"
+                                   LineStackingStrategy="BlockLineHeight"
+                                   MaxHeight="40"
                                    Text="{Binding ManualAggregationStatusMessage}"
+                                   TextTrimming="CharacterEllipsis"
                                    TextWrapping="Wrap"
+                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding ManualAggregationStatusMessage}"
                                    Style="{StaticResource BodyMutedTextStyle}" />
                     </DockPanel>
                 </Grid>

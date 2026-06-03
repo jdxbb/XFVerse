@@ -245,7 +245,8 @@
                         <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
                         <Control IsHitTestVisible="False"
                                  Template="{StaticResource PosterPlaceholderLargeTemplate}" />
-                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="420"
+                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="560"
+                               helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w500"
                                helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
                                helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=MovieDetailPosterPaletteShadowHost}"
                                helpers:PosterPaletteShadowBehavior.TargetName="MovieDetailPosterPaletteShadowHost"
@@ -576,7 +577,7 @@
                         Content="{Binding PlayButtonText}"
                         ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
                         IsEnabled="{Binding CanOpenPlayer}"
-                        Style="{StaticResource GlassPrimaryButtonStyle}"
+                        Style="{StaticResource GlassSecondaryButtonStyle}"
                         Tag="&#xE768;" />
                 <Button Grid.Column="2"
                         Command="{Binding TogglePreferenceCommand}"
@@ -937,7 +938,10 @@
                               Style="{StaticResource CorrectionDialogComboBoxStyle}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding CorrectionSourceDisplayText}" />
+                                <TextBlock Text="{Binding CorrectionSourceDisplayText}"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding CorrectionSourceDisplayText}" />
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>

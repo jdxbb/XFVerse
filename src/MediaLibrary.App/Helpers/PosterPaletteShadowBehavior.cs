@@ -171,6 +171,7 @@ public static class PosterPaletteShadowBehavior
 
         if (image.Source is null)
         {
+            ResetTargetShadowColor(image);
             return;
         }
 
@@ -197,6 +198,7 @@ public static class PosterPaletteShadowBehavior
         var hasPaletteColor = TryGetPosterShadowColor(image, source, out var shadowColor);
         if (!hasPaletteColor)
         {
+            ResetTargetShadowColor(image);
             return;
         }
 
@@ -215,6 +217,21 @@ public static class PosterPaletteShadowBehavior
             PlaceholderPosterShadowColor.Value,
             source: null,
             hasPaletteColor: true,
+            Stopwatch.GetTimestamp());
+    }
+
+    private static void ResetTargetShadowColor(Image image)
+    {
+        if (ResolveTargetElement(image) is not { } target)
+        {
+            return;
+        }
+
+        ApplyShadowColorToTarget(
+            target,
+            FallbackShadowColor,
+            source: null,
+            hasPaletteColor: false,
             Stopwatch.GetTimestamp());
     }
 

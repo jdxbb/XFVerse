@@ -101,7 +101,7 @@ public sealed class TvSeasonDetailModel
         ? Episodes.Count >= TotalEpisodeCount && WatchedEpisodeCount >= TotalEpisodeCount
         : Episodes.Count > 0 && WatchedEpisodeCount >= Episodes.Count;
 
-    public bool IsSeasonUnwatched => WatchedEpisodeCount == 0;
+    public bool IsSeasonUnwatched => !IsSeasonWatched;
 }
 
 public sealed class TvSeasonEpisodeListItem : INotifyPropertyChanged
@@ -211,6 +211,8 @@ public sealed class TvSeasonCorrectionSourceItem
 
     public string SourceSummary { get; set; } = string.Empty;
 
+    public IReadOnlyList<TvSeasonCorrectionPlaybackSourceItem> SourceOptions { get; set; } = [];
+
     public string EpisodeNumberText => $"E{EpisodeNumber:D2}";
 
     public string SafeFileName
@@ -223,6 +225,36 @@ public sealed class TvSeasonCorrectionSourceItem
     }
 
     public string SafeFilePath => string.IsNullOrWhiteSpace(FilePath) ? SafeFileName : FilePath;
+}
+
+public sealed class TvSeasonCorrectionPlaybackSourceItem
+{
+    public int MediaFileId { get; set; }
+
+    public string FileName { get; set; } = string.Empty;
+
+    public string FilePath { get; set; } = string.Empty;
+
+    public ProtocolType ProtocolType { get; set; }
+
+    public bool IsDefault { get; set; }
+
+    public string SourceTypeText => MediaSourceDisplayText.FormatSourceType(ProtocolType);
+
+    public string SafeFileName
+    {
+        get
+        {
+            var name = string.IsNullOrWhiteSpace(FileName) ? string.Empty : Path.GetFileName(FileName.Trim());
+            return string.IsNullOrWhiteSpace(name) ? $"MediaFile {MediaFileId}" : name;
+        }
+    }
+
+    public string SafeFilePath => string.IsNullOrWhiteSpace(FilePath) ? SafeFileName : FilePath;
+
+    public string DisplayText => IsDefault
+        ? $"默认源 · {SourceTypeText} · {SafeFilePath}"
+        : $"{SourceTypeText} · {SafeFilePath}";
 }
 
 internal static class TvDetailDisplayText

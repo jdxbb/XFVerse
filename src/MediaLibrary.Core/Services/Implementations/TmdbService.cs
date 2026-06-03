@@ -25,6 +25,7 @@ public sealed class TmdbService : ITmdbService
     private const string TvSeriesDetailCacheSchemaVersion = "v4";
     private const int DiscoveryPageSize = 20;
     internal const int HttpConcurrencyLimit = 8;
+    private const int MaxTmdbRequestAttempts = 4;
     private const int SearchCacheLimit = 300;
     private const int DetailCacheLimit = 600;
     private const int ExternalIdsCacheLimit = 600;
@@ -1062,30 +1063,55 @@ public sealed class TmdbService : ITmdbService
             async token =>
             {
                 Exception? lastNetworkException = null;
+                HttpStatusCode? lastTransientStatusCode = null;
 
-                foreach (var baseUri in BuildApiBaseUris(options.ApiBaseUrl))
+                for (var attempt = 1; attempt <= MaxTmdbRequestAttempts; attempt++)
                 {
-                    var effectiveRequestUri = options.UseBearerToken
-                        ? requestUri
-                        : AppendQueryParameter(requestUri, "api_key", options.ApiKey);
+                    token.ThrowIfCancellationRequested();
+                    foreach (var baseUri in BuildApiBaseUris(options.ApiBaseUrl))
+                    {
+                        var effectiveRequestUri = options.UseBearerToken
+                            ? requestUri
+                            : AppendQueryParameter(requestUri, "api_key", options.ApiKey);
 
-                    var absoluteUri = new Uri(baseUri, effectiveRequestUri);
-                    using var request = new HttpRequestMessage(HttpMethod.Get, absoluteUri);
-                    if (options.UseBearerToken)
-                    {
-                        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ReadAccessToken);
-                        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        var absoluteUri = new Uri(baseUri, effectiveRequestUri);
+                        using var request = new HttpRequestMessage(HttpMethod.Get, absoluteUri);
+                        if (options.UseBearerToken)
+                        {
+                            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ReadAccessToken);
+                            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        }
+
+                        try
+                        {
+                            var response = await _httpClient.SendAsync(request, token);
+                            if (!IsTransientTmdbStatusCode(response.StatusCode) || attempt >= MaxTmdbRequestAttempts)
+                            {
+                                return response;
+                            }
+
+                            lastTransientStatusCode = response.StatusCode;
+                            response.Dispose();
+                        }
+                        catch (Exception exception) when (!token.IsCancellationRequested
+                                                           && IsFallbackEligibleNetworkFailure(exception))
+                        {
+                            lastNetworkException = exception;
+                        }
                     }
 
-                    try
+                    if (attempt < MaxTmdbRequestAttempts)
                     {
-                        return await _httpClient.SendAsync(request, token);
+                        await DelayTmdbRetryAsync(attempt, token);
                     }
-                    catch (Exception exception) when (!token.IsCancellationRequested
-                                                       && IsFallbackEligibleNetworkFailure(exception))
-                    {
-                        lastNetworkException = exception;
-                    }
+                }
+
+                if (lastTransientStatusCode.HasValue)
+                {
+                    throw new HttpRequestException(
+                        $"TMDB 请求失败：{(int)lastTransientStatusCode.Value} {lastTransientStatusCode.Value}",
+                        null,
+                        lastTransientStatusCode.Value);
                 }
 
                 throw new HttpRequestException("TMDB 请求失败，主地址和后备地址都不可用。", lastNetworkException);
@@ -1121,6 +1147,25 @@ public sealed class TmdbService : ITmdbService
     private static bool IsFallbackEligibleNetworkFailure(Exception exception)
     {
         return exception is HttpRequestException or TaskCanceledException;
+    }
+
+    private static bool IsTransientTmdbStatusCode(HttpStatusCode statusCode)
+    {
+        var numericStatusCode = (int)statusCode;
+        return statusCode == HttpStatusCode.RequestTimeout
+               || numericStatusCode == 429
+               || numericStatusCode >= 500;
+    }
+
+    private static Task DelayTmdbRetryAsync(int attempt, CancellationToken cancellationToken)
+    {
+        var delayMilliseconds = attempt switch
+        {
+            <= 1 => 250,
+            2 => 600,
+            _ => 1200
+        };
+        return Task.Delay(delayMilliseconds, cancellationToken);
     }
 
     private static string NormalizeApiBaseUrl(string? baseUrl)

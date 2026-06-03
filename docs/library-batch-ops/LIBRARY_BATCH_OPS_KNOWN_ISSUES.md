@@ -20,6 +20,9 @@
 - `UserMovieCollectionItem` does not have fields for favorite or user rating. Moved-out favorite/rated Movies keep those values on `Movie`; resource-library visibility is provided by `LibraryQueryService`, and Favorites visibility for liked items continues to come from `Movie.IsFavorite`.
 - Favorites must continue to show all want-to-watch and favorite movies without a library/external split. Do not add a Favorites library-scope filter as part of Delete UX-1.
 - A movie removed with `移出资源库` can still affect Watch Insights statistics and WI-5 profile input if it keeps state or WatchHistory, so it must remain discoverable.
+- Runtime visual acceptance is still required for the revised equal-width batch toolbar on narrow windows and long localized button text.
+
+- Source-less recognized Movie rows can remain after their original playback source is later corrected to TV. This is currently a product decision: preserve the previously created source-less Movie record instead of auto-deleting or auto-hiding it.
 
 ## Noise
 
@@ -32,6 +35,9 @@
 - `移出资源库` must not make a Movie with watched/favorite/rating/history state unreachable. Such Movies remain visible through resource-library all/status scopes or Favorites where applicable.
 - Batch-2 AI-assisted identification does not call the playback-source reset path and does not call the scan identification main flow.
 - Batch-2 no-result and failed items preserve existing identification; only items with a valid candidate and readable TMDB details are overwritten.
+- Removed-library movie rows with stale MovieId now fall back to collection snapshot identity; if the snapshot itself lacks TMDB/IMDb/title-year identity, only the remaining collection record can be cleaned up.
+
+- The 2026-06-03 investigation found a TV episode-style filename that first passed the movie auto-match path and was later corrected to TV by batch AI. The old source-less Movie row is intentionally retained per the current decision above.
 
 ## Maintenance Rules
 

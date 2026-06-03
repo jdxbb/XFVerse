@@ -12,6 +12,8 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     private bool _isBatchSelectionMode;
     private bool _isSelected;
+    private double? _ratingOverrideValue;
+    private string? _ratingOverrideSourceName;
 
     public LibraryMovieItemViewModel(
         LibraryMovieListItem movie,
@@ -79,9 +81,9 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public IdentificationStatus IdentificationStatus => Movie.IdentificationStatus;
 
-    public double? PrimaryRatingValue => Movie.PrimaryRatingValue;
+    public double? PrimaryRatingValue => _ratingOverrideValue ?? Movie.PrimaryRatingValue;
 
-    public string PrimaryRatingSourceName => Movie.PrimaryRatingSourceName;
+    public string PrimaryRatingSourceName => _ratingOverrideSourceName ?? Movie.PrimaryRatingSourceName;
 
     public int SourceCount => Movie.SourceCount;
 
@@ -384,6 +386,25 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
     }
 
     public bool SelectionDotVisible => IsBatchSelectionMode;
+
+    public void ApplyRatingOverride(double? value, string sourceName)
+    {
+        var normalizedSourceName = string.IsNullOrWhiteSpace(sourceName) ? string.Empty : sourceName.Trim();
+        if (_ratingOverrideValue == value
+            && string.Equals(_ratingOverrideSourceName, normalizedSourceName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _ratingOverrideValue = value;
+        _ratingOverrideSourceName = normalizedSourceName;
+        OnPropertyChanged(nameof(PrimaryRatingValue));
+        OnPropertyChanged(nameof(PrimaryRatingSourceName));
+        OnPropertyChanged(nameof(HasRating));
+        OnPropertyChanged(nameof(RatingDisplayText));
+        OnPropertyChanged(nameof(IsHighRating));
+        OnPropertyChanged(nameof(RatingSourceText));
+    }
 
     private string MissingSingleTagFallback
     {

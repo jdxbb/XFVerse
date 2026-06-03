@@ -178,7 +178,8 @@
                     <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
                     <Control IsHitTestVisible="False"
                              Template="{StaticResource PosterPlaceholderLargeTemplate}" />
-                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="420"
+                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="560"
+                           helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w500"
                            helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
                            helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=SeasonPosterPaletteShadowHost}"
                            helpers:PosterPaletteShadowBehavior.TargetName="SeasonPosterPaletteShadowHost"
@@ -405,6 +406,7 @@
                          Background="Transparent"
                          BorderBrush="{DynamicResource BrushBorder}"
                          BorderThickness="0,1,0,0"
+                         ScrollViewer.ScrollChanged="OnEpisodeListScrollChanged"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
@@ -542,7 +544,7 @@
                                                 CommandParameter="{Binding}"
                                                 Content="{Binding PlayButtonText}">
                                             <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource GlassPrimaryButtonStyle}">
+                                                <Style TargetType="Button" BasedOn="{StaticResource GlassSecondaryButtonStyle}">
                                                     <Setter Property="IsEnabled" Value="False" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding HasPlayableSource}" Value="True">
