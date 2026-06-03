@@ -13,6 +13,10 @@ public static class PosterCacheImageBehavior
 {
     private const int DefaultDecodePixelWidth = 240;
     private const int MaxMemoryCacheEntries = 768;
+    public const string LoadStateLoading = "Loading";
+    public const string LoadStateLoaded = "Loaded";
+    public const string LoadStateEmpty = "Empty";
+    public const string LoadStateFailed = "Failed";
     private static readonly ConcurrentDictionary<string, ImageSource> MemoryCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentQueue<string> MemoryCacheOrder = new();
     private static readonly ConcurrentDictionary<string, Lazy<Task<PosterImageLoadResult>>> ImageLoadTasks = new(StringComparer.Ordinal);
@@ -46,6 +50,15 @@ public static class PosterCacheImageBehavior
             typeof(PosterCacheImageBehavior),
             new PropertyMetadata(string.Empty, OnImageRequestOptionChanged));
 
+    public static readonly DependencyProperty LoadStateProperty =
+        DependencyProperty.RegisterAttached(
+            "LoadState",
+            typeof(string),
+            typeof(PosterCacheImageBehavior),
+            new FrameworkPropertyMetadata(
+                LoadStateLoading,
+                FrameworkPropertyMetadataOptions.Inherits));
+
     private static readonly DependencyProperty RequestVersionProperty =
         DependencyProperty.RegisterAttached(
             "RequestVersion",
@@ -59,6 +72,13 @@ public static class PosterCacheImageBehavior
             typeof(CancellationTokenSource),
             typeof(PosterCacheImageBehavior),
             new PropertyMetadata(null));
+
+    private static readonly DependencyProperty SyncLoadStateOnLoadedProperty =
+        DependencyProperty.RegisterAttached(
+            "SyncLoadStateOnLoaded",
+            typeof(bool),
+            typeof(PosterCacheImageBehavior),
+            new PropertyMetadata(false));
 
     public static string? GetSource(DependencyObject target)
     {
@@ -98,6 +118,16 @@ public static class PosterCacheImageBehavior
     public static void SetPreferredTmdbImageSize(DependencyObject target, string value)
     {
         target.SetValue(PreferredTmdbImageSizeProperty, value);
+    }
+
+    public static string GetLoadState(DependencyObject target)
+    {
+        return (string)target.GetValue(LoadStateProperty);
+    }
+
+    public static void SetLoadState(DependencyObject target, string value)
+    {
+        target.SetValue(LoadStateProperty, value);
     }
 
     public static void ClearMemoryCache()
@@ -143,12 +173,14 @@ public static class PosterCacheImageBehavior
         {
             PosterCacheDiagnostics.Write("source-empty", $"version={version}");
             image.SetCurrentValue(Image.SourceProperty, null);
+            SetImageLoadState(image, LoadStateEmpty);
             return;
         }
 
         var decodePixelWidth = NormalizeDecodePixelWidth(GetDecodePixelWidth(image));
         if (TrySetMemoryCachedSource(image, source, decodePixelWidth))
         {
+            SetImageLoadState(image, LoadStateLoaded);
             PosterCacheDiagnostics.Write(
                 "memory-hit",
                 $"source={PosterCacheDiagnostics.SourceId(source)} width={decodePixelWidth} version={version}");
@@ -159,6 +191,7 @@ public static class PosterCacheImageBehavior
             "request-start",
             $"source={PosterCacheDiagnostics.SourceId(source)} width={decodePixelWidth} version={version}");
         image.SetCurrentValue(Image.SourceProperty, null);
+        SetImageLoadState(image, LoadStateLoading);
         var cancellation = new CancellationTokenSource();
         SetRequestCancellation(image, cancellation);
         _ = ApplySourceAsync(image, source, version, decodePixelWidth, cancellation.Token);
@@ -182,6 +215,11 @@ public static class PosterCacheImageBehavior
         }
         catch
         {
+            if (!cancellationToken.IsCancellationRequested && GetRequestVersion(image) == version)
+            {
+                SetImageLoadState(image, LoadStateFailed);
+            }
+
             return;
         }
 
@@ -193,13 +231,17 @@ public static class PosterCacheImageBehavior
             return;
         }
 
-        var imageSource = loadResult.ImageSource
-            ?? CreateRemoteFallbackImageSource(loadResult.RemoteFallbackSource, decodePixelWidth);
+        var imageSource = loadResult.ImageSource;
         if (imageSource is null)
         {
             PosterCacheDiagnostics.Write(
                 "set-empty",
                 $"source={PosterCacheDiagnostics.SourceId(source)} width={decodePixelWidth} result={loadResult.Kind}");
+            SetImageLoadState(
+                image,
+                string.Equals(loadResult.Kind, "empty", StringComparison.Ordinal)
+                    ? LoadStateEmpty
+                    : LoadStateFailed);
             return;
         }
 
@@ -207,6 +249,7 @@ public static class PosterCacheImageBehavior
             "set-image",
             $"source={PosterCacheDiagnostics.SourceId(source)} width={decodePixelWidth} result={loadResult.Kind}");
         image.SetCurrentValue(Image.SourceProperty, imageSource);
+        SetImageLoadState(image, LoadStateLoaded);
     }
 
     private static async Task<PosterImageLoadResult> GetOrCreateImageSourceAsync(
@@ -295,7 +338,7 @@ public static class PosterCacheImageBehavior
             PosterCacheDiagnostics.Write(
                 "remote-fallback",
                 $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth} resolveMs={resolveElapsed.TotalMilliseconds:0}");
-            return PosterImageLoadResult.FromRemoteFallback(displaySource);
+            return PosterImageLoadResult.Failed("remote-fallback");
         }
 
         try
@@ -315,7 +358,7 @@ public static class PosterCacheImageBehavior
             PosterCacheDiagnostics.Write(
                 "local-decode-error",
                 $"source={PosterCacheDiagnostics.SourceId(requestedSource)} display={PosterCacheDiagnostics.SourceId(displaySource)} width={decodePixelWidth} resolveMs={resolveElapsed.TotalMilliseconds:0} error={exception.GetType().Name}");
-            return PosterImageLoadResult.FromRemoteFallback(requestedSource);
+            return PosterImageLoadResult.Failed("local-decode-error");
         }
     }
 
@@ -342,25 +385,104 @@ public static class PosterCacheImageBehavior
             : Path.IsPathRooted(source);
     }
 
-    private static ImageSource? CreateRemoteFallbackImageSource(string? source, int decodePixelWidth)
+    private static void SetImageLoadState(Image image, string state)
     {
-        if (string.IsNullOrWhiteSpace(source)
-            || !Uri.TryCreate(source, UriKind.RelativeOrAbsolute, out var uri)
-            || IsLocalFileSource(source, uri))
+        image.SetCurrentValue(LoadStateProperty, state);
+
+        var parent = GetParent(image);
+        if (parent is not null)
         {
-            return null;
+            parent.SetCurrentValue(LoadStateProperty, state);
+            SetDescendantControlLoadState(parent, state);
+            return;
         }
 
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        if (decodePixelWidth > 0)
+        EnsureLoadStateSyncOnLoaded(image);
+    }
+
+    private static void EnsureLoadStateSyncOnLoaded(Image image)
+    {
+        if ((bool)image.GetValue(SyncLoadStateOnLoadedProperty))
         {
-            bitmap.DecodePixelWidth = decodePixelWidth;
+            return;
         }
 
-        bitmap.UriSource = uri;
-        bitmap.EndInit();
-        return bitmap;
+        image.SetValue(SyncLoadStateOnLoadedProperty, true);
+        image.Loaded += OnImageLoadedSyncLoadState;
+    }
+
+    private static void OnImageLoadedSyncLoadState(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Image image)
+        {
+            return;
+        }
+
+        image.Loaded -= OnImageLoadedSyncLoadState;
+        image.SetValue(SyncLoadStateOnLoadedProperty, false);
+        SetImageLoadState(image, GetLoadState(image));
+    }
+
+    private static void SetDescendantControlLoadState(DependencyObject root, string state)
+    {
+        foreach (var descendant in EnumerateDescendants(root))
+        {
+            if (descendant is Control control)
+            {
+                control.SetCurrentValue(LoadStateProperty, state);
+            }
+        }
+    }
+
+    private static DependencyObject? GetParent(DependencyObject current)
+    {
+        return current is Visual
+            ? VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current)
+            : LogicalTreeHelper.GetParent(current);
+    }
+
+    private static IEnumerable<DependencyObject> EnumerateDescendants(DependencyObject root)
+    {
+        var seen = new HashSet<DependencyObject>();
+        var queue = new Queue<DependencyObject>();
+        EnqueueChildren(root, queue, seen);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            yield return current;
+            EnqueueChildren(current, queue, seen);
+        }
+    }
+
+    private static void EnqueueChildren(
+        DependencyObject root,
+        Queue<DependencyObject> queue,
+        ISet<DependencyObject> seen)
+    {
+        if (root is Visual)
+        {
+            for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+            {
+                Enqueue(VisualTreeHelper.GetChild(root, index), queue, seen);
+            }
+        }
+
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            Enqueue(child, queue, seen);
+        }
+    }
+
+    private static void Enqueue(
+        DependencyObject child,
+        Queue<DependencyObject> queue,
+        ISet<DependencyObject> seen)
+    {
+        if (seen.Add(child))
+        {
+            queue.Enqueue(child);
+        }
     }
 
     private static bool TrySetMemoryCachedSource(Image image, string source, int decodePixelWidth)
@@ -539,18 +661,18 @@ public static class PosterCacheImageBehavior
         target.SetValue(RequestCancellationProperty, value);
     }
 
-    private readonly record struct PosterImageLoadResult(ImageSource? ImageSource, string? RemoteFallbackSource, string Kind)
+    private readonly record struct PosterImageLoadResult(ImageSource? ImageSource, string Kind)
     {
-        public static PosterImageLoadResult Empty => new(null, null, "empty");
+        public static PosterImageLoadResult Empty => new(null, "empty");
 
         public static PosterImageLoadResult FromImage(ImageSource imageSource)
         {
-            return new PosterImageLoadResult(imageSource, null, "local");
+            return new PosterImageLoadResult(imageSource, "local");
         }
 
-        public static PosterImageLoadResult FromRemoteFallback(string? source)
+        public static PosterImageLoadResult Failed(string kind)
         {
-            return new PosterImageLoadResult(null, source, "remote-fallback");
+            return new PosterImageLoadResult(null, kind);
         }
     }
 }

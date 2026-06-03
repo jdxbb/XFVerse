@@ -9,6 +9,8 @@ public sealed class NavigationStateService : INavigationStateService
     private readonly Stack<NavigationRequest> _detailBackStack = [];
     private readonly Dictionary<int, double> _seriesSeasonListScrollOffsets = [];
     private readonly Dictionary<int, double> _seasonEpisodeListScrollOffsets = [];
+    private readonly HashSet<int> _seriesSeasonListScrollRestoreRequests = [];
+    private readonly HashSet<int> _seasonEpisodeListScrollRestoreRequests = [];
     private NavigationRequest? _currentRequest;
 
     public int? SelectedMovieId { get; private set; }
@@ -111,6 +113,11 @@ public sealed class NavigationStateService : INavigationStateService
         SetScrollOffset(_seriesSeasonListScrollOffsets, tvSeriesId, offset);
     }
 
+    public bool ConsumeSeriesSeasonListScrollRestoreRequest(int tvSeriesId)
+    {
+        return _seriesSeasonListScrollRestoreRequests.Remove(tvSeriesId);
+    }
+
     public double GetSeasonEpisodeListScrollOffset(int tvSeasonId)
     {
         return _seasonEpisodeListScrollOffsets.GetValueOrDefault(tvSeasonId);
@@ -121,12 +128,18 @@ public sealed class NavigationStateService : INavigationStateService
         SetScrollOffset(_seasonEpisodeListScrollOffsets, tvSeasonId, offset);
     }
 
+    public bool ConsumeSeasonEpisodeListScrollRestoreRequest(int tvSeasonId)
+    {
+        return _seasonEpisodeListScrollRestoreRequests.Remove(tvSeasonId);
+    }
+
     private void RequestDetailBack(NavigationRequest fallbackRequest)
     {
         var request = _detailBackStack.Count > 0
             ? _detailBackStack.Pop()
             : fallbackRequest;
 
+        MarkDetailBackScrollRestoreRequest(request);
         Request(request, captureDetailOrigin: false);
     }
 
@@ -139,11 +152,38 @@ public sealed class NavigationStateService : INavigationStateService
 
         if (captureDetailOrigin)
         {
+            ClearDetailBackScrollRestoreRequest(request);
             CaptureDetailOrigin(request);
         }
 
         ApplyRequestSelection(request);
         NavigationRequested?.Invoke(this, request);
+    }
+
+    private void MarkDetailBackScrollRestoreRequest(NavigationRequest request)
+    {
+        if (request.PageKey == NavigationPageKey.SeriesOverview && request.TvSeriesId.HasValue)
+        {
+            _seriesSeasonListScrollRestoreRequests.Add(request.TvSeriesId.Value);
+        }
+
+        if (request.PageKey == NavigationPageKey.TvSeasonDetail && request.TvSeasonId.HasValue)
+        {
+            _seasonEpisodeListScrollRestoreRequests.Add(request.TvSeasonId.Value);
+        }
+    }
+
+    private void ClearDetailBackScrollRestoreRequest(NavigationRequest request)
+    {
+        if (request.PageKey == NavigationPageKey.SeriesOverview && request.TvSeriesId.HasValue)
+        {
+            _seriesSeasonListScrollRestoreRequests.Remove(request.TvSeriesId.Value);
+        }
+
+        if (request.PageKey == NavigationPageKey.TvSeasonDetail && request.TvSeasonId.HasValue)
+        {
+            _seasonEpisodeListScrollRestoreRequests.Remove(request.TvSeasonId.Value);
+        }
     }
 
     private void CaptureDetailOrigin(NavigationRequest targetRequest)

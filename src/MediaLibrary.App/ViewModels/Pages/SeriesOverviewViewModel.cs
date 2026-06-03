@@ -36,7 +36,9 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     private string _statusMessage = "请先选择一部电视剧。";
     private bool _hasSeries;
     private bool _canAddSeriesToLibrary;
+    private bool _isDetailLoading;
     private double _seasonListScrollOffset;
+    private bool? _restoreSeasonListScrollOffsetOnNextActivation;
 
     public SeriesOverviewViewModel(
         INavigationStateService navigationStateService,
@@ -128,6 +130,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(HasNoSeries));
                 OnPropertyChanged(nameof(HasSeasons));
                 OnPropertyChanged(nameof(HasNoSeasons));
+                RefreshSeriesLibraryButtonState();
             }
         }
     }
@@ -137,6 +140,12 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     public bool HasSeasons => HasSeries && Seasons.Count > 0;
 
     public bool HasNoSeasons => HasSeries && Seasons.Count == 0;
+
+    public bool IsDetailLoading
+    {
+        get => _isDetailLoading;
+        private set => SetProperty(ref _isDetailLoading, value);
+    }
 
     public bool CanAddSeriesToLibrary
     {
@@ -174,6 +183,29 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         ? "\uE738"
         : "\uE710";
 
+    public void PrepareForActivation()
+    {
+        var selectedSeriesId = _navigationStateService.SelectedTvSeriesId;
+        if (!selectedSeriesId.HasValue)
+        {
+            _restoreSeasonListScrollOffsetOnNextActivation = false;
+            return;
+        }
+
+        var shouldRestoreSeasonListOffset =
+            _navigationStateService.ConsumeSeriesSeasonListScrollRestoreRequest(selectedSeriesId.Value);
+        _restoreSeasonListScrollOffsetOnNextActivation = shouldRestoreSeasonListOffset;
+        if (!shouldRestoreSeasonListOffset)
+        {
+            ResetSeasonListScrollOffset(selectedSeriesId.Value);
+        }
+
+        if (!_seriesId.HasValue || _seriesId.Value != selectedSeriesId.Value)
+        {
+            BeginDetailLoading("正在加载电视剧详情...");
+        }
+    }
+
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         var selectedSeriesId = _navigationStateService.SelectedTvSeriesId;
@@ -187,10 +219,18 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         {
             if (_seriesId.HasValue && _seriesId.Value != selectedSeriesId.Value)
             {
+                BeginDetailLoading("正在加载电视剧详情...");
                 PosterDisplayUrl = string.Empty;
                 await Task.Yield();
             }
 
+            var shouldRestoreSeasonListOffset =
+                _restoreSeasonListScrollOffsetOnNextActivation ?? true;
+            _restoreSeasonListScrollOffsetOnNextActivation = null;
+            if (!shouldRestoreSeasonListOffset)
+            {
+                ResetSeasonListScrollOffset(selectedSeriesId.Value);
+            }
             var model = await _tvDetailQueryService.GetSeriesOverviewAsync(selectedSeriesId.Value, cancellationToken);
             if (model is null)
             {
@@ -198,7 +238,10 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 return;
             }
 
-            ApplyModel(model, cancellationToken);
+            ApplyModel(
+                model,
+                cancellationToken,
+                resetSeasonListScrollOffset: false);
             if (model.TmdbSeriesId.HasValue)
             {
                 _ = HydrateAndRefreshAsync(model.SeriesId, cancellationToken);
@@ -235,7 +278,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 return;
             }
 
-            ApplyModel(model, cancellationToken);
+            ApplyModel(model, cancellationToken, resetSeasonListScrollOffset: false);
             StatusMessage = result.Skipped
                 ? $"已加载 {Seasons.Count} 个 Season。"
                 : result.BuildStatusMessage();
@@ -252,11 +295,18 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         }
     }
 
-    private void ApplyModel(TvSeriesOverviewModel model, CancellationToken cancellationToken = default)
+    private void ApplyModel(
+        TvSeriesOverviewModel model,
+        CancellationToken cancellationToken = default,
+        bool resetSeasonListScrollOffset = false)
     {
         _seriesId = model.SeriesId;
+        if (resetSeasonListScrollOffset)
+        {
+            _navigationStateService.SetSeriesSeasonListScrollOffset(model.SeriesId, 0);
+        }
+
         _seasonListScrollOffset = _navigationStateService.GetSeriesSeasonListScrollOffset(model.SeriesId);
-        OnPropertyChanged(nameof(SeasonListScrollOffset));
         HasSeries = true;
         Name = model.Name;
         OriginalName = string.IsNullOrWhiteSpace(model.OriginalName) ? "-" : model.OriginalName;
@@ -282,16 +332,28 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
             Seasons.Add(season);
         }
 
+        OnPropertyChanged(nameof(SeasonListScrollOffset));
         CanAddSeriesToLibrary = model.Seasons.Count > 0;
-        OnPropertyChanged(nameof(AddSeriesToLibraryButtonText));
-        OnPropertyChanged(nameof(AddSeriesToLibraryButtonIcon));
-        OnPropertyChanged(nameof(ShowSeriesLibraryAction));
+        RefreshSeriesLibraryButtonState();
         OnPropertyChanged(nameof(HasSeasons));
         OnPropertyChanged(nameof(HasNoSeasons));
         StatusMessage = Seasons.Count == 0
             ? "该剧暂无 Season metadata。"
             : $"已加载 {Seasons.Count} 个 Season。";
+        IsDetailLoading = false;
         _ = LoadRatingsAsync(model.SeriesId, cancellationToken);
+    }
+
+    private void ResetSeasonListScrollOffset(int seriesId)
+    {
+        _navigationStateService.SetSeriesSeasonListScrollOffset(seriesId, 0);
+        if (_seasonListScrollOffset <= 0)
+        {
+            return;
+        }
+
+        _seasonListScrollOffset = 0;
+        OnPropertyChanged(nameof(SeasonListScrollOffset));
     }
 
     private async Task LoadRatingsAsync(int seriesId, CancellationToken cancellationToken)
@@ -327,6 +389,14 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         {
             Ratings.Add(bySource.GetValueOrDefault(source) ?? new MovieRatingItem { SourceName = source });
         }
+    }
+
+    private void RefreshSeriesLibraryButtonState()
+    {
+        OnPropertyChanged(nameof(ShowSeriesLibraryAction));
+        OnPropertyChanged(nameof(AddSeriesToLibraryButtonText));
+        OnPropertyChanged(nameof(AddSeriesToLibraryButtonIcon));
+        AddSeriesToLibraryCommand.RaiseCanExecuteChanged();
     }
 
     private void NavigateToSeason(object? parameter)
@@ -367,7 +437,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
             var model = await _tvDetailQueryService.GetSeriesOverviewAsync(_seriesId.Value, CancellationToken.None);
             if (model is not null)
             {
-                ApplyModel(model, CancellationToken.None);
+                ApplyModel(model, CancellationToken.None, resetSeasonListScrollOffset: false);
             }
 
             StatusMessage = Seasons.All(x => x.IsVisibleInLibrary) ? "已加入媒体库。" : "已移出媒体库。";
@@ -380,7 +450,10 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
 
     private void Clear(string statusMessage)
     {
+        IsDetailLoading = false;
         _seriesId = null;
+        _seasonListScrollOffset = 0;
+        OnPropertyChanged(nameof(SeasonListScrollOffset));
         CanAddSeriesToLibrary = false;
         HasSeries = false;
         Name = "未选择电视剧";
@@ -403,11 +476,16 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         StatusMessage = statusMessage;
         Seasons.Clear();
         Ratings.Clear();
-        OnPropertyChanged(nameof(AddSeriesToLibraryButtonText));
-        OnPropertyChanged(nameof(AddSeriesToLibraryButtonIcon));
-        OnPropertyChanged(nameof(ShowSeriesLibraryAction));
+        RefreshSeriesLibraryButtonState();
         OnPropertyChanged(nameof(HasSeasons));
         OnPropertyChanged(nameof(HasNoSeasons));
+    }
+
+    private void BeginDetailLoading(string statusMessage)
+    {
+        IsDetailLoading = true;
+        Clear(statusMessage);
+        IsDetailLoading = true;
     }
 
     private static string DescribeException(Exception exception)

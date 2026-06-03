@@ -311,7 +311,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid IsEnabled="{Binding IsSeasonCorrectionBaseInteractionEnabled}">
+            <Grid IsHitTestVisible="{Binding IsSeasonCorrectionBaseInteractionEnabled}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="172" />
                     <ColumnDefinition Width="12" />
@@ -354,8 +354,10 @@
                                    Style="{StaticResource BodyMutedTextStyle}"
                                    Text="电视剧名称" />
                         <Grid Grid.Column="2">
-                            <TextBox helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                            <TextBox x:Name="SeasonCorrectionSearchTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入电视剧名称"
+                                     PreviewKeyDown="SeasonCorrectionSearchTextBox_PreviewKeyDown"
                                      Style="{StaticResource SeasonCorrectionTextBoxStyle}"
                                      Text="{Binding SeasonCorrectionSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Margin="0,0,4,0"
@@ -376,8 +378,10 @@
                                    Style="{StaticResource BodyMutedTextStyle}"
                                    Text="季号" />
                         <Grid Grid.Column="2">
-                            <TextBox helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                            <TextBox x:Name="SeasonCorrectionSeasonNumberTextBox"
+                                     helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="季号"
+                                     PreviewKeyDown="SeasonCorrectionSearchTextBox_PreviewKeyDown"
                                      Style="{StaticResource SeasonCorrectionTextBoxStyle}"
                                      Text="{Binding SeasonCorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Margin="0,0,4,0"
@@ -462,7 +466,7 @@
             </TextBlock>
 
             <Grid Grid.Row="3"
-                  IsEnabled="{Binding IsSeasonCorrectionBaseInteractionEnabled}">
+                  IsHitTestVisible="{Binding IsSeasonCorrectionBaseInteractionEnabled}">
                 <TextBlock HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            Text="搜索后会在这里显示电视剧候选。">
@@ -736,7 +740,7 @@
 
             <Grid Grid.Row="4"
                   Margin="0,14,0,0"
-                  IsEnabled="{Binding IsSeasonCorrectionBaseInteractionEnabled}">
+                  IsHitTestVisible="{Binding IsSeasonCorrectionBaseInteractionEnabled}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -766,7 +770,9 @@
             </Grid>
 
             <Border Grid.RowSpan="5"
-                    Background="Transparent">
+                    Panel.ZIndex="30"
+                    Background="Transparent"
+                    IsHitTestVisible="True">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Visibility" Value="Collapsed" />

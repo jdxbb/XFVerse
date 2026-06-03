@@ -6,6 +6,7 @@ using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.App.ViewModels.Collections;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -112,6 +113,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _isCorrectionBusy;
     private bool _isRestoringCorrectionStatus;
     private bool _isUnknownSeasonPickerDialogOpen;
+    private bool _isDetailLoading;
     private CancellationTokenSource? _correctionAiCancellation;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
 
@@ -191,9 +193,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public ObservableCollection<TmdbTvSeriesCorrectionSeriesGroup> TvSeriesCandidateGroups { get; } = [];
 
-    public ObservableCollection<UnknownTvSeasonCorrectionTargetItem> UnknownSeasonTargets { get; } = [];
+    public BulkObservableCollection<UnknownTvSeasonCorrectionTargetItem> UnknownSeasonTargets { get; } = [];
 
-    public ObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
+    public BulkObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
 
     public RelayCommand NavigateBackCommand { get; }
 
@@ -563,6 +565,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public bool IsCorrectionInteractionEnabled => !IsCorrectionBusy;
 
+    public bool IsDetailLoading
+    {
+        get => _isDetailLoading;
+        private set => SetProperty(ref _isDetailLoading, value);
+    }
+
     public bool HasMovie
     {
         get => _hasMovie;
@@ -759,9 +767,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isVisibleInLibrary, value))
             {
-                OnPropertyChanged(nameof(ShowAddToLibraryAction));
-                OnPropertyChanged(nameof(AddToLibraryButtonIcon));
-                RefreshAddToLibraryCommandState();
+                RefreshAddToLibraryButtonState();
             }
         }
     }
@@ -773,9 +779,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _libraryVisibilityState, value))
             {
-                OnPropertyChanged(nameof(AddToLibraryButtonText));
-                OnPropertyChanged(nameof(ShowAddToLibraryAction));
-                RefreshAddToLibraryCommandState();
+                RefreshAddToLibraryButtonState();
             }
         }
     }
@@ -832,7 +836,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             if (!ReferenceEquals(_externalRecommendation, selectedExternalRecommendation))
             {
-                ClearMovieState("正在加载影片详情...");
+                BeginDetailLoading("正在加载影片详情...");
             }
 
             return;
@@ -844,7 +848,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 || _movieId.Value != selectedMovieId.Value
                 || _externalRecommendation is not null))
         {
-            ClearMovieState("正在加载影片详情...");
+            BeginDetailLoading("正在加载影片详情...");
         }
     }
 
@@ -852,7 +856,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         if (_movieId.HasValue && _movieId.Value != movieId)
         {
-            ClearMovieState("正在加载影片详情...");
+            BeginDetailLoading("正在加载影片详情...");
             await Task.Yield();
         }
 
@@ -1020,6 +1024,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 IdentificationStatus.Failed => "该影片尚未识别成功，可使用人工修正或 AI 辅助识别。",
                 _ => "详情已加载。"
             };
+            IsDetailLoading = false;
             ScheduleDetailLazyProbe(detail.MovieId, detail.Sources, cancellationToken);
 
             if (NeedsAutoClassification(detail))
@@ -1380,6 +1385,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         RefreshWantToWatchCommandState();
         RefreshNotInterestedCommandState();
         RefreshWatchedCommandState();
+        IsDetailLoading = false;
         if (shouldAutoClassify)
         {
             await ClassifyExternalRecommendationAsync(recommendation, cancellationToken);
@@ -1550,6 +1556,14 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(CanAddToLibrary));
         AddToLibraryCommand?.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshAddToLibraryButtonState()
+    {
+        OnPropertyChanged(nameof(ShowAddToLibraryAction));
+        OnPropertyChanged(nameof(AddToLibraryButtonText));
+        OnPropertyChanged(nameof(AddToLibraryButtonIcon));
+        RefreshAddToLibraryCommandState();
     }
 
     private void NotifyRecommendationChangedIfCurrentMovieAffectsAiRecommendation()
@@ -3002,17 +3016,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             .ThenBy(x => x.SeasonId)
             .ToList();
 
-        UnknownSeasonTargets.Clear();
-        foreach (var target in orderedTargets)
-        {
-            UnknownSeasonTargets.Add(target);
-        }
-
-        UnknownSeasonSeriesGroups.Clear();
-        foreach (var group in UnknownTvSeasonCorrectionSeriesGroup.FromTargets(orderedTargets))
-        {
-            UnknownSeasonSeriesGroups.Add(group);
-        }
+        UnknownSeasonTargets.ReplaceAll(orderedTargets);
+        UnknownSeasonSeriesGroups.ReplaceAll(UnknownTvSeasonCorrectionSeriesGroup.FromTargets(orderedTargets));
 
         OnPropertyChanged(nameof(HasUnknownSeasonTargets));
     }
@@ -3230,6 +3235,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private void ClearMovieState(string statusMessage)
     {
+        IsDetailLoading = false;
         _movieId = null;
         _externalRecommendation = null;
         HasMovie = false;
@@ -3303,6 +3309,13 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         SearchUnknownSeasonTargetsCommand.RaiseCanExecuteChanged();
         ApplyUnknownSeasonCorrectionCommand.RaiseCanExecuteChanged();
         AiSuggestSearchCommand.RaiseCanExecuteChanged();
+    }
+
+    private void BeginDetailLoading(string statusMessage)
+    {
+        IsDetailLoading = true;
+        ClearMovieState(statusMessage);
+        IsDetailLoading = true;
     }
 
     private bool CanResetSourceRecognition(object? parameter)

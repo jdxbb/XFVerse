@@ -1,5 +1,7 @@
-using System.Windows.Controls;
+using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MediaLibrary.App.ViewModels.Pages;
@@ -8,8 +10,10 @@ namespace MediaLibrary.App.Views.Pages;
 
 public partial class TvSeasonDetailPage : UserControl
 {
+    private const double OverviewMouseWheelScrollStep = 48d;
     private TvSeasonDetailViewModel? _subscribedViewModel;
     private bool _isRestoringScrollOffset;
+    private int _episodeListScrollApplyVersion;
 
     public TvSeasonDetailPage()
     {
@@ -23,27 +27,18 @@ public partial class TvSeasonDetailPage : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (_subscribedViewModel is null && DataContext is TvSeasonDetailViewModel viewModel)
-        {
-            _subscribedViewModel = viewModel;
-            _subscribedViewModel.TargetEpisodeLocated += OnTargetEpisodeLocated;
-        }
-
-        QueueRestoreEpisodeListScrollOffset();
+        AttachViewModelState();
+        QueueApplyEpisodeListScrollOffset();
     }
 
     private void OnEpisodeListBoxLoaded(object sender, RoutedEventArgs e)
     {
-        QueueRestoreEpisodeListScrollOffset();
+        QueueApplyEpisodeListScrollOffset();
     }
 
     private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (e.NewValue is true)
-        {
-            QueueRestoreEpisodeListScrollOffset();
-        }
-        else
+        if (e.NewValue is false)
         {
             StoreCurrentEpisodeListScrollOffset();
         }
@@ -51,31 +46,28 @@ public partial class TvSeasonDetailPage : UserControl
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (_subscribedViewModel is not null)
-        {
-            _subscribedViewModel.TargetEpisodeLocated -= OnTargetEpisodeLocated;
-        }
-
-        _subscribedViewModel = e.NewValue as TvSeasonDetailViewModel;
-        if (_subscribedViewModel is not null)
-        {
-            _subscribedViewModel.TargetEpisodeLocated += OnTargetEpisodeLocated;
-        }
+        DetachViewModelState();
+        AttachViewModelState();
+        QueueApplyEpisodeListScrollOffset();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         StoreCurrentEpisodeListScrollOffset();
-        if (_subscribedViewModel is not null)
-        {
-            _subscribedViewModel.TargetEpisodeLocated -= OnTargetEpisodeLocated;
-            _subscribedViewModel = null;
-        }
+        DetachViewModelState();
     }
 
     private void OnTargetEpisodeLocated(object? sender, TvSeasonDetailViewModel.TvSeasonTargetEpisodeLocatedEventArgs e)
     {
         _ = Dispatcher.InvokeAsync(() => ScrollToTargetEpisode(e.EpisodeId), DispatcherPriority.ContextIdle);
+    }
+
+    private void OnOverviewPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is ScrollViewer scrollViewer)
+        {
+            ScrollViewerBySmallWheelStep(scrollViewer, e, OverviewMouseWheelScrollStep);
+        }
     }
 
     private void OnEpisodeListScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -102,32 +94,54 @@ public partial class TvSeasonDetailPage : UserControl
         }
     }
 
-    private void QueueRestoreEpisodeListScrollOffset()
+    private void QueueApplyEpisodeListScrollOffset()
     {
-        if (DataContext is not TvSeasonDetailViewModel { EpisodeListScrollOffset: > 0 })
+        if (DataContext is not TvSeasonDetailViewModel viewModel)
         {
             return;
         }
 
         _isRestoringScrollOffset = true;
-        _ = Dispatcher.InvokeAsync(() => RestoreEpisodeListScrollOffset(0), DispatcherPriority.Loaded);
+        var applyVersion = ++_episodeListScrollApplyVersion;
+        if (TryApplyEpisodeListScrollOffset(viewModel))
+        {
+            _ = Dispatcher.InvokeAsync(
+                () =>
+                {
+                    if (applyVersion == _episodeListScrollApplyVersion)
+                    {
+                        _isRestoringScrollOffset = false;
+                    }
+                },
+                DispatcherPriority.ContextIdle);
+            return;
+        }
+
+        _ = Dispatcher.InvokeAsync(
+            () => ApplyEpisodeListScrollOffset(0, applyVersion),
+            DispatcherPriority.Loaded);
     }
 
-    private void RestoreEpisodeListScrollOffset(int attempt)
+    private void ApplyEpisodeListScrollOffset(int attempt, int applyVersion)
     {
+        if (applyVersion != _episodeListScrollApplyVersion)
+        {
+            return;
+        }
+
         if (DataContext is not TvSeasonDetailViewModel viewModel)
         {
             _isRestoringScrollOffset = false;
             return;
         }
 
-        EpisodeListBox.UpdateLayout();
-        var scrollViewer = FindDescendant<ScrollViewer>(EpisodeListBox);
-        if (scrollViewer is null || viewModel.EpisodeListScrollOffset <= 0)
+        if (!TryApplyEpisodeListScrollOffset(viewModel))
         {
             if (attempt < 16)
             {
-                _ = Dispatcher.InvokeAsync(() => RestoreEpisodeListScrollOffset(attempt + 1), DispatcherPriority.ContextIdle);
+                _ = Dispatcher.InvokeAsync(
+                    () => ApplyEpisodeListScrollOffset(attempt + 1, applyVersion),
+                    DispatcherPriority.ContextIdle);
                 return;
             }
 
@@ -135,16 +149,39 @@ public partial class TvSeasonDetailPage : UserControl
             return;
         }
 
-        if (scrollViewer.ScrollableHeight <= 0 && attempt < 16)
+        _ = Dispatcher.InvokeAsync(
+            () =>
+            {
+                if (applyVersion == _episodeListScrollApplyVersion)
+                {
+                    _isRestoringScrollOffset = false;
+                }
+            },
+            DispatcherPriority.ContextIdle);
+    }
+
+    private bool TryApplyEpisodeListScrollOffset(TvSeasonDetailViewModel viewModel)
+    {
+        EpisodeListBox.UpdateLayout();
+        var scrollViewer = FindDescendant<ScrollViewer>(EpisodeListBox);
+        if (scrollViewer is null)
         {
-            _ = Dispatcher.InvokeAsync(() => RestoreEpisodeListScrollOffset(attempt + 1), DispatcherPriority.ContextIdle);
-            return;
+            return false;
         }
 
-        scrollViewer.ScrollToVerticalOffset(Math.Min(viewModel.EpisodeListScrollOffset, scrollViewer.ScrollableHeight));
-        _ = Dispatcher.InvokeAsync(
-            () => _isRestoringScrollOffset = false,
-            DispatcherPriority.ContextIdle);
+        var targetOffset = Math.Max(0, viewModel.EpisodeListScrollOffset);
+        if (targetOffset > 0 && scrollViewer.ScrollableHeight <= 0)
+        {
+            return false;
+        }
+
+        var clampedOffset = Math.Min(targetOffset, scrollViewer.ScrollableHeight);
+        if (Math.Abs(scrollViewer.VerticalOffset - clampedOffset) > 0.5)
+        {
+            scrollViewer.ScrollToVerticalOffset(clampedOffset);
+        }
+
+        return true;
     }
 
     private void ScrollToTargetEpisode(int episodeId)
@@ -173,6 +210,68 @@ public partial class TvSeasonDetailPage : UserControl
         {
             EpisodeListBox.ScrollIntoView(EpisodeListBox.Items[0]);
         }
+    }
+
+    private void AttachViewModelState()
+    {
+        if (_subscribedViewModel is not null)
+        {
+            return;
+        }
+
+        if (DataContext is not TvSeasonDetailViewModel viewModel)
+        {
+            return;
+        }
+
+        _subscribedViewModel = viewModel;
+        viewModel.TargetEpisodeLocated += OnTargetEpisodeLocated;
+        ((INotifyPropertyChanged)viewModel).PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void DetachViewModelState()
+    {
+        if (_subscribedViewModel is null)
+        {
+            return;
+        }
+
+        _subscribedViewModel.TargetEpisodeLocated -= OnTargetEpisodeLocated;
+        ((INotifyPropertyChanged)_subscribedViewModel).PropertyChanged -= OnViewModelPropertyChanged;
+        _subscribedViewModel = null;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TvSeasonDetailViewModel.EpisodeListScrollOffset))
+        {
+            QueueApplyEpisodeListScrollOffset();
+        }
+    }
+
+    private static void ScrollViewerBySmallWheelStep(
+        ScrollViewer scrollViewer,
+        MouseWheelEventArgs e,
+        double step)
+    {
+        if (scrollViewer.ScrollableHeight <= 0)
+        {
+            return;
+        }
+
+        var direction = e.Delta > 0 ? -1d : 1d;
+        var wheelTicks = Math.Max(1d, Math.Abs(e.Delta) / 120d);
+        var targetOffset = Math.Clamp(
+            scrollViewer.VerticalOffset + direction * step * wheelTicks,
+            0d,
+            scrollViewer.ScrollableHeight);
+        if (Math.Abs(targetOffset - scrollViewer.VerticalOffset) <= double.Epsilon)
+        {
+            return;
+        }
+
+        scrollViewer.ScrollToVerticalOffset(targetOffset);
+        e.Handled = true;
     }
 
     private static T? FindDescendant<T>(DependencyObject root)

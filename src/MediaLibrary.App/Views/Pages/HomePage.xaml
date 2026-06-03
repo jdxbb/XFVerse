@@ -370,6 +370,23 @@
             <ColumnDefinition x:Name="AiPanelColumn" Width="360" />
         </Grid.ColumnDefinitions>
 
+        <Grid Grid.ColumnSpan="3">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsHomeInitialLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="660" />
+                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="360" />
+            </Grid.ColumnDefinitions>
+
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="1.34*" MinHeight="156" />
@@ -1156,6 +1173,33 @@
                         Command="{Binding NavigateToMovieDiscoveryCommand}"
                         Style="{StaticResource GlassPrimaryButtonStyle}" />
             </Grid>
+        </Border>
+        </Grid>
+
+        <Border Grid.ColumnSpan="3"
+                Panel.ZIndex="220"
+                Background="Transparent">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsHomeInitialLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <Control Width="34"
+                         Height="34"
+                         HorizontalAlignment="Center"
+                         Template="{StaticResource LoadingSpinnerTemplate}" />
+                <TextBlock Margin="0,12,0,0"
+                           HorizontalAlignment="Center"
+                           Style="{StaticResource InlineLoadingStyle}"
+                           Text="{Binding StatusMessage}" />
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>

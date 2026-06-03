@@ -285,6 +285,46 @@ Build:
 
 - `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
 
+## 2026-06-03 Home / Library Loading Overlay Follow-up
+
+Goal: remove the brief half-styled loading surface on first entry and reuse the shared spinner for page-level loading states.
+
+Changed behavior:
+
+- Home now exposes an initial-loading state while dashboard data is being loaded for the first time. During that state, the dashboard content is collapsed and a transparent overlay shows the shared spinner plus status text.
+- Library initial loading keeps the existing empty-state card behavior but now uses the shared spinner animation.
+- The removed-library dialog loading state now uses the shared spinner animation and keeps the modern list scrollbar / pixel-scroll behavior from the earlier retest fix.
+- The loading layers are transparent by design; they block interaction while avoiding the solid disabled-looking surface that could appear before data binding settled.
+- Follow-up retest tightened the first-frame rule: Home initial loading is active until the dashboard model has been applied, not only while the refresh command is already running.
+- Follow-up retest moved media-library initial loading out of the empty-state card. The result area now shows only a centered spinner and a small `加载中` label on a transparent layer.
+- The reusable rule set is now documented in `docs/ui-redesign/UI_LOADING_STATE_GUIDELINES.md`.
+
+Boundaries kept:
+
+- No remove-from-library, restore, delete-record, scan, binding, migration, database update, commit, or push semantics changed.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
+
+## 2026-06-03 Removed Library Panel Scroll Follow-up
+
+Goal: align the removed-library panel list scrolling with the rest of the media-library list surfaces.
+
+Changed behavior:
+
+- The removed-library panel list now uses the existing modern media-library scrollbar style.
+- The removed-library panel list now uses pixel scrolling and a smaller mouse-wheel step so the wheel no longer jumps by large rows.
+- The list is wired into the existing scrollbar reveal / hide handler used by the main library lists.
+
+Boundaries kept:
+
+- No change to remove-from-library, restore, delete-record, local file, WebDAV, migration, database update, commit, or push semantics.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
+
 ## 2026-06-03 Library List Hydration Diagnostics / Batch AI Cancel Follow-up
 
 Goal: make the media-library list-field auto-request path verifiable from sanitized logs, and let the main batch-selection button cancel a running batch AI identification.
@@ -335,6 +375,42 @@ Boundaries kept:
 - No physical local file or WebDAV file deletion.
 - No database fields, migration, database update, commit, or push.
 - No change to the decision to preserve source-less recognized movies after later correction.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
+
+## 2026-06-03 Library Clear Filter Button Follow-up
+
+Goal: keep the media-library clear-filter affordance disabled while the library is already in its default filter state.
+
+Changed behavior:
+
+- `ClearFiltersCommand` now has a real `CanExecute` predicate instead of always being enabled.
+- The clear-filter button is enabled only when the current search / filter / sort state differs from the default media-library state: empty search, playback source all, media source all, Movie + TV content type, no decade / tag / collection-status filters, watched all, and recent-update descending sort.
+- The command state refreshes when search text, submitted search, sort, source filters, content type, decade, collection status, watched status, genre text, or tag selection changes.
+
+Boundaries kept:
+
+- No media-library query semantics, batch operation behavior, hidden / deleted / restore semantics, database field, migration, database update, commit, or push changed.
+
+Build:
+
+- `dotnet build MediaLibrary.sln`, 0 warning / 0 error.
+
+## 2026-06-03 Removed Library Panel Transparent Shield Follow-up
+
+Goal: keep the removed-library panel modal behavior without darkening the media-library page behind it.
+
+Changed behavior:
+
+- The removed-library panel interaction shield now uses a transparent background instead of the shared dark overlay brush.
+- The shield still covers only the media-library page content area, preserving the existing title-bar and navigation-bar interaction scope.
+- The transparent shield still participates in hit testing, so media-library page buttons behind the panel remain blocked while the panel is open.
+
+Boundaries kept:
+
+- No remove-from-library, restore, delete-record, local file, WebDAV, scan, migration, database update, commit, or push semantics changed.
 
 Build:
 

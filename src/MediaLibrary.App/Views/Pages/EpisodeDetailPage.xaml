@@ -145,6 +145,23 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <Grid Grid.RowSpan="3">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDetailLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="18" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="620" />
@@ -182,8 +199,8 @@
                     <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
                     <Control IsHitTestVisible="False"
                              Template="{StaticResource PosterPlaceholderWideTemplate}" />
-                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="620"
-                           helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w500"
+                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="780"
+                           helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w780"
                            helpers:PosterCacheImageBehavior.Source="{Binding StillDisplayUrl}"
                            helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=EpisodeStillPaletteShadowHost}"
                            helpers:PosterPaletteShadowBehavior.TargetName="EpisodeStillPaletteShadowHost"
@@ -298,7 +315,7 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="简介" />
-                                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" helpers:ScrollBarAutoRevealBehavior.IsEnabled="True" helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
+                                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" helpers:ScrollBarAutoRevealBehavior.IsEnabled="True" helpers:TextScrollOverflowCueBehavior.IsEnabled="True" PreviewMouseWheel="OnOverviewPreviewMouseWheel">
                                     <ScrollViewer.Resources>
                                         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource EpisodeDetailModernScrollBarStyle}" />
                                     </ScrollViewer.Resources>
@@ -1081,6 +1098,33 @@
                             Style="{StaticResource GlassSecondaryButtonStyle}" />
                 </Grid>
             </Border>
+        </Border>
+        </Grid>
+
+        <Border Grid.RowSpan="3"
+                Panel.ZIndex="220"
+                Background="Transparent">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDetailLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <Control Width="34"
+                         Height="34"
+                         HorizontalAlignment="Center"
+                         Template="{StaticResource LoadingSpinnerTemplate}" />
+                <TextBlock Margin="0,12,0,0"
+                           HorizontalAlignment="Center"
+                           Style="{StaticResource InlineLoadingStyle}"
+                           Text="{Binding StatusMessage}" />
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>

@@ -3,6 +3,7 @@ using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.App.ViewModels.Collections;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -89,6 +90,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     private bool _isOpeningPlayer;
     private bool _isWatched;
     private bool _isUpdatingWatched;
+    private bool _isDetailLoading;
     private bool _hasCorrectionPreview;
     private bool _isCorrectionBusy;
     private bool _isRestoringCorrectionStatus;
@@ -161,9 +163,9 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     public ObservableCollection<TmdbTvSeriesCorrectionSeriesGroup> TvSeriesCandidateGroups { get; } = [];
 
-    public ObservableCollection<UnknownTvSeasonCorrectionTargetItem> UnknownSeasonTargets { get; } = [];
+    public BulkObservableCollection<UnknownTvSeasonCorrectionTargetItem> UnknownSeasonTargets { get; } = [];
 
-    public ObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
+    public BulkObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
 
     public IReadOnlyList<string> CorrectionTargetOptions { get; } =
     [
@@ -539,6 +541,12 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     public bool HasNoEpisode => !HasEpisode;
 
+    public bool IsDetailLoading
+    {
+        get => _isDetailLoading;
+        private set => SetProperty(ref _isDetailLoading, value);
+    }
+
     public bool IsUnidentified
     {
         get => _isUnidentified;
@@ -629,6 +637,16 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         ? "播放器打开中"
         : "播放此源";
 
+    public void PrepareForActivation()
+    {
+        var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
+        if (selectedEpisodeId.HasValue
+            && (!_episodeId.HasValue || _episodeId.Value != selectedEpisodeId.Value))
+        {
+            BeginDetailLoading("正在加载剧集详情...");
+        }
+    }
+
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
@@ -642,6 +660,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         {
             if (_episodeId.HasValue && _episodeId.Value != selectedEpisodeId.Value)
             {
+                BeginDetailLoading("正在加载剧集详情...");
                 StillDisplayUrl = string.Empty;
                 await Task.Yield();
             }
@@ -760,6 +779,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             StatusMessage = model.HasSources
                 ? $"已加载 {model.EpisodeNumberText}，可从默认源或指定播放源打开播放器。"
                 : $"已加载 {model.EpisodeNumberText}，暂无播放源。";
+            IsDetailLoading = false;
             ScheduleDetailLazyProbe(model.EpisodeId, model.Sources, cancellationToken);
             _ = LoadTmdbRatingAsync(model.EpisodeId, cancellationToken);
         }
@@ -2125,17 +2145,8 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             .ThenBy(x => x.SeasonId)
             .ToList();
 
-        UnknownSeasonTargets.Clear();
-        foreach (var target in orderedTargets)
-        {
-            UnknownSeasonTargets.Add(target);
-        }
-
-        UnknownSeasonSeriesGroups.Clear();
-        foreach (var group in UnknownTvSeasonCorrectionSeriesGroup.FromTargets(orderedTargets))
-        {
-            UnknownSeasonSeriesGroups.Add(group);
-        }
+        UnknownSeasonTargets.ReplaceAll(orderedTargets);
+        UnknownSeasonSeriesGroups.ReplaceAll(UnknownTvSeasonCorrectionSeriesGroup.FromTargets(orderedTargets));
 
         OnPropertyChanged(nameof(HasUnknownSeasonTargets));
     }
@@ -2289,6 +2300,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     private void Clear(string statusMessage)
     {
+        IsDetailLoading = false;
         _episodeId = null;
         _seasonId = null;
         _defaultMediaFileId = null;
@@ -2347,6 +2359,13 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         ResetSourceRecognitionCommand.RaiseCanExecuteChanged();
         RefreshWatchedCommandState();
         RefreshPlayerCommandState();
+    }
+
+    private void BeginDetailLoading(string statusMessage)
+    {
+        IsDetailLoading = true;
+        Clear(statusMessage);
+        IsDetailLoading = true;
     }
 
     private static string DescribeException(Exception exception)

@@ -46,9 +46,13 @@ public interface INavigationStateService
 
     void SetSeriesSeasonListScrollOffset(int tvSeriesId, double offset);
 
+    bool ConsumeSeriesSeasonListScrollRestoreRequest(int tvSeriesId);
+
     double GetSeasonEpisodeListScrollOffset(int tvSeasonId);
 
     void SetSeasonEpisodeListScrollOffset(int tvSeasonId, double offset);
+
+    bool ConsumeSeasonEpisodeListScrollRestoreRequest(int tvSeasonId);
 
     DateTime? ConsumeWatchHistoryTargetDate();
 }

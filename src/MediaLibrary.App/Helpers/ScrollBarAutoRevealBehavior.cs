@@ -58,6 +58,20 @@ public static class ScrollBarAutoRevealBehavior
         target.SetValue(IsRevealedProperty, value);
     }
 
+    public static void Hide(ScrollViewer viewer)
+    {
+        SetIsRevealed(viewer, false);
+        foreach (var scrollBar in FindOwnedScrollBars(viewer))
+        {
+            SetIsRevealed(scrollBar, false);
+        }
+
+        if (viewer.GetValue(RevealTimerProperty) is DispatcherTimer timer)
+        {
+            timer.Stop();
+        }
+    }
+
     private static void OnIsEnabledChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
         if (target is not FrameworkElement element)
@@ -141,6 +155,7 @@ public static class ScrollBarAutoRevealBehavior
     private static void OnViewerScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (sender is ScrollViewer viewer
+            && IsSelfScrollEvent(viewer, e.OriginalSource)
             && (Math.Abs(e.VerticalChange) > double.Epsilon || Math.Abs(e.HorizontalChange) > double.Epsilon))
         {
             Reveal(viewer);
@@ -151,14 +166,23 @@ public static class ScrollBarAutoRevealBehavior
     {
         if (sender is ScrollViewer viewer)
         {
-            Reveal(viewer);
+            if (!IsSelfScrollEvent(viewer, e.OriginalSource))
+            {
+                return;
+            }
+
+            var direction = e.Delta < 0 ? 1 : -1;
+            if (CanScrollVertically(viewer, direction))
+            {
+                Reveal(viewer);
+            }
         }
     }
 
     private static void Reveal(ScrollViewer viewer)
     {
         SetIsRevealed(viewer, true);
-        foreach (var scrollBar in FindVisualDescendants<ScrollBar>(viewer, includeRoot: false))
+        foreach (var scrollBar in FindOwnedScrollBars(viewer))
         {
             SetIsRevealed(scrollBar, true);
         }
@@ -174,7 +198,7 @@ public static class ScrollBarAutoRevealBehavior
             {
                 timer.Stop();
                 SetIsRevealed(viewer, false);
-                foreach (var scrollBar in FindVisualDescendants<ScrollBar>(viewer, includeRoot: false))
+                foreach (var scrollBar in FindOwnedScrollBars(viewer))
                 {
                     SetIsRevealed(scrollBar, false);
                 }
@@ -192,6 +216,63 @@ public static class ScrollBarAutoRevealBehavior
         {
             TextScrollOverflowCueBehavior.Refresh(viewer);
         }
+    }
+
+    private static bool CanScrollVertically(ScrollViewer viewer, int direction)
+    {
+        if (viewer.ScrollableHeight <= double.Epsilon)
+        {
+            return false;
+        }
+
+        return direction > 0
+            ? viewer.VerticalOffset < viewer.ScrollableHeight - double.Epsilon
+            : viewer.VerticalOffset > double.Epsilon;
+    }
+
+    private static bool IsSelfScrollEvent(ScrollViewer viewer, object originalSource)
+    {
+        if (originalSource is not DependencyObject source)
+        {
+            return true;
+        }
+
+        var sourceViewer = source is ScrollViewer scrollViewer
+            ? scrollViewer
+            : FindNearestAncestor<ScrollViewer>(source);
+        return sourceViewer is null || ReferenceEquals(sourceViewer, viewer);
+    }
+
+    private static IEnumerable<ScrollBar> FindOwnedScrollBars(ScrollViewer viewer)
+    {
+        foreach (var scrollBar in FindVisualDescendants<ScrollBar>(viewer, includeRoot: false))
+        {
+            if (ReferenceEquals(FindNearestAncestor<ScrollViewer>(scrollBar), viewer))
+            {
+                yield return scrollBar;
+            }
+        }
+    }
+
+    private static T? FindNearestAncestor<T>(DependencyObject source)
+        where T : DependencyObject
+    {
+        for (var current = GetParent(source); current is not null; current = GetParent(current))
+        {
+            if (current is T typed)
+            {
+                return typed;
+            }
+        }
+
+        return null;
+    }
+
+    private static DependencyObject? GetParent(DependencyObject current)
+    {
+        return current is Visual
+            ? VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current)
+            : LogicalTreeHelper.GetParent(current);
     }
 
     private static IEnumerable<T> FindVisualDescendants<T>(DependencyObject root, bool includeRoot)

@@ -1785,11 +1785,13 @@
                     </ListBox>
 
                     <Border Grid.Row="1"
+                            Panel.ZIndex="40"
                             Margin="0,18,0,0"
                             HorizontalAlignment="Stretch"
-                            VerticalAlignment="Top">
+                            VerticalAlignment="Stretch"
+                            Background="Transparent">
                         <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource LoadingStateStyle}">
+                            <Style TargetType="Border">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding ShowLibraryInitialLoading}" Value="True">
@@ -1798,11 +1800,23 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <StackPanel>
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <Control Width="34"
+                                     Height="34"
+                                     HorizontalAlignment="Center"
+                                     Template="{StaticResource LoadingSpinnerTemplate}" />
+                            <TextBlock Margin="0,12,0,0"
+                                       HorizontalAlignment="Center"
+                                       Text="加载中"
+                                       Style="{StaticResource InlineLoadingStyle}" />
                             <TextBlock Text="正在加载媒体库..."
+                                       Margin="0,12,0,0"
+                                       Visibility="Collapsed"
                                        Style="{StaticResource EmptyStateTitleStyle}" />
                             <TextBlock Margin="0,8,0,0"
                                        Text="正在读取媒体库内容和筛选状态。"
+                                       Visibility="Collapsed"
                                        Style="{StaticResource InlineLoadingStyle}" />
                         </StackPanel>
                     </Border>
@@ -2041,7 +2055,7 @@
         </Border>
 
         <Border Grid.RowSpan="3"
-                Background="{DynamicResource BrushOverlay}">
+                Background="Transparent">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -2099,10 +2113,17 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <TextBlock HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Text="正在加载已移出媒体库项目..."
-                                       Style="{StaticResource InlineLoadingStyle}" />
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <Control Width="34"
+                                         Height="34"
+                                         HorizontalAlignment="Center"
+                                         Template="{StaticResource LoadingSpinnerTemplate}" />
+                                <TextBlock Margin="0,12,0,0"
+                                           HorizontalAlignment="Center"
+                                           Text="正在加载已移出媒体库项目..."
+                                           Style="{StaticResource InlineLoadingStyle}" />
+                            </StackPanel>
                         </Border>
                         <Border HorizontalAlignment="Stretch"
                                 VerticalAlignment="Stretch">
@@ -2131,9 +2152,17 @@
                             </StackPanel>
                         </Border>
                         <ListBox ItemsSource="{Binding RemovedLibraryGroups}"
+                                 ScrollViewer.CanContentScroll="True"
+                                 ScrollViewer.ScrollChanged="OnLibraryListScrollChanged"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingPanel.ScrollUnit="Pixel"
+                                 helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                 PreviewMouseWheel="RemovedLibraryListBox_PreviewMouseWheel"
                                  MaxHeight="560">
+                            <ListBox.Resources>
+                                <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource LibraryModernScrollBarStyle}" />
+                            </ListBox.Resources>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource LibraryRemovedPanelListItemStyle}" />
                             </ListBox.ItemContainerStyle>

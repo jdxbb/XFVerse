@@ -306,9 +306,20 @@ public sealed class MainWindowViewModel : ViewModelBase
             CurrentPageViewModel?.Deactivate();
         }
 
-        if (pageViewModel is MovieDetailViewModel movieDetail)
+        switch (pageViewModel)
         {
-            movieDetail.PrepareForActivation();
+            case MovieDetailViewModel movieDetail:
+                movieDetail.PrepareForActivation();
+                break;
+            case SeriesOverviewViewModel seriesOverview:
+                seriesOverview.PrepareForActivation();
+                break;
+            case TvSeasonDetailViewModel seasonDetail:
+                seasonDetail.PrepareForActivation();
+                break;
+            case EpisodeDetailViewModel episodeDetail:
+                episodeDetail.PrepareForActivation();
+                break;
         }
 
         _pageActivationCancellation?.Cancel();

@@ -147,7 +147,7 @@ public sealed class HomeViewModel : PageViewModelBase
         if (_refreshPendingOnActivate)
         {
             _refreshPendingOnActivate = false;
-            _hasLoadedDashboard = false;
+            SetHasLoadedDashboard(false);
         }
 
         if (IsRefreshing)
@@ -226,8 +226,13 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private void SetIsRefreshing(bool value)
     {
-        SetProperty(ref _isRefreshing, value, nameof(IsRefreshing));
+        if (SetProperty(ref _isRefreshing, value, nameof(IsRefreshing)))
+        {
+            OnPropertyChanged(nameof(IsHomeInitialLoading));
+        }
     }
+
+    public bool IsHomeInitialLoading => !_hasLoadedDashboard;
 
     private async Task RefreshByReasonAsync(AppDataChangeReason reason)
     {
@@ -273,12 +278,23 @@ public sealed class HomeViewModel : PageViewModelBase
         await TryRefreshAsync("最近播放", () => RefreshRecentPlaybackAsync(cancellationToken), failures);
         await TryRefreshAsync("AI 推荐", () => RefreshRecommendationsAsync(cancellationToken), failures);
 
-        _hasLoadedDashboard = true;
+        SetHasLoadedDashboard(true);
         StatusMessage = failures.Count == 0
             ? MovieCount == 0
                 ? "当前片库为空，请先到扫描任务页执行扫描。"
                 : $"已加载 {MovieCount} 部影片、{SourceCount} 个播放源。"
             : $"首页部分模块刷新失败：{string.Join("、", failures)}";
+    }
+
+    private void SetHasLoadedDashboard(bool value)
+    {
+        if (_hasLoadedDashboard == value)
+        {
+            return;
+        }
+
+        _hasLoadedDashboard = value;
+        OnPropertyChanged(nameof(IsHomeInitialLoading));
     }
 
     private async Task TryRefreshAsync(string moduleName, Func<Task> refresh, ICollection<string> failures)

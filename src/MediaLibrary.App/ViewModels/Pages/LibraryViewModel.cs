@@ -234,7 +234,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         RefreshCommand = new AsyncRelayCommand(() => RequestLibraryRefreshAsync(RefreshReasonManual, debounce: false, allowWhenInactive: true));
         ApplySearchCommand = new RelayCommand(SubmitSearch);
         ClearSearchCommand = new RelayCommand(ClearSearch);
-        ClearFiltersCommand = new RelayCommand(ClearFilters);
+        ClearFiltersCommand = new RelayCommand(ClearFilters, () => CanClearFilters);
         RefreshTagOptions();
         _ = LoadLibraryPreferencesAsync();
     }
@@ -366,7 +366,10 @@ public sealed class LibraryViewModel : PageViewModelBase
         get => _searchText;
         set
         {
-            SetProperty(ref _searchText, value);
+            if (SetProperty(ref _searchText, value))
+            {
+                RefreshClearFiltersCommandState();
+            }
         }
     }
 
@@ -596,6 +599,8 @@ public sealed class LibraryViewModel : PageViewModelBase
             ? _selectedDecadeFilters.Count == 0
             : _selectedDecadeFilters.Contains(option);
     }
+
+    public bool CanClearFilters => !IsDefaultLibraryFilterState();
 
     public bool IsPosterView
     {
@@ -1992,6 +1997,36 @@ public sealed class LibraryViewModel : PageViewModelBase
         ApplyFilters();
     }
 
+    private bool IsDefaultLibraryFilterState()
+    {
+        return string.IsNullOrWhiteSpace(SearchText)
+               && string.IsNullOrWhiteSpace(_submittedSearchText)
+               && string.IsNullOrWhiteSpace(GenreFilterText)
+               && string.Equals(SelectedSortOption, "最近更新", StringComparison.Ordinal)
+               && string.Equals(SelectedSortDirection, "降序", StringComparison.Ordinal)
+               && string.Equals(SelectedStatusFilter, FilterAll, StringComparison.Ordinal)
+               && string.Equals(SelectedWatchedFilter, FilterAll, StringComparison.Ordinal)
+               && string.Equals(SelectedLibraryScope, LibraryScopeAll, StringComparison.Ordinal)
+               && string.Equals(SelectedSourceFilter, SourceFilterAll, StringComparison.Ordinal)
+               && _selectedCollectionStatusFilters.Count == 0
+               && IsDefaultContentTypeFilterState()
+               && _selectedDecadeFilters.Count == 0
+               && IsTagFilterAllSelected;
+    }
+
+    private bool IsDefaultContentTypeFilterState()
+    {
+        return _selectedContentTypeFilters.Count == 2
+               && _selectedContentTypeFilters.Contains(ContentTypeMovie)
+               && _selectedContentTypeFilters.Contains(ContentTypeTv);
+    }
+
+    private void RefreshClearFiltersCommandState()
+    {
+        OnPropertyChanged(nameof(CanClearFilters));
+        ClearFiltersCommand?.RaiseCanExecuteChanged();
+    }
+
     private void SubmitSearch()
     {
         SetSubmittedSearchText(SearchText);
@@ -2157,6 +2192,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(IsContentTypeMovieSelected));
         OnPropertyChanged(nameof(IsContentTypeTvSelected));
         OnPropertyChanged(nameof(IsContentTypeOtherSelected));
+        RefreshClearFiltersCommandState();
         if (applyFilters)
         {
             ApplyFilters();
@@ -2171,6 +2207,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             DecadeAll);
         OnPropertyChanged(nameof(SelectedDecadeFilter));
         OnPropertyChanged(nameof(DecadeButtonText));
+        RefreshClearFiltersCommandState();
         if (applyFilters)
         {
             ApplyFilters();
@@ -2190,6 +2227,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(IsCollectionStatusFavoriteSelected));
         OnPropertyChanged(nameof(IsCollectionStatusWantToWatchSelected));
         OnPropertyChanged(nameof(IsCollectionStatusNotInterestedSelected));
+        RefreshClearFiltersCommandState();
         if (applyFilters)
         {
             ApplyFilters();
@@ -2241,6 +2279,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(TagFilterMenuHeader));
         OnPropertyChanged(nameof(TagFilterButtonText));
         OnPropertyChanged(nameof(IsTagFilterAllSelected));
+        RefreshClearFiltersCommandState();
         if (applyFilters)
         {
             ApplyFilters();
@@ -2396,6 +2435,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(TagFilterMenuHeader));
         OnPropertyChanged(nameof(TagFilterButtonText));
         OnPropertyChanged(nameof(IsTagFilterAllSelected));
+        RefreshClearFiltersCommandState();
         ApplyFilters();
     }
 
@@ -2477,6 +2517,7 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private void ApplyFilters()
     {
+        RefreshClearFiltersCommandState();
         _ = ApplyFiltersWithMetrics();
     }
 

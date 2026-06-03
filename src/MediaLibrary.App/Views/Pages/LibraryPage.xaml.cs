@@ -17,6 +17,7 @@ public partial class LibraryPage : UserControl
 {
     private const double CollapsedSearchColumnWidth = 816;
     private const double ExpandedSearchColumnWidth = 660;
+    private const double RemovedLibraryMouseWheelScrollStep = 56d;
     private static readonly bool ScrollDiagnosticsEnabled =
         string.Equals(
             Environment.GetEnvironmentVariable("XFVERSE_LIBRARY_SCROLL_DIAGNOSTICS"),
@@ -249,6 +250,34 @@ public partial class LibraryPage : UserControl
     private void SearchButton_Click(object sender, RoutedEventArgs e)
     {
         Keyboard.ClearFocus();
+    }
+
+    private void RemovedLibraryListBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not DependencyObject source)
+        {
+            return;
+        }
+
+        var scrollViewer = FindVisualChildren<ScrollViewer>(source).FirstOrDefault();
+        if (scrollViewer is null || scrollViewer.ScrollableHeight <= 0)
+        {
+            return;
+        }
+
+        var direction = e.Delta > 0 ? -1d : 1d;
+        var wheelTicks = Math.Max(1d, Math.Abs(e.Delta) / 120d);
+        var targetOffset = Math.Clamp(
+            scrollViewer.VerticalOffset + direction * RemovedLibraryMouseWheelScrollStep * wheelTicks,
+            0d,
+            scrollViewer.ScrollableHeight);
+        if (Math.Abs(targetOffset - scrollViewer.VerticalOffset) <= double.Epsilon)
+        {
+            return;
+        }
+
+        scrollViewer.ScrollToVerticalOffset(targetOffset);
+        e.Handled = true;
     }
 
     private void OnLibraryListScrollChanged(object sender, ScrollChangedEventArgs e)

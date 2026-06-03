@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.App.ViewModels.Collections;
 using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -68,11 +69,13 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private bool _isVisibleInLibrary;
     private bool _isEpisodeMetadataLoading;
     private bool _isOpeningEpisodePlayer;
+    private bool _isDetailLoading;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
     private string _tmdbRatingDisplay = SeasonRatingUnavailableText;
     private string _imdbRatingDisplay = string.Empty;
     private MovieRatingItem _seasonTmdbRating = new() { SourceName = "TMDB" };
     private double _episodeListScrollOffset;
+    private bool? _restoreEpisodeListScrollOffsetOnNextActivation;
     private bool _isSeasonCorrectionPanelOpen;
     private bool _isSeasonCorrectionBusy;
     private string _seasonCorrectionSearchQuery = string.Empty;
@@ -164,7 +167,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public ObservableCollection<TmdbTvSeriesCorrectionSeriesGroup> RecognizedSeasonSeriesGroups { get; } = [];
 
-    public ObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
+    public BulkObservableCollection<UnknownTvSeasonCorrectionSeriesGroup> UnknownSeasonSeriesGroups { get; } = [];
 
     public RelayCommand NavigateBackToSeriesCommand { get; }
 
@@ -338,6 +341,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(HasEpisodes));
                 OnPropertyChanged(nameof(HasNoEpisodes));
                 OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
+                RefreshSeasonLibraryButtonState();
                 RaiseSeasonStateCommandCanExecuteChanged();
                 RaiseSeasonCorrectionCommandStates();
             }
@@ -349,6 +353,12 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     public bool HasEpisodes => HasSeason && Episodes.Count > 0;
 
     public bool HasNoEpisodes => HasSeason && Episodes.Count == 0;
+
+    public bool IsDetailLoading
+    {
+        get => _isDetailLoading;
+        private set => SetProperty(ref _isDetailLoading, value);
+    }
 
     public bool IsEpisodeMetadataLoading
     {
@@ -669,10 +679,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _isVisibleInLibrary, value))
             {
-                OnPropertyChanged(nameof(CanAddSeasonToLibrary));
-                OnPropertyChanged(nameof(AddSeasonToLibraryButtonText));
-                OnPropertyChanged(nameof(AddSeasonToLibraryButtonIcon));
-                AddSeasonToLibraryCommand.RaiseCanExecuteChanged();
+                RefreshSeasonLibraryButtonState();
             }
         }
     }
@@ -690,8 +697,31 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             if (SetProperty(ref _libraryVisibilityState, value))
             {
-                OnPropertyChanged(nameof(AddSeasonToLibraryButtonText));
+                RefreshSeasonLibraryButtonState();
             }
+        }
+    }
+
+    public void PrepareForActivation()
+    {
+        var selectedSeasonId = _navigationStateService.SelectedTvSeasonId;
+        if (!selectedSeasonId.HasValue)
+        {
+            _restoreEpisodeListScrollOffsetOnNextActivation = false;
+            return;
+        }
+
+        var shouldRestoreEpisodeListOffset =
+            _navigationStateService.ConsumeSeasonEpisodeListScrollRestoreRequest(selectedSeasonId.Value);
+        _restoreEpisodeListScrollOffsetOnNextActivation = shouldRestoreEpisodeListOffset;
+        if (!shouldRestoreEpisodeListOffset)
+        {
+            ResetEpisodeListScrollOffset(selectedSeasonId.Value);
+        }
+
+        if (!_seasonId.HasValue || _seasonId.Value != selectedSeasonId.Value)
+        {
+            BeginDetailLoading("正在加载电视剧季详情...");
         }
     }
 
@@ -708,8 +738,17 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         {
             if (_seasonId.HasValue && _seasonId.Value != selectedSeasonId.Value)
             {
+                BeginDetailLoading("正在加载电视剧季详情...");
                 PosterDisplayUrl = string.Empty;
                 await Task.Yield();
+            }
+
+            var shouldRestoreEpisodeListOffset =
+                _restoreEpisodeListScrollOffsetOnNextActivation ?? true;
+            _restoreEpisodeListScrollOffsetOnNextActivation = null;
+            if (!shouldRestoreEpisodeListOffset)
+            {
+                ResetEpisodeListScrollOffset(selectedSeasonId.Value);
             }
 
             var model = await _tvDetailQueryService.GetSeasonDetailAsync(selectedSeasonId.Value, cancellationToken);
@@ -822,6 +861,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             {
                 _ = EnsureSeasonEpisodesAndRefreshAsync(model.SeasonId, cancellationToken);
             }
+
+            IsDetailLoading = false;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -837,6 +878,26 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         return model.TmdbSeriesId is > 0
                && (model.Episodes.Count == 0
                    || (model.TotalEpisodeCount > 0 && model.Episodes.Count < model.TotalEpisodeCount));
+    }
+
+    private void RefreshSeasonLibraryButtonState()
+    {
+        OnPropertyChanged(nameof(CanAddSeasonToLibrary));
+        OnPropertyChanged(nameof(AddSeasonToLibraryButtonText));
+        OnPropertyChanged(nameof(AddSeasonToLibraryButtonIcon));
+        AddSeasonToLibraryCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ResetEpisodeListScrollOffset(int seasonId)
+    {
+        _navigationStateService.SetSeasonEpisodeListScrollOffset(seasonId, 0);
+        if (_episodeListScrollOffset <= 0)
+        {
+            return;
+        }
+
+        _episodeListScrollOffset = 0;
+        OnPropertyChanged(nameof(EpisodeListScrollOffset));
     }
 
     private async Task EnsureSeasonEpisodesAndRefreshAsync(int seasonId, CancellationToken cancellationToken)
@@ -1083,16 +1144,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     private void CloseSeasonCorrection()
     {
-        if (_seasonCorrectionAiCancellation is not null)
-        {
-            CancelSeasonCorrection();
-            return;
-        }
-
-        if (!IsSeasonCorrectionBusy)
-        {
-            CancelSeasonCorrection();
-        }
+        CancelSeasonCorrection();
     }
 
     private void OpenSeasonEpisodeMapping()
@@ -1405,6 +1457,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             OnPropertyChanged(nameof(SelectedRecognizedSeasonTargetDisplay));
             OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
             UpdateSeasonCorrectionConfirmation();
+            await Task.Yield();
 
             var page = await _tmdbService.SearchTvSeriesAsync(query, 1, cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
@@ -1514,16 +1567,14 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             OnPropertyChanged(nameof(SelectedSeasonCorrectionTargetDisplay));
             OnPropertyChanged(nameof(HasSelectedSeasonCorrectionTarget));
             UpdateSeasonCorrectionConfirmation();
+            await Task.Yield();
 
             var targets = await _singleSourceCorrectionService.SearchUnknownSeasonTargetsAsync(null, cancellation.Token);
             cancellation.Token.ThrowIfCancellationRequested();
             var filteredTargets = targets
                 .Where(x => !_seasonId.HasValue || x.SeasonId != _seasonId.Value)
                 .ToList();
-            foreach (var group in UnknownTvSeasonCorrectionSeriesGroup.FromTargets(filteredTargets))
-            {
-                UnknownSeasonSeriesGroups.Add(group);
-            }
+            UnknownSeasonSeriesGroups.ReplaceAll(UnknownTvSeasonCorrectionSeriesGroup.FromTargets(filteredTargets));
 
             OnPropertyChanged(nameof(HasUnknownSeasonTargets));
             IsUnknownSeasonPickerDialogOpen = true;
@@ -2178,8 +2229,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     private void Clear(string statusMessage)
     {
+        IsDetailLoading = false;
         _seasonId = null;
         _seriesId = null;
+        _episodeListScrollOffset = 0;
+        OnPropertyChanged(nameof(EpisodeListScrollOffset));
         HasSeason = false;
         SeriesName = "-";
         SeriesOriginalName = "-";
@@ -2234,6 +2288,13 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasNoEpisodes));
         OnPropertyChanged(nameof(CanCorrectSeasonToRecognized));
         OnPropertyChanged(nameof(CanShowRecognizedSeasonCorrectionEntry));
+    }
+
+    private void BeginDetailLoading(string statusMessage)
+    {
+        IsDetailLoading = true;
+        Clear(statusMessage);
+        IsDetailLoading = true;
     }
 
     private void RaiseSeasonStateCommandCanExecuteChanged()

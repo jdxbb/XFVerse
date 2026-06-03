@@ -179,6 +179,25 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <Grid Grid.RowSpan="5">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDetailLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="18" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="18" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="240" />
@@ -245,8 +264,8 @@
                         <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
                         <Control IsHitTestVisible="False"
                                  Template="{StaticResource PosterPlaceholderLargeTemplate}" />
-                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="560"
-                               helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w500"
+                        <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="780"
+                               helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w780"
                                helpers:PosterCacheImageBehavior.Source="{Binding PosterDisplayUrl}"
                                helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=MovieDetailPosterPaletteShadowHost}"
                                helpers:PosterPaletteShadowBehavior.TargetName="MovieDetailPosterPaletteShadowHost"
@@ -432,6 +451,7 @@
                                               Margin="0,5,0,0"
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto"
+                                              PreviewMouseWheel="OnOverviewPreviewMouseWheel"
                                               helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
                                               helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
                                     <ScrollViewer.Resources>
@@ -1414,6 +1434,33 @@
                             Style="{StaticResource GlassSecondaryButtonStyle}" />
                 </Grid>
             </Border>
+        </Border>
+        </Grid>
+
+        <Border Grid.RowSpan="5"
+                Panel.ZIndex="220"
+                Background="Transparent">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDetailLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <Control Width="34"
+                         Height="34"
+                         HorizontalAlignment="Center"
+                         Template="{StaticResource LoadingSpinnerTemplate}" />
+                <TextBlock Margin="0,12,0,0"
+                           HorizontalAlignment="Center"
+                           Style="{StaticResource InlineLoadingStyle}"
+                           Text="{Binding StatusMessage}" />
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>

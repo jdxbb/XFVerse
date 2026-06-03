@@ -214,6 +214,65 @@ Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
 
+### Phase 4 Detail Loading / Nested Scroll Retest Follow-up
+
+Completed:
+
+- Movie, Series, Season, and Episode detail pages now enter a dedicated loading state before binding a new detail model.
+- During that loading state, the main detail content is collapsed and a transparent hit-test layer shows the shared spinner plus status text. This avoids briefly rendering stale or half-styled detail controls while the new page data is still loading.
+- Episode detail now participates in the same pre-activation cleanup path as Movie, Series, and Season detail.
+- Detail loading is cleared only after the current model has been applied, so switching between different details no longer exposes the previous detail state during the load gap.
+- The shared scrollbar auto-reveal behavior now ignores nested `ScrollViewer` scroll events. When a correction-result overview scrolls, the parent result list scrollbar is no longer revealed by that nested scroll.
+- Movie and Episode correction dialogs share the same nested-overview behavior, so this fix applies to both dialogs.
+
+Not done:
+
+- No scan identification rule, correction transaction boundary, schema migration, database update, commit, or push was changed.
+- Runtime visual acceptance for first-launch navigation timing and transparent overlay appearance is still manual.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4 Correction Dialog Input / Nested Scroll Retest Follow-up
+
+Completed:
+
+- Movie and Episode correction candidate overviews now consume mouse-wheel input whenever the overview has scrollable content. Reaching the overview top or bottom no longer forwards the same wheel gesture to the parent result list while the pointer remains over the overview.
+- Parent result-list scrollbars are explicitly hidden when a nested candidate overview consumes the wheel, avoiding stale parent scrollbar reveal during overview scrolling.
+- Short candidate overviews that do not have scrollable content still forward wheel input to the parent result list.
+- Movie and Episode correction TMDB search form inputs execute the existing `SearchCandidatesCommand` on Enter after updating the active text binding.
+- Season correction recognized-target TMDB search inputs execute the existing `SearchSeasonCorrectionCandidatesCommand` on Enter after updating the active text binding.
+
+Not done:
+
+- No correction transaction boundary, scan rule, confidence threshold, schema migration, database update, commit, or push was changed.
+- Runtime visual acceptance for nested scrollbar timing and Enter-key handling is still manual.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4 Series Detail Scroll Retest Follow-up
+
+Completed:
+
+- Series detail season-list scroll restoration now distinguishes detail-back navigation from normal entry. Returning from a Season detail keeps the previous season-list offset, while entering the same Series detail from another page resets to the top.
+- The Series detail page now applies the stored season-list offset after the season rows are repopulated, and avoids the previous visible restore pass on page visibility changes that could look like an unexpected scroll animation.
+- Movie detail and Series detail overview text ScrollViewers now handle mouse wheel input with a smaller local step, without changing other page scroll surfaces.
+
+Not done:
+
+- No Season detail / Episode detail scroll semantics were changed in this pass.
+- No correction dialog, scan rule, media-library semantic, schema migration, database update, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
 ### Phase 4 Media Library List Hydration Follow-up
 
 Completed:
@@ -3947,7 +4006,7 @@ Verification:
 
 Completed:
 
-- Detail-page TMDB images now request original-size TMDB assets at the detail-poster/still level while keeping list and season-card thumbnails on their existing cached sizes.
+- Detail-page TMDB images requested original-size assets in this pass, but that detail image path has since been superseded by the 2026-06-03 `w780` follow-up below.
 - Series and Season detail list scroll offsets are retained when navigating into Season / Episode detail and returning.
 - Season aggregate watched text is kept in the stable `已看 x / y 集` format after single-Episode watched-state edits.
 - Season-level want-to-watch now remains available unless the full Season is watched; partially watched Seasons are no longer treated as fully unwatched-only for this action.
@@ -3961,6 +4020,66 @@ Not done:
 
 - No scan identification rule, confidence threshold, transaction boundary, schema migration, database update, commit, or push was added.
 - Runtime visual acceptance for every correction-dialog edge case is still manual.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4 Series / Season Scroll Retest Follow-up
+
+Completed:
+
+- Series overview and Season detail now distinguish a child-detail return from a fresh navigation entry before the page is shown.
+- Returning from Season detail to Series overview keeps the previous Season-list offset. Navigating to Series overview from Library or another non-child route resets the Season list to the top.
+- Returning from Episode detail to Season detail keeps the previous Episode-list offset. Navigating to Season detail from Series overview or another non-child route resets the Episode list to the top.
+- Series and Season list offset application now uses a versioned queued apply path, applies zero offsets as real reset targets, skips redundant `ScrollToVerticalOffset` calls when the current offset already matches, and no longer restores again on `IsVisible=true`.
+- Season and Episode detail overview text areas now use the same small-step local mouse wheel behavior as Movie and Series overview text areas.
+
+Not done:
+
+- No TV identification rule, correction transaction boundary, schema migration, database update, commit, or push was added.
+- Runtime visual acceptance for the remaining one-frame navigation transition is still manual.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4 Detail Image / Library Action Retest Follow-up
+
+Completed:
+
+- Movie, Series, Season, and Episode detail hero images now request TMDB `w780` and decode at width 780. This avoids `original` while improving clarity over the previous `w500` detail image requests.
+- Series detail Season-list posters remain on the existing thumbnail-sized binding.
+- Movie detail library action state now refreshes button text and icon together whenever visibility or library visibility state changes, preventing reused detail view state from leaving a stale plus / minus icon or label.
+- Series overview and Season detail library action states now use a single refresh path for command state, label, icon, and visibility after model load / clear / collection state changes.
+
+Not done:
+
+- No poster cache cleanup policy, scan rule, correction transaction boundary, schema migration, database update, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+### Phase 4 Correction Dialog Scroll / Overlay Retest Follow-up
+
+Completed:
+
+- Movie and Episode correction reuse the same result-overview wheel handler. When a candidate overview can scroll, the wheel scrolls that overview with a small local step; when it cannot scroll or is already at the requested edge, the wheel is forwarded to the parent result list.
+- Scrollbar auto-reveal now marks only the active `ScrollViewer`'s own scrollbar, so scrolling a parent result list no longer reveals nested overview scrollbars.
+- Season correction replaces disabled base panels with hit-test blocking during busy and mapping states, avoiding WPF disabled-state gray overlays while preserving interaction blocking.
+- The Season target-episode mapping layer is an explicit transparent hit-test blocker above the base correction content.
+- Closing Season correction now always runs the same cancellation / close path, so an active TMDB search is cancelled before the panel is cleared.
+- Unknown-Season target lists in Movie, Episode, and Season correction now use `BulkObservableCollection.ReplaceAll` for grouped results, reducing first-load UI churn when switching to the unknown-Season target for the first time.
+- Season correction TMDB search and unknown-Season loading yield once after setting busy/status state so the spinner can render before service work begins.
+
+Not done:
+
+- No correction transaction boundary, scan rule, confidence threshold, schema migration, database update, commit, or push was changed.
+- Runtime visual acceptance for the remaining first-time template warmup is still manual.
 
 Verification:
 

@@ -332,6 +332,7 @@
                             <TextBox x:Name="MovieSearchTextBox"
                                      helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入电影名称"
+                                     PreviewKeyDown="CorrectionSearchTextBox_PreviewKeyDown"
                                      Style="{StaticResource CorrectionTextBoxStyle}"
                                      Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Margin="0,0,4,0"
@@ -355,6 +356,7 @@
                             <TextBox x:Name="MovieYearTextBox"
                                      helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入上映年份"
+                                     PreviewKeyDown="CorrectionSearchTextBox_PreviewKeyDown"
                                      Style="{StaticResource CorrectionTextBoxStyle}"
                                      Text="{Binding ManualSearchYear, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Margin="0,0,4,0"
@@ -427,6 +429,7 @@
                             <TextBox x:Name="TvSearchTextBox"
                                      helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入电视剧名称"
+                                     PreviewKeyDown="CorrectionSearchTextBox_PreviewKeyDown"
                                      Style="{StaticResource CorrectionTextBoxStyle}"
                                      Text="{Binding TvCorrectionQuery, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Margin="0,0,4,0"
@@ -450,6 +453,7 @@
                             <TextBox x:Name="SeasonNumberTextBox"
                                      helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="季号"
+                                     PreviewKeyDown="CorrectionSearchTextBox_PreviewKeyDown"
                                      Style="{StaticResource CorrectionTextBoxStyle}"
                                      Text="{Binding CorrectionSeasonNumber, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Margin="0,0,4,0"
@@ -473,6 +477,7 @@
                             <TextBox x:Name="EpisodeNumberTextBox"
                                      helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="集号"
+                                     PreviewKeyDown="CorrectionSearchTextBox_PreviewKeyDown"
                                      Style="{StaticResource CorrectionTextBoxStyle}"
                                      Text="{Binding CorrectionEpisodeNumber, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Margin="0,0,4,0"
@@ -699,7 +704,8 @@
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   VerticalScrollBarVisibility="Auto"
                                                   helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
-                                                  helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
+                                                  helpers:TextScrollOverflowCueBehavior.IsEnabled="True"
+                                                  PreviewMouseWheel="ResultOverviewScrollViewer_PreviewMouseWheel">
                                         <ScrollViewer.Resources>
                                             <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CorrectionModernScrollBarStyle}" />
                                         </ScrollViewer.Resources>
