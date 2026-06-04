@@ -1,5 +1,22 @@
 # 影片发现 Known Issues
 
+## Phase 7.4b 媒体库一致性修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 榜单 Tab 仍需按 7.4c 做完整视觉一致性收口；本轮只补入榜单内容区滚动位置恢复。
+- AI 推荐 Tab 和推荐偏好弹窗仍需按 7.4d 做完整视觉收口。
+- 搜索 / 榜单滚动 offset 目前按媒介和布局保存，不按关键词、筛选组合或榜单类型保存；新搜索、筛选重建、翻页、榜单重载会清零 offset，避免旧内容位置污染新内容。
+
+Noise:
+
+- Discovery 的媒体库式菜单、Tab、工具栏网格、结果卡片首行和滚动条自动显隐样式目前仍是 `MovieDiscoveryPage` 本地资源，未抽为全局组件，避免影响媒体库以外页面。
+- TV 观看状态是按 Series 下 Episode 聚合的 Discovery 展示投影；它不创建 `WatchHistory`、不创建播放源，也不改变 TV 的 AI / Watch Insights 排除边界。
+
 ## Phase 4.13b-fix No-source Movie Semantics
 
 - External no-source Movie candidates reuse the previous not-in-library detail add-to-library write semantics; media-library projection now shows visible no-source external rows, and no-source Movie detail hides correction because there is no source to correct.
@@ -248,15 +265,15 @@ Noise:
 - Unrecognized Movie placeholders being visible in `Other` is expected and does not mean Movie Discovery ranking/search changed.
 - TV scan logs may mention Movie fallback blocking or placeholder grouping; those are scan diagnostics and are not Movie Discovery recommendation inputs.
 
-## Phase 7.4a Notes
+## Phase 7.4a / 7.4b Notes
 
 Blocker:
 
-- None after the Discovery search toolbar / layout implementation and build validation.
+- None after the Discovery search toolbar / layout implementation, 7.4b visual alignment and build validation.
 
 Deferred:
 
-- Final Discovery search UI visual alignment remains 7.4b, including media-library-like toolbar/filter styling, result summary layout, scroll/density polish, poster/list result containers, list-row top-right want action, type/source tag placement, rating badge treatment and poster-card visual alignment.
+- Exact media-library visual parity for the Discovery search toolbar remains deferred per user instruction. Current differences include button size, layout-toggle button position, search input size, search icon treatment and dropdown menu styling.
 - Ranking visual consistency remains 7.4c.
 - AI recommendation tab and preference dialog polish remain 7.4d.
 
@@ -264,3 +281,4 @@ Noise:
 
 - TV person search is a Discovery search feature only. It uses TMDB `person/{id}/tv_credits` and does not add TV recommendation, Watch Insights, profile/persona inputs or fingerprint behavior.
 - Discovery search layout memory is App-layer JSON preference state in `discovery-preferences.json`; it is not a database schema change.
+- In Discovery search results, TV `想看` is a display tag for existing want-to-watch seasons only. Absence of the tag means no known want-to-watch season state; it is not a missing `+ 想看` action.

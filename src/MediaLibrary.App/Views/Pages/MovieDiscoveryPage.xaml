@@ -4,385 +4,938 @@
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              xmlns:viewModels="clr-namespace:MediaLibrary.App.ViewModels.Pages">
     <UserControl.Resources>
+        <Style x:Key="DiscoverySearchBoxStyle" TargetType="TextBox" BasedOn="{StaticResource SearchBoxStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="DiscoveryFilterMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource MenuItemStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="MinWidth" Value="86" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="ItemChrome"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                Margin="{TemplateBinding Margin}"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscoveryFilterContextMenuStyle" TargetType="ContextMenu" BasedOn="{StaticResource ContextMenuStyle}">
+            <Setter Property="Padding" Value="7" />
+            <Setter Property="MaxHeight" Value="420" />
+            <Setter Property="Background" Value="{DynamicResource BrushPopupBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}"
+                                Effect="{StaticResource ShadowPopup}"
+                                SnapsToDevicePixels="True">
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscoveryModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border Width="6"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="3"
+                                Opacity="0.58" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscoveryModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscoveryModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="MinWidth" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Width="{TemplateBinding Width}" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Style="{StaticResource DiscoveryModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource DiscoveryModernScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Style="{StaticResource DiscoveryModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="IsMouseCaptureWithin" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}"
+                             Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource DiscoveryModernScrollBarStyle}" />
+
+        <Style x:Key="DiscoveryMultiFilterMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+            <Setter Property="Header" Value="{Binding Label}" />
+            <Setter Property="IsCheckable" Value="True" />
+            <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=OneWay}" />
+            <Setter Property="CommandParameter" Value="{Binding Label}" />
+            <Setter Property="StaysOpenOnClick" Value="True" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Label}" Value="全部">
+                    <Setter Property="StaysOpenOnClick" Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DiscoveryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSmallButtonStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="86" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="MenuButton_PreviewMouseLeftButtonDown" />
+        </Style>
+
+        <Style x:Key="DiscoveryToolbarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="DiscoverySortDirectionIconButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscoveryToolbarIconButtonStyle}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="MinWidth" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+        </Style>
+
+        <Style x:Key="DiscoveryLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSmallButtonStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="54" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style x:Key="DiscoveryPosterLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscoveryLayoutSegmentButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSearchPosterLayout}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DiscoveryListLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscoveryLayoutSegmentButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSearchListLayout}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DiscoveryLayoutSegmentHostStyle" TargetType="Border">
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+
+        <Style x:Key="DiscoverySearchClearButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="MinWidth" Value="22" />
+            <Setter Property="MinHeight" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SearchText}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DiscoveryTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0,16,0,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Border Height="1"
+                                        VerticalAlignment="Bottom"
+                                        Background="{DynamicResource BrushDivider}" />
+                                <TabPanel x:Name="HeaderPanel"
+                                          Panel.ZIndex="1"
+                                          HorizontalAlignment="Left"
+                                          IsItemsHost="True"
+                                          KeyboardNavigation.TabIndex="1" />
+                            </Grid>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Grid.Row="1"
+                                              Margin="{TemplateBinding Padding}"
+                                              ContentSource="SelectedContent" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscoveryTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="0,0,0,10" />
+            <Setter Property="Margin" Value="0,0,34,0" />
+            <Setter Property="MinWidth" Value="76" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Grid MinWidth="{TemplateBinding MinWidth}"
+                              Background="Transparent">
+                            <ContentPresenter x:Name="HeaderContent"
+                                              ContentSource="Header"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                            <Border x:Name="SelectedUnderline"
+                                    Height="3"
+                                    VerticalAlignment="Bottom"
+                                    Background="{DynamicResource BrushAccent}"
+                                    Opacity="0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="SelectedUnderline" Property="Opacity" Value="1" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscoveryWantButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSecondaryButtonStyle}">
+            <Setter Property="MinWidth" Value="58" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="DiscoveryBadgeStyle" TargetType="Border">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style x:Key="DiscoveryAccentBadgeStyle" TargetType="Border" BasedOn="{StaticResource DiscoveryBadgeStyle}">
+            <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentSoft}" />
+        </Style>
+
+        <Style x:Key="DiscoveryBadgeTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="DiscoveryPosterCardStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
+            <Setter Property="Width" Value="180" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,14,18" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <Style x:Key="DiscoveryListItemStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+
+        <ItemsPanelTemplate x:Key="DiscoveryPosterItemsPanelTemplate">
+            <WrapPanel />
+        </ItemsPanelTemplate>
+
         <DataTemplate DataType="{x:Type viewModels:DiscoveryTvSeriesCardViewModel}">
-            <Border Width="232"
-                    Margin="0,0,18,18"
-                    IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                    Style="{StaticResource CompactCardStyle}">
+            <Border IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    Style="{StaticResource DiscoveryPosterCardStyle}">
                 <Border.InputBindings>
                     <MouseBinding MouseAction="LeftClick"
                                   Command="{Binding DataContext.OpenTvSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                   CommandParameter="{Binding}" />
                 </Border.InputBindings>
-                <StackPanel>
-                    <Grid Height="300">
-                        <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
-                            <Grid>
-                                <Control IsHitTestVisible="False"
-                                         Template="{StaticResource PosterPlaceholderTemplate}" />
-                                <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
-                            </Grid>
-                        </Border>
-                        <Border HorizontalAlignment="Left"
-                                VerticalAlignment="Top"
-                                Margin="10"
-                                Padding="9,5"
-                                CornerRadius="999"
-                                Background="{DynamicResource BrushAccent}">
-                            <TextBlock Text="{Binding AvailabilityText}"
-                                       Foreground="{DynamicResource BrushOnAccent}"
-                                       FontWeight="SemiBold" />
-                        </Border>
-                        <Border HorizontalAlignment="Right"
-                                VerticalAlignment="Top"
-                                Margin="10"
-                                Padding="9,5"
-                                CornerRadius="999"
-                                Background="{DynamicResource BrushSurfaceAlt}">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasRank}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <TextBlock Text="{Binding RankText}" Style="{StaticResource BodyTextStyle}" />
-                        </Border>
-                    </Grid>
+                <Grid Height="270">
+                    <Border Background="{DynamicResource BrushSurfaceAlt}">
+                        <Grid>
+                            <Control IsHitTestVisible="False"
+                                     Template="{StaticResource PosterPlaceholderTemplate}" />
+                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                   Stretch="UniformToFill" />
+                        </Grid>
+                    </Border>
 
-                    <TextBlock Margin="0,14,0,0"
-                               Text="{Binding Title}"
-                               TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis"
-                               Style="{StaticResource SectionTitleTextStyle}" />
-                    <TextBlock Margin="0,4,0,0"
-                               Text="{Binding OriginalTitleText}"
-                               TextWrapping="Wrap">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding OriginalTitleText}" Value="">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                    <Border HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Margin="10"
+                            Style="{StaticResource DiscoveryAccentBadgeStyle}">
+                        <TextBlock Text="电视剧" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                    </Border>
 
-                    <DockPanel Margin="0,8,0,0">
-                        <TextBlock Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBlock DockPanel.Dock="Right"
-                                   Text="{Binding RatingText}"
-                                   FontWeight="SemiBold"
-                                   Style="{StaticResource BodyTextStyle}" />
-                    </DockPanel>
-
-                    <TextBlock Margin="0,8,0,0"
-                               Text="{Binding DisplayTags}"
-                               TextWrapping="Wrap"
-                               Style="{StaticResource BodyTextStyle}" />
-                    <TextBlock Margin="0,6,0,0"
-                               Text="{Binding OverviewText}"
-                               TextWrapping="Wrap"
-                               MaxHeight="72"
-                               Style="{StaticResource BodyMutedTextStyle}" />
-
-                    <WrapPanel Margin="0,10,0,0">
-                        <Border Margin="0,0,8,8"
-                                Padding="8,4"
-                                CornerRadius="999"
-                                Background="{DynamicResource BrushSurfaceAlt}">
-                            <TextBlock Text="{Binding SeasonCountText}" Style="{StaticResource BodyMutedTextStyle}" />
-                        </Border>
-                        <Border Margin="0,0,8,8"
-                                Padding="8,4"
-                                CornerRadius="999"
-                                Background="{DynamicResource BrushSurfaceAlt}">
-                            <TextBlock Text="{Binding LibraryStatusText}" Style="{StaticResource BodyMutedTextStyle}" />
-                        </Border>
-                        <Border Margin="0,0,8,8"
-                                Padding="8,4"
-                                CornerRadius="999"
-                                Background="{DynamicResource BrushAccentSoft}">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasSeasonStateSummary}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <TextBlock Text="{Binding SeasonStateSummaryText}" Style="{StaticResource BodyMutedTextStyle}" />
-                        </Border>
-                    </WrapPanel>
-                    <Button Margin="0,10,0,0"
-                            Content="{Binding AddToLibraryButtonText}"
-                            Command="{Binding DataContext.AddTvSeriesToLibraryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            CommandParameter="{Binding}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                    <Border HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="10">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource DiscoveryAccentBadgeStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding CanAddToLibrary}" Value="True">
+                                    <DataTrigger Binding="{Binding HasWantToWatchSeasonTag}" Value="True">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Button.Style>
-                    </Button>
-                </StackPanel>
+                        </Border.Style>
+                        <TextBlock Text="想看" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                    </Border>
+
+                    <Border VerticalAlignment="Bottom"
+                            Padding="12,10"
+                            Background="{DynamicResource BrushOverlay}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.ColumnSpan="3"
+                                       Text="{Binding Title}"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"
+                                       Style="{StaticResource BodyTextStyle}" />
+                            <TextBlock Grid.Row="1"
+                                       Grid.ColumnSpan="3"
+                                       Margin="0,3,0,0"
+                                       Text="{Binding YearText}"
+                                       Foreground="#D8FFFFFF"
+                                       Style="{StaticResource CaptionTextStyle}" />
+                            <TextBlock Grid.Row="2"
+                                       Margin="0,5,0,0"
+                                       Text="{Binding DisplayTags}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="#D8FFFFFF"
+                                       Style="{StaticResource CaptionTextStyle}" />
+                            <Border Grid.Row="2"
+                                    Grid.Column="2"
+                                    Margin="0,2,0,0"
+                                    Style="{StaticResource DiscoveryAccentBadgeStyle}">
+                                <TextBlock Text="{Binding RatingBadgeText}" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Border>
         </DataTemplate>
     </UserControl.Resources>
-    <Border Style="{StaticResource PageCardStyle}">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <StackPanel>
-                <TextBlock Text="影片发现" Style="{StaticResource CardTitleTextStyle}" />
-                <TextBlock Margin="0,8,0,0"
-                           Text="通过 TMDB 搜索影片、电视剧和电影人物作品；AI 推荐继续使用现有推荐流程。"
-                           Style="{StaticResource BodyMutedTextStyle}" />
-            </StackPanel>
-
-            <TabControl Grid.Row="1"
-                        Margin="0,22,0,0"
-                        SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
-                        Style="{StaticResource ModernTabControlStyle}">
-                <TabItem Header="影片搜索" Style="{StaticResource ModernTabItemStyle}">
-                    <Grid Margin="0,18,0,0">
+    <Grid Background="Transparent" PreviewMouseDown="OnRootPreviewMouseDown">
+        <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                    Style="{StaticResource DiscoveryTabControlStyle}">
+                <TabItem Header="影片" Style="{StaticResource DiscoveryTabItemStyle}">
+                    <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="14" />
+                            <RowDefinition Height="18" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel>
+                        <Border Padding="14" Style="{StaticResource GlassPageCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="12" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="132" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition x:Name="SearchToolbarColumn" Width="816" />
+                                    <ColumnDefinition Width="8" />
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="40" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel>
-                                    <TextBlock Text="媒介" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding SearchMediaTypeOptions}"
-                                              SelectedItem="{Binding SelectedSearchMediaType}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="搜索方式" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding SearchTypeOptions}"
-                                              SelectedItem="{Binding SelectedSearchType}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="4">
-                                    <TextBlock Text="关键词" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBox MinWidth="320"
-                                             helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                <Grid Grid.Column="0">
+                                    <TextBox helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
                                              helpers:TextBoxPlaceholderBehavior.PlaceholderText="{Binding SearchPlaceholderText}"
                                              ToolTip="{Binding SearchInputToolTip}"
                                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                             Style="{StaticResource FormTextBoxStyle}">
+                                             Padding="10,3,30,3"
+                                             Style="{StaticResource DiscoverySearchBoxStyle}">
                                         <TextBox.InputBindings>
                                             <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
                                         </TextBox.InputBindings>
                                     </TextBox>
-                                </StackPanel>
+                                    <Button HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Margin="0,0,4,0"
+                                            Command="{Binding ClearSearchTextCommand}"
+                                            Style="{StaticResource DiscoverySearchClearButtonStyle}">
+                                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="10"
+                                                   Text="&#xE711;" />
+                                    </Button>
+                                </Grid>
 
-                                <Button Grid.Column="6"
-                                        MinWidth="96"
+                                <Button Grid.Column="2"
                                         VerticalAlignment="Bottom"
-                                        Content="搜索"
                                         Command="{Binding SearchCommand}"
-                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                        Style="{StaticResource DiscoveryToolbarIconButtonStyle}">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                                               FontSize="16"
+                                               RenderTransformOrigin="0.5,0.5"
+                                               Text="&#xE721;">
+                                        <TextBlock.RenderTransform>
+                                            <ScaleTransform ScaleX="-1" />
+                                        </TextBlock.RenderTransform>
+                                    </TextBlock>
+                                </Button>
+                                <Grid Grid.Column="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Command="{Binding ToggleSearchSortDirectionCommand}"
+                                            Style="{StaticResource DiscoverySortDirectionIconButtonStyle}"
+                                            ToolTip="{Binding SearchSortDirectionButtonToolTip}">
+                                        <Viewbox Width="16" Height="16">
+                                            <Canvas Width="26" Height="24">
+                                                <Path Data="{Binding SearchSortDirectionIconData}"
+                                                      Stroke="{DynamicResource BrushForegroundSecondary}"
+                                                      StrokeThickness="2"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      StrokeLineJoin="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Button>
+                                    <Button Grid.Column="2"
+                                            Content="{Binding SearchSortOptionButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SortOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchSortOptionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+                                    <Button Grid.Column="4"
+                                            HorizontalAlignment="Right"
+                                            Content="清除筛选"
+                                            Command="{Binding ClearSearchFiltersCommand}"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}" />
+                                </Grid>
                             </Grid>
 
-                            <WrapPanel Margin="0,14,0,0">
-                                <WrapPanel.Style>
-                                    <Style TargetType="WrapPanel">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsMovieSearchSelected}" Value="False">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </WrapPanel.Style>
-                                <StackPanel Width="132" Margin="0,0,12,12">
-                                    <TextBlock Text="类型" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding GenreFilterOptions}"
-                                              SelectedItem="{Binding SelectedGenreFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                            <WrapPanel Grid.Row="2">
+                                    <WrapPanel.Style>
+                                        <Style TargetType="WrapPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMovieSearchSelected}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </WrapPanel.Style>
 
-                                <StackPanel Width="132" Margin="0,0,12,12">
-                                    <TextBlock Text="地区" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding RegionFilterOptions}"
-                                              SelectedItem="{Binding SelectedRegionFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchMediaTypeButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchMediaTypeOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchMediaTypeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="132" Margin="0,0,12,12">
-                                    <TextBlock Text="观看状态" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding WatchStatusFilterOptions}"
-                                              SelectedItem="{Binding SelectedWatchStatusFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchTypeButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchTypeOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchTypeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="116" Margin="0,0,12,12">
-                                    <TextBlock Text="顺序" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding SortDirectionOptions}"
-                                              SelectedItem="{Binding SelectedSortDirection}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchGenreFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding GenreFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchGenreFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="132" Margin="0,0,12,12">
-                                    <TextBlock Text="排序" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding SortOptions}"
-                                              SelectedItem="{Binding SelectedSortOption}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchRegionFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchRegionFilterMenuOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryMultiFilterMenuItemStyle}">
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchRegionMultiFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="116" Margin="0,0,12,12">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchWatchStatusFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding WatchStatusFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchWatchStatusFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchPlaybackSourceFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding PlaybackSourceFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchPlaybackSourceFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchCollectionStatusFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchCollectionStatusFilterMenuOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryMultiFilterMenuItemStyle}">
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchCollectionStatusFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchDecadeFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding DecadeFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchDecadeFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchLanguageFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchLanguageFilterMenuOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryMultiFilterMenuItemStyle}">
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchLanguageMultiFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+                                </WrapPanel>
+
+                                <WrapPanel Grid.Row="2">
+                                    <WrapPanel.Style>
+                                        <Style TargetType="WrapPanel">
                                             <Setter Property="Visibility" Value="Collapsed" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <DataTrigger Binding="{Binding IsTvSearchSelected}" Value="True">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
-                                    </StackPanel.Style>
-                                    <TextBlock Text="年代" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding DecadeFilterOptions}"
-                                              SelectedItem="{Binding SelectedDecadeFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    </WrapPanel.Style>
 
-                                <StackPanel Width="116" Margin="0,0,12,12">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-                                    <TextBlock Text="语言" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding LanguageFilterOptions}"
-                                              SelectedItem="{Binding SelectedLanguageFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchMediaTypeButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchMediaTypeOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchMediaTypeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <Button MinWidth="96"
-                                        Margin="0,20,12,12"
-                                        Content="清除筛选"
-                                        Command="{Binding ClearSearchFiltersCommand}"
-                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding SearchTypeButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchTypeOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSearchTypeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <Button MinWidth="96"
-                                        Margin="0,20,0,12"
-                                        Content="{Binding SearchLayoutToggleText}"
-                                        Command="{Binding SwitchSearchLayoutCommand}"
-                                        ToolTip="{Binding SearchLayoutStatusText}"
-                                        Style="{StaticResource SecondaryButtonStyle}" />
-                            </WrapPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding TvSearchGenreFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding TvGenreFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTvSearchGenreFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                            <WrapPanel Margin="0,14,0,0">
-                                <WrapPanel.Style>
-                                    <Style TargetType="WrapPanel">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsTvSearchSelected}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </WrapPanel.Style>
-                                <StackPanel Width="132" Margin="0,0,12,12">
-                                    <TextBlock Text="类型" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding TvGenreFilterOptions}"
-                                              SelectedItem="{Binding SelectedTvGenreFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding TvSearchRegionFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding TvSearchRegionFilterMenuOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryMultiFilterMenuItemStyle}">
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTvSearchRegionMultiFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="132" Margin="0,0,12,12">
-                                    <TextBlock Text="地区" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding RegionFilterOptions}"
-                                              SelectedItem="{Binding SelectedTvRegionFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding TvSearchPlaybackSourceFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding PlaybackSourceFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTvSearchPlaybackSourceFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="150" Margin="0,0,12,12">
-                                    <TextBlock Text="播放源状态" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding TvWatchStatusFilterOptions}"
-                                              SelectedItem="{Binding SelectedTvWatchStatusFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding TvSearchWatchStatusFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding TvWatchStatusFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTvSearchWatchStatusFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="116" Margin="0,0,12,12">
-                                    <TextBlock Text="顺序" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding SortDirectionOptions}"
-                                              SelectedItem="{Binding SelectedTvSortDirection}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding TvSearchCollectionStatusFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding TvSearchCollectionStatusFilterMenuOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryMultiFilterMenuItemStyle}">
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTvSearchCollectionStatusFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="132" Margin="0,0,12,12">
-                                    <TextBlock Text="排序" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding TvSortOptions}"
-                                              SelectedItem="{Binding SelectedTvSortOption}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding TvSearchDecadeFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding DecadeFilterOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTvSearchDecadeFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
 
-                                <StackPanel Width="116" Margin="0,0,12,12">
-                                    <TextBlock Text="年代" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding DecadeFilterOptions}"
-                                              SelectedItem="{Binding SelectedTvDecadeFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
+                                    <Button Margin="0,0,8,8"
+                                            Content="{Binding TvSearchLanguageFilterButtonText}"
+                                            Click="OpenButtonContextMenu"
+                                            Style="{StaticResource DiscoveryToolbarButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding TvSearchLanguageFilterMenuOptions}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryMultiFilterMenuItemStyle}">
+                                                        <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTvSearchLanguageMultiFilterCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+                                </WrapPanel>
+                        </Grid>
+                        </Border>
 
-                                <StackPanel Width="116" Margin="0,0,12,12">
-                                    <TextBlock Text="语言" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ComboBox ItemsSource="{Binding LanguageFilterOptions}"
-                                              SelectedItem="{Binding SelectedTvLanguageFilter}"
-                                              Style="{StaticResource FormComboBoxStyle}" />
-                                </StackPanel>
-
-                                <Button MinWidth="96"
-                                        Margin="0,20,12,12"
-                                        Content="清除筛选"
-                                        Command="{Binding ClearSearchFiltersCommand}"
-                                        Style="{StaticResource SecondaryButtonStyle}" />
-
-                                <Button MinWidth="96"
-                                        Margin="0,20,0,12"
-                                        Content="{Binding SearchLayoutToggleText}"
-                                        Command="{Binding SwitchSearchLayoutCommand}"
-                                        ToolTip="{Binding SearchLayoutStatusText}"
-                                        Style="{StaticResource SecondaryButtonStyle}" />
-                            </WrapPanel>
-                        </StackPanel>
-
-                        <Border Grid.Row="2" Style="{StaticResource CompactCardStyle}">
+                        <Border Grid.Row="2" Style="{StaticResource GlassPageCardStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -390,18 +943,44 @@
                                 </Grid.RowDefinitions>
 
                                 <DockPanel>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding ActiveSearchStatusMessage}"
+                                    <Border DockPanel.Dock="Right"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource DiscoveryLayoutSegmentHostStyle}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="海报"
+                                                    Command="{Binding SwitchSearchToPosterLayoutCommand}"
+                                                    Style="{StaticResource DiscoveryPosterLayoutSegmentButtonStyle}" />
+                                            <Button Margin="2,0,0,0"
+                                                    Content="列表"
+                                                    Command="{Binding SwitchSearchToListLayoutCommand}"
+                                                    Style="{StaticResource DiscoveryListLayoutSegmentButtonStyle}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <StackPanel Margin="20,0,0,0"
+                                                VerticalAlignment="Center">
+                                        <TextBlock FontSize="12"
+                                                   LineHeight="18"
+                                                   LineStackingStrategy="BlockLineHeight"
+                                                   MaxHeight="36"
+                                                   Text="{Binding ActiveSearchStatusMessage}"
+                                                   TextTrimming="CharacterEllipsis"
                                                    TextWrapping="Wrap"
+                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding ActiveSearchStatusMessage}"
                                                    Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,6,0,0"
+                                        <TextBlock Margin="0,4,0,0"
+                                                   LineHeight="{StaticResource LineHeightBody}"
+                                                   LineStackingStrategy="BlockLineHeight"
+                                                   MaxHeight="44"
                                                    Text="{Binding ActiveSearchSummaryText}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding ActiveSearchSummaryText}"
                                                    TextWrapping="Wrap"
                                                    Style="{StaticResource BodyTextStyle}" />
                                     </StackPanel>
                                 </DockPanel>
 
-                                <Grid Grid.Row="1" Margin="0,16,0,0">
+                                <Grid Grid.Row="1" Margin="0,18,0,0">
                                     <TextBlock HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
                                                Panel.ZIndex="1"
@@ -419,7 +998,12 @@
                                         </TextBlock.Style>
                                     </TextBlock>
 
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer x:Name="SearchMoviePosterScrollViewer"
+                                                  Loaded="DiscoveryScrollViewer_Loaded"
+                                                  ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
+                                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
                                         <ScrollViewer.Style>
                                             <Style TargetType="ScrollViewer">
                                                 <Setter Property="Visibility" Value="Visible" />
@@ -458,63 +1042,40 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Width="232"
-                                                                Margin="0,0,18,18"
-                                                                Style="{StaticResource CompactCardStyle}">
+                                                        <Border Style="{StaticResource DiscoveryPosterCardStyle}">
                                                             <Border.InputBindings>
                                                                 <MouseBinding MouseAction="LeftClick"
                                                                               Command="{Binding DataContext.OpenSearchMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                               CommandParameter="{Binding}" />
                                                             </Border.InputBindings>
-                                                            <StackPanel>
-                                                                <Grid Height="300">
-                                                                    <Border CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
-                                                                        <Grid>
-                                                                            <Control IsHitTestVisible="False"
-                                                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
-                                                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
-                                                                        </Grid>
-                                                                    </Border>
+                                                            <Grid Height="270">
+                                                                <Border Background="{DynamicResource BrushSurfaceAlt}">
+                                                                    <Grid>
+                                                                        <Control IsHitTestVisible="False"
+                                                                                 Template="{StaticResource PosterPlaceholderTemplate}" />
+                                                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                                               Stretch="UniformToFill" />
+                                                                    </Grid>
+                                                                </Border>
 
-                                                                    <Border HorizontalAlignment="Left"
-                                                                            VerticalAlignment="Top"
-                                                                            Margin="10"
-                                                                            Padding="9,5"
-                                                                            CornerRadius="999"
-                                                                            Background="{DynamicResource BrushAccent}">
-                                                                        <TextBlock Text="{Binding AvailabilityText}"
-                                                                                   Foreground="{DynamicResource BrushOnAccent}"
-                                                                                   FontWeight="SemiBold" />
-                                                                    </Border>
+                                                                <Border HorizontalAlignment="Left"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="10"
+                                                                        Style="{StaticResource DiscoveryAccentBadgeStyle}">
+                                                                    <TextBlock Text="电影" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                                                                </Border>
 
-                                                                    <Button HorizontalAlignment="Right"
-                                                                            VerticalAlignment="Top"
-                                                                            Margin="10"
-                                                                            Content="{Binding WantToWatchButtonText}"
-                                                                            Command="{Binding DataContext.ToggleSearchWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                            CommandParameter="{Binding}">
-                                                                        <Button.Style>
-                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </Button.Style>
-                                                                    </Button>
-                                                                </Grid>
-
-                                                                <Button Margin="0,10,0,0"
-                                                                        Content="{Binding AddToLibraryButtonText}"
-                                                                        Command="{Binding DataContext.AddSearchMovieToLibraryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                <Button HorizontalAlignment="Right"
+                                                                        VerticalAlignment="Top"
+                                                                        Margin="10"
+                                                                        Content="{Binding WantToWatchButtonText}"
+                                                                        Command="{Binding DataContext.ToggleSearchWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                         CommandParameter="{Binding}">
                                                                     <Button.Style>
-                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource DiscoveryWantButtonStyle}">
                                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                                             <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding CanAddToLibrary}" Value="True">
+                                                                                <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
                                                                                     <Setter Property="Visibility" Value="Visible" />
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
@@ -522,108 +1083,64 @@
                                                                     </Button.Style>
                                                                 </Button>
 
-                                                                <TextBlock Margin="0,14,0,0"
-                                                                           Text="{Binding Title}"
-                                                                           TextWrapping="Wrap"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           Style="{StaticResource SectionTitleTextStyle}" />
-                                                                <TextBlock Margin="0,4,0,0"
-                                                                           Text="{Binding OriginalTitleText}"
-                                                                           TextWrapping="Wrap">
-                                                                    <TextBlock.Style>
-                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding OriginalTitleText}" Value="">
+                                                                <Border VerticalAlignment="Bottom"
+                                                                        Padding="12,10"
+                                                                        Background="{DynamicResource BrushOverlay}">
+                                                                    <Grid>
+                                                                        <Grid.RowDefinitions>
+                                                                            <RowDefinition Height="Auto" />
+                                                                            <RowDefinition Height="Auto" />
+                                                                            <RowDefinition Height="Auto" />
+                                                                        </Grid.RowDefinitions>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="8" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                        </Grid.ColumnDefinitions>
+
+                                                                        <TextBlock Grid.ColumnSpan="3"
+                                                                                   Text="{Binding Title}"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="White"
+                                                                                   Style="{StaticResource BodyTextStyle}" />
+                                                                        <TextBlock Grid.Row="1"
+                                                                                   Grid.ColumnSpan="3"
+                                                                                   Margin="0,3,0,0"
+                                                                                   Text="{Binding YearText}"
+                                                                                   Foreground="#D8FFFFFF"
+                                                                                   Style="{StaticResource CaptionTextStyle}" />
+                                                                        <TextBlock Grid.Row="2"
+                                                                                   Margin="0,5,0,0"
+                                                                                   Text="{Binding DisplayTags}"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   Foreground="#D8FFFFFF"
+                                                                                   Style="{StaticResource CaptionTextStyle}" />
+                                                                        <Button Grid.Row="2"
+                                                                                Margin="0,24,0,0"
+                                                                                Content="{Binding AddToLibraryButtonText}"
+                                                                                Command="{Binding DataContext.AddSearchMovieToLibraryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                CommandParameter="{Binding}">
+                                                                            <Button.Style>
+                                                                                <Style TargetType="Button" BasedOn="{StaticResource DiscoveryWantButtonStyle}">
                                                                                     <Setter Property="Visibility" Value="Collapsed" />
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </TextBlock.Style>
-                                                                </TextBlock>
-
-                                                                <DockPanel Margin="0,8,0,0">
-                                                                    <TextBlock Text="{Binding YearText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    <TextBlock DockPanel.Dock="Right"
-                                                                               Text="{Binding RatingText}"
-                                                                               FontWeight="SemiBold"
-                                                                               Style="{StaticResource BodyTextStyle}" />
-                                                                </DockPanel>
-
-                                                                <TextBlock Margin="0,8,0,0"
-                                                                           Text="{Binding DisplayTags}"
-                                                                           TextWrapping="Wrap"
-                                                                           Style="{StaticResource BodyTextStyle}" />
-                                                                <TextBlock Margin="0,6,0,0"
-                                                                           Text="{Binding EmotionTagsText}"
-                                                                           TextWrapping="Wrap">
-                                                                    <TextBlock.Style>
-                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding EmotionTagsText}" Value="">
-                                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </TextBlock.Style>
-                                                                </TextBlock>
-
-                                                                <WrapPanel Margin="0,10,0,0">
-                                                                    <Border Margin="0,0,8,8"
-                                                                            Padding="8,4"
-                                                                            CornerRadius="999"
-                                                                            Background="{DynamicResource BrushSurfaceAlt}">
-                                                                        <TextBlock Text="{Binding WatchStateText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    </Border>
-                                                                    <Border Margin="0,0,8,8"
-                                                                            Padding="8,4"
-                                                                            CornerRadius="999"
-                                                                            Background="{DynamicResource BrushAccentSoft}">
-                                                                        <Border.Style>
-                                                                            <Style TargetType="Border">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </Border.Style>
-                                                                        <TextBlock Text="想看" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    </Border>
-                                                                    <Border Margin="0,0,8,8"
-                                                                            Padding="8,4"
-                                                                            CornerRadius="999"
-                                                                            Background="{DynamicResource BrushSurfaceAlt}">
-                                                                        <Border.Style>
-                                                                            <Style TargetType="Border">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding IsFavorite}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </Border.Style>
-                                                                        <TextBlock Text="喜爱" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    </Border>
-                                                                    <Border Margin="0,0,8,8"
-                                                                            Padding="8,4"
-                                                                            CornerRadius="999"
-                                                                            Background="{DynamicResource BrushSurfaceAlt}">
-                                                                        <Border.Style>
-                                                                            <Style TargetType="Border">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding IsNotInterested}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </Border.Style>
-                                                                        <TextBlock Text="不想看" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    </Border>
-                                                                </WrapPanel>
-                                                            </StackPanel>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding CanAddToLibrary}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Button.Style>
+                                                                        </Button>
+                                                                        <Border Grid.Row="2"
+                                                                                Grid.Column="2"
+                                                                                Margin="0,2,0,0"
+                                                                                Style="{StaticResource DiscoveryAccentBadgeStyle}">
+                                                                            <TextBlock Text="{Binding RatingBadgeText}" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                                                                        </Border>
+                                                                    </Grid>
+                                                                </Border>
+                                                            </Grid>
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
@@ -645,7 +1162,7 @@
                                                 <Button MinWidth="88"
                                                         Content="上一页"
                                                         Command="{Binding GoPreviousSearchPageCommand}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
                                                            Text="{Binding SearchPageStatusText}"
@@ -653,12 +1170,17 @@
                                                 <Button MinWidth="88"
                                                         Content="下一页"
                                                         Command="{Binding GoNextSearchPageCommand}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                             </StackPanel>
                                         </StackPanel>
                                     </ScrollViewer>
 
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer x:Name="SearchMovieListScrollViewer"
+                                                  Loaded="DiscoveryScrollViewer_Loaded"
+                                                  ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
+                                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
                                         <ScrollViewer.Style>
                                             <Style TargetType="ScrollViewer">
                                                 <Setter Property="Visibility" Value="Visible" />
@@ -682,84 +1204,72 @@
                                             <ItemsControl ItemsSource="{Binding SearchMovies}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Margin="0,0,0,12"
-                                                                Padding="12"
-                                                                Style="{StaticResource CompactCardStyle}">
+                                                        <Border Style="{StaticResource DiscoveryListItemStyle}">
                                                             <Border.InputBindings>
                                                                 <MouseBinding MouseAction="LeftClick"
                                                                               Command="{Binding DataContext.OpenSearchMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                               CommandParameter="{Binding}" />
                                                             </Border.InputBindings>
-                                                            <Grid>
+                                                            <Grid MinHeight="92">
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="76" />
-                                                                    <ColumnDefinition Width="14" />
+                                                                    <ColumnDefinition Width="16" />
                                                                     <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="16" />
+                                                                    <ColumnDefinition Width="128" />
                                                                 </Grid.ColumnDefinitions>
 
                                                                 <Border Width="76"
-                                                                        Height="108"
-                                                                        CornerRadius="12"
-                                                                        Background="{DynamicResource BrushSurfaceAlt}">
-                                                                    <Grid>
-                                                                        <Control IsHitTestVisible="False"
-                                                                                 Template="{StaticResource PosterPlaceholderTemplate}" />
-                                                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
-                                                                               Stretch="UniformToFill" />
-                                                                    </Grid>
+                                                                        Height="62"
+                                                                        VerticalAlignment="Center"
+                                                                        Style="{StaticResource DiscoveryAccentBadgeStyle}">
+                                                                    <TextBlock Text="{Binding RatingBadgeText}"
+                                                                               TextAlignment="Center"
+                                                                               TextWrapping="Wrap"
+                                                                               Style="{StaticResource DiscoveryBadgeTextStyle}" />
                                                                 </Border>
 
                                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding TitleWithOriginalText}"
                                                                                TextTrimming="CharacterEllipsis"
                                                                                Style="{StaticResource SectionTitleTextStyle}" />
+                                                                    <WrapPanel Margin="0,6,0,0">
+                                                                        <TextBlock Margin="0,0,14,0"
+                                                                                   Text="{Binding YearText}"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <TextBlock Margin="0,0,14,0"
+                                                                                   Text="{Binding AvailabilityText}"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <TextBlock Text="{Binding WatchStateText}"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    </WrapPanel>
                                                                     <TextBlock Margin="0,6,0,0"
+                                                                               Text="{Binding DisplayTags}"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               Style="{StaticResource BodyTextStyle}" />
+                                                                    <TextBlock Margin="0,4,0,0"
                                                                                Text="{Binding OverviewText}"
                                                                                TextWrapping="Wrap"
                                                                                TextTrimming="CharacterEllipsis"
-                                                                               MaxHeight="42"
+                                                                               MaxHeight="34"
                                                                                Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    <WrapPanel Margin="0,8,0,0">
-                                                                        <Border Margin="0,0,8,6"
-                                                                                Padding="8,4"
-                                                                                CornerRadius="999"
-                                                                                Background="{DynamicResource BrushAccent}">
-                                                                            <TextBlock Text="{Binding AvailabilityText}"
-                                                                                       Foreground="{DynamicResource BrushOnAccent}"
-                                                                                       FontWeight="SemiBold" />
-                                                                        </Border>
-                                                                        <Border Margin="0,0,8,6"
-                                                                                Padding="8,4"
-                                                                                CornerRadius="999"
-                                                                                Background="{DynamicResource BrushSurfaceAlt}">
-                                                                            <TextBlock Text="电影" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                        </Border>
-                                                                        <TextBlock Margin="0,2,0,6"
-                                                                                   Text="{Binding DisplayTags}"
-                                                                                   TextWrapping="Wrap"
-                                                                                   Style="{StaticResource BodyTextStyle}" />
-                                                                    </WrapPanel>
                                                                 </StackPanel>
 
-                                                                <StackPanel Grid.Column="3"
-                                                                            MinWidth="118"
-                                                                            Margin="16,0,0,0"
-                                                                            VerticalAlignment="Center">
-                                                                    <TextBlock HorizontalAlignment="Right"
-                                                                               Text="{Binding RatingText}"
-                                                                               FontWeight="SemiBold"
-                                                                               Style="{StaticResource BodyTextStyle}" />
-                                                                    <TextBlock Margin="0,6,0,0"
-                                                                               HorizontalAlignment="Right"
-                                                                               Text="{Binding YearText}"
-                                                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    <Button Margin="0,10,0,0"
+                                                                <Grid Grid.Column="4">
+                                                                    <Grid.RowDefinitions>
+                                                                        <RowDefinition Height="Auto" />
+                                                                        <RowDefinition Height="8" />
+                                                                        <RowDefinition Height="Auto" />
+                                                                        <RowDefinition Height="*" />
+                                                                        <RowDefinition Height="Auto" />
+                                                                    </Grid.RowDefinitions>
+
+                                                                    <Button HorizontalAlignment="Right"
                                                                             Content="{Binding WantToWatchButtonText}"
                                                                             Command="{Binding DataContext.ToggleSearchWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                             CommandParameter="{Binding}">
                                                                         <Button.Style>
-                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource DiscoveryWantButtonStyle}">
                                                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                                                 <Style.Triggers>
                                                                                     <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
@@ -769,12 +1279,13 @@
                                                                             </Style>
                                                                         </Button.Style>
                                                                     </Button>
-                                                                    <Button Margin="0,8,0,0"
+                                                                    <Button Grid.Row="2"
+                                                                            HorizontalAlignment="Right"
                                                                             Content="{Binding AddToLibraryButtonText}"
                                                                             Command="{Binding DataContext.AddSearchMovieToLibraryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                             CommandParameter="{Binding}">
                                                                         <Button.Style>
-                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource DiscoveryWantButtonStyle}">
                                                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                                                 <Style.Triggers>
                                                                                     <DataTrigger Binding="{Binding CanAddToLibrary}" Value="True">
@@ -784,7 +1295,12 @@
                                                                             </Style>
                                                                         </Button.Style>
                                                                     </Button>
-                                                                </StackPanel>
+                                                                    <Border Grid.Row="4"
+                                                                            HorizontalAlignment="Right"
+                                                                            Style="{StaticResource DiscoveryBadgeStyle}">
+                                                                        <TextBlock Text="电影" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                                                                    </Border>
+                                                                </Grid>
                                                             </Grid>
                                                         </Border>
                                                     </DataTemplate>
@@ -797,7 +1313,7 @@
                                                 <Button MinWidth="88"
                                                         Content="上一页"
                                                         Command="{Binding GoPreviousSearchPageCommand}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
                                                            Text="{Binding SearchPageStatusText}"
@@ -805,12 +1321,17 @@
                                                 <Button MinWidth="88"
                                                         Content="下一页"
                                                         Command="{Binding GoNextSearchPageCommand}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                             </StackPanel>
                                         </StackPanel>
                                     </ScrollViewer>
 
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer x:Name="SearchTvPosterScrollViewer"
+                                                  Loaded="DiscoveryScrollViewer_Loaded"
+                                                  ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
+                                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
                                         <ScrollViewer.Style>
                                             <Style TargetType="ScrollViewer">
                                                 <Setter Property="Visibility" Value="Visible" />
@@ -846,7 +1367,7 @@
                                                         Content="上一页"
                                                         Command="{Binding GoPreviousSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoPreviousTvSearchPage}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
                                                            Text="{Binding TvSearchPageStatusText}"
@@ -855,12 +1376,17 @@
                                                         Content="下一页"
                                                         Command="{Binding GoNextSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoNextTvSearchPage}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                             </StackPanel>
                                         </StackPanel>
                                     </ScrollViewer>
 
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer x:Name="SearchTvListScrollViewer"
+                                                  Loaded="DiscoveryScrollViewer_Loaded"
+                                                  ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
+                                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
                                         <ScrollViewer.Style>
                                             <Style TargetType="ScrollViewer">
                                                 <Setter Property="Visibility" Value="Visible" />
@@ -884,89 +1410,87 @@
                                             <ItemsControl ItemsSource="{Binding SearchTvSeries}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Margin="0,0,0,12"
-                                                                Padding="12"
-                                                                IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                Style="{StaticResource CompactCardStyle}">
+                                                        <Border IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                Style="{StaticResource DiscoveryListItemStyle}">
                                                             <Border.InputBindings>
                                                                 <MouseBinding MouseAction="LeftClick"
                                                                               Command="{Binding DataContext.OpenTvSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                               CommandParameter="{Binding}" />
                                                             </Border.InputBindings>
-                                                            <Grid>
+                                                            <Grid MinHeight="92">
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="76" />
-                                                                    <ColumnDefinition Width="14" />
+                                                                    <ColumnDefinition Width="16" />
                                                                     <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="16" />
+                                                                    <ColumnDefinition Width="128" />
                                                                 </Grid.ColumnDefinitions>
 
                                                                 <Border Width="76"
-                                                                        Height="108"
-                                                                        CornerRadius="12"
-                                                                        Background="{DynamicResource BrushSurfaceAlt}">
-                                                                    <Grid>
-                                                                        <Control IsHitTestVisible="False"
-                                                                                 Template="{StaticResource PosterPlaceholderTemplate}" />
-                                                                        <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
-                                                                               Stretch="UniformToFill" />
-                                                                    </Grid>
+                                                                        Height="62"
+                                                                        VerticalAlignment="Center"
+                                                                        Style="{StaticResource DiscoveryAccentBadgeStyle}">
+                                                                    <TextBlock Text="{Binding RatingBadgeText}"
+                                                                               TextAlignment="Center"
+                                                                               TextWrapping="Wrap"
+                                                                               Style="{StaticResource DiscoveryBadgeTextStyle}" />
                                                                 </Border>
 
                                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding TitleWithOriginalText}"
                                                                                TextTrimming="CharacterEllipsis"
                                                                                Style="{StaticResource SectionTitleTextStyle}" />
+                                                                    <WrapPanel Margin="0,6,0,0">
+                                                                        <TextBlock Margin="0,0,14,0"
+                                                                                   Text="{Binding YearText}"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <TextBlock Margin="0,0,14,0"
+                                                                                   Text="{Binding SeasonCountText}"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                        <TextBlock Text="{Binding LibraryStatusText}"
+                                                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                                    </WrapPanel>
                                                                     <TextBlock Margin="0,6,0,0"
+                                                                               Text="{Binding DisplayTags}"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               Style="{StaticResource BodyTextStyle}" />
+                                                                    <TextBlock Margin="0,4,0,0"
                                                                                Text="{Binding OverviewText}"
                                                                                TextWrapping="Wrap"
                                                                                TextTrimming="CharacterEllipsis"
-                                                                               MaxHeight="42"
+                                                                               MaxHeight="34"
                                                                                Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    <WrapPanel Margin="0,8,0,0">
-                                                                        <Border Margin="0,0,8,6"
-                                                                                Padding="8,4"
-                                                                                CornerRadius="999"
-                                                                                Background="{DynamicResource BrushAccent}">
-                                                                            <TextBlock Text="{Binding AvailabilityText}"
-                                                                                       Foreground="{DynamicResource BrushOnAccent}"
-                                                                                       FontWeight="SemiBold" />
-                                                                        </Border>
-                                                                        <Border Margin="0,0,8,6"
-                                                                                Padding="8,4"
-                                                                                CornerRadius="999"
-                                                                                Background="{DynamicResource BrushSurfaceAlt}">
-                                                                            <TextBlock Text="电视剧" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                        </Border>
-                                                                        <TextBlock Margin="0,2,0,6"
-                                                                                   Text="{Binding DisplayTags}"
-                                                                                   TextWrapping="Wrap"
-                                                                                   Style="{StaticResource BodyTextStyle}" />
-                                                                    </WrapPanel>
                                                                 </StackPanel>
 
-                                                                <StackPanel Grid.Column="3"
-                                                                            MinWidth="124"
-                                                                            Margin="16,0,0,0"
-                                                                            VerticalAlignment="Center">
-                                                                    <TextBlock HorizontalAlignment="Right"
-                                                                               Text="{Binding RatingText}"
-                                                                               FontWeight="SemiBold"
-                                                                               Style="{StaticResource BodyTextStyle}" />
-                                                                    <TextBlock Margin="0,6,0,0"
-                                                                               HorizontalAlignment="Right"
-                                                                               Text="{Binding SeasonCountText}"
-                                                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    <TextBlock Margin="0,6,0,0"
-                                                                               HorizontalAlignment="Right"
-                                                                               Text="{Binding YearText}"
-                                                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                                                    <Button Margin="0,10,0,0"
+                                                                <Grid Grid.Column="4">
+                                                                    <Grid.RowDefinitions>
+                                                                        <RowDefinition Height="Auto" />
+                                                                        <RowDefinition Height="8" />
+                                                                        <RowDefinition Height="Auto" />
+                                                                        <RowDefinition Height="*" />
+                                                                        <RowDefinition Height="Auto" />
+                                                                    </Grid.RowDefinitions>
+
+                                                                    <Border HorizontalAlignment="Right">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border" BasedOn="{StaticResource DiscoveryAccentBadgeStyle}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding HasWantToWatchSeasonTag}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="想看" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                                                                    </Border>
+                                                                    <Button Grid.Row="2"
+                                                                            HorizontalAlignment="Right"
                                                                             Content="{Binding AddToLibraryButtonText}"
                                                                             Command="{Binding DataContext.AddTvSeriesToLibraryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                             CommandParameter="{Binding}">
                                                                         <Button.Style>
-                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource DiscoveryWantButtonStyle}">
                                                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                                                 <Style.Triggers>
                                                                                     <DataTrigger Binding="{Binding CanAddToLibrary}" Value="True">
@@ -976,7 +1500,12 @@
                                                                             </Style>
                                                                         </Button.Style>
                                                                     </Button>
-                                                                </StackPanel>
+                                                                    <Border Grid.Row="4"
+                                                                            HorizontalAlignment="Right"
+                                                                            Style="{StaticResource DiscoveryBadgeStyle}">
+                                                                        <TextBlock Text="电视剧" Style="{StaticResource DiscoveryBadgeTextStyle}" />
+                                                                    </Border>
+                                                                </Grid>
                                                             </Grid>
                                                         </Border>
                                                     </DataTemplate>
@@ -990,7 +1519,7 @@
                                                         Content="上一页"
                                                         Command="{Binding GoPreviousSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoPreviousTvSearchPage}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
                                                            Text="{Binding TvSearchPageStatusText}"
@@ -999,7 +1528,7 @@
                                                         Content="下一页"
                                                         Command="{Binding GoNextSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoNextTvSearchPage}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                                        Style="{StaticResource DiscoveryToolbarButtonStyle}" />
                                             </StackPanel>
                                         </StackPanel>
                                     </ScrollViewer>
@@ -1008,8 +1537,8 @@
                         </Border>
                     </Grid>
                 </TabItem>
-                <TabItem Header="榜单" Style="{StaticResource ModernTabItemStyle}">
-                    <Grid Margin="0,18,0,0">
+                <TabItem Header="榜单" Style="{StaticResource DiscoveryTabItemStyle}">
+                    <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="14" />
@@ -1090,8 +1619,12 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <ScrollViewer x:Name="RankingScrollViewer"
+                                <ScrollViewer x:Name="RankingMovieScrollViewer"
                                               Grid.Row="0"
+                                              Loaded="DiscoveryScrollViewer_Loaded"
+                                              ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
+                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                              HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto">
                                     <ScrollViewer.Style>
                                         <Style TargetType="ScrollViewer">
@@ -1431,7 +1964,12 @@
 
                                     </StackPanel>
                                 </ScrollViewer>
-                                <ScrollViewer Grid.Row="0"
+                                <ScrollViewer x:Name="RankingTvScrollViewer"
+                                              Grid.Row="0"
+                                              Loaded="DiscoveryScrollViewer_Loaded"
+                                              ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
+                                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                              HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto">
                                     <ScrollViewer.Style>
                                         <Style TargetType="ScrollViewer">
@@ -1760,11 +2298,10 @@
                         </Border>
                     </Grid>
                 </TabItem>
-                <TabItem Header="AI 推荐" Style="{StaticResource ModernTabItemStyle}">
-                    <ContentControl Margin="0,18,0,0"
+                <TabItem Header="AI" Style="{StaticResource DiscoveryTabItemStyle}">
+                    <ContentControl
                                     Content="{Binding AiRecommendationViewModel}" />
                 </TabItem>
-            </TabControl>
-        </Grid>
-    </Border>
+        </TabControl>
+    </Grid>
 </UserControl>

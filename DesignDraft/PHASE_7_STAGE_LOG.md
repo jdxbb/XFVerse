@@ -1062,7 +1062,7 @@ Completed:
 - Read the current Phase 7 plan, Phase 7 known issues, movie-discovery product docs, page specs, relevant Discovery / Recommendation / Home / Media Library XAML and ViewModel code, shared UI rule docs, and the referenced Discovery / Media Library screenshots.
 - Added the single Phase 7.4 execution plan at `docs/movie-discovery/PHASE_7_4_DISCOVERY_PLAN.md`.
 - Split 7.4 into search toolbar/modes/filters/layout state, search result cards, ranking tab, AI recommendation tab/preference dialog, and Discovery regression closeout.
-- Captured the user-confirmed search requirements: media-library-like search/filter UI, no search-card progress bar, top-left Movie/TV tag, top-right `+ 想看`, rating badge reuse from Home AI recommendation, Discovery-specific result copy, no `已移出媒体库` button, TV search-method option, dynamic placeholders, and list-row upper-right want action.
+- Captured the user-confirmed search requirements: media-library-like search/filter UI, no search-card progress bar, top-left Movie/TV tag, Movie top-right `+ 想看`, TV `想看` tag only when at least one season is want-to-watch, rating badge treatment, Discovery-specific result copy, no `已移出媒体库` button, TV search-method option, dynamic placeholders, and list-row upper-right state/action placement.
 - Added per-substage required-reading lists, reusable component references, similar-page references, UI-rule references, output requirements, acceptance criteria, business-logic accounting and non-stage-page accounting.
 - Linked the detailed plan from `DesignDraft/PHASE_7_PLAN.md`.
 
@@ -1119,7 +1119,7 @@ Non-stage page changes:
 
 Not done:
 
-- 7.4b full search UI visual alignment is not complete: toolbar/filter styling, result summary layout, scroll/density polish, final poster/list card badge placement, top-right want action in list rows and Home AI rating badge reuse remain next-stage work.
+- At 7.4a closeout, the full search UI visual pass was deferred to 7.4b. 7.4b later completed the structural toolbar / filter / result-card pass, while exact media-library visual parity remains Deferred by current user instruction.
 - Ranking tab and AI recommendation tab were not changed.
 - No database update, commit or push was executed.
 
@@ -1130,3 +1130,50 @@ Validation:
 Suggested commit message:
 
 - `Implement discovery search layout and TV person search`
+
+### 7.4b - Search UI Visual Alignment
+
+Completed:
+
+- Replaced the Discovery search toolbar baseline with a media-library-like compact button / ContextMenu structure while keeping Discovery-specific Movie / TV field sets.
+- Kept search result status and summary copy on the Discovery-specific active search messages.
+- Reworked search result containers, poster cards and list rows for Movie and TV.
+- Movie search cards now have no progress bar, show a top-left `电影` tag, a top-right want-state action, rating badge treatment and conditional add-to-library action.
+- TV search cards now have no progress bar, show a top-left `电视剧` tag, and show a `想看` tag only when at least one season is want-to-watch. They do not expose a TV `+ 想看` action.
+- Movie list rows keep the right-bottom `电影` tag and use the upper-right slot for the Movie want-state action.
+- TV list rows keep the right-bottom `电视剧` tag and use the upper-right slot only for the conditional `想看` season-state tag.
+- Added page-local search UI styles and a page-local ContextMenu opener. No shared Home, Recommendation or Media Library resource was edited.
+
+Acceptance:
+
+- Search toolbar / filter controls follow the media-library button/menu structure without changing Discovery filter semantics.
+- Poster search cards have no progress bar and no `已移出媒体库` action.
+- Movie search cards expose want-state actions in poster and list layouts.
+- TV search cards do not expose a `+ 想看` action; `想看` is only a conditional label for existing want-to-watch seasons.
+- Rating badges are visible in poster and list layouts.
+- List rows retain Movie / TV right-bottom type labels and do not use that slot for source labels.
+- Exact media-library visual parity is not claimed for this pass; button size, layout-toggle placement, search input size, search icon treatment and dropdown menu styling remain Deferred per user instruction.
+
+Business logic changes:
+
+- No search service, TMDB request, recommendation, scan, schema, migration, database update, media-library visibility or player behavior changed.
+- UI binding/projection only: search filter selection commands for menu controls, short rating badge projection and a TV want-season tag projection.
+
+Non-stage page changes:
+
+- None. Home, Media Library, Recommendation, Detail, Player and Settings pages were not edited.
+
+Not done:
+
+- Ranking tab visual consistency remains 7.4c.
+- AI recommendation tab and preference dialog polish remain 7.4d.
+- Exact media-library visual parity for Discovery search controls remains deferred by current user instruction.
+- No database update, commit or push was executed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Suggested commit message:
+
+- `Align discovery search UI visuals`

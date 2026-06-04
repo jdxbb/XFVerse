@@ -104,8 +104,12 @@ public sealed class TvSeriesSeasonListItem
     public string SeasonDisplayText => SeasonNumber == 0 ? "特别篇" : $"第{SeasonNumber}季";
 
     public string SeasonNameDisplayText => TvDetailDisplayText.ShouldHideSeasonName(SeasonDisplayText, Name)
-        ? string.Empty
-        : Name;
+        ? UnidentifiedSeasonSuffix
+        : $"{Name}{UnidentifiedSeasonSuffix}";
+
+    public bool IsUnidentified => IdentificationStatus == IdentificationStatus.Failed || !TmdbSeasonId.HasValue;
+
+    private string UnidentifiedSeasonSuffix => IsUnidentified ? "（未识别）" : string.Empty;
 
     public string ProgressText => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount}";
 

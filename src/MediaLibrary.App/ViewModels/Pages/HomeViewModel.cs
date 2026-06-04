@@ -35,6 +35,7 @@ public sealed class HomeViewModel : PageViewModelBase
     private bool _isContinuingPlayback;
     private bool _isActive;
     private bool _refreshPendingOnActivate;
+    private int _recommendationRefreshVersion;
 
     public HomeViewModel(
         IHomeDashboardQueryService dashboardQueryService,
@@ -144,11 +145,8 @@ public sealed class HomeViewModel : PageViewModelBase
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         _isActive = true;
-        if (_refreshPendingOnActivate)
-        {
-            _refreshPendingOnActivate = false;
-            SetHasLoadedDashboard(false);
-        }
+        var forceRefresh = _refreshPendingOnActivate;
+        _refreshPendingOnActivate = false;
 
         if (IsRefreshing)
         {
@@ -156,7 +154,7 @@ public sealed class HomeViewModel : PageViewModelBase
             return;
         }
 
-        if (_hasLoadedDashboard)
+        if (_hasLoadedDashboard && !forceRefresh)
         {
             ApplyActivePlaybackState();
             ContinuePlaybackCommand.RaiseCanExecuteChanged();
@@ -214,6 +212,12 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private async Task SafeRefreshByReasonAsync(AppDataChangeReason reason)
     {
+        if (!_isActive)
+        {
+            _refreshPendingOnActivate = true;
+            return;
+        }
+
         try
         {
             await RefreshByReasonAsync(reason);
@@ -236,6 +240,12 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private async Task RefreshByReasonAsync(AppDataChangeReason reason)
     {
+        if (!_isActive)
+        {
+            _refreshPendingOnActivate = true;
+            return;
+        }
+
         if (!_hasLoadedDashboard)
         {
             await ActivateAsync();
@@ -276,7 +286,6 @@ public sealed class HomeViewModel : PageViewModelBase
         var failures = new List<string>();
         await TryRefreshAsync("片库概览", () => RefreshLibraryOverviewAsync(cancellationToken), failures);
         await TryRefreshAsync("最近播放", () => RefreshRecentPlaybackAsync(cancellationToken), failures);
-        await TryRefreshAsync("AI 推荐", () => RefreshRecommendationsAsync(cancellationToken), failures);
 
         SetHasLoadedDashboard(true);
         StatusMessage = failures.Count == 0
@@ -284,6 +293,34 @@ public sealed class HomeViewModel : PageViewModelBase
                 ? "当前片库为空，请先到扫描任务页执行扫描。"
                 : $"已加载 {MovieCount} 部影片、{SourceCount} 个播放源。"
             : $"首页部分模块刷新失败：{string.Join("、", failures)}";
+        StartRecommendationsRefresh(cancellationToken);
+    }
+
+    private void StartRecommendationsRefresh(CancellationToken cancellationToken)
+    {
+        var refreshVersion = unchecked(_recommendationRefreshVersion + 1);
+        _recommendationRefreshVersion = refreshVersion;
+        _ = RefreshRecommendationsInBackgroundAsync(refreshVersion, cancellationToken);
+    }
+
+    private async Task RefreshRecommendationsInBackgroundAsync(
+        int refreshVersion,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await RefreshRecommendationsAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (refreshVersion == _recommendationRefreshVersion)
+            {
+                StatusMessage = $"AI 推荐刷新失败：{exception.Message}";
+            }
+        }
     }
 
     private void SetHasLoadedDashboard(bool value)

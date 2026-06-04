@@ -154,8 +154,8 @@ Scope:
 - recommendation preference UI if already supported by current services.
 
 Substages:
-- 7.4a search toolbar, modes, filters and layout state;
-- 7.4b full search UI visual alignment: toolbar, filter controls, result summary, poster/list containers and cards;
+- 7.4a search toolbar, modes, filters and layout state completed;
+- 7.4b search UI structural alignment completed: toolbar, filter controls, result summary, poster/list containers and cards. Movie cards expose want-state actions; TV cards only show a `想看` tag when at least one season is want-to-watch. Exact media-library visual parity remains deferred;
 - 7.4c ranking tab visual consistency;
 - 7.4d AI recommendation tab and preference dialog polish;
 - 7.4e Discovery regression closeout.

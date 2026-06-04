@@ -12,6 +12,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
     private bool _hasWantToWatchSeason;
     private bool _hasFavoriteSeason;
     private bool _hasNotInterestedSeason;
+    private bool _isWatched;
     private bool _isVisibleInLibrary;
     private bool _hasHiddenSeason;
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
@@ -168,6 +169,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(SeasonStateSummaryText));
                 OnPropertyChanged(nameof(HasSeasonStateSummary));
+                OnPropertyChanged(nameof(HasWantToWatchSeasonTag));
             }
         }
     }
@@ -198,6 +200,18 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
         }
     }
 
+    public bool IsWatched
+    {
+        get => _isWatched;
+        private set
+        {
+            if (SetProperty(ref _isWatched, value))
+            {
+                OnPropertyChanged(nameof(WatchStateText));
+            }
+        }
+    }
+
     public string Title => Name;
 
     public string YearText => FirstAirYear?.ToString() ?? "-";
@@ -220,6 +234,8 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
     public string LibraryStatusText => IsInLibrary
         ? InLibrarySeasonCount > 0 ? $"有播放源 {InLibrarySeasonCount} 季" : "有播放源"
         : "无播放源";
+
+    public string WatchStateText => IsWatched ? "已看" : "未看";
 
     public string SeasonCountText
     {
@@ -247,6 +263,10 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             return $"TMDB 剧集评分 {TmdbRating.Value:0.0}{voteText}";
         }
     }
+
+    public string RatingBadgeText => TmdbRating is > 0 ? TmdbRating.Value.ToString("0.0") : "暂无评分";
+
+    public bool HasWantToWatchSeasonTag => HasWantToWatchSeason;
 
     public string SeasonStateSummaryText
     {
@@ -286,6 +306,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
         HasHiddenSeason = status.HasHiddenSeason;
         LibraryVisibilityState = status.LibraryVisibilityState;
         InLibrarySeasonCount = status.InLibrarySeasonCount;
+        IsWatched = status.IsWatched;
         HasWantToWatchSeason = status.HasWantToWatchSeason;
         HasFavoriteSeason = status.HasFavoriteSeason;
         HasNotInterestedSeason = status.HasNotInterestedSeason;

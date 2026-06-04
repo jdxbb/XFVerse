@@ -105,6 +105,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private readonly HashSet<string> _queuedRefreshReasons = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _attemptedMovieCrewHydrationIds = [];
     private readonly Dictionary<string, int> _listHydrationAttempts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ListRatingOverride> _listRatingOverrides = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _refreshDebounceCts;
     private CancellationTokenSource? _listHydrationCts;
     private Task? _refreshLoopTask;
@@ -142,6 +143,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     private bool _isManualAggregationDialogOpen;
     private bool _preserveRemovedLibraryPanelOnDeactivate;
     private bool _isManualAggregationBusy;
+    private double _posterScrollOffset;
+    private double _listScrollOffset;
     private string _statusMessage = "正在加载媒体库...";
     private string _batchResultSummary = string.Empty;
     private string _manualAggregationSeriesTitle = string.Empty;
@@ -700,6 +703,18 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     public bool ShowLibraryEmptyState => !IsLibraryInitialLoading && !HasMovies;
 
+    public double PosterScrollOffset
+    {
+        get => _posterScrollOffset;
+        set => SetProperty(ref _posterScrollOffset, Math.Max(0d, value));
+    }
+
+    public double ListScrollOffset
+    {
+        get => _listScrollOffset;
+        set => SetProperty(ref _listScrollOffset, Math.Max(0d, value));
+    }
+
     public string EmptyStateTitle => _allMovies.Count == 0
         ? "媒体库暂无内容"
         : "没有匹配结果";
@@ -1141,7 +1156,8 @@ public sealed class LibraryViewModel : PageViewModelBase
                 token => HydrateTvListMetadataAsync(item, token));
 
             if (viewModel is not null
-                && NeedsTvListRating(item))
+                && NeedsTvListRating(item)
+                && !TryGetListRatingOverride(item, out _))
             {
                 TryAddListFieldHydrationCandidate(
                     candidates,
@@ -1322,8 +1338,38 @@ public sealed class LibraryViewModel : PageViewModelBase
             return false;
         }
 
+        var ratingOverride = new ListRatingOverride(weightedRating.Value, "TMDB/IMDb");
+        _listRatingOverrides[BuildTvRatingHydrationKey(item)] = ratingOverride;
         await Application.Current.Dispatcher.InvokeAsync(
-            () => viewModel.ApplyRatingOverride(weightedRating.Value, "TMDB/IMDb"));
+            () => viewModel.ApplyRatingOverride(ratingOverride.Value, ratingOverride.SourceName));
+        return false;
+    }
+
+    private LibraryMovieItemViewModel CreateLibraryItemViewModel(LibraryMovieListItem movie)
+    {
+        var selectionKey = BuildSelectionKey(movie);
+        var viewModel = new LibraryMovieItemViewModel(
+            movie,
+            selectionKey,
+            IsBatchSelectionMode,
+            _selectedItemKeys.Contains(selectionKey));
+
+        if (TryGetListRatingOverride(movie, out var ratingOverride))
+        {
+            viewModel.ApplyRatingOverride(ratingOverride.Value, ratingOverride.SourceName);
+        }
+
+        return viewModel;
+    }
+
+    private bool TryGetListRatingOverride(LibraryMovieListItem item, out ListRatingOverride ratingOverride)
+    {
+        if (NeedsTvListRating(item))
+        {
+            return _listRatingOverrides.TryGetValue(BuildTvRatingHydrationKey(item), out ratingOverride);
+        }
+
+        ratingOverride = default;
         return false;
     }
 
@@ -2620,15 +2666,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         ReconcileSelectionWithVisibleItems(filtered);
 
         var viewModels = filtered
-            .Select(movie =>
-            {
-                var selectionKey = BuildSelectionKey(movie);
-                return new LibraryMovieItemViewModel(
-                    movie,
-                    selectionKey,
-                    IsBatchSelectionMode,
-                    _selectedItemKeys.Contains(selectionKey));
-            })
+            .Select(CreateLibraryItemViewModel)
             .ToList();
         Movies.ReplaceAll(viewModels);
         ScheduleVisibleListFieldHydration(filtered, viewModels);
@@ -4578,6 +4616,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     private sealed record ListFieldHydrationCandidate(
         string Key,
         Func<CancellationToken, Task<bool>> HydrateAsync);
+
+    private readonly record struct ListRatingOverride(double Value, string SourceName);
 
     private sealed record BatchItemError(string SelectionKey, string Title, string Message);
 }

@@ -1040,6 +1040,11 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .Where(season => visibleSeasonIds.Contains(season.SeasonId))
                         .Select(season => metricsBySeason[season.SeasonId])
                         .ToList();
+                    var visibleCollectionStates = seasons
+                        .Where(season => visibleSeasonIds.Contains(season.SeasonId))
+                        .Select(season => stateBySeason.TryGetValue(season.SeasonId, out var state) ? state : null)
+                        .Where(state => state is not null)
+                        .ToList();
                     var displayMetrics = displaySeasons
                         .Select(season => metricsBySeason[season.SeasonId])
                         .ToList();
@@ -1101,6 +1106,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasLibraryContext = isVisibleInLibrary,
                         HasUserState = hasState || hasWatchedEpisodeState,
                         IsInLibrary = hasActiveSource,
+                        IsFavorite = visibleCollectionStates.Any(state => state!.IsFavorite),
+                        IsWantToWatch = visibleCollectionStates.Any(state => state!.IsWantToWatch),
+                        IsNotInterested = visibleCollectionStates.Any(state => state!.IsNotInterested),
                         IsWatched = isWatched,
                         SeasonCount = displaySeasons.Count,
                         WatchedSeasonCount = watchedSeasonCount,

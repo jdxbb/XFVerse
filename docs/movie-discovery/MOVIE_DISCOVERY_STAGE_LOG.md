@@ -1,5 +1,32 @@
 # 影片发现阶段日志
 
+## Phase 7.4b 媒体库一致性修复
+
+完成内容：
+
+- 移除影片发现页内重复标题和整页外层卡片背景，副标题改为草图文案 `遇见更多适合你的影片`。
+- 顶层 Tab 改为标题栏下方横线上的左对齐轻量样式；当前 Tab 使用强调色文字和同色下划线，搜索 Tab 使用短文案 `影片` 避免重复 Shell 页面标题。
+- 影片搜索工具栏补齐媒体库式紧凑输入框、输入清空、搜索图标、顺序图标、右侧三控件网格、菜单圆角壳、菜单居中打开和再次点击关闭逻辑。
+- 搜索结果圆角区域第一行对齐媒体库：左侧为状态 / 摘要，右侧为海报 / 列表分段切换；实际结果或空状态从第二行开始。
+- 搜索海报卡片密度收紧到媒体库式 180x270 基准，避免搜索结果列数明显少于媒体库。
+- 搜索结果和榜单主滚动区接入隐藏式 6px 垂直滚动条自动显隐，横向滚动禁用。
+- Movie / TV 的地区、语言、收藏状态改为多选筛选；Movie 和 TV 均拆分观看状态、播放源、收藏状态。
+- 搜索方式和媒介文案改为 `搜索方式：电影 / 人物`、`搜索方式：电视剧 / 人物`、`影视：电影 / 电视剧`。
+- `清除筛选` 只重置筛选，不清空搜索词和当前结果池。
+- 搜索结果区和榜单内容区新增当前软件运行会话内滚动位置恢复；导航离开和详情返回保留位置，新搜索 / 翻页 / 榜单重载回到顶部，重启后自然清零。
+- TV 搜索卡片新增 Series 观看状态投影，作为 TV 观看状态筛选依据；TV 仍不进入 AI 推荐、Watch Insights、画像、观影人格或推荐 fingerprint。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- 本轮按用户提供的媒体库 / 影片发现截图做静态对照；用户明确已截图后未再额外启动软件截图。
+
+未做事项：
+
+- 榜单 Tab 的完整视觉重做仍按 7.4c 处理。
+- AI 推荐 Tab 和推荐偏好弹窗仍按 7.4d 处理。
+- 未新增数据库字段、未新增 migration、未执行 database update。
+
 ## Phase 4.18 Phase 4 Discovery Regression Note
 
 - Movie Discovery remains the default discovery surface for Movie search, person search, Movie rankings, Movie detail navigation, no-source Movie detail, and Movie-side collection actions.
@@ -949,6 +976,43 @@ Non-stage page changes:
 
 - None. No Home, Media Library, Recommendation, Detail, Player or Settings page was edited.
 - Shared DI registration was updated for the new Discovery preference service.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Discovery Search UI Visual Alignment
+
+Completed:
+
+- Discovery search toolbar now uses a local media-library-like structure with compact buttons and ContextMenu filters for media type, search method, genre, region, watch/source status, sort direction, sort option, decade, language, clear filters and layout switching.
+- Existing Discovery Movie / TV filter option sets are reused; menu selection writes only to the existing `Selected*` filter properties.
+- Search result status and summary continue to use Discovery-specific active search messages rather than media-library summaries.
+- Movie poster search cards now remove the media-library progress bar, show the `电影` type tag, keep the top-right want action, show a rating badge, and retain the conditional add-to-library action.
+- TV poster search cards now remove the progress bar, show the `电视剧` type tag, show a `想看` tag only when at least one season is marked want-to-watch, and do not expose a TV `+ 想看` action.
+- Movie list rows now use a rating block, central title/status/tag copy, a top-right want action, conditional add-to-library action and a bottom-right `电影` tag.
+- TV list rows now use a rating block, central title/season/library/tag copy, a top-right `想看` tag only for series with want-to-watch seasons, conditional add-to-library action and a bottom-right `电视剧` tag.
+- Discovery page-local XAML styles and a page-local left-click ContextMenu opener were added; Home, Recommendations and Media Library pages were not changed.
+
+Acceptance:
+
+- Search toolbar and filters follow the media-library compact button/menu structure while keeping Discovery-specific fields.
+- Poster cards have no progress bar and no `已移出媒体库` action.
+- Movie cards expose the want-to-watch action in the expected top-right location.
+- TV cards do not expose a `+ 想看` action; the `想看` label appears only when `HasWantToWatchSeasonTag` is true.
+- Rating labels are visible in poster and list layouts.
+- List rows keep the Movie / TV type label at the right-bottom position and no longer use that right-side slot for source labels.
+- Source and add-to-library state remain represented without creating media files, playback sources or visibility side effects.
+- Exact media-library visual parity is not claimed for this pass; button size, layout-toggle placement, search input size, search icon treatment and dropdown menu styling remain Deferred per user instruction.
+
+Business logic changes:
+
+- No search-service, TMDB, recommendation, scan, schema, migration, database update or media-library visibility business logic was changed.
+- UI binding/projection only: added search filter selection commands for the button menus, short rating badge projection and a TV want-season tag projection.
+
+Non-stage page changes:
+
+- None. No Home, Recommendation, Media Library, Detail, Player or Settings page was edited.
 
 Validation:
 

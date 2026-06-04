@@ -33,7 +33,8 @@
                   Height="34">
                 <Ellipse Stroke="#66F7F7F5"
                          StrokeThickness="3" />
-                <Path Data="M17,2 A15,15 0 0 1 32,17"
+                <Path x:Name="SpinnerArc"
+                      Data="M17,2 A15,15 0 0 1 32,17"
                       Stroke="{DynamicResource BrushAccent}"
                       StrokeThickness="3"
                       StrokeStartLineCap="Round"
@@ -42,45 +43,54 @@
                         <RotateTransform CenterX="17"
                                          CenterY="17" />
                     </Path.RenderTransform>
-                    <Path.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
-                                                     From="0"
-                                                     To="360"
-                                                     Duration="0:0:0.9" />
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Path.Triggers>
                 </Path>
             </Grid>
         </Viewbox>
+        <ControlTemplate.Triggers>
+            <Trigger Property="Visibility" Value="Visible">
+                <Trigger.EnterActions>
+                    <BeginStoryboard x:Name="PosterSpinnerRotationStoryboard">
+                        <Storyboard RepeatBehavior="Forever">
+                            <DoubleAnimation Storyboard.TargetName="SpinnerArc"
+                                             Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
+                                             From="0"
+                                             To="360"
+                                             Duration="0:0:0.9" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <StopStoryboard BeginStoryboardName="PosterSpinnerRotationStoryboard" />
+                </Trigger.ExitActions>
+            </Trigger>
+        </ControlTemplate.Triggers>
     </ControlTemplate>
 
     <Style x:Key="PosterPlaceholderLoadingIndicatorStyle" TargetType="Control">
         <Setter Property="Visibility" Value="Visible" />
         <Style.Triggers>
-            <DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Loaded">
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Loaded">
                 <Setter Property="Visibility" Value="Collapsed" />
             </DataTrigger>
-            <DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Empty">
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Empty">
                 <Setter Property="Visibility" Value="Collapsed" />
             </DataTrigger>
-            <DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Failed">
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Failed">
                 <Setter Property="Visibility" Value="Collapsed" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
 
     <Style x:Key="PosterPlaceholderNoPosterLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource PosterPlaceholderLabelTextStyle}">
+        <Setter Property="Text" Value="无海报" />
         <Setter Property="Visibility" Value="Collapsed" />
         <Style.Triggers>
-            <DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Empty">
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Empty">
+                <Setter Property="Text" Value="无海报" />
                 <Setter Property="Visibility" Value="Visible" />
             </DataTrigger>
-            <DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Failed">
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:PosterCacheImageBehavior.LoadState)}" Value="Failed">
+                <Setter Property="Text" Value="加载失败" />
                 <Setter Property="Visibility" Value="Visible" />
             </DataTrigger>
         </Style.Triggers>
@@ -107,7 +117,6 @@
                          Template="{StaticResource PosterLoadingSpinnerTemplate}" />
                 <TextBlock Grid.Row="1"
                            HorizontalAlignment="Center"
-                           Text="无海报"
                            Style="{StaticResource PosterPlaceholderNoPosterLabelStyle}" />
             </Grid>
         </Grid>
@@ -134,7 +143,6 @@
                 <TextBlock Grid.Row="1"
                            HorizontalAlignment="Center"
                            FontSize="22"
-                           Text="无海报"
                            Style="{StaticResource PosterPlaceholderNoPosterLabelStyle}" />
             </Grid>
         </Grid>
@@ -156,7 +164,6 @@
                 <TextBlock HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            FontSize="26"
-                           Text="无海报"
                            Style="{StaticResource PosterPlaceholderNoPosterLabelStyle}" />
             </Grid>
         </Grid>

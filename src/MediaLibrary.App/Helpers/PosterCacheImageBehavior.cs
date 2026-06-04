@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -49,6 +50,13 @@ public static class PosterCacheImageBehavior
             typeof(string),
             typeof(PosterCacheImageBehavior),
             new PropertyMetadata(string.Empty, OnImageRequestOptionChanged));
+
+    public static readonly DependencyProperty PropagateLoadStateProperty =
+        DependencyProperty.RegisterAttached(
+            "PropagateLoadState",
+            typeof(bool),
+            typeof(PosterCacheImageBehavior),
+            new PropertyMetadata(true));
 
     public static readonly DependencyProperty LoadStateProperty =
         DependencyProperty.RegisterAttached(
@@ -118,6 +126,16 @@ public static class PosterCacheImageBehavior
     public static void SetPreferredTmdbImageSize(DependencyObject target, string value)
     {
         target.SetValue(PreferredTmdbImageSizeProperty, value);
+    }
+
+    public static bool GetPropagateLoadState(DependencyObject target)
+    {
+        return (bool)target.GetValue(PropagateLoadStateProperty);
+    }
+
+    public static void SetPropagateLoadState(DependencyObject target, bool value)
+    {
+        target.SetValue(PropagateLoadStateProperty, value);
     }
 
     public static string GetLoadState(DependencyObject target)
@@ -389,15 +407,22 @@ public static class PosterCacheImageBehavior
     {
         image.SetCurrentValue(LoadStateProperty, state);
 
-        var parent = GetParent(image);
-        if (parent is not null)
+        var shouldPropagate = GetPropagateLoadState(image);
+        var host = shouldPropagate ? GetParent(image) : null;
+        var syncedElementCount = 0;
+        if (host is not null)
         {
-            parent.SetCurrentValue(LoadStateProperty, state);
-            SetDescendantControlLoadState(parent, state);
-            return;
+            host.SetCurrentValue(LoadStateProperty, state);
+            syncedElementCount = SetDescendantElementLoadState(host, state);
+        }
+        else if (shouldPropagate)
+        {
+            EnsureLoadStateSyncOnLoaded(image);
         }
 
-        EnsureLoadStateSyncOnLoaded(image);
+        PosterCacheDiagnostics.Write(
+            "ui-load-state",
+            $"image={RuntimeHelpers.GetHashCode(image):x} state={state} source={PosterCacheDiagnostics.SourceId(GetSource(image))} version={GetRequestVersion(image)} propagate={shouldPropagate} host={host?.GetType().Name ?? "none"} syncedElements={syncedElementCount}");
     }
 
     private static void EnsureLoadStateSyncOnLoaded(Image image)
@@ -423,15 +448,19 @@ public static class PosterCacheImageBehavior
         SetImageLoadState(image, GetLoadState(image));
     }
 
-    private static void SetDescendantControlLoadState(DependencyObject root, string state)
+    private static int SetDescendantElementLoadState(DependencyObject root, string state)
     {
+        var count = 0;
         foreach (var descendant in EnumerateDescendants(root))
         {
-            if (descendant is Control control)
+            if (descendant is FrameworkElement element)
             {
-                control.SetCurrentValue(LoadStateProperty, state);
+                element.SetCurrentValue(LoadStateProperty, state);
+                count++;
             }
         }
+
+        return count;
     }
 
     private static DependencyObject? GetParent(DependencyObject current)

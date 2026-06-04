@@ -36,6 +36,8 @@ public partial class LibraryPage : UserControl
     private long _scrollDiagnosticsTotalTicks;
     private long _scrollDiagnosticsMaxTicks;
     private long _lastScrollDiagnosticsTimestamp;
+    private bool _isRestoringLibraryScrollOffset;
+    private int _libraryScrollApplyVersion;
 
     public LibraryPage()
     {
@@ -44,6 +46,8 @@ public partial class LibraryPage : UserControl
         Unloaded += OnUnloaded;
         DataContextChanged += OnDataContextChanged;
         IsVisibleChanged += OnIsVisibleChanged;
+        PosterLibraryListBox.Loaded += OnLibraryItemsListBoxLoaded;
+        ListLibraryListBox.Loaded += OnLibraryItemsListBoxLoaded;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -51,10 +55,17 @@ public partial class LibraryPage : UserControl
         AttachLibraryState();
         AttachShellState();
         UpdateToolbarSearchWidth();
+        QueueApplyLibraryScrollOffset();
+    }
+
+    private void OnLibraryItemsListBoxLoaded(object sender, RoutedEventArgs e)
+    {
+        QueueApplyLibraryScrollOffset();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        StoreCurrentLibraryScrollOffsets();
         CloseRemovedLibraryPanelIfOpen();
         DetachLibraryState();
         DetachShellState();
@@ -71,8 +82,12 @@ public partial class LibraryPage : UserControl
     {
         if (e.NewValue is false)
         {
+            StoreCurrentLibraryScrollOffsets();
             CloseRemovedLibraryPanelIfOpen();
+            return;
         }
+
+        QueueApplyLibraryScrollOffset();
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -80,6 +95,7 @@ public partial class LibraryPage : UserControl
         DetachLibraryState();
         AttachLibraryState();
         UpdateToolbarSearchWidth();
+        QueueApplyLibraryScrollOffset();
     }
 
     private void OnRootPreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -290,6 +306,7 @@ public partial class LibraryPage : UserControl
                 return;
             }
 
+            StoreLibraryScrollOffset(source, e.VerticalOffset);
             var scrollBar = GetOrCacheVerticalScrollBar(source);
             if (scrollBar is null)
             {
@@ -526,6 +543,147 @@ public partial class LibraryPage : UserControl
         {
             UpdateToolbarSearchWidth();
         }
+
+        if (e.PropertyName is nameof(LibraryViewModel.IsPosterView)
+            or nameof(LibraryViewModel.IsListView)
+            or nameof(LibraryViewModel.HasMovies)
+            or nameof(LibraryViewModel.ShowLibraryInitialLoading)
+            or nameof(LibraryViewModel.ShowLibraryEmptyState))
+        {
+            StoreCurrentLibraryScrollOffsets();
+            QueueApplyLibraryScrollOffset();
+        }
+    }
+
+    private void StoreLibraryScrollOffset(DependencyObject source, double verticalOffset)
+    {
+        if (_isRestoringLibraryScrollOffset || DataContext is not LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(source, PosterLibraryListBox))
+        {
+            viewModel.PosterScrollOffset = verticalOffset;
+        }
+        else if (ReferenceEquals(source, ListLibraryListBox))
+        {
+            viewModel.ListScrollOffset = verticalOffset;
+        }
+    }
+
+    private void StoreCurrentLibraryScrollOffsets()
+    {
+        if (_isRestoringLibraryScrollOffset || DataContext is not LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        StoreCurrentLibraryScrollOffset(PosterLibraryListBox, offset => viewModel.PosterScrollOffset = offset);
+        StoreCurrentLibraryScrollOffset(ListLibraryListBox, offset => viewModel.ListScrollOffset = offset);
+    }
+
+    private void StoreCurrentLibraryScrollOffset(ListBox listBox, Action<double> storeOffset)
+    {
+        var scrollViewer = FindVisualChildren<ScrollViewer>(listBox).FirstOrDefault();
+        if (scrollViewer is not null)
+        {
+            storeOffset(scrollViewer.VerticalOffset);
+        }
+    }
+
+    private void QueueApplyLibraryScrollOffset()
+    {
+        if (DataContext is not LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        _isRestoringLibraryScrollOffset = true;
+        var applyVersion = ++_libraryScrollApplyVersion;
+        if (TryApplyLibraryScrollOffset(viewModel))
+        {
+            _ = Dispatcher.InvokeAsync(
+                () =>
+                {
+                    if (applyVersion == _libraryScrollApplyVersion)
+                    {
+                        _isRestoringLibraryScrollOffset = false;
+                    }
+                },
+                DispatcherPriority.ContextIdle);
+            return;
+        }
+
+        _ = Dispatcher.InvokeAsync(
+            () => ApplyLibraryScrollOffset(0, applyVersion),
+            DispatcherPriority.Loaded);
+    }
+
+    private void ApplyLibraryScrollOffset(int attempt, int applyVersion)
+    {
+        if (applyVersion != _libraryScrollApplyVersion)
+        {
+            return;
+        }
+
+        if (DataContext is not LibraryViewModel viewModel)
+        {
+            _isRestoringLibraryScrollOffset = false;
+            return;
+        }
+
+        if (!TryApplyLibraryScrollOffset(viewModel))
+        {
+            if (attempt < 16)
+            {
+                _ = Dispatcher.InvokeAsync(
+                    () => ApplyLibraryScrollOffset(attempt + 1, applyVersion),
+                    DispatcherPriority.ContextIdle);
+                return;
+            }
+
+            _isRestoringLibraryScrollOffset = false;
+            return;
+        }
+
+        _ = Dispatcher.InvokeAsync(
+            () =>
+            {
+                if (applyVersion == _libraryScrollApplyVersion)
+                {
+                    _isRestoringLibraryScrollOffset = false;
+                }
+            },
+            DispatcherPriority.ContextIdle);
+    }
+
+    private bool TryApplyLibraryScrollOffset(LibraryViewModel viewModel)
+    {
+        var listBox = viewModel.IsPosterView ? PosterLibraryListBox : ListLibraryListBox;
+        listBox.UpdateLayout();
+        var scrollViewer = FindVisualChildren<ScrollViewer>(listBox).FirstOrDefault();
+        if (scrollViewer is null)
+        {
+            return false;
+        }
+
+        var targetOffset = viewModel.IsPosterView
+            ? viewModel.PosterScrollOffset
+            : viewModel.ListScrollOffset;
+        targetOffset = Math.Max(0, targetOffset);
+        if (targetOffset > 0 && scrollViewer.ScrollableHeight <= 0)
+        {
+            return false;
+        }
+
+        var clampedOffset = Math.Min(targetOffset, scrollViewer.ScrollableHeight);
+        if (Math.Abs(scrollViewer.VerticalOffset - clampedOffset) > 0.5)
+        {
+            scrollViewer.ScrollToVerticalOffset(clampedOffset);
+        }
+
+        return true;
     }
 
     private void UpdateToolbarSearchWidth()

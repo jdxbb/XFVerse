@@ -39,6 +39,8 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                     series.FirstAirYear,
                     Country = series.Country ?? string.Empty,
                     Language = series.Language ?? string.Empty,
+                    EpisodeCount = series.Seasons.Sum(season => season.Episodes.Count),
+                    WatchedEpisodeCount = series.Seasons.Sum(season => season.Episodes.Count(episode => episode.IsWatched)),
                     PlayableSeasonCount = series.Seasons.Count(
                         season => season.Episodes.Any(
                             episode => episode.MediaFiles.Any(file => !file.IsDeleted))),
@@ -77,6 +79,8 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                 IsInLibrary = inLibrarySeasonCount > 0,
                 IsVisibleInLibrary = inLibrarySeasonCount > 0,
                 InLibrarySeasonCount = inLibrarySeasonCount,
+                IsWatched = group.Sum(row => row.EpisodeCount) > 0
+                            && group.Sum(row => row.WatchedEpisodeCount) >= group.Sum(row => row.EpisodeCount),
                 Name = series.Name,
                 OriginalName = series.OriginalName,
                 Overview = series.Overview,

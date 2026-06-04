@@ -20,8 +20,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const int AiRecommendationTabIndex = 2;
     private const string DiscoveryMediaTypeMovie = "电影";
     private const string DiscoveryMediaTypeTv = "电视剧";
-    private const string SearchTypeMovie = "按片名搜";
-    private const string SearchTypePerson = "按人物搜";
+    private const string SearchTypePerson = "人物";
     private const string RankingTypePopular = "热门榜";
     private const string RankingTypeTopRated = "高分榜";
     private const string RankingTypeTrending = "趋势榜";
@@ -31,6 +30,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const string TrendingWindowWeek = "week";
     private const string FilterAll = "全部";
     private const string FilterOther = "其它";
+    private const string PlaybackSourceWithSource = "有播放源";
+    private const string PlaybackSourceWithoutSource = "无播放源";
+    private const string WatchStatusWatched = "已看";
+    private const string WatchStatusUnwatched = "未看";
+    private const string CollectionStatusFavorite = "喜爱";
+    private const string CollectionStatusWantToWatch = "想看";
+    private const string CollectionStatusNotInterested = "不想看";
     private const string SortRelevance = "相关度";
     private const string SortRating = "评分";
     private const string SortPopularity = "热度";
@@ -55,6 +61,58 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const int MaxRankingMovies = 200;
     private const int RankingFirstDisplayPageSize = 21;
     private const int RankingRegularDisplayPageSize = 20;
+
+    private static readonly IReadOnlyList<string> MovieSearchTypeOptions =
+    [
+        DiscoveryMediaTypeMovie,
+        SearchTypePerson
+    ];
+
+    private static readonly IReadOnlyList<string> TvSearchTypeOptions =
+    [
+        DiscoveryMediaTypeTv,
+        SearchTypePerson
+    ];
+
+    private static readonly IReadOnlyList<string> RegionFilterLabels =
+    [
+        FilterAll,
+        "中国大陆",
+        "香港",
+        "台湾",
+        "美国",
+        "日本",
+        "韩国",
+        "英国",
+        "法国",
+        "德国",
+        "印度",
+        "泰国",
+        FilterOther
+    ];
+
+    private static readonly IReadOnlyList<string> LanguageFilterLabels =
+    [
+        FilterAll,
+        "中文",
+        "英语",
+        "日语",
+        "韩语",
+        "法语",
+        "德语",
+        "西班牙语",
+        "印地语",
+        "泰语",
+        FilterOther
+    ];
+
+    private static readonly IReadOnlyList<string> CollectionStatusFilterLabels =
+    [
+        FilterAll,
+        CollectionStatusFavorite,
+        CollectionStatusWantToWatch,
+        CollectionStatusNotInterested
+    ];
 
     private static readonly IReadOnlyDictionary<string, string[]> RegionCountryCodes = new Dictionary<string, string[]>
     {
@@ -123,6 +181,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private readonly List<DiscoveryTvSeriesCardViewModel> _rankingTvSeries = [];
     private readonly HashSet<int> _rankingTvSeriesTmdbIds = [];
     private readonly Dictionary<int, TmdbTvSeriesSearchPage> _rankingTvSeriesSourcePageCache = [];
+    private readonly HashSet<string> _selectedRegionFilters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _selectedLanguageFilters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _selectedCollectionStatusFilters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _selectedTvRegionFilters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _selectedTvLanguageFilters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _selectedTvCollectionStatusFilters = new(StringComparer.Ordinal);
 
     private CancellationTokenSource? _searchCancellationTokenSource;
     private CancellationTokenSource? _rankingCancellationTokenSource;
@@ -131,12 +195,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool _hasActivatedAiRecommendations;
     private string _searchText = string.Empty;
     private string _selectedSearchMediaType = DiscoveryMediaTypeMovie;
-    private string _selectedSearchType = SearchTypeMovie;
+    private string _selectedSearchType = DiscoveryMediaTypeMovie;
     private bool _isSearchPosterLayout = true;
     private bool _isDiscoveryPreferencesLoaded;
     private string _selectedGenreFilter = FilterAll;
     private string _selectedRegionFilter = FilterAll;
     private string _selectedWatchStatusFilter = FilterAll;
+    private string _selectedPlaybackSourceFilter = FilterAll;
+    private string _selectedCollectionStatusFilter = FilterAll;
     private string _selectedSortOption = SortRelevance;
     private string _selectedSortDirection = DirectionDescending;
     private string _selectedDecadeFilter = DecadeAll;
@@ -154,6 +220,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private int _nextSearchOrder;
     private bool _searchSourceExhausted;
     private bool _canGoToNextSearchPage;
+    private double _searchMoviePosterScrollOffset;
+    private double _searchMovieListScrollOffset;
     private string _tvSearchStatusMessage = "输入电视剧名后搜索 TMDB 电视剧。";
     private string _tvSearchSummaryText = string.Empty;
     private bool _isTvSearchLoading;
@@ -161,6 +229,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private string _selectedTvGenreFilter = FilterAll;
     private string _selectedTvRegionFilter = FilterAll;
     private string _selectedTvWatchStatusFilter = FilterAll;
+    private string _selectedTvPlaybackSourceFilter = FilterAll;
+    private string _selectedTvCollectionStatusFilter = FilterAll;
     private string _selectedTvSortOption = SortRelevance;
     private string _selectedTvSortDirection = DirectionDescending;
     private string _selectedTvDecadeFilter = DecadeAll;
@@ -174,6 +244,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private int _nextTvSearchOrder;
     private bool _tvSearchSourceExhausted;
     private bool _canGoToNextTvSearchPage;
+    private double _searchTvPosterScrollOffset;
+    private double _searchTvListScrollOffset;
     private string _selectedRankingMediaType = DiscoveryMediaTypeMovie;
     private string _selectedRankingType = RankingTypePopular;
     private string _selectedTvRankingType = RankingTypePopular;
@@ -191,6 +263,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private int _nextRankingRank;
     private bool _rankingSourceExhausted;
     private bool _canGoToNextRankingPage;
+    private double _rankingMovieScrollOffset;
     private DiscoveryMovieCardViewModel? _topRankingMovie;
     private DiscoveryTvSeriesCardViewModel? _topRankingTvSeries;
     private string _tvRankingStatusMessage = "切换到电视剧榜单后将加载 TMDB TV 热门榜。";
@@ -205,6 +278,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private int _nextTvRankingRank;
     private bool _tvRankingSourceExhausted;
     private bool _canGoToNextTvRankingPage;
+    private double _rankingTvScrollOffset;
     private int _tvSeriesOpenRequestVersion;
     private bool _isTvSeriesNavigating;
     private bool _openAiRecommendationsOnNextActivation;
@@ -222,7 +296,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         IDataRefreshService dataRefreshService,
         IConfirmationDialogService confirmationDialogService,
         IDiscoveryPreferencesService discoveryPreferencesService)
-        : base("影片发现", "搜索、榜单和 AI 推荐集中在这里。")
+        : base("影片发现", "遇见更多适合你的影片")
     {
         _aiRecommendationViewModel = aiRecommendationViewModel;
         _tmdbService = tmdbService;
@@ -238,26 +312,66 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _discoveryPreferencesService = discoveryPreferencesService;
 
         SearchMediaTypeOptions = [DiscoveryMediaTypeMovie, DiscoveryMediaTypeTv];
-        SearchTypeOptions = [SearchTypeMovie, SearchTypePerson];
         GenreFilterOptions = TmdbGenreMapper.GenreLabels;
-        RegionFilterOptions = [FilterAll, "中国大陆", "香港", "台湾", "美国", "日本", "韩国", "英国", "法国", "德国", "印度", "泰国", FilterOther];
-        WatchStatusFilterOptions = [FilterAll, "有播放源", "无播放源", "已看", "未看", "想看", "喜爱", "不想看"];
+        RegionFilterOptions = RegionFilterLabels;
+        WatchStatusFilterOptions = [FilterAll, WatchStatusWatched, WatchStatusUnwatched];
+        PlaybackSourceFilterOptions = [FilterAll, PlaybackSourceWithSource, PlaybackSourceWithoutSource];
+        CollectionStatusFilterOptions = CollectionStatusFilterLabels;
         SortOptions = [SortRelevance, SortRating, SortPopularity, SortReleaseDate, SortTitle];
         SortDirectionOptions = [DirectionDescending, DirectionAscending];
         DecadeFilterOptions = [DecadeAll, "2020s", "2010s", "2000s", "1990s", "1980s", "1970s", "1960s", DecadeEarlier];
-        LanguageFilterOptions = [FilterAll, "中文", "英语", "日语", "韩语", "法语", "德语", "西班牙语", "印地语", "泰语", FilterOther];
+        LanguageFilterOptions = LanguageFilterLabels;
         TvGenreFilterOptions = TmdbTvGenreMapper.GenreLabels;
-        TvWatchStatusFilterOptions = [FilterAll, "有播放源", "无播放源", "有想看 Season", "有喜爱 Season", "有不想看 Season"];
+        TvWatchStatusFilterOptions = [FilterAll, WatchStatusWatched, WatchStatusUnwatched];
         TvSortOptions = [SortRelevance, SortRating, SortPopularity, SortFirstAirYear, SortSeriesName];
         RankingMediaTypeOptions = [DiscoveryMediaTypeMovie, DiscoveryMediaTypeTv];
         RankingTypeOptions = [RankingTypePopular, RankingTypeTopRated, RankingTypeTrending];
         TrendingTimeOptions = [TrendingTimeDay, TrendingTimeWeek];
+        ReplaceDiscoveryFilterOptions(SearchRegionFilterMenuOptions, RegionFilterOptions);
+        ReplaceDiscoveryFilterOptions(SearchLanguageFilterMenuOptions, LanguageFilterOptions);
+        ReplaceDiscoveryFilterOptions(SearchCollectionStatusFilterMenuOptions, CollectionStatusFilterOptions);
+        ReplaceDiscoveryFilterOptions(TvSearchRegionFilterMenuOptions, RegionFilterOptions);
+        ReplaceDiscoveryFilterOptions(TvSearchLanguageFilterMenuOptions, LanguageFilterOptions);
+        ReplaceDiscoveryFilterOptions(TvSearchCollectionStatusFilterMenuOptions, CollectionStatusFilterOptions);
+        RefreshSearchRegionFilterState(applyFilters: false);
+        RefreshSearchLanguageFilterState(applyFilters: false);
+        RefreshSearchCollectionStatusFilterState(applyFilters: false);
+        RefreshTvSearchRegionFilterState(applyFilters: false);
+        RefreshTvSearchLanguageFilterState(applyFilters: false);
+        RefreshTvSearchCollectionStatusFilterState(applyFilters: false);
 
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !IsActiveSearchLoading);
         GoPreviousSearchPageCommand = new AsyncRelayCommand(GoPreviousSearchPageAsync, () => CanGoPreviousActiveSearchPage);
         GoNextSearchPageCommand = new AsyncRelayCommand(GoNextSearchPageAsync, () => CanGoNextActiveSearchPage);
         ClearSearchFiltersCommand = new RelayCommand(ClearSearchFilters);
-        SwitchSearchLayoutCommand = new RelayCommand(SwitchSearchLayout);
+        ClearSearchTextCommand = new RelayCommand(ClearSearchText, () => !string.IsNullOrEmpty(SearchText));
+        SwitchSearchToPosterLayoutCommand = new RelayCommand(() => SetSearchLayout(isPosterLayout: true));
+        SwitchSearchToListLayoutCommand = new RelayCommand(() => SetSearchLayout(isPosterLayout: false));
+        ToggleSearchSortDirectionCommand = new RelayCommand(ToggleActiveSearchSortDirection);
+        SelectSearchMediaTypeCommand = new RelayCommand(SelectSearchMediaType);
+        SelectSearchTypeCommand = new RelayCommand(SelectSearchType);
+        SelectSearchGenreFilterCommand = new RelayCommand(value => SelectedGenreFilter = GetOptionValue(value, FilterAll));
+        SelectSearchRegionFilterCommand = new RelayCommand(value => SelectedRegionFilter = GetOptionValue(value, FilterAll));
+        SelectSearchRegionMultiFilterCommand = new RelayCommand(SelectSearchRegionMultiFilter);
+        SelectSearchWatchStatusFilterCommand = new RelayCommand(value => SelectedWatchStatusFilter = GetOptionValue(value, FilterAll));
+        SelectSearchPlaybackSourceFilterCommand = new RelayCommand(value => SelectedPlaybackSourceFilter = GetOptionValue(value, FilterAll));
+        SelectSearchCollectionStatusFilterCommand = new RelayCommand(SelectSearchCollectionStatusFilter);
+        SelectSearchSortOptionCommand = new RelayCommand(value => SelectedSortOption = GetOptionValue(value, SortRelevance));
+        SelectSearchSortDirectionCommand = new RelayCommand(value => SelectedSortDirection = GetOptionValue(value, DirectionDescending));
+        SelectSearchDecadeFilterCommand = new RelayCommand(value => SelectedDecadeFilter = GetOptionValue(value, DecadeAll));
+        SelectSearchLanguageFilterCommand = new RelayCommand(value => SelectedLanguageFilter = GetOptionValue(value, FilterAll));
+        SelectSearchLanguageMultiFilterCommand = new RelayCommand(SelectSearchLanguageMultiFilter);
+        SelectTvSearchGenreFilterCommand = new RelayCommand(value => SelectedTvGenreFilter = GetOptionValue(value, FilterAll));
+        SelectTvSearchRegionFilterCommand = new RelayCommand(value => SelectedTvRegionFilter = GetOptionValue(value, FilterAll));
+        SelectTvSearchRegionMultiFilterCommand = new RelayCommand(SelectTvSearchRegionMultiFilter);
+        SelectTvSearchWatchStatusFilterCommand = new RelayCommand(value => SelectedTvWatchStatusFilter = GetOptionValue(value, FilterAll));
+        SelectTvSearchPlaybackSourceFilterCommand = new RelayCommand(value => SelectedTvPlaybackSourceFilter = GetOptionValue(value, FilterAll));
+        SelectTvSearchCollectionStatusFilterCommand = new RelayCommand(SelectTvSearchCollectionStatusFilter);
+        SelectTvSearchSortOptionCommand = new RelayCommand(value => SelectedTvSortOption = GetOptionValue(value, SortRelevance));
+        SelectTvSearchSortDirectionCommand = new RelayCommand(value => SelectedTvSortDirection = GetOptionValue(value, DirectionDescending));
+        SelectTvSearchDecadeFilterCommand = new RelayCommand(value => SelectedTvDecadeFilter = GetOptionValue(value, DecadeAll));
+        SelectTvSearchLanguageFilterCommand = new RelayCommand(value => SelectedTvLanguageFilter = GetOptionValue(value, FilterAll));
+        SelectTvSearchLanguageMultiFilterCommand = new RelayCommand(SelectTvSearchLanguageMultiFilter);
         OpenSearchMovieCommand = new AsyncRelayCommand(OpenSearchMovieAsync);
         ToggleSearchWantToWatchCommand = new AsyncRelayCommand(ToggleSearchWantToWatchAsync);
         AddSearchMovieToLibraryCommand = new AsyncRelayCommand(AddSearchMovieToLibraryAsync);
@@ -284,15 +398,31 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public ObservableCollection<DiscoveryTvRankingRowViewModel> RankingTvRows { get; } = [];
 
+    public ObservableCollection<DiscoveryFilterOption> SearchRegionFilterMenuOptions { get; } = [];
+
+    public ObservableCollection<DiscoveryFilterOption> SearchLanguageFilterMenuOptions { get; } = [];
+
+    public ObservableCollection<DiscoveryFilterOption> SearchCollectionStatusFilterMenuOptions { get; } = [];
+
+    public ObservableCollection<DiscoveryFilterOption> TvSearchRegionFilterMenuOptions { get; } = [];
+
+    public ObservableCollection<DiscoveryFilterOption> TvSearchLanguageFilterMenuOptions { get; } = [];
+
+    public ObservableCollection<DiscoveryFilterOption> TvSearchCollectionStatusFilterMenuOptions { get; } = [];
+
     public IReadOnlyList<string> SearchMediaTypeOptions { get; }
 
-    public IReadOnlyList<string> SearchTypeOptions { get; }
+    public IReadOnlyList<string> SearchTypeOptions => IsTvSearchSelected ? TvSearchTypeOptions : MovieSearchTypeOptions;
 
     public IReadOnlyList<string> GenreFilterOptions { get; }
 
     public IReadOnlyList<string> RegionFilterOptions { get; }
 
     public IReadOnlyList<string> WatchStatusFilterOptions { get; }
+
+    public IReadOnlyList<string> PlaybackSourceFilterOptions { get; }
+
+    public IReadOnlyList<string> CollectionStatusFilterOptions { get; }
 
     public IReadOnlyList<string> SortOptions { get; }
 
@@ -314,6 +444,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public IReadOnlyList<string> TrendingTimeOptions { get; }
 
+    public event EventHandler? RequestCloseFilterMenu;
+
     public AsyncRelayCommand SearchCommand { get; }
 
     public AsyncRelayCommand GoPreviousSearchPageCommand { get; }
@@ -322,7 +454,61 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public RelayCommand ClearSearchFiltersCommand { get; }
 
-    public RelayCommand SwitchSearchLayoutCommand { get; }
+    public RelayCommand ClearSearchTextCommand { get; }
+
+    public RelayCommand SwitchSearchToPosterLayoutCommand { get; }
+
+    public RelayCommand SwitchSearchToListLayoutCommand { get; }
+
+    public RelayCommand ToggleSearchSortDirectionCommand { get; }
+
+    public RelayCommand SelectSearchMediaTypeCommand { get; }
+
+    public RelayCommand SelectSearchTypeCommand { get; }
+
+    public RelayCommand SelectSearchGenreFilterCommand { get; }
+
+    public RelayCommand SelectSearchRegionFilterCommand { get; }
+
+    public RelayCommand SelectSearchRegionMultiFilterCommand { get; }
+
+    public RelayCommand SelectSearchWatchStatusFilterCommand { get; }
+
+    public RelayCommand SelectSearchPlaybackSourceFilterCommand { get; }
+
+    public RelayCommand SelectSearchCollectionStatusFilterCommand { get; }
+
+    public RelayCommand SelectSearchSortOptionCommand { get; }
+
+    public RelayCommand SelectSearchSortDirectionCommand { get; }
+
+    public RelayCommand SelectSearchDecadeFilterCommand { get; }
+
+    public RelayCommand SelectSearchLanguageFilterCommand { get; }
+
+    public RelayCommand SelectSearchLanguageMultiFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchGenreFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchRegionFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchRegionMultiFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchWatchStatusFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchPlaybackSourceFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchCollectionStatusFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchSortOptionCommand { get; }
+
+    public RelayCommand SelectTvSearchSortDirectionCommand { get; }
+
+    public RelayCommand SelectTvSearchDecadeFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchLanguageFilterCommand { get; }
+
+    public RelayCommand SelectTvSearchLanguageMultiFilterCommand { get; }
 
     public AsyncRelayCommand OpenSearchMovieCommand { get; }
 
@@ -373,7 +559,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public string SearchText
     {
         get => _searchText;
-        set => SetProperty(ref _searchText, value);
+        set
+        {
+            if (SetProperty(ref _searchText, value))
+            {
+                ClearSearchTextCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     public string SelectedSearchMediaType
@@ -383,6 +575,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedSearchMediaType, value))
             {
+                if (!IsSearchPersonSelected)
+                {
+                    _selectedSearchType = GetTitleSearchTypeForActiveMedia();
+                    OnPropertyChanged(nameof(SelectedSearchType));
+                }
+
                 RefreshSearchModeProperties();
                 RefreshActiveSearchPromptIfIdle();
             }
@@ -411,8 +609,6 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _isSearchPosterLayout, value))
             {
                 OnPropertyChanged(nameof(IsSearchListLayout));
-                OnPropertyChanged(nameof(SearchLayoutToggleText));
-                OnPropertyChanged(nameof(SearchLayoutStatusText));
                 if (_isDiscoveryPreferencesLoaded)
                 {
                     _ = SaveDiscoveryPreferencesAsync();
@@ -423,9 +619,87 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public bool IsSearchListLayout => !IsSearchPosterLayout;
 
-    public string SearchLayoutToggleText => IsSearchPosterLayout ? "列表布局" : "海报布局";
+    public double SearchMoviePosterScrollOffset
+    {
+        get => _searchMoviePosterScrollOffset;
+        set => SetProperty(ref _searchMoviePosterScrollOffset, Math.Max(0d, value));
+    }
 
-    public string SearchLayoutStatusText => IsSearchPosterLayout ? "当前海报布局" : "当前列表布局";
+    public double SearchMovieListScrollOffset
+    {
+        get => _searchMovieListScrollOffset;
+        set => SetProperty(ref _searchMovieListScrollOffset, Math.Max(0d, value));
+    }
+
+    public double SearchTvPosterScrollOffset
+    {
+        get => _searchTvPosterScrollOffset;
+        set => SetProperty(ref _searchTvPosterScrollOffset, Math.Max(0d, value));
+    }
+
+    public double SearchTvListScrollOffset
+    {
+        get => _searchTvListScrollOffset;
+        set => SetProperty(ref _searchTvListScrollOffset, Math.Max(0d, value));
+    }
+
+    public double RankingMovieScrollOffset
+    {
+        get => _rankingMovieScrollOffset;
+        set => SetProperty(ref _rankingMovieScrollOffset, Math.Max(0d, value));
+    }
+
+    public double RankingTvScrollOffset
+    {
+        get => _rankingTvScrollOffset;
+        set => SetProperty(ref _rankingTvScrollOffset, Math.Max(0d, value));
+    }
+
+    public string SearchMediaTypeButtonText => BuildFilterButtonText("影视", SelectedSearchMediaType);
+
+    public string SearchTypeButtonText => BuildFilterButtonText(
+        "搜索方式",
+        IsSearchPersonSelected ? SearchTypePerson : GetTitleSearchTypeForActiveMedia());
+
+    public string SearchGenreFilterButtonText => BuildFilterButtonText("类型", SelectedGenreFilter);
+
+    public string SearchRegionFilterButtonText => BuildFilterButtonText("地区", SelectedRegionFilter);
+
+    public string SearchWatchStatusFilterButtonText => BuildFilterButtonText("观看状态", SelectedWatchStatusFilter);
+
+    public string SearchPlaybackSourceFilterButtonText => BuildFilterButtonText("播放源", SelectedPlaybackSourceFilter);
+
+    public string SearchCollectionStatusFilterButtonText => BuildFilterButtonText("收藏状态", SelectedCollectionStatusFilter);
+
+    public string SearchSortDirectionButtonToolTip => BuildFilterButtonText("顺序", ActiveSearchSortDirection);
+
+    public string SearchSortDirectionIconData => string.Equals(ActiveSearchSortDirection, DirectionAscending, StringComparison.Ordinal)
+        ? "M 8 18 L 8 6 M 4 10 L 8 6 L 12 10 M 15 7 H 23 M 15 12 H 21 M 15 17 H 19"
+        : "M 8 6 L 8 18 M 4 14 L 8 18 L 12 14 M 15 7 H 19 M 15 12 H 21 M 15 17 H 23";
+
+    public string SearchSortOptionButtonText => BuildFilterButtonText("排序", SelectedSortOption);
+
+    public string SearchDecadeFilterButtonText => BuildFilterButtonText("年代", SelectedDecadeFilter);
+
+    public string SearchLanguageFilterButtonText => BuildFilterButtonText("语言", SelectedLanguageFilter);
+
+    public string TvSearchGenreFilterButtonText => BuildFilterButtonText("类型", SelectedTvGenreFilter);
+
+    public string TvSearchRegionFilterButtonText => BuildFilterButtonText("地区", SelectedTvRegionFilter);
+
+    public string TvSearchWatchStatusFilterButtonText => BuildFilterButtonText("观看状态", SelectedTvWatchStatusFilter);
+
+    public string TvSearchPlaybackSourceFilterButtonText => BuildFilterButtonText("播放源", SelectedTvPlaybackSourceFilter);
+
+    public string TvSearchCollectionStatusFilterButtonText => BuildFilterButtonText("收藏状态", SelectedTvCollectionStatusFilter);
+
+    public string TvSearchSortDirectionButtonText => BuildFilterButtonText("顺序", SelectedTvSortDirection);
+
+    public string TvSearchSortOptionButtonText => BuildFilterButtonText("排序", SelectedTvSortOption);
+
+    public string TvSearchDecadeFilterButtonText => BuildFilterButtonText("年代", SelectedTvDecadeFilter);
+
+    public string TvSearchLanguageFilterButtonText => BuildFilterButtonText("语言", SelectedTvLanguageFilter);
 
     public string SelectedTvGenreFilter
     {
@@ -434,6 +708,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTvGenreFilter, value))
             {
+                OnPropertyChanged(nameof(TvSearchGenreFilterButtonText));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -446,6 +721,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTvRegionFilter, value))
             {
+                OnPropertyChanged(nameof(TvSearchRegionFilterButtonText));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -458,7 +734,33 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTvWatchStatusFilter, value))
             {
+                OnPropertyChanged(nameof(TvSearchWatchStatusFilterButtonText));
                 ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvPlaybackSourceFilter
+    {
+        get => _selectedTvPlaybackSourceFilter;
+        set
+        {
+            if (SetProperty(ref _selectedTvPlaybackSourceFilter, value))
+            {
+                OnPropertyChanged(nameof(TvSearchPlaybackSourceFilterButtonText));
+                ResetTvSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedTvCollectionStatusFilter
+    {
+        get => _selectedTvCollectionStatusFilter;
+        private set
+        {
+            if (SetProperty(ref _selectedTvCollectionStatusFilter, value))
+            {
+                OnPropertyChanged(nameof(TvSearchCollectionStatusFilterButtonText));
             }
         }
     }
@@ -470,6 +772,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTvSortOption, value))
             {
+                OnPropertyChanged(nameof(TvSearchSortOptionButtonText));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -482,6 +785,10 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTvSortDirection, value))
             {
+                OnPropertyChanged(nameof(TvSearchSortDirectionButtonText));
+                OnPropertyChanged(nameof(ActiveSearchSortDirection));
+                OnPropertyChanged(nameof(SearchSortDirectionIconData));
+                OnPropertyChanged(nameof(SearchSortDirectionButtonToolTip));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -494,6 +801,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTvDecadeFilter, value))
             {
+                OnPropertyChanged(nameof(TvSearchDecadeFilterButtonText));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -506,6 +814,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTvLanguageFilter, value))
             {
+                OnPropertyChanged(nameof(TvSearchLanguageFilterButtonText));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -518,6 +827,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedSearchType, value))
             {
+                OnPropertyChanged(nameof(SearchTypeButtonText));
                 RefreshSearchTypeProperties();
                 if (IsTvSearchSelected)
                 {
@@ -538,6 +848,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedGenreFilter, value))
             {
+                OnPropertyChanged(nameof(SearchGenreFilterButtonText));
                 ResetSearchFromFilterChange();
             }
         }
@@ -550,6 +861,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedRegionFilter, value))
             {
+                OnPropertyChanged(nameof(SearchRegionFilterButtonText));
                 ResetSearchFromFilterChange();
             }
         }
@@ -562,7 +874,33 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedWatchStatusFilter, value))
             {
+                OnPropertyChanged(nameof(SearchWatchStatusFilterButtonText));
                 ResetSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedPlaybackSourceFilter
+    {
+        get => _selectedPlaybackSourceFilter;
+        set
+        {
+            if (SetProperty(ref _selectedPlaybackSourceFilter, value))
+            {
+                OnPropertyChanged(nameof(SearchPlaybackSourceFilterButtonText));
+                ResetSearchFromFilterChange();
+            }
+        }
+    }
+
+    public string SelectedCollectionStatusFilter
+    {
+        get => _selectedCollectionStatusFilter;
+        private set
+        {
+            if (SetProperty(ref _selectedCollectionStatusFilter, value))
+            {
+                OnPropertyChanged(nameof(SearchCollectionStatusFilterButtonText));
             }
         }
     }
@@ -574,6 +912,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedSortOption, value))
             {
+                OnPropertyChanged(nameof(SearchSortOptionButtonText));
                 ResetSearchFromFilterChange();
             }
         }
@@ -586,6 +925,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedSortDirection, value))
             {
+                OnPropertyChanged(nameof(ActiveSearchSortDirection));
+                OnPropertyChanged(nameof(SearchSortDirectionIconData));
+                OnPropertyChanged(nameof(SearchSortDirectionButtonToolTip));
                 ResetSearchFromFilterChange();
             }
         }
@@ -598,6 +940,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedDecadeFilter, value))
             {
+                OnPropertyChanged(nameof(SearchDecadeFilterButtonText));
                 ResetSearchFromFilterChange();
             }
         }
@@ -610,6 +953,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedLanguageFilter, value))
             {
+                OnPropertyChanged(nameof(SearchLanguageFilterButtonText));
                 ResetSearchFromFilterChange();
             }
         }
@@ -814,6 +1158,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         : $"第 {TvSearchPageIndex} / {TvSearchTotalPages} 页";
 
     public string ActiveSearchPageStatusText => IsTvSearchSelected ? TvSearchPageStatusText : SearchPageStatusText;
+
+    public string ActiveSearchSortDirection => IsTvSearchSelected ? SelectedTvSortDirection : SelectedSortDirection;
 
     public string SelectedRankingMediaType
     {
@@ -1166,9 +1512,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _rankingCancellationTokenSource?.Cancel();
     }
 
-    private void SwitchSearchLayout()
+    private void SetSearchLayout(bool isPosterLayout)
     {
-        IsSearchPosterLayout = !IsSearchPosterLayout;
+        if (IsSearchPosterLayout == isPosterLayout)
+        {
+            return;
+        }
+
+        IsSearchPosterLayout = isPosterLayout;
         var message = IsSearchPosterLayout ? "已切换为海报布局。" : "已切换为列表布局。";
         if (IsTvSearchSelected)
         {
@@ -1178,6 +1529,114 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             SearchStatusMessage = message;
         }
+    }
+
+    private void ClearSearchText()
+    {
+        SearchText = string.Empty;
+    }
+
+    private void ToggleActiveSearchSortDirection()
+    {
+        if (IsTvSearchSelected)
+        {
+            SelectedTvSortDirection = ToggleSortDirectionValue(SelectedTvSortDirection);
+            return;
+        }
+
+        SelectedSortDirection = ToggleSortDirectionValue(SelectedSortDirection);
+    }
+
+    private void SelectSearchMediaType(object? parameter)
+    {
+        var mediaType = GetOptionValue(parameter, DiscoveryMediaTypeMovie);
+        if (!SearchMediaTypeOptions.Contains(mediaType, StringComparer.Ordinal)
+            || string.Equals(mediaType, SelectedSearchMediaType, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        SelectedSearchMediaType = mediaType;
+    }
+
+    private void SelectSearchType(object? parameter)
+    {
+        var searchType = GetOptionValue(parameter, GetTitleSearchTypeForActiveMedia());
+        if (!SearchTypeOptions.Contains(searchType, StringComparer.Ordinal)
+            || string.Equals(searchType, SelectedSearchType, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        SelectedSearchType = searchType;
+    }
+
+    private void SelectSearchRegionMultiFilter(object? parameter)
+    {
+        UpdateDiscoveryMultiSelectFilter(
+            GetOptionValue(parameter, FilterAll),
+            FilterAll,
+            RegionFilterOptions,
+            _selectedRegionFilters,
+            SearchRegionFilterMenuOptions,
+            RefreshSearchRegionFilterState);
+    }
+
+    private void SelectSearchLanguageMultiFilter(object? parameter)
+    {
+        UpdateDiscoveryMultiSelectFilter(
+            GetOptionValue(parameter, FilterAll),
+            FilterAll,
+            LanguageFilterOptions,
+            _selectedLanguageFilters,
+            SearchLanguageFilterMenuOptions,
+            RefreshSearchLanguageFilterState);
+    }
+
+    private void SelectSearchCollectionStatusFilter(object? parameter)
+    {
+        UpdateDiscoveryMultiSelectFilter(
+            GetOptionValue(parameter, FilterAll),
+            FilterAll,
+            CollectionStatusFilterOptions,
+            _selectedCollectionStatusFilters,
+            SearchCollectionStatusFilterMenuOptions,
+            RefreshSearchCollectionStatusFilterState,
+            resetWhenAllNonAllSelected: false);
+    }
+
+    private void SelectTvSearchRegionMultiFilter(object? parameter)
+    {
+        UpdateDiscoveryMultiSelectFilter(
+            GetOptionValue(parameter, FilterAll),
+            FilterAll,
+            RegionFilterOptions,
+            _selectedTvRegionFilters,
+            TvSearchRegionFilterMenuOptions,
+            RefreshTvSearchRegionFilterState);
+    }
+
+    private void SelectTvSearchLanguageMultiFilter(object? parameter)
+    {
+        UpdateDiscoveryMultiSelectFilter(
+            GetOptionValue(parameter, FilterAll),
+            FilterAll,
+            LanguageFilterOptions,
+            _selectedTvLanguageFilters,
+            TvSearchLanguageFilterMenuOptions,
+            RefreshTvSearchLanguageFilterState);
+    }
+
+    private void SelectTvSearchCollectionStatusFilter(object? parameter)
+    {
+        UpdateDiscoveryMultiSelectFilter(
+            GetOptionValue(parameter, FilterAll),
+            FilterAll,
+            CollectionStatusFilterOptions,
+            _selectedTvCollectionStatusFilters,
+            TvSearchCollectionStatusFilterMenuOptions,
+            RefreshTvSearchCollectionStatusFilterState,
+            resetWhenAllNonAllSelected: false);
     }
 
     private async Task SearchAsync()
@@ -1192,6 +1651,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             ResetSearchBuffers();
             SearchMovies.Clear();
+            ResetMovieSearchScrollOffsets();
             SearchPageIndex = 1;
             SearchTotalPages = 0;
             _canGoToNextSearchPage = false;
@@ -1253,6 +1713,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             ResetTvSearchBuffers();
             SearchTvSeries.Clear();
+            ResetTvSearchScrollOffsets();
             TvSearchPageIndex = 1;
             TvSearchTotalPages = 0;
             _canGoToNextTvSearchPage = false;
@@ -1272,6 +1733,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _searchCancellationTokenSource?.Cancel();
         _searchCancellationTokenSource = new CancellationTokenSource();
         ResetTvSearchBuffers();
+        ResetTvSearchScrollOffsets();
         TvSearchPageIndex = 1;
         TvSearchTotalPages = 0;
         SearchTvSeries.Clear();
@@ -1316,6 +1778,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             }
 
             TvSearchPageIndex = displayPage;
+            ResetTvSearchScrollOffsets();
             var visibleItems = RebuildTvSearchDisplay();
             if (SearchTvSeries.Count == 0)
             {
@@ -1517,14 +1980,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             query = query.Where(item => SplitTags(item.GenresText).Contains(SelectedTvGenreFilter, StringComparer.OrdinalIgnoreCase));
         }
 
-        if (!string.Equals(SelectedTvRegionFilter, FilterAll, StringComparison.Ordinal))
+        if (_selectedTvRegionFilters.Count > 0)
         {
-            query = query.Where(item => MatchesRegion(item, SelectedTvRegionFilter));
+            query = query.Where(item => _selectedTvRegionFilters.Any(filter => MatchesRegion(item, filter)));
         }
 
-        if (!string.Equals(SelectedTvLanguageFilter, FilterAll, StringComparison.Ordinal))
+        if (_selectedTvLanguageFilters.Count > 0)
         {
-            query = query.Where(item => MatchesLanguage(item, SelectedTvLanguageFilter));
+            query = query.Where(item => _selectedTvLanguageFilters.Any(filter => MatchesLanguage(item, filter)));
         }
 
         if (!string.Equals(SelectedTvDecadeFilter, DecadeAll, StringComparison.Ordinal))
@@ -1532,15 +1995,25 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             query = query.Where(item => MatchesDecade(item, SelectedTvDecadeFilter));
         }
 
-        query = SelectedTvWatchStatusFilter switch
+        query = SelectedTvPlaybackSourceFilter switch
         {
-            "有播放源" => query.Where(item => item.IsInLibrary),
-            "无播放源" => query.Where(item => !item.IsInLibrary),
-            "有想看 Season" => query.Where(item => item.HasWantToWatchSeason),
-            "有喜爱 Season" => query.Where(item => item.HasFavoriteSeason),
-            "有不想看 Season" => query.Where(item => item.HasNotInterestedSeason),
+            PlaybackSourceWithSource => query.Where(item => item.IsInLibrary),
+            PlaybackSourceWithoutSource => query.Where(item => !item.IsInLibrary),
             _ => query
         };
+
+        query = SelectedTvWatchStatusFilter switch
+        {
+            WatchStatusWatched => query.Where(item => item.IsWatched),
+            WatchStatusUnwatched => query.Where(item => !item.IsWatched),
+            _ => query
+        };
+
+        if (_selectedTvCollectionStatusFilters.Count > 0)
+        {
+            query = query.Where(
+                item => _selectedTvCollectionStatusFilters.Any(filter => MatchesTvCollectionStatusFilter(item, filter)));
+        }
 
         return ApplyTvSearchSorting(query).ToList();
     }
@@ -1571,10 +2044,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool HasExpandedTvSearchCriteria()
     {
         return !string.Equals(SelectedTvGenreFilter, FilterAll, StringComparison.Ordinal)
-               || !string.Equals(SelectedTvRegionFilter, FilterAll, StringComparison.Ordinal)
-               || !string.Equals(SelectedTvLanguageFilter, FilterAll, StringComparison.Ordinal)
+               || _selectedTvRegionFilters.Count > 0
+               || _selectedTvLanguageFilters.Count > 0
                || !string.Equals(SelectedTvDecadeFilter, DecadeAll, StringComparison.Ordinal)
                || !string.Equals(SelectedTvWatchStatusFilter, FilterAll, StringComparison.Ordinal)
+               || !string.Equals(SelectedTvPlaybackSourceFilter, FilterAll, StringComparison.Ordinal)
+               || _selectedTvCollectionStatusFilters.Count > 0
                || !string.Equals(SelectedTvSortOption, SortRelevance, StringComparison.Ordinal)
                || !string.Equals(SelectedTvSortDirection, DirectionDescending, StringComparison.Ordinal);
     }
@@ -1616,6 +2091,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _searchCancellationTokenSource?.Cancel();
         _searchCancellationTokenSource = new CancellationTokenSource();
         ResetSearchBuffers();
+        ResetMovieSearchScrollOffsets();
         SearchPageIndex = 1;
         SearchTotalPages = 0;
         SearchMovies.Clear();
@@ -1660,6 +2136,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             }
 
             SearchPageIndex = displayPage;
+            ResetMovieSearchScrollOffsets();
             var visibleItems = RebuildSearchDisplay();
             if (SearchMovies.Count == 0)
             {
@@ -1979,14 +2456,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             query = query.Where(item => SplitTags(item.DisplayTags).Contains(SelectedGenreFilter, StringComparer.OrdinalIgnoreCase));
         }
 
-        if (!string.Equals(SelectedRegionFilter, FilterAll, StringComparison.Ordinal))
+        if (_selectedRegionFilters.Count > 0)
         {
-            query = query.Where(item => MatchesRegion(item, SelectedRegionFilter));
+            query = query.Where(item => _selectedRegionFilters.Any(filter => MatchesRegion(item, filter)));
         }
 
-        if (!string.Equals(SelectedLanguageFilter, FilterAll, StringComparison.Ordinal))
+        if (_selectedLanguageFilters.Count > 0)
         {
-            query = query.Where(item => MatchesLanguage(item, SelectedLanguageFilter));
+            query = query.Where(item => _selectedLanguageFilters.Any(filter => MatchesLanguage(item, filter)));
         }
 
         if (!string.Equals(SelectedDecadeFilter, DecadeAll, StringComparison.Ordinal))
@@ -1994,17 +2471,25 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             query = query.Where(item => MatchesDecade(item, SelectedDecadeFilter));
         }
 
-        query = SelectedWatchStatusFilter switch
+        query = SelectedPlaybackSourceFilter switch
         {
-            "有播放源" => query.Where(item => item.IsInLibrary),
-            "无播放源" => query.Where(item => !item.IsInLibrary),
-            "已看" => query.Where(item => item.IsWatched),
-            "未看" => query.Where(item => !item.IsWatched),
-            "想看" => query.Where(item => item.IsWantToWatch),
-            "喜爱" => query.Where(item => item.IsFavorite),
-            "不想看" => query.Where(item => item.IsNotInterested),
+            PlaybackSourceWithSource => query.Where(item => item.IsInLibrary),
+            PlaybackSourceWithoutSource => query.Where(item => !item.IsInLibrary),
             _ => query
         };
+
+        query = SelectedWatchStatusFilter switch
+        {
+            WatchStatusWatched => query.Where(item => item.IsWatched),
+            WatchStatusUnwatched => query.Where(item => !item.IsWatched),
+            _ => query
+        };
+
+        if (_selectedCollectionStatusFilters.Count > 0)
+        {
+            query = query.Where(
+                item => _selectedCollectionStatusFilters.Any(filter => MatchesMovieCollectionStatusFilter(item, filter)));
+        }
 
         return ApplySearchSorting(query).ToList();
     }
@@ -2076,10 +2561,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool HasExpandedSearchCriteria()
     {
         return !string.Equals(SelectedGenreFilter, FilterAll, StringComparison.Ordinal)
-               || !string.Equals(SelectedRegionFilter, FilterAll, StringComparison.Ordinal)
-               || !string.Equals(SelectedLanguageFilter, FilterAll, StringComparison.Ordinal)
+               || _selectedRegionFilters.Count > 0
+               || _selectedLanguageFilters.Count > 0
                || !string.Equals(SelectedDecadeFilter, DecadeAll, StringComparison.Ordinal)
                || !string.Equals(SelectedWatchStatusFilter, FilterAll, StringComparison.Ordinal)
+               || !string.Equals(SelectedPlaybackSourceFilter, FilterAll, StringComparison.Ordinal)
+               || _selectedCollectionStatusFilters.Count > 0
                || !string.Equals(SelectedSortOption, SortRelevance, StringComparison.Ordinal)
                || !string.Equals(SelectedSortDirection, DirectionDescending, StringComparison.Ordinal);
     }
@@ -2094,46 +2581,46 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
         _suppressFilterApply = true;
         SelectedGenreFilter = FilterAll;
-        SelectedRegionFilter = FilterAll;
+        _selectedRegionFilters.Clear();
+        RefreshSearchRegionFilterState(applyFilters: false);
         SelectedWatchStatusFilter = FilterAll;
+        SelectedPlaybackSourceFilter = FilterAll;
+        _selectedCollectionStatusFilters.Clear();
+        RefreshSearchCollectionStatusFilterState(applyFilters: false);
         SelectedSortOption = SortRelevance;
         SelectedSortDirection = DirectionDescending;
         SelectedDecadeFilter = DecadeAll;
-        SelectedLanguageFilter = FilterAll;
+        _selectedLanguageFilters.Clear();
+        RefreshSearchLanguageFilterState(applyFilters: false);
         _suppressFilterApply = false;
 
-        if (string.IsNullOrWhiteSpace(SearchText))
-        {
-            RebuildSearchDisplay();
-            SearchStatusMessage = $"筛选已清除。{BuildSearchPromptMessage()}";
-            return;
-        }
-
+        SearchPageIndex = 1;
+        ResetMovieSearchScrollOffsets();
+        RebuildSearchDisplay();
         SearchStatusMessage = "筛选已清除。";
-        _ = ResetAndLoadSearchDisplayPageAsync(1);
     }
 
     private void ClearTvSearchFilters()
     {
         _suppressTvFilterApply = true;
         SelectedTvGenreFilter = FilterAll;
-        SelectedTvRegionFilter = FilterAll;
+        _selectedTvRegionFilters.Clear();
+        RefreshTvSearchRegionFilterState(applyFilters: false);
         SelectedTvWatchStatusFilter = FilterAll;
+        SelectedTvPlaybackSourceFilter = FilterAll;
+        _selectedTvCollectionStatusFilters.Clear();
+        RefreshTvSearchCollectionStatusFilterState(applyFilters: false);
         SelectedTvSortOption = SortRelevance;
         SelectedTvSortDirection = DirectionDescending;
         SelectedTvDecadeFilter = DecadeAll;
-        SelectedTvLanguageFilter = FilterAll;
+        _selectedTvLanguageFilters.Clear();
+        RefreshTvSearchLanguageFilterState(applyFilters: false);
         _suppressTvFilterApply = false;
 
-        if (string.IsNullOrWhiteSpace(SearchText))
-        {
-            RebuildTvSearchDisplay();
-            TvSearchStatusMessage = $"筛选已清除。{BuildSearchPromptMessage()}";
-            return;
-        }
-
+        TvSearchPageIndex = 1;
+        ResetTvSearchScrollOffsets();
+        RebuildTvSearchDisplay();
         TvSearchStatusMessage = "筛选已清除。";
-        _ = ResetAndLoadTvSearchDisplayPageAsync(1);
     }
 
     private async Task OpenSearchMovieAsync(object? parameter)
@@ -2647,6 +3134,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _rankingCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource = new CancellationTokenSource();
         ResetRankingBuffers();
+        ResetRankingMovieScrollOffset();
         RankingPageIndex = 1;
         RankingTotalDisplayPages = 1;
         TopRankingMovie = null;
@@ -2743,6 +3231,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             }
 
             RankingPageIndex = displayPage;
+            ResetRankingMovieScrollOffset();
             UpdateRankingTotalPages();
             var visibleItems = RebuildRankingRows();
             WriteRankingDiagnostics(
@@ -2825,6 +3314,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _rankingCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource = new CancellationTokenSource();
         ResetTvRankingBuffers();
+        ResetRankingTvScrollOffset();
         TvRankingPageIndex = 1;
         TvRankingTotalDisplayPages = 1;
         TopRankingTvSeries = null;
@@ -2866,6 +3356,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             }
 
             TvRankingPageIndex = displayPage;
+            ResetRankingTvScrollOffset();
             UpdateTvRankingTotalPages();
             var visibleItems = RebuildTvRankingDisplay();
             TvRankingStatusMessage = visibleItems.Count == 0
@@ -3478,6 +3969,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _canGoToNextSearchPage = false;
     }
 
+    private void ResetMovieSearchScrollOffsets()
+    {
+        SearchMoviePosterScrollOffset = 0;
+        SearchMovieListScrollOffset = 0;
+    }
+
     private void ResetTvSearchBuffers()
     {
         _tvSearchResultPool.Clear();
@@ -3489,6 +3986,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _nextTvSearchOrder = 0;
         _tvSearchSourceExhausted = false;
         _canGoToNextTvSearchPage = false;
+    }
+
+    private void ResetTvSearchScrollOffsets()
+    {
+        SearchTvPosterScrollOffset = 0;
+        SearchTvListScrollOffset = 0;
     }
 
     private void ResetRankingBuffers()
@@ -3504,6 +4007,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _canGoToNextRankingPage = false;
     }
 
+    private void ResetRankingMovieScrollOffset()
+    {
+        RankingMovieScrollOffset = 0;
+    }
+
     private void ResetTvRankingBuffers()
     {
         _rankingTvSeries.Clear();
@@ -3515,6 +4023,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _nextTvRankingRank = 0;
         _tvRankingSourceExhausted = false;
         _canGoToNextTvRankingPage = false;
+    }
+
+    private void ResetRankingTvScrollOffset()
+    {
+        RankingTvScrollOffset = 0;
     }
 
     private void RefreshSearchVisibility()
@@ -3590,6 +4103,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         OnPropertyChanged(nameof(IsMovieSearchSelected));
         OnPropertyChanged(nameof(IsTvSearchSelected));
+        OnPropertyChanged(nameof(SearchMediaTypeButtonText));
+        OnPropertyChanged(nameof(SearchTypeOptions));
+        OnPropertyChanged(nameof(SearchTypeButtonText));
+        OnPropertyChanged(nameof(ActiveSearchSortDirection));
+        OnPropertyChanged(nameof(SearchSortDirectionIconData));
+        OnPropertyChanged(nameof(SearchSortDirectionButtonToolTip));
         RefreshSearchTypeProperties();
         OnPropertyChanged(nameof(IsActiveSearchLoading));
         OnPropertyChanged(nameof(ActiveSearchStatusMessage));
@@ -3605,6 +4124,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private void RefreshSearchTypeProperties()
     {
         OnPropertyChanged(nameof(IsSearchPersonSelected));
+        OnPropertyChanged(nameof(SearchTypeButtonText));
         OnPropertyChanged(nameof(SearchPlaceholderText));
         OnPropertyChanged(nameof(SearchInputToolTip));
         RefreshActiveSearchPromptIfIdle();
@@ -3651,7 +4171,10 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private string GetSearchRegionParameter()
     {
-        return RegionCountryCodes.TryGetValue(SelectedRegionFilter, out var codes)
+        var selectedRegion = _selectedRegionFilters.Count == 1
+            ? _selectedRegionFilters.First()
+            : SelectedRegionFilter;
+        return RegionCountryCodes.TryGetValue(selectedRegion, out var codes)
             ? codes.FirstOrDefault() ?? string.Empty
             : string.Empty;
     }
@@ -3792,6 +4315,225 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                 .ToList();
     }
 
+    private static string GetOptionValue(object? parameter, string fallback)
+    {
+        return parameter is string value && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : fallback;
+    }
+
+    private static string BuildFilterButtonText(string label, string selectedValue)
+    {
+        var value = string.IsNullOrWhiteSpace(selectedValue) ? FilterAll : selectedValue;
+        return $"{label}：{value}";
+    }
+
+    private static string FormatMultiSelectFilterForButton(
+        IReadOnlySet<string> selectedOptions,
+        IReadOnlyList<string> optionOrder,
+        string allOption)
+    {
+        if (selectedOptions.Count == 0)
+        {
+            return allOption;
+        }
+
+        var ordered = optionOrder
+            .Where(option => !string.Equals(option, allOption, StringComparison.Ordinal)
+                             && selectedOptions.Contains(option))
+            .ToList();
+        return ordered.Count switch
+        {
+            0 => allOption,
+            <= 2 => string.Join(" / ", ordered),
+            _ => $"{ordered.Count} 项"
+        };
+    }
+
+    private void UpdateDiscoveryMultiSelectFilter(
+        string option,
+        string allOption,
+        IReadOnlyList<string> allOptions,
+        HashSet<string> selectedOptions,
+        ObservableCollection<DiscoveryFilterOption> menuOptions,
+        Action<bool> refreshState,
+        bool resetWhenAllNonAllSelected = true)
+    {
+        var closeMenu = false;
+        if (string.Equals(option, allOption, StringComparison.Ordinal))
+        {
+            selectedOptions.Clear();
+            closeMenu = true;
+        }
+        else if (allOptions.Contains(option, StringComparer.Ordinal))
+        {
+            if (!selectedOptions.Remove(option))
+            {
+                selectedOptions.Add(option);
+            }
+        }
+
+        var nonAllCount = allOptions.Count(value => !string.Equals(value, allOption, StringComparison.Ordinal));
+        if (resetWhenAllNonAllSelected && selectedOptions.Count >= nonAllCount)
+        {
+            selectedOptions.Clear();
+            closeMenu = true;
+        }
+
+        RefreshDiscoveryFilterOptionSelections(menuOptions, selectedOptions, allOption);
+        refreshState(true);
+        if (closeMenu)
+        {
+            RequestCloseFilterMenu?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void RefreshSearchRegionFilterState(bool applyFilters)
+    {
+        SetProperty(
+            ref _selectedRegionFilter,
+            FormatMultiSelectFilterForButton(_selectedRegionFilters, RegionFilterOptions, FilterAll),
+            nameof(SelectedRegionFilter));
+        OnPropertyChanged(nameof(SearchRegionFilterButtonText));
+        RefreshDiscoveryFilterOptionSelections(SearchRegionFilterMenuOptions, _selectedRegionFilters, FilterAll);
+        if (applyFilters)
+        {
+            ResetSearchFromFilterChange();
+        }
+    }
+
+    private void RefreshSearchLanguageFilterState(bool applyFilters)
+    {
+        SetProperty(
+            ref _selectedLanguageFilter,
+            FormatMultiSelectFilterForButton(_selectedLanguageFilters, LanguageFilterOptions, FilterAll),
+            nameof(SelectedLanguageFilter));
+        OnPropertyChanged(nameof(SearchLanguageFilterButtonText));
+        RefreshDiscoveryFilterOptionSelections(SearchLanguageFilterMenuOptions, _selectedLanguageFilters, FilterAll);
+        if (applyFilters)
+        {
+            ResetSearchFromFilterChange();
+        }
+    }
+
+    private void RefreshSearchCollectionStatusFilterState(bool applyFilters)
+    {
+        SelectedCollectionStatusFilter = FormatMultiSelectFilterForButton(
+            _selectedCollectionStatusFilters,
+            CollectionStatusFilterOptions,
+            FilterAll);
+        RefreshDiscoveryFilterOptionSelections(
+            SearchCollectionStatusFilterMenuOptions,
+            _selectedCollectionStatusFilters,
+            FilterAll);
+        if (applyFilters)
+        {
+            ResetSearchFromFilterChange();
+        }
+    }
+
+    private void RefreshTvSearchRegionFilterState(bool applyFilters)
+    {
+        SetProperty(
+            ref _selectedTvRegionFilter,
+            FormatMultiSelectFilterForButton(_selectedTvRegionFilters, RegionFilterOptions, FilterAll),
+            nameof(SelectedTvRegionFilter));
+        OnPropertyChanged(nameof(TvSearchRegionFilterButtonText));
+        RefreshDiscoveryFilterOptionSelections(TvSearchRegionFilterMenuOptions, _selectedTvRegionFilters, FilterAll);
+        if (applyFilters)
+        {
+            ResetTvSearchFromFilterChange();
+        }
+    }
+
+    private void RefreshTvSearchLanguageFilterState(bool applyFilters)
+    {
+        SetProperty(
+            ref _selectedTvLanguageFilter,
+            FormatMultiSelectFilterForButton(_selectedTvLanguageFilters, LanguageFilterOptions, FilterAll),
+            nameof(SelectedTvLanguageFilter));
+        OnPropertyChanged(nameof(TvSearchLanguageFilterButtonText));
+        RefreshDiscoveryFilterOptionSelections(TvSearchLanguageFilterMenuOptions, _selectedTvLanguageFilters, FilterAll);
+        if (applyFilters)
+        {
+            ResetTvSearchFromFilterChange();
+        }
+    }
+
+    private void RefreshTvSearchCollectionStatusFilterState(bool applyFilters)
+    {
+        SelectedTvCollectionStatusFilter = FormatMultiSelectFilterForButton(
+            _selectedTvCollectionStatusFilters,
+            CollectionStatusFilterOptions,
+            FilterAll);
+        RefreshDiscoveryFilterOptionSelections(
+            TvSearchCollectionStatusFilterMenuOptions,
+            _selectedTvCollectionStatusFilters,
+            FilterAll);
+        if (applyFilters)
+        {
+            ResetTvSearchFromFilterChange();
+        }
+    }
+
+    private static void ReplaceDiscoveryFilterOptions(
+        ObservableCollection<DiscoveryFilterOption> target,
+        IReadOnlyList<string> source)
+    {
+        target.Clear();
+        foreach (var label in source)
+        {
+            target.Add(new DiscoveryFilterOption(label));
+        }
+    }
+
+    private static void RefreshDiscoveryFilterOptionSelections(
+        ObservableCollection<DiscoveryFilterOption> options,
+        IReadOnlySet<string> selectedOptions,
+        string allOption)
+    {
+        foreach (var option in options)
+        {
+            option.IsSelected = string.Equals(option.Label, allOption, StringComparison.Ordinal)
+                ? selectedOptions.Count == 0
+                : selectedOptions.Contains(option.Label);
+        }
+    }
+
+    private static string ToggleSortDirectionValue(string value)
+    {
+        return string.Equals(value, DirectionDescending, StringComparison.Ordinal)
+            ? DirectionAscending
+            : DirectionDescending;
+    }
+
+    private string GetTitleSearchTypeForActiveMedia()
+    {
+        return IsTvSearchSelected ? DiscoveryMediaTypeTv : DiscoveryMediaTypeMovie;
+    }
+
+    private static bool MatchesMovieCollectionStatusFilter(DiscoveryMovieCardViewModel item, string filter)
+    {
+        return filter switch
+        {
+            CollectionStatusFavorite => item.IsFavorite,
+            CollectionStatusWantToWatch => item.IsWantToWatch,
+            CollectionStatusNotInterested => item.IsNotInterested,
+            _ => true
+        };
+    }
+
+    private static bool MatchesTvCollectionStatusFilter(DiscoveryTvSeriesCardViewModel item, string filter)
+    {
+        return filter switch
+        {
+            CollectionStatusFavorite => item.HasFavoriteSeason,
+            CollectionStatusWantToWatch => item.HasWantToWatchSeason,
+            CollectionStatusNotInterested => item.HasNotInterestedSeason,
+            _ => true
+        };
+    }
+
     private string BuildSearchPromptMessage()
     {
         if (IsSearchPersonSelected)
@@ -3880,5 +4622,23 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
 
         return dispatcher.InvokeAsync(action).Task;
+    }
+
+    public sealed class DiscoveryFilterOption : ObservableObject
+    {
+        private bool _isSelected;
+
+        public DiscoveryFilterOption(string label)
+        {
+            Label = label;
+        }
+
+        public string Label { get; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set => SetProperty(ref _isSelected, value);
+        }
     }
 }

@@ -128,6 +128,22 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="HomeInlineEmptyStateStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="HomeInlineEmptyStateTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
         <Style x:Key="HomeMetricValueTextStyle" TargetType="TextBlock" BasedOn="{StaticResource MetricTextStyle}">
             <Setter Property="FontSize" Value="24" />
             <Setter Property="LineHeight" Value="28" />
@@ -504,7 +520,7 @@
 
                     <Border Grid.Row="2">
                         <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
+                            <Style TargetType="Border" BasedOn="{StaticResource HomeInlineEmptyStateStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding RecentlyPlayed.Count}" Value="0">
@@ -513,12 +529,7 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="还没有观看记录" Style="{StaticResource EmptyStateTitleStyle}" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="播放或标记影片后，这里会显示你的继续观看列表。"
-                                       Style="{StaticResource EmptyStateDescriptionStyle}" />
-                        </StackPanel>
+                        <TextBlock Text="还没有观看记录" Style="{StaticResource HomeInlineEmptyStateTextStyle}" />
                     </Border>
 
                     <ItemsControl Grid.Row="2"
@@ -663,7 +674,7 @@
 
                     <Border Grid.Row="2">
                         <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
+                            <Style TargetType="Border" BasedOn="{StaticResource HomeInlineEmptyStateStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding RecentlyAdded.Count}" Value="0">
@@ -672,12 +683,7 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="还没有新增影片" Style="{StaticResource EmptyStateTitleStyle}" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="扫描完成后，最近加入的影片会出现在这里。"
-                                       Style="{StaticResource EmptyStateDescriptionStyle}" />
-                        </StackPanel>
+                        <TextBlock Text="还没有新增影片" Style="{StaticResource HomeInlineEmptyStateTextStyle}" />
                     </Border>
 
                     <ItemsControl Grid.Row="2"
@@ -802,9 +808,9 @@
                 </Grid>
 
                 <Grid Grid.Row="1" Margin="0,10,0,0">
-                    <Border VerticalAlignment="Center">
+                    <Border>
                         <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource EmptyStateContainerStyle}">
+                            <Style TargetType="Border" BasedOn="{StaticResource HomeInlineEmptyStateStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding AiRecommendationViewModel.Recommendations.Count}" Value="0">
@@ -813,12 +819,7 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <StackPanel>
-                            <TextBlock Text="暂无可展示的推荐" Style="{StaticResource EmptyStateTitleStyle}" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="标记几部影片后，AI 推荐会更准确。"
-                                       Style="{StaticResource EmptyStateDescriptionStyle}" />
-                        </StackPanel>
+                        <TextBlock Text="暂无可展示的推荐" Style="{StaticResource HomeInlineEmptyStateTextStyle}" />
                     </Border>
 
                     <ItemsControl ItemsSource="{Binding AiRecommendationPreview}">

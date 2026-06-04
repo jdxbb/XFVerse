@@ -13,6 +13,8 @@ public sealed class TvSeasonDetailModel
 
     public int? TmdbSeriesId { get; set; }
 
+    public int? TmdbSeasonId { get; set; }
+
     public int SeasonNumber { get; set; }
 
     public string SeriesName { get; set; } = string.Empty;
@@ -77,11 +79,11 @@ public sealed class TvSeasonDetailModel
 
     public IReadOnlyList<TvSeasonCorrectionSourceItem> CorrectionSources { get; set; } = [];
 
-    public bool IsUnidentified => IdentificationStatus == IdentificationStatus.Failed;
+    public bool IsUnidentified => IdentificationStatus == IdentificationStatus.Failed || !TmdbSeasonId.HasValue;
 
     public string SeasonNumberText => SeasonNumber == 0 ? "特别篇" : $"S{SeasonNumber:D2}";
 
-    public string SeasonTitleText => TvDetailDisplayText.FormatSeasonTitle(SeasonNumber, Name);
+    public string SeasonTitleText => TvDetailDisplayText.FormatSeasonTitle(SeasonNumber, Name, IsUnidentified);
 
     public string AirDateText => AirDate.HasValue
         ? AirDate.Value.ToString("yyyy-MM-dd")
@@ -262,10 +264,13 @@ internal static class TvDetailDisplayText
     private static readonly Regex GenericSeasonNameRegex = new(@"^S\d{1,4}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex GenericEpisodeNameRegex = new(@"^(E\d{1,4}|第\d{1,4}集)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    public static string FormatSeasonTitle(int seasonNumber, string? name)
+    public static string FormatSeasonTitle(int seasonNumber, string? name, bool isUnidentified = false)
     {
         var label = seasonNumber == 0 ? "特别篇" : $"第{seasonNumber}季";
-        return ShouldHideSeasonName(label, name) ? label : $"{label}  {name!.Trim()}";
+        var unidentifiedSuffix = isUnidentified ? "（未识别）" : string.Empty;
+        return ShouldHideSeasonName(label, name)
+            ? $"{label}{unidentifiedSuffix}"
+            : $"{label}  {name!.Trim()}{unidentifiedSuffix}";
     }
 
     public static string FormatEpisodeTitle(int seasonNumber, int episodeNumber, string? title, string? fallbackTitle)

@@ -74,6 +74,7 @@
                IsHitTestVisible="False"
                Opacity="0"
                helpers:PosterCacheImageBehavior.DecodePixelWidth="128"
+               helpers:PosterCacheImageBehavior.PropagateLoadState="False"
                helpers:PosterCacheImageBehavior.Source="{Binding DetailBackdropSource}"
                helpers:PosterPaletteBackdropBehavior.TargetElement="{Binding ElementName=DetailBackdrop}" />
 

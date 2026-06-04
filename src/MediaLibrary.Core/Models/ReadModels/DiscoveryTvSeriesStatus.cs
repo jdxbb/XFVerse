@@ -18,6 +18,8 @@ public sealed class DiscoveryTvSeriesStatus
 
     public int InLibrarySeasonCount { get; set; }
 
+    public bool IsWatched { get; set; }
+
     public bool HasWantToWatchSeason { get; set; }
 
     public bool HasFavoriteSeason { get; set; }

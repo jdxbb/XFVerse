@@ -765,8 +765,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             HasSeason = true;
             SeriesName = model.SeriesName;
             SeriesOriginalName = string.IsNullOrWhiteSpace(model.SeriesOriginalName) ? "-" : model.SeriesOriginalName;
-            Name = model.IsUnidentified ? "未识别电视剧季" : model.Name;
-            SeasonTitleText = model.IsUnidentified ? "未识别电视剧季" : model.SeasonTitleText;
+            Name = string.IsNullOrWhiteSpace(model.Name) ? model.SeasonTitleText : model.Name;
+            SeasonTitleText = model.SeasonTitleText;
             Overview = string.IsNullOrWhiteSpace(model.Overview) ? "暂无简介" : model.Overview;
             PosterDisplayUrl = model.PosterDisplayUrl;
             SeasonNumberText = model.SeasonNumberText;

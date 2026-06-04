@@ -164,8 +164,8 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                         TmdbSeasonId = season.TmdbSeasonId,
                         Name = season.Name,
                         Overview = season.Overview ?? string.Empty,
-                        PosterRemoteUrl = season.PosterRemoteUrl ?? string.Empty,
-                        PosterLocalPath = season.PosterLocalPath ?? string.Empty,
+                        PosterRemoteUrl = FirstNonEmpty(season.PosterRemoteUrl, series.PosterRemoteUrl),
+                        PosterLocalPath = FirstNonEmpty(season.PosterLocalPath, series.PosterLocalPath),
                         AirDate = season.AirDate,
                         AirYear = season.AirYear,
                         WatchedEpisodeCount = countableSeasonEpisodes.Count(x => x.IsWatched),
@@ -235,6 +235,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
                     x.Id,
                     x.TvSeriesId,
                     x.SeasonNumber,
+                    x.TmdbSeasonId,
                     x.Name,
                     x.Overview,
                     x.PosterRemoteUrl,
@@ -371,6 +372,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             SeasonId = season.Id,
             SeriesId = season.TvSeriesId,
             TmdbSeriesId = season.SeriesTmdbId,
+            TmdbSeasonId = season.TmdbSeasonId,
             SeasonNumber = season.SeasonNumber,
             SeriesName = season.SeriesName,
             SeriesOriginalName = season.SeriesOriginalName ?? string.Empty,
@@ -399,7 +401,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
             TotalEpisodeCount = totalEpisodeCount,
             InLibraryEpisodeCount = episodeItems.Count(x => x.HasPlayableSource),
             IdentificationStatus = season.IdentificationStatus,
-            UnidentifiedSummary = season.IdentificationStatus == IdentificationStatus.Failed
+            UnidentifiedSummary = season.IdentificationStatus == IdentificationStatus.Failed || !season.TmdbSeasonId.HasValue
                 ? "未识别电视剧季。可先查看已解析集数和播放源，修正入口将在后续阶段接入。"
                 : string.Empty,
             Episodes = episodeItems,

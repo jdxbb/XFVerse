@@ -149,6 +149,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         private set => SetProperty(ref _ratingText, value);
     }
 
+    public string RatingBadgeText => RatingText;
+
     public double? RatingValue
     {
         get => _ratingValue;
@@ -347,5 +349,6 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         var presentation = DiscoveryRatingPresenter.Build(TmdbRating, TmdbVoteCount, OmdbRating);
         RatingValue = presentation.Value;
         RatingText = presentation.Text;
+        OnPropertyChanged(nameof(RatingBadgeText));
     }
 }

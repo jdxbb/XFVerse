@@ -6,7 +6,7 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 
 ## Blocker
 
-- None currently known after the Phase 7.4a Discovery search toolbar / layout implementation.
+- None currently known after the Phase 7.4b Discovery search UI structural alignment and build validation.
 
 ## Deferred
 
@@ -15,11 +15,11 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 - Dedicated 7.4 plan is tracked in `docs/movie-discovery/PHASE_7_4_DISCOVERY_PLAN.md`.
 - 7.4a completed Discovery search toolbar, shared Movie / TV search modes, dynamic placeholders, result status copy, baseline poster / list layout switching and Discovery-specific file-backed layout memory.
 - 7.4a added TV person search as a scoped Discovery search behavior through TMDB `person/{id}/tv_credits`; TV remains excluded from Movie AI recommendations, Watch Insights, profile/persona inputs and recommendation fingerprints.
-- 7.4b owns the full Discovery search UI visual alignment, including media-library-like toolbar/filter styling, result summary layout, scroll/density polish, poster/list containers and final result cards. Card requirements include no progress bar, top-left Movie/TV tag, top-right want-state action, rating badge treatment and no `已移出媒体库` button.
+- 7.4b completed Discovery search UI structural alignment: media-library-like toolbar / filter structure, result summary, scroll / density pass, poster / list containers and final result cards. Movie cards expose want-state actions; TV cards only show a `想看` tag when at least one season is want-to-watch.
+- Exact media-library visual parity for Discovery search controls remains deferred per user instruction. Known differences include button size, layout-toggle button position, search input size, search icon treatment and dropdown menu styling.
 - 7.4c owns ranking visual consistency only. TMDB ranking order, ranking source inclusion and paging semantics must remain unchanged unless explicitly documented as a blocker fix.
 - 7.4d owns the embedded AI recommendation tab and custom preference dialog polish only. Movie recommendation algorithms, prompts, profile/persona inputs, fingerprints and TV exclusion remain out of scope.
 - 7.4e owns Discovery regression closeout, docs updates and cross-page impact accounting.
-- 7.4a search UI is a functional baseline only. Full media-library-like visual alignment for the search toolbar, filters, summary, poster/list result areas, final list-row top-right want action, type/source tag placement and rating badge reuse remains 7.4b.
 - Discovery layout memory uses an App-layer preference file and must continue to avoid database fields or migrations.
 
 ### 7.3 Details
