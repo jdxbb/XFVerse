@@ -38,6 +38,7 @@ public partial class LibraryPage : UserControl
     private long _lastScrollDiagnosticsTimestamp;
     private bool _isRestoringLibraryScrollOffset;
     private int _libraryScrollApplyVersion;
+    private bool _isSortAlignmentQueued;
 
     public LibraryPage()
     {
@@ -46,6 +47,11 @@ public partial class LibraryPage : UserControl
         Unloaded += OnUnloaded;
         DataContextChanged += OnDataContextChanged;
         IsVisibleChanged += OnIsVisibleChanged;
+        SizeChanged += OnSizeChanged;
+        ToolbarRightButtonGrid.SizeChanged += OnToolbarAlignmentElementSizeChanged;
+        SortOptionFilterButton.SizeChanged += OnToolbarAlignmentElementSizeChanged;
+        CollectionStatusFilterButton.SizeChanged += OnToolbarAlignmentElementSizeChanged;
+        WatchedStatusFilterButton.SizeChanged += OnToolbarAlignmentElementSizeChanged;
         PosterLibraryListBox.Loaded += OnLibraryItemsListBoxLoaded;
         ListLibraryListBox.Loaded += OnLibraryItemsListBoxLoaded;
     }
@@ -55,6 +61,7 @@ public partial class LibraryPage : UserControl
         AttachLibraryState();
         AttachShellState();
         UpdateToolbarSearchWidth();
+        QueueAlignSortButton();
         QueueApplyLibraryScrollOffset();
     }
 
@@ -95,7 +102,18 @@ public partial class LibraryPage : UserControl
         DetachLibraryState();
         AttachLibraryState();
         UpdateToolbarSearchWidth();
+        QueueAlignSortButton();
         QueueApplyLibraryScrollOffset();
+    }
+
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        QueueAlignSortButton();
+    }
+
+    private void OnToolbarAlignmentElementSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        QueueAlignSortButton();
     }
 
     private void OnRootPreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -534,6 +552,7 @@ public partial class LibraryPage : UserControl
             or nameof(MainWindowViewModel.SidebarColumnWidth))
         {
             UpdateToolbarSearchWidth();
+            QueueAlignSortButton();
         }
     }
 
@@ -697,6 +716,7 @@ public partial class LibraryPage : UserControl
         ToolbarSearchColumn.Width = new GridLength(
             isSidebarCollapsed ? CollapsedSearchColumnWidth : ExpandedSearchColumnWidth);
         UpdateToolbarSecondRowLayout(isSidebarCollapsed);
+        QueueAlignSortButton();
     }
 
     private void UpdateToolbarSecondRowLayout(bool isSidebarCollapsed)
@@ -741,6 +761,67 @@ public partial class LibraryPage : UserControl
         if (!showBatchEntry)
         {
             Grid.SetColumn(BatchSelectionToggleButton, 0);
+        }
+
+        QueueAlignSortButton();
+    }
+
+    private void QueueAlignSortButton()
+    {
+        if (_isSortAlignmentQueued)
+        {
+            return;
+        }
+
+        _isSortAlignmentQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _isSortAlignmentQueued = false;
+                AlignSortButtonToSecondRowTarget();
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    private void AlignSortButtonToSecondRowTarget()
+    {
+        if (!IsLoaded
+            || ToolbarRightButtonGrid.ActualWidth <= 0
+            || SortOptionFilterButton.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var isSidebarCollapsed = true;
+        if (Window.GetWindow(this)?.DataContext is MainWindowViewModel shellViewModel)
+        {
+            isSidebarCollapsed = shellViewModel.IsSidebarCollapsed;
+        }
+
+        var targetButton = isSidebarCollapsed
+            ? WatchedStatusFilterButton
+            : CollectionStatusFilterButton;
+        if (targetButton.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var targetCenter = targetButton.TranslatePoint(
+            new Point(targetButton.ActualWidth / 2d, targetButton.ActualHeight / 2d),
+            ToolbarRightButtonGrid).X;
+        var desiredLeft = targetCenter - (SortOptionFilterButton.ActualWidth / 2d);
+        var clearWidth = ClearFiltersButton.ActualWidth > 0 ? ClearFiltersButton.ActualWidth : 0d;
+        var maxLeft = Math.Max(0d, ToolbarRightButtonGrid.ActualWidth - clearWidth - 12d - SortOptionFilterButton.ActualWidth);
+        var clampedLeft = Math.Max(0d, Math.Min(desiredLeft, maxLeft));
+        var currentLeft = Canvas.GetLeft(SortOptionFilterButton);
+        if (double.IsNaN(currentLeft))
+        {
+            currentLeft = 0d;
+        }
+
+        if (Math.Abs(currentLeft - clampedLeft) > 0.5)
+        {
+            Canvas.SetLeft(SortOptionFilterButton, clampedLeft);
         }
     }
 

@@ -7,6 +7,10 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
 {
+    private const int PosterTagDisplayLength = 18;
+    private const int ListTagDisplayLength = 76;
+    private const string TagOverflowMarker = "..";
+
     private bool _isInLibrary;
     private int _inLibrarySeasonCount;
     private bool _hasWantToWatchSeason;
@@ -81,6 +85,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             if (SetProperty(ref _totalSeasonCount, value))
             {
                 OnPropertyChanged(nameof(SeasonCountText));
+                OnPropertyChanged(nameof(ListDateRuntimeText));
             }
         }
     }
@@ -93,6 +98,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             if (SetProperty(ref _hasLoadedSeasonCount, value))
             {
                 OnPropertyChanged(nameof(SeasonCountText));
+                OnPropertyChanged(nameof(ListDateRuntimeText));
             }
         }
     }
@@ -170,6 +176,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
                 OnPropertyChanged(nameof(SeasonStateSummaryText));
                 OnPropertyChanged(nameof(HasSeasonStateSummary));
                 OnPropertyChanged(nameof(HasWantToWatchSeasonTag));
+                OnPropertyChanged(nameof(CurrentWantTagText));
             }
         }
     }
@@ -216,6 +223,8 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
 
     public string YearText => FirstAirYear?.ToString() ?? "-";
 
+    public string ReleaseDateText => string.IsNullOrWhiteSpace(FirstAirDate) ? YearText : FirstAirDate;
+
     public string RankText => $"#{SearchOrder}";
 
     public string OriginalTitleText => string.IsNullOrWhiteSpace(OriginalName) ? string.Empty : OriginalName;
@@ -228,6 +237,12 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
     public string DisplayTags => string.IsNullOrWhiteSpace(GenresText) ? "暂无类型" : GenresText;
 
     public string OverviewText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
+
+    public bool HasPoster => !string.IsNullOrWhiteSpace(PosterRemoteUrl);
+
+    public string CategoryTagText => "电视剧";
+
+    public string DetailHintText => "电视剧";
 
     public string AvailabilityText => IsInLibrary ? "有播放源" : "无播放源";
 
@@ -266,7 +281,51 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
 
     public string RatingBadgeText => TmdbRating is > 0 ? TmdbRating.Value.ToString("0.0") : "暂无评分";
 
+    public string WeightedAverageRatingText => RatingBadgeText;
+
+    public string RatingDisplayText => RatingBadgeText;
+
+    public bool IsHighRating => TmdbRating is >= 8d;
+
+    public bool IsHighWeightedAverageRating => IsHighRating;
+
     public bool HasWantToWatchSeasonTag => HasWantToWatchSeason;
+
+    public string CurrentWantTagText => "当前想看";
+
+    public string FullTagLine => BuildLimitedTagLine(DisplayTags, ListTagDisplayLength);
+
+    public string PosterTagLine => PosterTagGroupOneText;
+
+    public string PosterTagToolTipText => DisplayTags;
+
+    public string ListTagToolTipText => DisplayTags;
+
+    public string PosterTagGroupOneText => BuildLimitedTagLine(DisplayTags, PosterTagDisplayLength);
+
+    public string PosterTagGroupTwoText => string.Empty;
+
+    public string PosterTagGroupThreeText => string.Empty;
+
+    public string PosterTagSeparatorAfterOneText => string.Empty;
+
+    public string PosterTagSeparatorAfterTwoText => string.Empty;
+
+    public string ListTagGroupOneText => BuildLimitedTagLine(DisplayTags, ListTagDisplayLength);
+
+    public string ListTagGroupTwoText => string.Empty;
+
+    public string ListTagGroupThreeText => string.Empty;
+
+    public string ListTagSeparatorAfterOneText => string.Empty;
+
+    public string ListTagSeparatorAfterTwoText => string.Empty;
+
+    public string ListDateRuntimeText => $"{ReleaseDateText} | {SeasonCountText}";
+
+    public string ListDateAndTagSpacingText => "      ";
+
+    public string ListTagLine => ListTagGroupOneText;
 
     public string SeasonStateSummaryText
     {
@@ -330,10 +389,14 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
         OnPropertyChanged(nameof(Overview));
         OnPropertyChanged(nameof(OverviewText));
         OnPropertyChanged(nameof(PosterRemoteUrl));
+        OnPropertyChanged(nameof(HasPoster));
         OnPropertyChanged(nameof(GenresText));
         OnPropertyChanged(nameof(DisplayTags));
+        NotifyTagPresentationChanged();
         OnPropertyChanged(nameof(FirstAirYear));
         OnPropertyChanged(nameof(YearText));
+        OnPropertyChanged(nameof(ReleaseDateText));
+        OnPropertyChanged(nameof(ListDateRuntimeText));
     }
 
     public void ApplyDetails(TmdbTvSeriesDetailResult details)
@@ -359,6 +422,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             GenresText = details.GenresText;
             OnPropertyChanged(nameof(GenresText));
             OnPropertyChanged(nameof(DisplayTags));
+            NotifyTagPresentationChanged();
         }
 
         if (!FirstAirYear.HasValue && details.FirstAirYear.HasValue)
@@ -366,6 +430,8 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             FirstAirYear = details.FirstAirYear;
             OnPropertyChanged(nameof(FirstAirYear));
             OnPropertyChanged(nameof(YearText));
+            OnPropertyChanged(nameof(ReleaseDateText));
+            OnPropertyChanged(nameof(ListDateRuntimeText));
         }
     }
 
@@ -373,5 +439,98 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
     {
         TotalSeasonCount = null;
         HasLoadedSeasonCount = true;
+    }
+
+    private void NotifyTagPresentationChanged()
+    {
+        OnPropertyChanged(nameof(FullTagLine));
+        OnPropertyChanged(nameof(PosterTagLine));
+        OnPropertyChanged(nameof(PosterTagToolTipText));
+        OnPropertyChanged(nameof(ListTagToolTipText));
+        OnPropertyChanged(nameof(PosterTagGroupOneText));
+        OnPropertyChanged(nameof(PosterTagGroupTwoText));
+        OnPropertyChanged(nameof(PosterTagGroupThreeText));
+        OnPropertyChanged(nameof(PosterTagSeparatorAfterOneText));
+        OnPropertyChanged(nameof(PosterTagSeparatorAfterTwoText));
+        OnPropertyChanged(nameof(ListTagGroupOneText));
+        OnPropertyChanged(nameof(ListTagGroupTwoText));
+        OnPropertyChanged(nameof(ListTagGroupThreeText));
+        OnPropertyChanged(nameof(ListTagSeparatorAfterOneText));
+        OnPropertyChanged(nameof(ListTagSeparatorAfterTwoText));
+        OnPropertyChanged(nameof(ListTagLine));
+    }
+
+    private static string BuildLimitedTagLine(string? value, int maxDisplayLength)
+    {
+        var tags = ParseTags(value);
+        if (tags.Count == 0)
+        {
+            return "暂无类型";
+        }
+
+        var fullLine = FormatTags(tags);
+        if (FitsDisplayLength(fullLine, maxDisplayLength))
+        {
+            return fullLine;
+        }
+
+        var selected = new List<string>();
+        foreach (var tag in tags)
+        {
+            var candidate = selected.Concat([tag]).ToArray();
+            if (!FitsDisplayLength(FormatTags(candidate), maxDisplayLength))
+            {
+                break;
+            }
+
+            selected.Add(tag);
+        }
+
+        return selected.Count == 0
+            ? TruncateForDisplay(tags[0], maxDisplayLength)
+            : $"{FormatTags(selected)}{TagOverflowMarker}";
+    }
+
+    private static IReadOnlyList<string> ParseTags(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Array.Empty<string>();
+        }
+
+        return value
+            .Split(['/', '、', ',', '，', '|', ';', '；'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string FormatTags(IEnumerable<string> tags)
+    {
+        return string.Join(" / ", tags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
+    }
+
+    private static bool FitsDisplayLength(string value, int maxDisplayLength)
+    {
+        return CalculateDisplayLength(value) <= maxDisplayLength;
+    }
+
+    private static int CalculateDisplayLength(string value)
+    {
+        return value.Count(character => !char.IsWhiteSpace(character));
+    }
+
+    private static string TruncateForDisplay(string value, int maxDisplayLength)
+    {
+        if (FitsDisplayLength(value, maxDisplayLength))
+        {
+            return value;
+        }
+
+        var remaining = Math.Max(1, maxDisplayLength - TagOverflowMarker.Length);
+        var chars = value
+            .Where(character => !char.IsWhiteSpace(character))
+            .Take(remaining);
+        return $"{new string(chars.ToArray())}{TagOverflowMarker}";
     }
 }

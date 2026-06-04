@@ -119,6 +119,7 @@
         <Style x:Key="LibraryMediaMutedTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource LibraryMediaCardMutedTextBrush}" />
             <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
@@ -141,7 +142,9 @@
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Height" Value="28" />
             <Setter Property="Padding" Value="10,3" />
+            <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
         <Style x:Key="LibraryCompactComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource FormComboBoxStyle}">
@@ -517,31 +520,66 @@
             <Setter Property="MinWidth" Value="28" />
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+        </Style>
+
+        <Style x:Key="LibraryLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="ButtonChrome"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="14">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True" />
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushGlassButtonHover}" />
-                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushGlassButtonPressed}" />
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
+                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushDisabledBorder}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                                <Setter Property="Cursor" Value="Arrow" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="LibraryPosterLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryLayoutSegmentButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsPosterView}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LibraryListLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryLayoutSegmentButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsListView}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="SelectionDotButtonStyle" TargetType="Button">
@@ -867,7 +905,9 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition x:Name="ToolbarSearchColumn" Width="816" />
-                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="2" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="40" />
                         <ColumnDefinition Width="*" />
@@ -909,29 +949,29 @@
                             </TextBlock.RenderTransform>
                         </TextBlock>
                     </Button>
-                    <Grid Grid.Column="4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Button Command="{Binding ToggleSortDirectionCommand}"
-                                Style="{StaticResource LibrarySortDirectionIconButtonStyle}"
-                                ToolTip="{Binding SortDirectionButtonToolTip}">
-                            <Viewbox Width="16" Height="16">
-                                <Canvas Width="26" Height="24">
-                                    <Path Data="{Binding SortDirectionIconData}"
-                                          Stroke="{DynamicResource BrushForegroundSecondary}"
-                                          StrokeThickness="2"
-                                          StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round"
-                                          StrokeLineJoin="Round" />
-                                </Canvas>
-                            </Viewbox>
-                        </Button>
-                        <Button Grid.Column="2"
+                    <Button Grid.Column="4"
+                            VerticalAlignment="Bottom"
+                            Command="{Binding ToggleSortDirectionCommand}"
+                            Style="{StaticResource LibrarySortDirectionIconButtonStyle}"
+                            ToolTip="{Binding SortDirectionButtonToolTip}">
+                        <Viewbox Width="16" Height="16">
+                            <Canvas Width="26" Height="24">
+                                <Path Data="{Binding SortDirectionIconData}"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+                    <Canvas x:Name="ToolbarRightButtonGrid"
+                            Grid.Column="6"
+                            Height="28"
+                            VerticalAlignment="Bottom">
+                        <Button x:Name="SortOptionFilterButton"
+                                Canvas.Left="0"
+                                Canvas.Top="0"
                                 Content="{Binding SortButtonText}"
                                 Click="OpenButtonContextMenu"
                                 Style="{StaticResource LibraryFilterButtonStyle}">
@@ -945,12 +985,14 @@
                                 </ContextMenu>
                             </Button.ContextMenu>
                         </Button>
-                        <Button Grid.Column="4"
-                                HorizontalAlignment="Right"
+                        <Button x:Name="ClearFiltersButton"
+                                Canvas.Right="0"
+                                Canvas.Top="0"
                                 Content="清除筛选"
                                 Command="{Binding ClearFiltersCommand}"
+                                IsEnabled="{Binding CanClearFilters}"
                                 Style="{StaticResource LibraryToolbarButtonStyle}" />
-                    </Grid>
+                    </Canvas>
                 </Grid>
 
                 <Grid x:Name="ToolbarSecondRowGrid"
@@ -1091,6 +1133,7 @@
                                 <MenuItem Header="喜爱" IsCheckable="True" IsChecked="{Binding IsCollectionStatusFavoriteSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="喜爱" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                                 <MenuItem Header="想看" IsCheckable="True" IsChecked="{Binding IsCollectionStatusWantToWatchSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                                 <MenuItem Header="不想看" IsCheckable="True" IsChecked="{Binding IsCollectionStatusNotInterestedSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="不想看" Style="{StaticResource LibraryFilterMenuItemStyle}" />
+                                <MenuItem Header="其他" IsCheckable="True" IsChecked="{Binding IsCollectionStatusOtherSelected, Mode=OneWay}" StaysOpenOnClick="True" Command="{Binding SelectCollectionStatusCommand}" CommandParameter="其他" Style="{StaticResource LibraryFilterMenuItemStyle}" />
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
@@ -1178,44 +1221,20 @@
                                     Command="{Binding OpenRemovedLibraryCommand}"
                                     Style="{StaticResource LibraryToolbarButtonStyle}" />
                             <Border Margin="8,0,0,0"
-                                    Padding="2"
+                                    Padding="0"
                                     Background="{DynamicResource BrushGlassSurfaceAlt}"
                                     BorderBrush="{DynamicResource BrushBorder}"
                                     BorderThickness="1"
-                                    CornerRadius="10">
+                                    CornerRadius="3">
                                 <StackPanel Orientation="Horizontal">
                                     <Button Content="海报"
-                                            Command="{Binding SwitchToPosterViewCommand}">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
-                                                <Setter Property="Background" Value="Transparent" />
-                                                <Setter Property="BorderBrush" Value="Transparent" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsPosterView}" Value="True">
-                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
+                                            Command="{Binding SwitchToPosterViewCommand}"
+                                            Style="{StaticResource LibraryPosterLayoutSegmentButtonStyle}">
                                     </Button>
                                     <Button Margin="2,0,0,0"
                                             Content="列表"
-                                            Command="{Binding SwitchToListViewCommand}">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource LibraryToolbarButtonStyle}">
-                                                <Setter Property="Background" Value="Transparent" />
-                                                <Setter Property="BorderBrush" Value="Transparent" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsListView}" Value="True">
-                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
+                                            Command="{Binding SwitchToListViewCommand}"
+                                            Style="{StaticResource LibraryListLayoutSegmentButtonStyle}">
                                     </Button>
                                 </StackPanel>
                             </Border>
@@ -1224,6 +1243,7 @@
                         <StackPanel Margin="20,0,0,0"
                                     VerticalAlignment="Center">
                             <TextBlock FontSize="12"
+                                       FontWeight="SemiBold"
                                        LineHeight="18"
                                        LineStackingStrategy="BlockLineHeight"
                                        MaxHeight="36"
@@ -1242,6 +1262,7 @@
                                        TextWrapping="Wrap">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+                                        <Setter Property="FontWeight" Value="SemiBold" />
                                         <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding HasBatchStatusLine}" Value="True">

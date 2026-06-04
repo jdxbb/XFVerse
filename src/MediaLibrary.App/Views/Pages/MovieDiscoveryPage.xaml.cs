@@ -12,8 +12,10 @@ namespace MediaLibrary.App.Views.Pages;
 
 public partial class MovieDiscoveryPage : UserControl
 {
-    private const double CollapsedSearchColumnWidth = 816;
-    private const double ExpandedSearchColumnWidth = 660;
+    private const double CollapsedSearchColumnWidth = 544;
+    private const double ExpandedSearchColumnWidth = 440;
+    private const double FilterMenuWheelScrollStep = 42;
+    private const double PosterPagerBottomThreshold = 1d;
     private Button? _openMenuButton;
     private ContextMenu? _openContextMenu;
     private INotifyPropertyChanged? _shellPropertyChangedSource;
@@ -36,6 +38,7 @@ public partial class MovieDiscoveryPage : UserControl
         AttachShellState();
         UpdateSearchToolbarWidth();
         QueueApplyDiscoveryScrollOffset();
+        QueueUpdateDiscoveryPosterPagerVisibility();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -52,6 +55,7 @@ public partial class MovieDiscoveryPage : UserControl
         AttachDiscoveryState();
         UpdateSearchToolbarWidth();
         QueueApplyDiscoveryScrollOffset();
+        QueueUpdateDiscoveryPosterPagerVisibility();
     }
 
     private void AttachShellState()
@@ -119,6 +123,32 @@ public partial class MovieDiscoveryPage : UserControl
         {
             Keyboard.ClearFocus();
         }
+    }
+
+    private void SearchTextBox_KeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            Keyboard.ClearFocus();
+        }
+    }
+
+    private void ContextMenu_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not ContextMenu contextMenu)
+        {
+            return;
+        }
+
+        var scrollViewer = FindVisualDescendant<ScrollViewer>(contextMenu);
+        if (scrollViewer is null || scrollViewer.ScrollableHeight <= 0)
+        {
+            return;
+        }
+
+        var offsetDelta = e.Delta > 0 ? -FilterMenuWheelScrollStep : FilterMenuWheelScrollStep;
+        scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + offsetDelta);
+        e.Handled = true;
     }
 
     private void MenuButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -217,6 +247,24 @@ public partial class MovieDiscoveryPage : UserControl
         }
     }
 
+    private void DiscoveryListBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        QueueApplyDiscoveryScrollOffset();
+        if (sender is ListBox listBox)
+        {
+            QueueUpdateDiscoveryPosterPagerVisibility(listBox);
+        }
+    }
+
+    private void DiscoveryListBox_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is ListBox listBox)
+        {
+            StoreDiscoveryListBoxScrollOffset(listBox, e.VerticalOffset);
+            UpdateDiscoveryPosterPagerVisibility(listBox);
+        }
+    }
+
     private void AttachDiscoveryState()
     {
         if (_discoveryPropertyChangedSource is not null)
@@ -272,6 +320,7 @@ public partial class MovieDiscoveryPage : UserControl
             or nameof(MovieDiscoveryViewModel.IsTvRankingLoading))
         {
             QueueApplyDiscoveryScrollOffset();
+            QueueUpdateDiscoveryPosterPagerVisibility();
         }
     }
 
@@ -284,17 +333,9 @@ public partial class MovieDiscoveryPage : UserControl
             return;
         }
 
-        if (ReferenceEquals(scrollViewer, SearchMoviePosterScrollViewer))
-        {
-            viewModel.SearchMoviePosterScrollOffset = verticalOffset;
-        }
-        else if (ReferenceEquals(scrollViewer, SearchMovieListScrollViewer))
+        if (ReferenceEquals(scrollViewer, SearchMovieListScrollViewer))
         {
             viewModel.SearchMovieListScrollOffset = verticalOffset;
-        }
-        else if (ReferenceEquals(scrollViewer, SearchTvPosterScrollViewer))
-        {
-            viewModel.SearchTvPosterScrollOffset = verticalOffset;
         }
         else if (ReferenceEquals(scrollViewer, SearchTvListScrollViewer))
         {
@@ -310,6 +351,25 @@ public partial class MovieDiscoveryPage : UserControl
         }
     }
 
+    private void StoreDiscoveryListBoxScrollOffset(ListBox listBox, double verticalOffset)
+    {
+        if (_isRestoringDiscoveryScrollOffset
+            || !listBox.IsVisible
+            || DataContext is not MovieDiscoveryViewModel viewModel)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(listBox, SearchMoviePosterListBox))
+        {
+            viewModel.SearchMoviePosterScrollOffset = verticalOffset;
+        }
+        else if (ReferenceEquals(listBox, SearchTvPosterListBox))
+        {
+            viewModel.SearchTvPosterScrollOffset = verticalOffset;
+        }
+    }
+
     private void StoreCurrentDiscoveryScrollOffsets()
     {
         if (_isRestoringDiscoveryScrollOffset || DataContext is not MovieDiscoveryViewModel viewModel)
@@ -317,9 +377,9 @@ public partial class MovieDiscoveryPage : UserControl
             return;
         }
 
-        StoreCurrentDiscoveryScrollOffset(SearchMoviePosterScrollViewer, offset => viewModel.SearchMoviePosterScrollOffset = offset);
+        StoreCurrentDiscoveryListBoxScrollOffset(SearchMoviePosterListBox, offset => viewModel.SearchMoviePosterScrollOffset = offset);
         StoreCurrentDiscoveryScrollOffset(SearchMovieListScrollViewer, offset => viewModel.SearchMovieListScrollOffset = offset);
-        StoreCurrentDiscoveryScrollOffset(SearchTvPosterScrollViewer, offset => viewModel.SearchTvPosterScrollOffset = offset);
+        StoreCurrentDiscoveryListBoxScrollOffset(SearchTvPosterListBox, offset => viewModel.SearchTvPosterScrollOffset = offset);
         StoreCurrentDiscoveryScrollOffset(SearchTvListScrollViewer, offset => viewModel.SearchTvListScrollOffset = offset);
         StoreCurrentDiscoveryScrollOffset(RankingMovieScrollViewer, offset => viewModel.RankingMovieScrollOffset = offset);
         StoreCurrentDiscoveryScrollOffset(RankingTvScrollViewer, offset => viewModel.RankingTvScrollOffset = offset);
@@ -328,6 +388,20 @@ public partial class MovieDiscoveryPage : UserControl
     private static void StoreCurrentDiscoveryScrollOffset(ScrollViewer scrollViewer, Action<double> storeOffset)
     {
         if (scrollViewer.IsVisible)
+        {
+            storeOffset(scrollViewer.VerticalOffset);
+        }
+    }
+
+    private static void StoreCurrentDiscoveryListBoxScrollOffset(ListBox listBox, Action<double> storeOffset)
+    {
+        if (!listBox.IsVisible)
+        {
+            return;
+        }
+
+        var scrollViewer = FindVisualDescendant<ScrollViewer>(listBox);
+        if (scrollViewer is not null)
         {
             storeOffset(scrollViewer.VerticalOffset);
         }
@@ -407,14 +481,20 @@ public partial class MovieDiscoveryPage : UserControl
             return true;
         }
 
-        var (scrollViewer, targetOffset) = target.Value;
+        var (source, targetOffset) = target.Value;
         targetOffset = Math.Max(0d, targetOffset);
-        if (!scrollViewer.IsVisible)
+        if (!source.IsVisible)
         {
             return targetOffset <= 0d;
         }
 
-        scrollViewer.UpdateLayout();
+        source.UpdateLayout();
+        var scrollViewer = GetDiscoveryScrollViewer(source);
+        if (scrollViewer is null)
+        {
+            return false;
+        }
+
         if (targetOffset > 0d && scrollViewer.ScrollableHeight <= 0d)
         {
             return false;
@@ -426,19 +506,24 @@ public partial class MovieDiscoveryPage : UserControl
             scrollViewer.ScrollToVerticalOffset(clampedOffset);
         }
 
+        if (source is ListBox listBox)
+        {
+            UpdateDiscoveryPosterPagerVisibility(listBox, scrollViewer);
+        }
+
         return true;
     }
 
-    private (ScrollViewer ScrollViewer, double Offset)? GetActiveDiscoveryScrollTarget(MovieDiscoveryViewModel viewModel)
+    private (FrameworkElement Source, double Offset)? GetActiveDiscoveryScrollTarget(MovieDiscoveryViewModel viewModel)
     {
         return viewModel.SelectedTabIndex switch
         {
             0 when viewModel.IsTvSearchSelected && viewModel.IsSearchPosterLayout =>
-                (SearchTvPosterScrollViewer, viewModel.SearchTvPosterScrollOffset),
+                (SearchTvPosterListBox, viewModel.SearchTvPosterScrollOffset),
             0 when viewModel.IsTvSearchSelected =>
                 (SearchTvListScrollViewer, viewModel.SearchTvListScrollOffset),
             0 when viewModel.IsSearchPosterLayout =>
-                (SearchMoviePosterScrollViewer, viewModel.SearchMoviePosterScrollOffset),
+                (SearchMoviePosterListBox, viewModel.SearchMoviePosterScrollOffset),
             0 =>
                 (SearchMovieListScrollViewer, viewModel.SearchMovieListScrollOffset),
             1 when viewModel.IsTvRankingSelected =>
@@ -447,6 +532,71 @@ public partial class MovieDiscoveryPage : UserControl
                 (RankingMovieScrollViewer, viewModel.RankingMovieScrollOffset),
             _ => null
         };
+    }
+
+    private static ScrollViewer? GetDiscoveryScrollViewer(FrameworkElement source)
+    {
+        return source as ScrollViewer ?? FindVisualDescendant<ScrollViewer>(source);
+    }
+
+    private void QueueUpdateDiscoveryPosterPagerVisibility()
+    {
+        _ = Dispatcher.InvokeAsync(
+            () => UpdateDiscoveryPosterPagerVisibility(),
+            DispatcherPriority.Loaded);
+    }
+
+    private void QueueUpdateDiscoveryPosterPagerVisibility(ListBox listBox)
+    {
+        _ = Dispatcher.InvokeAsync(
+            () => UpdateDiscoveryPosterPagerVisibility(listBox),
+            DispatcherPriority.Loaded);
+    }
+
+    private void UpdateDiscoveryPosterPagerVisibility()
+    {
+        UpdateDiscoveryPosterPagerVisibility(SearchMoviePosterListBox);
+        UpdateDiscoveryPosterPagerVisibility(SearchTvPosterListBox);
+    }
+
+    private void UpdateDiscoveryPosterPagerVisibility(ListBox listBox)
+    {
+        var scrollViewer = FindVisualDescendant<ScrollViewer>(listBox);
+        UpdateDiscoveryPosterPagerVisibility(listBox, scrollViewer);
+    }
+
+    private void UpdateDiscoveryPosterPagerVisibility(ListBox listBox, ScrollViewer? scrollViewer)
+    {
+        var pagerPanel = GetDiscoveryPosterPagerPanel(listBox);
+        if (pagerPanel is null)
+        {
+            return;
+        }
+
+        if (!listBox.IsVisible || scrollViewer is null)
+        {
+            pagerPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var shouldShowPager = scrollViewer.ScrollableHeight <= PosterPagerBottomThreshold
+            || scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - PosterPagerBottomThreshold;
+        pagerPanel.Visibility = shouldShowPager ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private StackPanel? GetDiscoveryPosterPagerPanel(ListBox listBox)
+    {
+        if (ReferenceEquals(listBox, SearchMoviePosterListBox))
+        {
+            return SearchMoviePosterPagerPanel;
+        }
+
+        if (ReferenceEquals(listBox, SearchTvPosterListBox))
+        {
+            return SearchTvPosterPagerPanel;
+        }
+
+        return null;
     }
 
     private static bool IsWithinTextInput(DependencyObject source)
@@ -478,5 +628,27 @@ public partial class MovieDiscoveryPage : UserControl
             FrameworkContentElement contentElement => contentElement.Parent,
             _ => null
         };
+    }
+
+    private static T? FindVisualDescendant<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var descendant = FindVisualDescendant<T>(child);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 }

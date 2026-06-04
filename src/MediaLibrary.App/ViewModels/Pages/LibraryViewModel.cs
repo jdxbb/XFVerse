@@ -29,6 +29,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string CollectionStatusFavorite = "喜爱";
     private const string CollectionStatusWantToWatch = "想看";
     private const string CollectionStatusNotInterested = "不想看";
+    private const string CollectionStatusOther = "其他";
     private const string ContentTypeAll = "全部";
     private const string ContentTypeMovie = "电影";
     private const string ContentTypeTv = "电视剧";
@@ -80,6 +81,13 @@ public sealed class LibraryViewModel : PageViewModelBase
     [
         "独自观看", "情侣", "朋友", "亲子", "家人", "深夜", "放松", "下饭", "周末", "聚会",
         "高专注", "背景播放", "二刷", "影院感", "通勤", "短时观看", "长片沉浸", "节日", "雨天", "睡前"
+    ];
+
+    private static readonly IReadOnlyList<string> DefaultCollectionStatusFilters =
+    [
+        CollectionStatusOther,
+        CollectionStatusFavorite,
+        CollectionStatusWantToWatch
     ];
 
     private readonly ILibraryQueryService _libraryQueryService;
@@ -193,8 +201,10 @@ public sealed class LibraryViewModel : PageViewModelBase
         WatchedFilterOptions = [FilterAll, WatchedFilterWatched, WatchedFilterUnwatched];
         LibraryScopeOptions = [LibraryScopeAll, LibraryScopeWithSource, LibraryScopeWithoutSource];
         SourceFilterOptions = [SourceFilterAll, SourceFilterLocal, SourceFilterWebDav];
-        CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested];
+        CollectionStatusOptions = [FilterAll, CollectionStatusFavorite, CollectionStatusWantToWatch, CollectionStatusNotInterested, CollectionStatusOther];
         ContentTypeOptions = [ContentTypeAll, ContentTypeMovie, ContentTypeTv, ContentTypeOther];
+        ResetCollectionStatusFilterToDefault();
+        RefreshCollectionStatusFilterState(applyFilters: false);
         ResetContentTypeFilterToDefault();
         RefreshContentTypeFilterState(applyFilters: false);
         SwitchToPosterViewCommand = new RelayCommand(() => SetLibraryLayout(isPosterView: true));
@@ -569,6 +579,8 @@ public sealed class LibraryViewModel : PageViewModelBase
     public bool IsCollectionStatusWantToWatchSelected => _selectedCollectionStatusFilters.Contains(CollectionStatusWantToWatch);
 
     public bool IsCollectionStatusNotInterestedSelected => _selectedCollectionStatusFilters.Contains(CollectionStatusNotInterested);
+
+    public bool IsCollectionStatusOtherSelected => _selectedCollectionStatusFilters.Contains(CollectionStatusOther);
 
     public string TagFilterButtonText
     {
@@ -2033,7 +2045,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         SelectedWatchedFilter = FilterAll;
         SelectedLibraryScope = LibraryScopeAll;
         SelectedSourceFilter = SourceFilterAll;
-        _selectedCollectionStatusFilters.Clear();
+        ResetCollectionStatusFilterToDefault();
         RefreshCollectionStatusFilterState(applyFilters: false);
         ResetContentTypeFilterToDefault();
         RefreshContentTypeFilterState(applyFilters: false);
@@ -2054,7 +2066,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                && string.Equals(SelectedWatchedFilter, FilterAll, StringComparison.Ordinal)
                && string.Equals(SelectedLibraryScope, LibraryScopeAll, StringComparison.Ordinal)
                && string.Equals(SelectedSourceFilter, SourceFilterAll, StringComparison.Ordinal)
-               && _selectedCollectionStatusFilters.Count == 0
+               && IsDefaultCollectionStatusFilter()
                && IsDefaultContentTypeFilterState()
                && _selectedDecadeFilters.Count == 0
                && IsTagFilterAllSelected;
@@ -2189,8 +2201,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             FilterAll,
             CollectionStatusOptions,
             _selectedCollectionStatusFilters,
-            RefreshCollectionStatusFilterState,
-            resetWhenAllNonAllSelected: false);
+            RefreshCollectionStatusFilterState);
     }
 
     private void UpdateMultiSelectFilter(
@@ -2273,6 +2284,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(IsCollectionStatusFavoriteSelected));
         OnPropertyChanged(nameof(IsCollectionStatusWantToWatchSelected));
         OnPropertyChanged(nameof(IsCollectionStatusNotInterestedSelected));
+        OnPropertyChanged(nameof(IsCollectionStatusOtherSelected));
         RefreshClearFiltersCommandState();
         if (applyFilters)
         {
@@ -2299,7 +2311,22 @@ public sealed class LibraryViewModel : PageViewModelBase
             return string.Join(" / ", ordered);
         }
 
-        return $"{ordered.Count} 项";
+        return $"{ordered.Count}项";
+    }
+
+    private void ResetCollectionStatusFilterToDefault()
+    {
+        _selectedCollectionStatusFilters.Clear();
+        foreach (var status in DefaultCollectionStatusFilters)
+        {
+            _selectedCollectionStatusFilters.Add(status);
+        }
+    }
+
+    private bool IsDefaultCollectionStatusFilter()
+    {
+        return _selectedCollectionStatusFilters.Count == DefaultCollectionStatusFilters.Count
+               && DefaultCollectionStatusFilters.All(_selectedCollectionStatusFilters.Contains);
     }
 
     private void ClearTagFilter()
@@ -2760,6 +2787,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             CollectionStatusFavorite => item.IsFavorite,
             CollectionStatusWantToWatch => item.IsWantToWatch,
             CollectionStatusNotInterested => item.IsNotInterested,
+            CollectionStatusOther => !item.IsFavorite && !item.IsWantToWatch && !item.IsNotInterested,
             _ => true
         };
     }

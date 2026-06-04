@@ -7,6 +7,10 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class DiscoveryMovieCardViewModel : ObservableObject
 {
+    private const int PosterMovieTagDisplayLength = 18;
+    private const int ListMovieTagDisplayLength = 76;
+    private const string TagOverflowMarker = "..";
+
     private bool _isWantToWatch;
     private bool _isWatched;
     private bool _isFavorite;
@@ -151,13 +155,23 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public string RatingBadgeText => RatingText;
 
+    public string WeightedAverageRatingText => RatingText;
+
+    public string RatingDisplayText => RatingText;
+
     public double? RatingValue
     {
         get => _ratingValue;
         private set => SetProperty(ref _ratingValue, value);
     }
 
+    public bool IsHighRating => RatingValue is >= 8d;
+
+    public bool IsHighWeightedAverageRating => IsHighRating;
+
     public string YearText => ReleaseYear?.ToString() ?? "-";
+
+    public string ReleaseDateText => string.IsNullOrWhiteSpace(ReleaseDate) ? YearText : ReleaseDate;
 
     public string RankText => $"#{SearchOrder}";
 
@@ -170,6 +184,12 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public string OverviewText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
 
+    public bool HasPoster => !string.IsNullOrWhiteSpace(PosterRemoteUrl);
+
+    public string CategoryTagText => "电影";
+
+    public string DetailHintText => "电影";
+
     public string AvailabilityText => IsInLibrary
         ? "有播放源"
         : HasLocalMovie || IsVisibleInLibrary
@@ -180,7 +200,47 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public bool CanToggleWantToWatch => !IsWatched;
 
-    public string WantToWatchButtonText => IsWatched ? "已看" : IsWantToWatch ? "想看" : "+ 想看";
+    public string WantToWatchButtonText => IsWatched ? "已看" : IsWantToWatch ? "取消想看" : "+ 想看";
+
+    public string FullTagLine => JoinVisibleGroups(BuildTagGroups(null));
+
+    public string PosterTagLine => JoinVisibleGroups(PosterTagGroupOneText, PosterTagGroupTwoText, PosterTagGroupThreeText);
+
+    public string PosterTagToolTipText => FullTagLine;
+
+    public string ListTagToolTipText => FullTagLine;
+
+    public string PosterTagGroupOneText => BuildTagGroups(PosterMovieTagDisplayLength)[0];
+
+    public string PosterTagGroupTwoText => BuildTagGroups(PosterMovieTagDisplayLength)[1];
+
+    public string PosterTagGroupThreeText => BuildTagGroups(PosterMovieTagDisplayLength)[2];
+
+    public string PosterTagSeparatorAfterOneText => BuildSeparator(PosterTagGroupOneText, PosterTagGroupTwoText, PosterTagGroupThreeText);
+
+    public string PosterTagSeparatorAfterTwoText => BuildSeparator(PosterTagGroupTwoText, PosterTagGroupThreeText);
+
+    public string ListTagGroupOneText => BuildTagGroups(ListMovieTagDisplayLength)[0];
+
+    public string ListTagGroupTwoText => BuildTagGroups(ListMovieTagDisplayLength)[1];
+
+    public string ListTagGroupThreeText => BuildTagGroups(ListMovieTagDisplayLength)[2];
+
+    public string ListTagSeparatorAfterOneText => BuildSeparator(ListTagGroupOneText, ListTagGroupTwoText, ListTagGroupThreeText);
+
+    public string ListTagSeparatorAfterTwoText => BuildSeparator(ListTagGroupTwoText, ListTagGroupThreeText);
+
+    public string ListDateRuntimeText => RuntimeMinutes is > 0
+        ? $"{ReleaseDateText} | {RuntimeText}"
+        : ReleaseDateText;
+
+    public string ListDateAndTagSpacingText => "      ";
+
+    public string ListTagLine => JoinVisibleGroups(ListTagGroupOneText, ListTagGroupTwoText, ListTagGroupThreeText);
+
+    public string RuntimeText => RuntimeMinutes is > 0
+        ? $"{RuntimeMinutes.Value / 60:00}:{RuntimeMinutes.Value % 60:00}:00"
+        : "--:--:--";
 
     public bool CanAddToLibrary => LibraryVisibilityState == LibraryVisibilityState.Hidden
                                    || (!HasLocalMovie && !IsVisibleInLibrary);
@@ -248,13 +308,18 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(ReleaseYear));
             OnPropertyChanged(nameof(ReleaseDate));
             OnPropertyChanged(nameof(YearText));
+            OnPropertyChanged(nameof(ReleaseDateText));
             OnPropertyChanged(nameof(PosterRemoteUrl));
+            OnPropertyChanged(nameof(HasPoster));
             OnPropertyChanged(nameof(Overview));
             OnPropertyChanged(nameof(OverviewText));
             OnPropertyChanged(nameof(GenresText));
             OnPropertyChanged(nameof(DisplayTags));
             OnPropertyChanged(nameof(EmotionTagsText));
             OnPropertyChanged(nameof(SceneTagsText));
+            NotifyTagPresentationChanged();
+            OnPropertyChanged(nameof(ListDateRuntimeText));
+            OnPropertyChanged(nameof(RuntimeText));
             OnPropertyChanged(nameof(IsInLibrary));
             OnPropertyChanged(nameof(HasLocalMovie));
             OnPropertyChanged(nameof(ActiveSourceCount));
@@ -275,6 +340,24 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(CanAddToLibrary));
             OnPropertyChanged(nameof(AddToLibraryButtonText));
         }
+
+        NotifyLibraryStatusChanged();
+    }
+
+    public void ApplyMissingStatus()
+    {
+        MovieId = null;
+        ActiveSourceCount = 0;
+        IsInLibrary = false;
+        IsVisibleInLibrary = false;
+        LibraryVisibilityState = LibraryVisibilityState.Auto;
+        IsWatched = false;
+        IsWantToWatch = false;
+        IsFavorite = false;
+        IsNotInterested = false;
+
+        NotifyLibraryStatusChanged();
+        OnPropertyChanged(nameof(WatchStateText));
     }
 
     public void ApplyWantToWatchState(bool isWantToWatch)
@@ -284,6 +367,19 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         {
             IsNotInterested = false;
         }
+    }
+
+    private void NotifyLibraryStatusChanged()
+    {
+        OnPropertyChanged(nameof(MovieId));
+        OnPropertyChanged(nameof(ActiveSourceCount));
+        OnPropertyChanged(nameof(IsInLibrary));
+        OnPropertyChanged(nameof(IsVisibleInLibrary));
+        OnPropertyChanged(nameof(LibraryVisibilityState));
+        OnPropertyChanged(nameof(HasLocalMovie));
+        OnPropertyChanged(nameof(AvailabilityText));
+        OnPropertyChanged(nameof(CanAddToLibrary));
+        OnPropertyChanged(nameof(AddToLibraryButtonText));
     }
 
     public void SetImdbId(string imdbId)
@@ -321,6 +417,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         {
             RuntimeMinutes = details.RuntimeMinutes;
             OnPropertyChanged(nameof(RuntimeMinutes));
+            OnPropertyChanged(nameof(RuntimeText));
+            OnPropertyChanged(nameof(ListDateRuntimeText));
         }
 
         if (!TmdbRating.HasValue && details.TmdbRating.HasValue)
@@ -350,5 +448,132 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         RatingValue = presentation.Value;
         RatingText = presentation.Text;
         OnPropertyChanged(nameof(RatingBadgeText));
+        OnPropertyChanged(nameof(WeightedAverageRatingText));
+        OnPropertyChanged(nameof(RatingDisplayText));
+        OnPropertyChanged(nameof(IsHighRating));
+        OnPropertyChanged(nameof(IsHighWeightedAverageRating));
+    }
+
+    private void NotifyTagPresentationChanged()
+    {
+        OnPropertyChanged(nameof(FullTagLine));
+        OnPropertyChanged(nameof(PosterTagLine));
+        OnPropertyChanged(nameof(PosterTagToolTipText));
+        OnPropertyChanged(nameof(ListTagToolTipText));
+        OnPropertyChanged(nameof(PosterTagGroupOneText));
+        OnPropertyChanged(nameof(PosterTagGroupTwoText));
+        OnPropertyChanged(nameof(PosterTagGroupThreeText));
+        OnPropertyChanged(nameof(PosterTagSeparatorAfterOneText));
+        OnPropertyChanged(nameof(PosterTagSeparatorAfterTwoText));
+        OnPropertyChanged(nameof(ListTagGroupOneText));
+        OnPropertyChanged(nameof(ListTagGroupTwoText));
+        OnPropertyChanged(nameof(ListTagGroupThreeText));
+        OnPropertyChanged(nameof(ListTagSeparatorAfterOneText));
+        OnPropertyChanged(nameof(ListTagSeparatorAfterTwoText));
+        OnPropertyChanged(nameof(ListTagLine));
+    }
+
+    private string[] BuildTagGroups(int? maxDisplayLength)
+    {
+        var groups = new[]
+        {
+            ParseTags(DisplayTags),
+            ParseTags(EmotionTagsText),
+            ParseTags(SceneTagsText)
+        };
+
+        if (groups.All(group => group.Count == 0))
+        {
+            return ["暂无类型", string.Empty, string.Empty];
+        }
+
+        var formatted = groups.Select(FormatTags).ToArray();
+        if (!maxDisplayLength.HasValue || FitsDisplayLength(JoinVisibleGroups(formatted), maxDisplayLength.Value))
+        {
+            return formatted;
+        }
+
+        return TruncateVisibleGroupsForDisplay(formatted, maxDisplayLength.Value);
+    }
+
+    private static IReadOnlyList<string> ParseTags(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Array.Empty<string>();
+        }
+
+        return value
+            .Split(['/', '、', ',', '，', '|', ';', '；'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string FormatTags(IEnumerable<string> tags)
+    {
+        return string.Join(" / ", tags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
+    }
+
+    private static string JoinVisibleGroups(params string[] groups)
+    {
+        return string.Join(" | ", groups.Where(group => !string.IsNullOrWhiteSpace(group)));
+    }
+
+    private static string BuildSeparator(string currentGroup, params string[] followingGroups)
+    {
+        return !string.IsNullOrWhiteSpace(currentGroup) && followingGroups.Any(group => !string.IsNullOrWhiteSpace(group))
+            ? " | "
+            : string.Empty;
+    }
+
+    private static bool FitsDisplayLength(string value, int maxDisplayLength)
+    {
+        return CalculateDisplayLength(value) <= maxDisplayLength;
+    }
+
+    private static int CalculateDisplayLength(string value)
+    {
+        return value.Count(character => !char.IsWhiteSpace(character));
+    }
+
+    private static string[] TruncateVisibleGroupsForDisplay(string[] groups, int maxDisplayLength)
+    {
+        var result = groups.ToArray();
+        while (!FitsDisplayLength(JoinVisibleGroups(result), maxDisplayLength))
+        {
+            var groupIndex = Enumerable.Range(0, result.Length)
+                .Where(index => !string.IsNullOrWhiteSpace(result[index]))
+                .LastOrDefault(-1);
+            if (groupIndex < 0)
+            {
+                break;
+            }
+
+            var current = result[groupIndex];
+            if (CalculateDisplayLength(current) <= TagOverflowMarker.Length + 1)
+            {
+                result[groupIndex] = string.Empty;
+                continue;
+            }
+
+            result[groupIndex] = TruncateForDisplay(current, CalculateDisplayLength(current) - 1);
+        }
+
+        return result;
+    }
+
+    private static string TruncateForDisplay(string value, int maxDisplayLength)
+    {
+        if (FitsDisplayLength(value, maxDisplayLength))
+        {
+            return value;
+        }
+
+        var remaining = Math.Max(1, maxDisplayLength - TagOverflowMarker.Length);
+        var chars = value
+            .Where(character => !char.IsWhiteSpace(character))
+            .Take(remaining);
+        return $"{new string(chars.ToArray())}{TagOverflowMarker}";
     }
 }

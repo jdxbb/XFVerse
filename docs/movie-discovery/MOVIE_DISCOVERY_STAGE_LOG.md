@@ -1,5 +1,150 @@
 # 影片发现阶段日志
 
+## 2026-06-05 - 7.4b follow-up / 工具栏、结果区域与想看摘要测试反馈修复
+
+完成内容：
+- 影片搜索第一行改为左侧输入框 / 搜索图标 / 顺序图标一组，右侧排序 / 影视 / 搜索方式 / 清除筛选四按钮一组；顺序图标移出右侧筛选组，去掉常驻边框和背景，仅沿用图标按钮 hover / pressed 效果。
+- 影片搜索 `清除筛选` 增加当前激活 Movie / TV 模式下的默认状态判断，筛选全部为默认时禁用按钮；切换筛选、切换 Movie / TV 和重建结果时同步刷新 CanExecute。
+- 影片搜索海报结果增加媒体库同参数的海报槽位和安全留白，使用 194x288 槽位与 `0,10,0,30` 内容边距，降低左右不齐和阴影裁切风险。
+- 影片搜索和媒体库的海报 / 列表布局切换组件统一为本地 28px 小圆角模板，外层圆角降为 4px，选中按钮圆角降为 3px，并移除 Discovery 组件的固定最小宽度。
+- Movie 搜索结果取消想看后重新解析本地状态；当状态解析器确认没有本地 / 用户状态时清空卡片的入库、可见、播放源和用户状态字段，摘要重新按实际状态统计。主动入库仍存在时不强制出库。
+- 媒体库第一行同步改为左侧输入框 / 搜索图标 / 顺序图标一组，右侧排序 / 清除筛选两按钮一组；顺序图标去掉常驻边框和背景，并绑定按钮前景色。
+- 媒体库海报和列表小字样式补充 `SemiBold` 字重，对齐影片搜索结果的小字粗体观感。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改搜索服务、TMDB 请求、榜单、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未新增 TV series 级 `+ 想看` / `取消想看` 操作；TV 仍只展示已有想看季状态。
+- 未启动完整桌面应用做人工截图验收。
+
+## 2026-06-05 - 7.4b follow-up / 搜索结果卡片测试反馈修复
+
+完成内容：
+
+- 影片搜索 Movie / TV 海报结果改为媒体库 180x270 海报卡片结构：裁剪、双层阴影、海报占位、上下渐变、左上类型标签和底部信息区对齐媒体库卡片。
+- Movie 海报右上角从播放源标签改为 `+ 想看` / `取消想看` 按钮，并用不同底色区分状态；TV 海报右上角改为存在想看季时才显示 `当前想看` 标签。
+- 海报卡片去掉媒体库进度条和进度标签；标题 / 日期列缩短，右侧加入首页 AI 推荐同款评分标签，评分标签相对标题和日期两行垂直居中。
+- 影片搜索 Movie / TV 列表结果改为媒体库列表结构：深色圆角行、左侧评分块、中部标题和标签行、右侧标签区；去掉进度条和进度标签。
+- Movie 列表右侧播放源标签改为 `+ 想看` / `取消想看` 按钮；TV 列表右侧保留 `当前想看` 标签语义，仅在存在想看季时显示。
+
+验证：
+
+- `git diff --check` passed。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+
+未做事项：
+
+- 未修改搜索服务、TMDB 请求、筛选语义、榜单、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未新增 TV series 级想看切换；TV 仍按已有“存在想看季”状态展示。
+- 未启动完整桌面应用做人工截图验收。
+
+## 2026-06-05 - 7.4b follow-up / 搜索工具栏三次测试反馈修复
+
+完成内容：
+
+- 影片搜索第一行搜索输入框在侧栏收起 / 展开状态下分别从 816 / 660 调整到 544 / 440，释放出的宽度由右侧按钮组的等权星号间隔承接，最右侧 `清除筛选` 仍锚定在工具栏右端。
+- 影片搜索第一行右侧控件改为：顺序图标、排序、影视、搜索方式、清除筛选；`搜索方式` 从第二行移动到 `影视` 右侧。
+- 影片搜索第二行 Movie / TV 筛选均从 `类型` 开始，顺序为：类型、地区、语言、年代、入库状态、观看状态、收藏状态、播放源；第一个按钮左端仍对齐搜索输入框左端。
+
+验证：
+
+- `git diff --check` passed。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+
+未做事项：
+
+- 未修改搜索服务、TMDB 请求、筛选语义、榜单、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收。
+
+## 2026-06-05 - 7.4b follow-up / 搜索工具栏二次测试反馈修复
+
+完成内容：
+
+- 媒体库搜索输入框和结果摘要字体加粗；摘要常规行和批量状态行均显式使用半粗字重。
+- 影片搜索第一行右侧控件改为：顺序图标、排序、影视、清除筛选；`影视` 从第二行移动到排序按钮右侧。
+- 影片搜索第二行 Movie / TV 筛选均从 `搜索方式` 开始，顺序为：搜索方式、类型、地区、语言、年代、入库状态、观看状态、收藏状态、播放源。
+- 第二行筛选按钮继续使用等宽星号间隔，左端对齐搜索输入框左端，播放源右端对齐清除筛选右端。
+
+验证：
+
+- `git diff --check` passed。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+
+未做事项：
+
+- 未修改搜索服务、TMDB 请求、筛选语义、榜单、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收。
+
+## 2026-06-05 - 7.4b follow-up / 搜索工具栏测试反馈修复
+
+完成内容：
+
+- 媒体库搜索输入框显式使用与影片搜索输入框一致的基础字体族、12px 字号和普通字重。
+- 影片搜索新增单选筛选 `入库状态：全部 / 已入库 / 未入库`；Movie / TV 各自保存筛选状态，默认均为 `全部`。
+- 影片搜索第二行筛选改为 10 列等距网格，视觉顺序为：影视、搜索方式、类型、地区、语言、年代、入库状态、观看状态、收藏状态、播放源；左端对齐搜索输入框，右端对齐清除筛选按钮。
+- 搜索结果加载时清空当前可见结果和摘要，保留加载覆盖层转圈动画与当前媒介 / 搜索方式提示文案。
+- 搜索结果摘要改为单行媒体库式统计：`共找到 x 项媒体 · 已入库 x 项 · 未入库 x 项`，不再显示布局切换或缓存扫描提示。
+- 搜索结果容器空白区域显式使用箭头光标，保留结果卡片和可点击控件的手形光标。
+- 影片搜索 Movie / TV 的上一页 / 下一页按钮改为透明 chevron 图标按钮，仅 hover / pressed 时显示边框和选中态。
+
+验证：
+
+- `git diff --check` passed。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+
+- 未修改 TMDB 请求、搜索排序、榜单算法、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未改榜单分页按钮；本轮反馈限定在影片搜索结果区域分页按钮。
+- 未启动完整桌面应用做人工截图验收。
+
+## 2026-06-05 - 7.4b follow-up / Tab 对齐根因修复
+
+完成内容：
+
+- 复查 Tab 偏移问题后确认：原 `TabItem` 模板内文字和下划线本身可居中，但可见效果仍受 WPF `TabPanel` / `TabItem` header 单元测量和潜在裁剪影响，可能表现为文字完整而下划线一侧被截断或视觉中心偏移。
+- 顶层可见 Tab 头改为 `TabControl` 模板内的固定宽度手工按钮条，三个按钮都使用 104px 固定坐标系；文字 `TextBlock` 与选中下划线 `Border` 绑定同一宽度，选中状态只切换下划线刷色，不改变宽度或重新测量。
+- 原 `TabPanel` 保留为 0 高度、不可点击、透明的 `ItemsHost`，仅用于维持 `TabControl.SelectedContent` 内容选择；可见 Tab 头不再依赖 `TabItem` header 渲染。
+- `SelectedTabIndex` 增加三个选中状态投影和手工 Tab 选择命令，确保点击按钮、导航持久化和程序切 Tab 都共享同一个状态源。
+- 顶层 Tab 区域和分隔横线整体继续上移 4px。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- WPF 离屏像素验证：三个可见 Tab 下划线均为 104px；`影片搜索` / `榜单` 文字中心与线中心差值为 0px，`AI推荐` 为 -0.5px。
+
+未做事项：
+
+- 未改搜索、榜单、AI 推荐、TMDB 请求、扫描、数据库 schema、migration 或 database update。
+- 未启动整包应用做人工截图；本轮以代码结构、离屏像素验证和 build 作为自动验证。
+
+## Phase 7.4c 榜单视觉一致性
+
+完成内容：
+
+- 榜单 Tab 头部改为媒体库式紧凑按钮 / ContextMenu：媒介、榜单类型和趋势时间不再使用旧 ComboBox / Menu 外观。
+- 榜单头部保留 Discovery 专属状态文案和摘要，右侧补当前 Movie / TV 榜单页码徽标。
+- 榜单内容区改为统一玻璃卡片容器，Movie / TV 独立滚动、加载、空状态和分页绑定保持不变。
+- Movie 榜单 Top card 和普通双列行对齐 7.4b 搜索卡片语言：排名、类型、评分、播放源状态、观看状态、想看动作、加入媒体库 / 恢复动作。
+- TV 榜单 Top card 和普通双列行对齐 Movie 榜单视觉：类型、评分、媒体库状态、季数、Season 状态摘要、想看季标签、加入媒体库 / 恢复动作。
+- TV 榜单继续使用既有 metadata hydration / 剧详情入口，不进入 AI 推荐、Watch Insights、画像、观影人格或推荐 fingerprint。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+
+- AI 推荐 Tab 和推荐偏好弹窗仍按 7.4d 处理。
+- 榜单样式仍是 `MovieDiscoveryPage` 本地资源，未抽取为全局组件。
+- 未新增数据库字段、未新增 migration、未执行 database update。
+
 ## Phase 7.4b 媒体库一致性修复
 
 完成内容：
@@ -10,7 +155,7 @@
 - 搜索结果圆角区域第一行对齐媒体库：左侧为状态 / 摘要，右侧为海报 / 列表分段切换；实际结果或空状态从第二行开始。
 - 搜索海报卡片密度收紧到媒体库式 180x270 基准，避免搜索结果列数明显少于媒体库。
 - 搜索结果和榜单主滚动区接入隐藏式 6px 垂直滚动条自动显隐，横向滚动禁用。
-- Movie / TV 的地区、语言、收藏状态改为多选筛选；Movie 和 TV 均拆分观看状态、播放源、收藏状态。
+- Movie / TV 的地区、语言改为多选筛选；Movie 和 TV 均拆分观看状态、播放源、收藏状态，收藏状态当前为单选筛选。
 - 搜索方式和媒介文案改为 `搜索方式：电影 / 人物`、`搜索方式：电视剧 / 人物`、`影视：电影 / 电视剧`。
 - `清除筛选` 只重置筛选，不清空搜索词和当前结果池。
 - 搜索结果区和榜单内容区新增当前软件运行会话内滚动位置恢复；导航离开和详情返回保留位置，新搜索 / 翻页 / 榜单重载回到顶部，重启后自然清零。
@@ -976,6 +1121,184 @@ Non-stage page changes:
 
 - None. No Home, Media Library, Recommendation, Detail, Player or Settings page was edited.
 - Shared DI registration was updated for the new Discovery preference service.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Poster Pager Placement
+
+Completed:
+
+- Discovery Movie / TV poster-layout pagers were moved out of the fixed extra Grid row and into a bottom overlay inside the poster `ListBox` host.
+- The overlay pager now follows the list-layout visibility rule: it is shown when the poster list does not need vertical scrolling, or when the internal poster `ListBox` scroll viewer is at the bottom.
+- Poster results keep the media-library `ListBox + VirtualizingWrapPanel` sizing, viewport padding and internal scroll contract; this avoids returning to the earlier `ScrollViewer + ItemsControl + VirtualizingWrapPanel` path that broke poster scrolling.
+
+Not done:
+
+- No TMDB request shape, ranking logic, recommendation logic, scan logic, database schema, migration, database update, commit or push was changed.
+
+Known Issues:
+
+- Blocker: None found in this follow-up.
+- Deferred: Actual window validation is still needed to compare poster-layout pager placement against the list-layout pager in short and multi-row search results.
+- Noise: `git diff --check` reports line-ending normalization warnings only.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Poster Scroll and Library Sort Alignment Fixes
+
+Completed:
+
+- Discovery search poster results now use a media-library-like `ListBox` with its own internal `ScrollViewer` and the shared `VirtualizingWrapPanel`, preserving both vertical scrolling and media-library poster spacing.
+- Discovery search poster item width, content width, item height and viewport padding follow the media-library collapsed / expanded sidebar pattern.
+- Media Library toolbar sort option button is now positioned by runtime layout calculation: collapsed sidebar aligns it to the watched-status filter below; expanded sidebar aligns it to the collection-status filter below.
+- The Media Library clear-filter button remains right-aligned while sort alignment is recalculated on load, sidebar changes, batch-mode layout changes and page size changes.
+
+Not done:
+
+- No search service, TMDB request shape, ranking logic, recommendation logic, scan logic, player behavior, database schema, migration, database update, commit or push was changed.
+- No screenshot / manual desktop-window validation was performed in this pass.
+
+Known Issues:
+
+- Blocker: None found in this follow-up.
+- Deferred: Actual window validation is still needed for poster shadow spacing and the two media-library sort alignment targets.
+- Noise: The previous `ScrollViewer + ItemsControl + VirtualizingWrapPanel` search structure was removed because it broke scrolling; Discovery now follows the media-library `ListBox + VirtualizingWrapPanel` scroll contract.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Search / Library Toolbar and Result Regression Fixes
+
+Completed:
+
+- Discovery search filter changes now refresh paging / clear-filter command state without raising the search-submit command state from result rebuilds.
+- Discovery search collection status is a normal multi-select filter with `全部 / 喜爱 / 想看 / 不想看 / 其他`; default state is `其他 + 喜爱 + 想看`, displayed as `收藏状态：3项`.
+- Media Library collection status uses the same four concrete status options and default state; selecting all four concrete options folds back to `全部`.
+- Discovery search input tooltip is suppressed while the input text is empty.
+- TV series navigation no longer contributes to the Discovery search-result status overlay, avoiding the brief search-area spinner before detail navigation.
+- Discovery search result poster layout now uses the media-library `ListBox + VirtualizingWrapPanel` sizing / viewport padding pattern so poster spacing and vertical scrolling are both preserved.
+- Discovery search result pager is placed in a bottom row under the result content so short result pages keep pagination near the result area bottom.
+- Discovery and Media Library layout toggle hosts remove inner vertical padding so the selected segment fills the component height more closely.
+- Media Library toolbar right group was adjusted so the sort button tracks the available right-side space instead of sticking to the group edge.
+
+Not done:
+
+- No search service, TMDB request shape, ranking logic, recommendation logic, scan logic, player behavior, database schema, migration, database update, commit or push was changed.
+- No screenshot / manual desktop-window validation was performed in this pass.
+
+Known Issues:
+
+- Blocker: None found in this follow-up.
+- Deferred: Pager bottom placement and poster shadow spacing still need actual window inspection in both sidebar states.
+- Noise: Collection-status `其他` is a UI/client-side filter meaning no favorite / want-to-watch / not-interested state; it is not a new database state.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Discovery Search Tab / Filter Polish
+
+Completed:
+
+- Discovery top-level tabs now use full labels `影片搜索` / `榜单` / `AI推荐`, a thicker separator, centered tab text and a longer selected underline.
+- Discovery tab selection is retained in memory for the current app run; direct first activation still defaults to `影片搜索`, while the existing AI-entry request can still open `AI推荐`.
+- Search method labels were changed to `按电影名` / `按电视剧名` and `按人物名`; the media-type selector remains `电影` / `电视剧`.
+- Pressing Enter in the search input still triggers search and then clears TextBox focus.
+- The search toolbar card explicitly uses an arrow cursor on empty space; button hit targets retain the hand cursor.
+- The Discovery clear-filter button now uses the same compact width behavior as the media-library clear-filter button.
+- Movie / TV genre and decade filters now use the same multi-select model as region / language / collection status.
+- Genre, region, language, decade and collection status all reset to `全部` when every non-`全部` option is selected.
+- Genre and region menus use a shorter scrollable popup with the page-local modern scrollbar and a smaller wheel step.
+
+Not done:
+
+- No search service, TMDB request shape, ranking logic, recommendation logic, scan logic, database schema, migration, database update, commit or push was changed.
+- Watch status and playback source remain single-select as designed for this toolbar.
+- AI recommendation tab visual polish remains a separate 7.4d item.
+
+Known Issues:
+
+- Blocker: None found in this follow-up.
+- Deferred: Full AI recommendation tab and preference dialog polish remains 7.4d.
+- Noise: Multi-select filters are still applied to the loaded / expanded result pool, not as TMDB full-catalog exact filters.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Round 1 Regression Fixes
+
+Completed:
+
+- Discovery Tab headers now use a fixed header width / height so each label is centered against its selected underline instead of being measured only by text content.
+- Tab header text was moved higher, increasing the gap between the label and the separator / selected underline.
+- Search loading overlay now shows the shared `LoadingSpinnerTemplate` while `IsActiveSearchLoading` is true; empty states still show text only.
+- Multi-select filter menu options now force `IsSelected` binding refresh even when the source value remains `false`, so selecting the final non-`全部` option and auto-resetting to `全部` no longer leaves that clicked menu item visually checked.
+
+Not done:
+
+- No search service, TMDB request shape, ranking logic, recommendation logic, scan logic, database schema, migration, database update, commit or push was changed.
+
+Known Issues:
+
+- Blocker: None found in this regression pass.
+- Deferred: AI recommendation tab and preference dialog polish remains 7.4d.
+- Noise: `git diff --check` reports line-ending normalization warnings only.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Round 2 Regression Fixes
+
+Completed:
+
+- Discovery Tab template now binds the label `TextBlock` and selected underline to the same fixed width, avoiding ContentPresenter measurement drift and keeping each label centered against its underline.
+- Tab label vertical position was lowered from the previous round so it is no longer excessively high above the separator.
+- Movie / TV search collection-status filters were reverted from multi-select checkboxes to normal single-select menu items.
+- Collection-status selection still stores a single active value through the existing selected-status set, so existing filtering code remains scoped and unchanged.
+- Movie OMDb enrichment no longer rebuilds the whole search result list for each card update; details and rating properties update per card, and the search list is rebuilt once at the end of the enrichment batch when needed.
+- TV search display loading avoids one duplicate filtered-count calculation when correcting an out-of-range page.
+
+Not done:
+
+- No TMDB request shape, ranking logic, recommendation logic, scan logic, database schema, migration, database update, commit or push was changed.
+
+Known Issues:
+
+- Blocker: None found in this regression pass.
+- Deferred: If search still feels slow after this pass, the next targeted audit should capture aggregate timings for TMDB fetch, status resolve, poster cache load and UI apply separately.
+- Noise: `git diff --check` reports line-ending normalization warnings only.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Round 3 Regression Fixes
+
+Completed:
+
+- Root cause for repeated Tab centering failures was isolated to using the `TabItem` header cell as the visual centering basis. The text and selected underline were both in the item template, but their perceived center still depended on the TabPanel / TabItem header cell width rather than the selected underline itself.
+- The Tab template now puts the label and selected underline inside the same centered `StackPanel`; the underline has a fixed 104px width and the label is centered relative to that exact underline, making the underline the single visual centering basis.
+- The whole Tab strip and divider were moved slightly upward.
+- The Tab label was lowered from the previous pass so it is no longer too high above the underline.
+- The search-result header status block now collapses whenever the center overlay state is visible, so the idle / empty prompt is shown only in the page center and not duplicated in the top-left summary area.
+- Documentation was updated to reflect that collection status is now single-select while genre / region / language / decade remain multi-select.
+
+Not done:
+
+- No TMDB request shape, ranking logic, recommendation logic, scan logic, database schema, migration, database update, commit or push was changed.
+
+Known Issues:
+
+- Blocker: None found in this regression pass.
+- Deferred: Further Tab visual tuning should be done by adjusting the single centered stack only, not by independently moving text and underline.
+- Noise: `git diff --check` reports line-ending normalization warnings only.
 
 Validation:
 

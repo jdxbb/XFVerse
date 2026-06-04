@@ -1,5 +1,115 @@
 # 影片发现 Known Issues
 
+## 2026-06-05 工具栏、结果区域与想看摘要测试反馈修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需实际窗口人工确认影片搜索第一行左侧搜索组和右侧四按钮组在侧栏展开 / 收起状态下的主观间距。
+- 仍需实际窗口人工确认 Discovery 海报结果使用 194x288 槽位和安全留白后，左右边距、行尾余量和阴影裁切是否与媒体库视觉一致。
+- 仍需实际窗口人工确认媒体库与影片搜索布局切换组件的小圆角选中态是否符合预期。
+
+Noise:
+
+- Movie 取消想看后的摘要刷新以状态解析器返回结果为准；解析器仍返回主动入库状态时不会因为取消想看而强制出库。
+- 本轮只调整 Discovery 和媒体库的局部 XAML / ViewModel 状态投影，不改数据库、TMDB、推荐、扫描或播放语义。
+
+## 2026-06-05 搜索结果卡片测试反馈修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需实际窗口人工确认搜索海报结果与媒体库海报卡片在阴影、裁剪、渐变、字号和标签间距上的主观一致性。
+- 仍需实际窗口人工确认搜索列表结果与媒体库列表在行高、评分块、标题截断和右侧标签区上的主观一致性。
+
+Noise:
+
+- TV 搜索结果未新增 series 级 `+ 想看` / `取消想看` 操作；右上角和列表右侧仍只展示已有“存在想看季”的 `当前想看` 标签。
+- 本轮按视觉反馈移除了搜索结果卡片 / 列表上的直接加入媒体库按钮；未改变详情页或服务层入库语义。
+
+## 2026-06-05 搜索工具栏三次测试反馈修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需实际窗口人工确认第一行输入框缩短为 544 / 440 后，顺序图标 / 排序 / 影视 / 搜索方式 / 清除筛选在展开和收起侧栏状态下的主观间距是否满意。
+- 仍需实际窗口人工确认第二行从 `类型` 到 `播放源` 的按钮文本截断是否符合预期。
+
+Noise:
+
+- `搜索方式` 仅移动到第一行复用原有菜单和绑定；本轮不改变按片名 / 人物搜索语义，也不改变 Movie / TV 的筛选结果。
+
+## 2026-06-05 搜索工具栏二次测试反馈修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需实际窗口人工确认第一行加入 `影视` 后，排序 / 影视 / 清除筛选在展开和收起侧栏状态下的主观间距是否满意。
+- 仍需实际窗口人工确认第二行从 `搜索方式` 到 `播放源` 的按钮文本截断是否符合预期。
+
+Noise:
+
+- 第二行不再包含 `影视`，但 Movie / TV 仍分别渲染一套筛选网格，以保留已有 Movie / TV 专属类型菜单和筛选绑定。
+
+## 2026-06-05 搜索工具栏测试反馈修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需用户在实际软件窗口中确认第二行 10 个筛选按钮在不同窗口宽度下的主观间距和文本截断是否满意。
+- 榜单分页按钮仍沿用 7.4c 工具栏按钮样式；本轮只按反馈修改影片搜索结果区域上一页 / 下一页。
+
+Noise:
+
+- `入库状态` 使用可见入库状态过滤；`播放源` 继续使用是否有可用播放源过滤。隐藏项会按未入库处理，但不会删除 metadata、播放源或用户状态。
+- 搜索摘要统计基于当前过滤后的结果池，不代表 TMDB 全量库的最终总数。
+
+## 2026-06-05 Tab 对齐回归
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需用户在实际软件窗口中人工确认顶层 Tab 位置是否符合主观视觉预期；自动验证已覆盖固定宽度和像素中心，但不替代最终肉眼验收。
+
+Noise:
+
+- 可见 Tab 头现在是 `MovieDiscoveryPage` 本地手工按钮条，原 `TabItem` header 仅作为隐藏 ItemsHost 容器参与内容选择；这是为规避 WPF `TabPanel` / header 裁剪与测量偏差，暂不抽为全局 Tab 组件。
+
+## Phase 7.4c 榜单视觉一致性
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- AI 推荐 Tab 和推荐偏好弹窗仍需按 7.4d 做完整视觉收口。
+- 搜索 / 榜单滚动 offset 目前按媒介和布局保存，不按关键词、筛选组合或榜单类型保存；新搜索、筛选重建、翻页、榜单重载会清零 offset，避免旧内容位置污染新内容。
+
+Noise:
+
+- 榜单头部、重点卡、普通行、分页和榜单专用样式仍是 `MovieDiscoveryPage` 本地资源，未抽为全局组件，避免影响媒体库、Home 或 Recommendation 页面。
+- `SelectRankingMediaTypeCommand` 只是榜单头部按钮菜单的 UI 绑定补齐，最终仍写入既有 `SelectedRankingMediaType`。
+- TV 榜单加入媒体库 / 恢复按钮复用已有 TV metadata hydration 和 Season collection 服务；不创建播放源，也不改变 TV 的 AI / Watch Insights 排除边界。
+
 ## Phase 7.4b 媒体库一致性修复
 
 Blocker:
@@ -269,16 +379,23 @@ Noise:
 
 Blocker:
 
-- None after the Discovery search toolbar / layout implementation, 7.4b visual alignment and build validation.
+- None after the Discovery search toolbar / layout implementation, 7.4b visual alignment, follow-up tab/filter polish and build validation.
 
 Deferred:
 
-- Exact media-library visual parity for the Discovery search toolbar remains deferred per user instruction. Current differences include button size, layout-toggle button position, search input size, search icon treatment and dropdown menu styling.
-- Ranking visual consistency remains 7.4c.
+- Exact media-library visual parity for non-search Discovery surfaces remains deferred per user instruction.
 - AI recommendation tab and preference dialog polish remain 7.4d.
+- Discovery poster-layout pager placement still needs actual window validation against the list-layout pager in short and multi-row search results.
 
 Noise:
 
 - TV person search is a Discovery search feature only. It uses TMDB `person/{id}/tv_credits` and does not add TV recommendation, Watch Insights, profile/persona inputs or fingerprint behavior.
 - Discovery search layout memory is App-layer JSON preference state in `discovery-preferences.json`; it is not a database schema change.
+- Discovery selected-tab memory is runtime-only ViewModel state; it is not written to the database, navigation state or the Discovery preference file.
+- Genre / region / language / decade / collection-status multi-select filters operate on the loaded / expanded result pool and still do not imply TMDB full-catalog exact filtering.
+- Discovery and Media Library collection-status `其他` means items without favorite / want-to-watch / not-interested state; it is a client-side filter projection, not a new persisted state.
+- Discovery search result pager and poster shadow safe space were aligned closer to Media Library, but still need visual inspection in collapsed and expanded sidebar states.
+- Discovery search poster results use the same `ListBox + VirtualizingWrapPanel` scroll contract as Media Library; avoid returning to `ScrollViewer + ItemsControl + VirtualizingWrapPanel`, which caused poster scrolling to stop.
+- Discovery poster-layout pager is a bottom overlay driven by the internal poster `ListBox` scroll state; it should show when no poster scrolling is needed or when the poster list reaches the bottom.
+- Media Library toolbar sort alignment is calculated from the current sidebar state: collapsed aligns to watched status, expanded aligns to collection status.
 - In Discovery search results, TV `想看` is a display tag for existing want-to-watch seasons only. Absence of the tag means no known want-to-watch season state; it is not a missing `+ 想看` action.
