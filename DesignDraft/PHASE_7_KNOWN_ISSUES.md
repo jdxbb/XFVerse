@@ -1,12 +1,12 @@
 # Phase 7 Known Issues
 
-Last updated: 2026-06-04
+Last updated: 2026-06-06
 
 This file tracks current blockers, deferred work, risks, noise and user-confirmed non-issues for Phase 7. It should be updated at every Phase 7 substage closeout.
 
 ## Blocker
 
-- None currently known after the Phase 7.4b Discovery search UI structural alignment and build validation.
+- None currently known after the Phase 7.4e Discovery regression closeout, build validation and migration diff verification.
 
 ## Deferred
 
@@ -19,7 +19,7 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 - Exact media-library visual parity for Discovery search controls remains deferred per user instruction. Known differences include button size, layout-toggle button position, search input size, search icon treatment and dropdown menu styling.
 - 7.4c owns ranking visual consistency only. TMDB ranking order, ranking source inclusion and paging semantics must remain unchanged unless explicitly documented as a blocker fix.
 - 7.4d owns the embedded AI recommendation tab and custom preference dialog polish only. Movie recommendation algorithms, prompts, profile/persona inputs, fingerprints and TV exclusion remain out of scope.
-- 7.4e owns Discovery regression closeout, docs updates and cross-page impact accounting.
+- 7.4e completed Discovery regression closeout, docs updates and cross-page impact accounting.
 - Discovery layout memory uses an App-layer preference file and must continue to avoid database fields or migrations.
 
 ### 7.3 Details
@@ -104,6 +104,7 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 
 ## User-Confirmed Non-Issues
 
+- Discovery TV search-card want-season tag copy `当前想看` is a later semantic update and passes 7.4e closeout without code changes.
 - Media-library result summary includes "有播放源"; this is confirmed product wording and is not a 7.2 Should Fix.
 - PlayerWindow / MainWindow / Core service UI-related changes seen in cumulative upstream diff are authorized historical changes and are not automatically 7.2 overreach.
 - Grouped placeholders currently pass user acceptance and can enter detail pages; they are not a 7.2 blocker.

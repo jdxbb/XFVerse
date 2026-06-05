@@ -6,12 +6,40 @@ Last updated: 2026-06-06
 
 ## 阶段状态
 
-- 状态：7.4a、7.4b、7.4c 已完成；7.4d-1、7.4d-2、7.4d-3、7.4d-4、7.4d-5 已完成。
+- 状态：7.4a、7.4b、7.4c 已完成；7.4d-1 到 7.4d-15 已完成；7.4e 回归收口已完成。
 - 当前范围：`影片发现` 页面，以及其中嵌入的 `AI 推荐` Tab。
 - 主要规格来源：`DesignDraft/page-spec/movie-discovery-page.md`。
 - 业务边界：7.4 可以完善搜索方式、卡片状态投影和 UI 偏好，但不能修改推荐算法，也不能让 TV 进入 Movie AI 推荐、观影洞察、画像、人格或推荐 fingerprint 链路。
 
 ## 执行记录
+
+### 2026-06-06 - 7.4e / Discovery 回归收口
+
+完成了什么：
+
+- 按 7.4e 验收矩阵定向核对 Discovery 搜索方式、placeholder、Movie / TV 搜索卡片、筛选、海报 / 列表切换、Movie / TV 榜单、AI Tab、推荐偏好弹窗、Movie-only 推荐边界和 migration diff。
+- 确认 Home `发现更多影片` 入口仍通过 `MovieDiscoveryViewModel.OpenAiRecommendationsOnNextActivation()` 进入 Discovery 的 AI 推荐 Tab，主导航仍不显示独立 AI 推荐入口。
+- 确认 TV 人物搜索走 TMDB `person/{id}/tv_credits` 并投影为 `DiscoveryTvSeriesCardViewModel`；TV 搜索 / 榜单未转换为 `AiRecommendationItem`。
+- 确认推荐服务种子、fingerprint 和候选生成仍读取 Movie / `UserMovieCollectionItems`，未纳入 TV Series / Season / Episode。
+- 确认 Discovery 布局偏好仍为 App-layer `discovery-preferences.json`，本轮未新增数据库字段、migration 或 database update。
+- 按用户确认，当前 TV 搜索卡片想看季标签实际文案 `当前想看` 属于后期语义更新，不需要修改代码，7.4e 按通过记录。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+- `git diff --name-only` 在文档更新前为空；本轮只修改收口文档。
+
+不属于本次：
+
+- 未修改业务代码、XAML、推荐算法、推荐 prompt、推荐 fingerprint、TV 推荐、观影洞察、画像、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未启动完整桌面应用做人工截图 / 点击验收；UI 交互仍需人工窗口复核。
+
+Known Issues：
+
+- Blocker：无。
+- Deferred：仍需实际窗口人工确认 Discovery 搜索 / 榜单 / AI 推荐三个 Tab 和偏好弹窗交互。
+- Noise：TV 搜索卡片想看季标签 `当前想看` 已由用户确认为后期语义更新，7.4e 按通过记录；7.4b follow-up 曾按授权新增 `AddTvSeriesRatingSources` migration，7.4e 本轮 migration diff 为空，未新增 migration。
 
 ### 2026-06-06 - 7.4d-5 / AI 推荐海报信息区测试反馈修复
 

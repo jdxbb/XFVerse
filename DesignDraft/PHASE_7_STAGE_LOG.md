@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Stage Log
 
-Last updated: 2026-06-04
+Last updated: 2026-06-06
 
 This is the living Phase 7 handoff log. Keep entries concise and stage-oriented. Do not turn this into a full code diff.
 
@@ -9,6 +9,31 @@ This is the living Phase 7 handoff log. Keep entries concise and stage-oriented.
 - Historical initial UI rebuild docs remain in `docs/ui-redesign/UI_REDESIGN_PLAN.md`, `UI_REDESIGN_STAGE_LOG.md` and `UI_REDESIGN_KNOWN_ISSUES.md`.
 - Phase 7 is a later formal UI rebuild stage, so ongoing Phase 7 maintenance lives in `DesignDraft/PHASE_7_PLAN.md`, this log and `DesignDraft/PHASE_7_KNOWN_ISSUES.md`.
 - Design source docs live in `DesignDraft`, especially `PHASE_6_COVERAGE_MATRIX.md` and `page-spec`.
+
+## Phase 7.4e - Discovery Regression Closeout
+
+Completed:
+
+- Closed out Phase 7.4 with a targeted read-only regression audit across Discovery search, ranking, embedded AI recommendations, Home entry routing, hidden Recommendation route compatibility, Movie-only recommendation boundaries and migration diff.
+- Confirmed Home `发现更多影片` opens the Discovery AI recommendation tab through `MovieDiscoveryViewModel.OpenAiRecommendationsOnNextActivation()` and does not add a visible standalone AI recommendation navigation item.
+- Confirmed TV person search is scoped to Discovery through TMDB `person/{id}/tv_credits`; TV search / ranking rows remain `DiscoveryTvSeriesCardViewModel` projections and are not converted into `AiRecommendationItem`.
+- Confirmed recommendation seed, fingerprint and candidate inputs remain Movie / `UserMovieCollectionItems` based, with no TV Series / Season / Episode input path found in the audited recommendation service code.
+- Confirmed Discovery layout memory remains an App-layer preference file and 7.4e added no schema or migration work.
+- Recorded the user-confirmed later semantic update that TV search-card want-season tag copy displays `当前想看`; no code change is needed and 7.4e treats it as accepted.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Not done:
+
+- No code, XAML, recommendation algorithm, recommendation prompt, TV recommendation, Watch Insights, scanner, player, schema, migration, database update, commit or push change.
+- No full WPF screenshot / click-through validation was performed in this pass.
+
+Suggested commit message:
+
+- `Close out phase 7.4 discovery regression`
 
 ## Phase 7.0 - Complete
 

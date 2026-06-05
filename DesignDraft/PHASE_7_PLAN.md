@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Plan
 
-Last updated: 2026-05-30
+Last updated: 2026-06-06
 
 ## Purpose
 
@@ -158,7 +158,7 @@ Substages:
 - 7.4b search UI structural alignment completed: toolbar, filter controls, result summary, poster/list containers and cards. Movie cards expose want-state actions; TV cards only show a `想看` tag when at least one season is want-to-watch. Exact media-library visual parity remains deferred;
 - 7.4c ranking tab visual consistency;
 - 7.4d AI recommendation tab and preference dialog polish;
-- 7.4e Discovery regression closeout.
+- 7.4e Discovery regression closeout completed.
 
 Not in scope:
 - changing recommendation algorithms;

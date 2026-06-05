@@ -1,5 +1,23 @@
 # 影片发现 Known Issues
 
+## 2026-06-06 7.4e Discovery 回归收口
+
+Blocker:
+
+- None after build validation and migration diff verification.
+
+Deferred:
+
+- 仍需实际窗口人工确认 Discovery 搜索 / 榜单 / AI 推荐三个 Tab 的交互、卡片文案、偏好弹窗打开 / 编辑 / 清空 / 取消 / 确认流程和 Home 入口跳转手感。
+- Exact media-library visual parity for Discovery search controls remains deferred per current stage boundary.
+
+Noise:
+
+- TV 搜索卡片想看季标签 `当前想看` 已由用户确认为后期语义更新，7.4e 按通过记录，不需要修改代码。
+- 本轮为 7.4e 回归收口和文档更新，不改推荐算法、prompt、fingerprint、TV 推荐、扫描、播放器或数据库 schema。
+- 7.4b follow-up 曾按授权新增 `AddTvSeriesRatingSources` migration；7.4e 本轮 `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+- `dotnet build MediaLibrary.sln` 已通过，0 warnings / 0 errors。
+
 ## 2026-06-06 榜单 Tab 悬停下拉延时
 
 Blocker:

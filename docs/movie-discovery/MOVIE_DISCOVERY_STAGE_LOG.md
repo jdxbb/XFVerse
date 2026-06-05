@@ -1,5 +1,24 @@
 # 影片发现阶段日志
 
+## 2026-06-06 - 7.4e / Discovery 回归收口
+
+完成内容：
+- 按 7.4e 验收矩阵完成只读回归核对，覆盖搜索方式 / placeholder、Movie / TV 搜索卡、筛选、海报 / 列表切换、Movie / TV 榜单、AI Tab、推荐偏好弹窗、Movie-only 推荐边界和 migration diff。
+- 确认 Home `发现更多影片` 入口仍进入 Discovery 内嵌 AI 推荐 Tab；主导航不新增独立 AI 推荐入口，隐藏 `Recommendations` 路由仅保留兼容。
+- 确认 TV 人物搜索通过 TMDB `person/{id}/tv_credits` 返回 TV Series Discovery rows；TV 搜索 / 榜单未转换为 `AiRecommendationItem`。
+- 确认 AI 推荐服务仍以 Movie / `UserMovieCollectionItems` 为种子、fingerprint 和候选输入，未纳入 TV Series / Season / Episode。
+- 确认 Discovery 布局偏好仍使用 `IDiscoveryPreferencesService` / `discovery-preferences.json`，未引入数据库偏好字段。
+- 按用户确认，TV 搜索卡片想看季标签当前实现为 `当前想看` 属于后期语义更新，不需要修改代码，7.4e 按通过记录。
+
+验证：
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+- `git diff --name-only` 在本轮文档更新前为空；本轮只修改收口文档。
+
+未做事项：
+- 未修改业务代码、XAML、推荐算法、推荐 prompt、推荐 fingerprint、TV 推荐、观影洞察、画像、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未启动完整桌面应用做人工截图 / 点击验收；仍需实际窗口确认 Discovery 三个 Tab、偏好弹窗和卡片文案观感。
+
 ## 2026-06-06 - 7.4c follow-up / 榜单 Tab 悬停下拉延时
 
 完成内容：
