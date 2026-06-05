@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.ViewModels.Main;
 using MediaLibrary.App.ViewModels.Pages;
 
@@ -15,9 +16,15 @@ public partial class MovieDiscoveryPage : UserControl
     private const double CollapsedSearchColumnWidth = 544;
     private const double ExpandedSearchColumnWidth = 440;
     private const double FilterMenuWheelScrollStep = 42;
+    private const double RankingTabHoverMenuDelayMilliseconds = 420d;
+    private const double RankingOverviewMouseWheelScrollStep = 48d;
+    private const double RankingOuterMouseWheelScrollStep = 56d;
     private const double PosterPagerBottomThreshold = 1d;
+    private readonly DispatcherTimer _rankingTabHoverMenuTimer;
     private Button? _openMenuButton;
     private ContextMenu? _openContextMenu;
+    private Button? _pendingRankingTabMenuButton;
+    private ContextMenu? _pendingRankingTabContextMenu;
     private INotifyPropertyChanged? _shellPropertyChangedSource;
     private INotifyPropertyChanged? _discoveryPropertyChangedSource;
     private bool _isRestoringDiscoveryScrollOffset;
@@ -25,6 +32,12 @@ public partial class MovieDiscoveryPage : UserControl
 
     public MovieDiscoveryPage()
     {
+        _rankingTabHoverMenuTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(RankingTabHoverMenuDelayMilliseconds)
+        };
+        _rankingTabHoverMenuTimer.Tick += RankingTabHoverMenuTimer_Tick;
+
         InitializeComponent();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -43,6 +56,7 @@ public partial class MovieDiscoveryPage : UserControl
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        CancelRankingTabHoverMenu();
         StoreCurrentDiscoveryScrollOffsets();
         DetachShellState();
         DetachDiscoveryState();
@@ -185,11 +199,27 @@ public partial class MovieDiscoveryPage : UserControl
 
     private void RankingTabButton_Click(object sender, RoutedEventArgs e)
     {
+        CancelRankingTabHoverMenu();
+
         if (DataContext is MovieDiscoveryViewModel { IsRankingTabSelected: false } viewModel)
         {
+            CloseOpenMenu();
             if (viewModel.SelectDiscoveryTabCommand.CanExecute("1"))
             {
                 viewModel.SelectDiscoveryTabCommand.Execute("1");
+            }
+
+            if (sender is Button { ContextMenu: { } contextMenu } button)
+            {
+                _ = Dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        if (CanOpenRankingTabMenu())
+                        {
+                            OpenContextMenuForButton(button, contextMenu);
+                        }
+                    },
+                    DispatcherPriority.Loaded);
             }
 
             e.Handled = true;
@@ -201,15 +231,64 @@ public partial class MovieDiscoveryPage : UserControl
 
     private void RankingTabButton_MouseEnter(object sender, MouseEventArgs e)
     {
-        if (DataContext is not MovieDiscoveryViewModel { IsRankingTabSelected: true }
+        if (!CanOpenRankingTabMenu()
             || sender is not Button { ContextMenu: { } contextMenu } button
             || IsOpenMenuButton(button))
         {
             return;
         }
 
-        OpenContextMenuForButton(button, contextMenu);
+        ScheduleRankingTabHoverMenu(button, contextMenu);
         e.Handled = true;
+    }
+
+    private void RankingTabButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        CancelRankingTabHoverMenu();
+    }
+
+    private void ScheduleRankingTabHoverMenu(Button button, ContextMenu contextMenu)
+    {
+        CancelRankingTabHoverMenu();
+        _pendingRankingTabMenuButton = button;
+        _pendingRankingTabContextMenu = contextMenu;
+        _rankingTabHoverMenuTimer.Start();
+    }
+
+    private void RankingTabHoverMenuTimer_Tick(object? sender, EventArgs e)
+    {
+        _rankingTabHoverMenuTimer.Stop();
+
+        var button = _pendingRankingTabMenuButton;
+        var contextMenu = _pendingRankingTabContextMenu;
+        _pendingRankingTabMenuButton = null;
+        _pendingRankingTabContextMenu = null;
+
+        if (button is null
+            || contextMenu is null
+            || !button.IsMouseOver
+            || !CanOpenRankingTabMenu()
+            || IsOpenMenuButton(button))
+        {
+            return;
+        }
+
+        OpenContextMenuForButton(button, contextMenu);
+    }
+
+    private void RankingTabButton_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (CanOpenRankingTabMenu())
+        {
+            return;
+        }
+
+        e.Handled = true;
+    }
+
+    private bool CanOpenRankingTabMenu()
+    {
+        return DataContext is MovieDiscoveryViewModel { IsRankingTabSelected: true };
     }
 
     private void ContextMenu_Closed(object? sender, RoutedEventArgs e)
@@ -243,6 +322,8 @@ public partial class MovieDiscoveryPage : UserControl
 
     private void CloseOpenMenu()
     {
+        CancelRankingTabHoverMenu();
+
         if (_openContextMenu is not null)
         {
             _openContextMenu.IsOpen = false;
@@ -250,6 +331,13 @@ public partial class MovieDiscoveryPage : UserControl
 
         _openMenuButton = null;
         _openContextMenu = null;
+    }
+
+    private void CancelRankingTabHoverMenu()
+    {
+        _rankingTabHoverMenuTimer.Stop();
+        _pendingRankingTabMenuButton = null;
+        _pendingRankingTabContextMenu = null;
     }
 
     private void AlignContextMenuToButtonCenter(Button button, ContextMenu contextMenu)
@@ -682,6 +770,93 @@ public partial class MovieDiscoveryPage : UserControl
         }
 
         return null;
+    }
+
+    private void RankingOverviewScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not ScrollViewer scrollViewer)
+        {
+            return;
+        }
+
+        if (HasVerticalScrollableContent(scrollViewer))
+        {
+            _ = ScrollViewerBySmallWheelStep(scrollViewer, e.Delta, RankingOverviewMouseWheelScrollStep);
+            HideAncestorScrollViewers(scrollViewer);
+            e.Handled = true;
+            return;
+        }
+
+        if (ScrollParentBySmallWheelStep(scrollViewer, e.Delta))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private static bool ScrollParentBySmallWheelStep(DependencyObject source, int wheelDelta)
+    {
+        var direction = wheelDelta < 0 ? 1 : -1;
+        for (var current = GetParent(source); current is not null; current = GetParent(current))
+        {
+            if (current is ScrollViewer scrollViewer
+                && CanScrollVertically(scrollViewer, direction)
+                && ScrollViewerBySmallWheelStep(scrollViewer, wheelDelta, RankingOuterMouseWheelScrollStep))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void HideAncestorScrollViewers(DependencyObject source)
+    {
+        for (var current = GetParent(source); current is not null; current = GetParent(current))
+        {
+            if (current is ScrollViewer scrollViewer)
+            {
+                ScrollBarAutoRevealBehavior.Hide(scrollViewer);
+            }
+        }
+    }
+
+    private static bool ScrollViewerBySmallWheelStep(ScrollViewer scrollViewer, int wheelDelta, double step)
+    {
+        var direction = wheelDelta < 0 ? 1 : -1;
+        if (!CanScrollVertically(scrollViewer, direction))
+        {
+            return false;
+        }
+
+        var wheelTicks = Math.Max(1d, Math.Abs(wheelDelta) / 120d);
+        var nextOffset = Math.Clamp(
+            scrollViewer.VerticalOffset + direction * step * wheelTicks,
+            0d,
+            scrollViewer.ScrollableHeight);
+        if (Math.Abs(nextOffset - scrollViewer.VerticalOffset) <= 0.1d)
+        {
+            return false;
+        }
+
+        scrollViewer.ScrollToVerticalOffset(nextOffset);
+        return true;
+    }
+
+    private static bool HasVerticalScrollableContent(ScrollViewer scrollViewer)
+    {
+        return scrollViewer.ScrollableHeight > double.Epsilon;
+    }
+
+    private static bool CanScrollVertically(ScrollViewer scrollViewer, int direction)
+    {
+        if (scrollViewer.ScrollableHeight <= double.Epsilon)
+        {
+            return false;
+        }
+
+        return direction > 0
+            ? scrollViewer.VerticalOffset < scrollViewer.ScrollableHeight - double.Epsilon
+            : scrollViewer.VerticalOffset > double.Epsilon;
     }
 
     private static bool IsWithinTextInput(DependencyObject source)

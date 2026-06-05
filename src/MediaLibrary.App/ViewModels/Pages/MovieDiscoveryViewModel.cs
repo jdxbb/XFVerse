@@ -393,7 +393,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         SelectSearchPlaybackSourceFilterCommand = new RelayCommand(value => SelectedPlaybackSourceFilter = GetOptionValue(value, FilterAll));
         SelectSearchLibraryStatusFilterCommand = new RelayCommand(value => SelectedLibraryStatusFilter = GetOptionValue(value, FilterAll));
         SelectSearchCollectionStatusFilterCommand = new RelayCommand(SelectSearchCollectionStatusFilter);
-        SelectSearchSortOptionCommand = new RelayCommand(value => SelectedSortOption = GetOptionValue(value, SortRelevance));
+        SelectSearchSortOptionCommand = new RelayCommand(SelectActiveSearchSortOption);
         SelectSearchSortDirectionCommand = new RelayCommand(value => SelectedSortDirection = GetOptionValue(value, DirectionDescending));
         SelectSearchDecadeFilterCommand = new RelayCommand(SelectSearchDecadeFilter);
         SelectSearchLanguageFilterCommand = new RelayCommand(value => SelectedLanguageFilter = GetOptionValue(value, FilterAll));
@@ -752,7 +752,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         ? "M 8 18 L 8 6 M 4 10 L 8 6 L 12 10 M 15 7 H 23 M 15 12 H 21 M 15 17 H 19"
         : "M 8 6 L 8 18 M 4 14 L 8 18 L 12 14 M 15 7 H 19 M 15 12 H 21 M 15 17 H 23";
 
-    public string SearchSortOptionButtonText => BuildFilterButtonText("排序", SelectedSortOption);
+    public IReadOnlyList<string> ActiveSearchSortOptions => IsTvSearchSelected ? TvSortOptions : SortOptions;
+
+    public string SearchSortOptionButtonText => BuildFilterButtonText(
+        "排序",
+        IsTvSearchSelected ? SelectedTvSortOption : SelectedSortOption);
 
     public string SearchDecadeFilterButtonText => BuildFilterButtonText("年代", SelectedDecadeFilter);
 
@@ -863,6 +867,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _selectedTvSortOption, value))
             {
                 OnPropertyChanged(nameof(TvSearchSortOptionButtonText));
+                OnPropertyChanged(nameof(SearchSortOptionButtonText));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -919,6 +924,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(SearchTypeButtonText));
                 RefreshSearchTypeProperties();
+                if (string.IsNullOrWhiteSpace(SearchText))
+                {
+                    RefreshSearchFilterCommandState();
+                    return;
+                }
+
                 if (IsTvSearchSelected)
                 {
                     ResetTvSearchFromFilterChange();
@@ -1665,6 +1676,17 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         }
 
         SelectedSortDirection = ToggleSortDirectionValue(SelectedSortDirection);
+    }
+
+    private void SelectActiveSearchSortOption(object? parameter)
+    {
+        if (IsTvSearchSelected)
+        {
+            SelectedTvSortOption = GetOptionValue(parameter, SortRelevance);
+            return;
+        }
+
+        SelectedSortOption = GetOptionValue(parameter, SortRelevance);
     }
 
     private void SelectDiscoveryTab(object? parameter)
@@ -3620,7 +3642,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private async Task EnsureRankingsActivatedAsync()
     {
-        if (_hasActivatedRankings)
+        if (_hasActivatedRankings && !ShouldLoadActiveRankingsOnActivation())
         {
             return;
         }
@@ -3634,6 +3656,16 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             _hasActivatedRankings = false;
         }
+    }
+
+    private bool ShouldLoadActiveRankingsOnActivation()
+    {
+        if (IsTvRankingSelected)
+        {
+            return !IsTvSeriesNavigating && !IsTvRankingLoading && !HasRankingTvSeries;
+        }
+
+        return !IsRankingLoading && !HasRankingMovies;
     }
 
     private void SelectRankingMediaType(object? parameter)
@@ -3801,6 +3833,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
         _rankingCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource = new CancellationTokenSource();
+        IsRankingLoading = true;
         ResetRankingBuffers();
         ResetRankingMovieScrollOffset();
         RankingPageIndex = 1;
@@ -3981,6 +4014,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         InvalidateTvSeriesOpenRequest();
         _rankingCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource = new CancellationTokenSource();
+        IsTvRankingLoading = true;
         ResetTvRankingBuffers();
         ResetRankingTvScrollOffset();
         TvRankingPageIndex = 1;
@@ -4816,6 +4850,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(SearchMediaTypeButtonText));
         OnPropertyChanged(nameof(SearchTypeOptions));
         OnPropertyChanged(nameof(SearchTypeButtonText));
+        OnPropertyChanged(nameof(ActiveSearchSortOptions));
+        OnPropertyChanged(nameof(SearchSortOptionButtonText));
         OnPropertyChanged(nameof(ActiveSearchSortDirection));
         OnPropertyChanged(nameof(SearchSortDirectionIconData));
         OnPropertyChanged(nameof(SearchSortDirectionButtonToolTip));

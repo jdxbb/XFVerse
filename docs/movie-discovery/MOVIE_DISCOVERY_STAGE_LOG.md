@@ -1,5 +1,243 @@
 # 影片发现阶段日志
 
+## 2026-06-06 - 7.4c follow-up / 榜单 Tab 悬停下拉延时
+
+完成内容：
+- 榜单 Tab 悬停打开下拉菜单从立即触发改为 420ms 延时触发，避免鼠标快速划过时弹出下拉菜单。
+- 增加榜单 Tab `MouseLeave` 取消逻辑；鼠标在延时结束前离开按钮时，不再打开下拉菜单。
+- 点击榜单 Tab 的行为保持即时：未在榜单页时仍切到榜单并打开菜单，已在榜单页时仍可点击开关菜单。
+
+验证：
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改榜单下拉菜单内容、布局、筛选项、榜单请求、排序、评分计算、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工交互验收；仍需实际窗口确认 420ms 延时手感是否合适。
+
+## 2026-06-05 - 7.4c follow-up / 榜单首次加载兜底与双列行距 28px
+
+完成内容：
+- 榜单激活入口增加空闲无数据兜底：已进入过榜单但当前 Movie / TV 榜单没有可见项且不在加载中时，再次激活榜单会重新拉起加载，避免首次进入未真正启动加载后被 `_hasActivatedRankings` 挡住。
+- Movie 榜单重置加载时，在清空列表和刷新可见性前先设置 `IsRankingLoading=true`，确保首次进入就显示加载转圈，而不是静止空状态。
+- TV 榜单重置加载时同步前置 `IsTvRankingLoading=true`，电视剧榜单首次加载也进入明确加载态。
+- Movie / TV 榜单普通双列行底部间距从 24px 提高到 28px。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、评分计算、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认首次进入榜单转圈、自动加载和 28px 双列间距。
+
+## 2026-06-05 - 7.4c follow-up / 榜单双列行间距微调
+
+完成内容：
+- 榜单 Movie 双列普通行之间的底部间距从 14px 提高到 24px，从双列海报第一行开始增加上下间隔。
+- 榜单 TV 双列普通行之间的底部间距同步从 14px 提高到 24px。
+- 未调整第一名区域、双列内左右间距、海报尺寸、海报列宽、标题 / 原名行、简介行距或简介滚轮处理。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `dotnet build src/MediaLibrary.App/MediaLibrary.App.csproj -o %TEMP%\xfverse-build-check` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、评分计算、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动新的完整桌面应用做人工截图验收；仍需实际窗口确认双列普通行间距是否合适。
+
+## 2026-06-05 - 7.4c follow-up / 榜单简介上方留白微调
+
+完成内容：
+- 榜单第一名信息模板中，导演 / 演员行与简介之间的上边距从 12px 提高到 32px；第一名简介行高为 20px，因此简介可视区域减少约一行。
+- 榜单普通双列项信息模板中，导演 / 演员行与简介之间的上边距从 12px 提高到 30px；普通项简介行高为 18px，因此简介可视区域减少约一行。
+- 未调整榜单信息模板总高度、海报尺寸、海报列宽、标题 / 原名行、日期 / 标签行、导演 / 演员字段宽度或简介滚轮处理。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` 未完成：当前运行中的 `MediaLibrary.App (16200)` 锁定默认 `bin` 输出，复制 apphost / dll 失败。
+- `dotnet build src/MediaLibrary.App/MediaLibrary.App.csproj -o %TEMP%\xfverse-build-check` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、评分计算、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认简介上方多一行留白和简介减少一行后的观感。
+
+## 2026-06-05 - 7.4c follow-up / 榜单滚动视口左侧安全区补偿
+
+完成内容：
+- 根据截图复核，确认仅扩大海报模板内部 shadow host 不足以解决第一列左侧阴影裁剪；普通榜单行仍从 `ScrollViewer` 视口左边界开始，负向绘制会被视口裁掉。
+- `RankingMovieScrollViewer` / `RankingTvScrollViewer` 增加 `Margin="-84,0,0,0"`，把榜单滚动视口向左扩展 84px，匹配媒体库海报阴影安全区。
+- 两个榜单 ScrollViewer 内部根 `Grid` 增加 `Margin="84,0,0,0"`，用等量内容补偿抵消视口左扩，保持海报本体、右侧文字、分隔线、分页和滚动条视觉位置不随之移动。
+- 保留上一轮媒体库同款 shadow host：普通海报 `348x438`、第一名海报 `384x492`，均使用 `Canvas.Left/Top=-84` 和 `Padding=84`。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、评分计算、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认第一列左侧阴影是否显示完整且内容坐标未发生可见位移。
+
+## 2026-06-05 - 7.4c follow-up / 榜单海报阴影安全留白对齐媒体库
+
+完成内容：
+- 对照媒体库 `LibraryPage` 海报模板，确认媒体库普通海报发光阴影使用 `348x438` shadow host、`Canvas.Left=-84`、`Canvas.Top=-84`、`PosterCachedShadowBehavior.Padding=84`，海报本体仍为 `180x270`。
+- 榜单 Movie / TV 普通海报同步媒体库阴影安全区：shadow host 从 `300x390` 改为 `348x438`，`Canvas.Left/Top` 从 `-60` 改为 `-84`，shadow padding 从 `60` 改为 `84`。
+- 榜单 Movie / TV 第一名海报按同样 84px 安全区处理：shadow host 从 `336x444` 改为 `384x492`，`Canvas.Left/Top` 从 `-60` 改为 `-84`，shadow padding 从 `60` 改为 `84`。
+- 保持榜单海报本体宽高、Grid 列宽、第一名左右 margin、普通双列 item margin 和右侧信息区位置不变。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、评分计算、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认左侧第一列海报阴影是否已完整显示。
+
+## 2026-06-05 - 7.4c follow-up / 榜单右上标签与海报阴影可视区修复
+
+完成内容：
+- 榜单 Movie 普通项和第一名海报右上角想看按钮已保持移除状态；本轮继续删除 TV 普通项和第一名海报右上角 `当前想看` 标签，榜单所有海报右上角不再显示想看状态。
+- 榜单外层滚动条继续只通过 `DiscoveryRankingOuterScrollBarStyle` 的 `RenderTransform X=4` 向右微移，作用域限定在 `RankingMovieScrollViewer` / `RankingTvScrollViewer` 的局部资源，不改变内容布局、列宽或组件坐标。
+- 榜单第一名卡片和普通项卡片显式设置 `ClipToBounds=False`，避免继承玻璃卡片裁剪导致左侧发光阴影显示不完整。
+- 榜单 Movie / TV 普通海报和第一名海报的 palette shadow 位图恢复 `Canvas.Left=-60`，匹配 60px shadow padding；海报本体宽高、列宽、Grid margin 和 ContentControl 位置未改。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、评分计算、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认 TV 右上标签完全消失、左侧发光阴影不再被裁剪、滚动条右移未带动其他组件位置。
+
+## 2026-06-05 - 7.4c follow-up / 榜单下拉阴影与第一名留白再修
+
+完成内容：
+- 榜单下拉主菜单和二级菜单去掉 `ShadowPopup` 效果，避免圆角菜单外出现直角黑色阴影。
+- 第一名 Movie / TV 顶部区域左右留白从 18px 加大到 36px，海报进一步右移，同时缩短右侧文字可显示宽度。
+- 导演字段上限进一步收窄：第一名从 250px 降到 210px，普通项从 130px 降到 105px，演员继续使用剩余宽度，更接近 3:7。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认下拉阴影是否完全消失、第一名左右留白是否对齐、导演 / 演员 3:7 是否合适。
+
+## 2026-06-05 - 7.4c follow-up / 榜单标题行与第一名留白修复
+
+完成内容：
+- 榜单第一行改为“标题 / 竖线 / 原名 + 右侧固定评分”结构，评分标签移到原名右侧固定位置，标题左端直接从信息区左侧开始，和日期、导演、简介三行左端对齐。
+- 标题 / 原名不再使用 `1.1* / *` 预留剧名长度；标题列改为 Auto + MaxWidth，竖线跟随标题实际宽度，避免竖线被剧名预留列推偏。
+- 标题 / 原名和评分标签统一放入同一高度行内垂直居中；竖线颜色改为主文本色、宽度保持 2px，两侧间距保持 8px。
+- 第一名 Movie / TV 区域整体增加左右等距 18px margin，使海报左边缘到外层背景边框的距离与简介右边缘到背景边框距离一致，同时缩短右侧文字可显示宽度。
+- 导演字段长度上限进一步收窄：第一名导演 MaxWidth 250，普通项导演 MaxWidth 130，演员继续紧随导演后以剩余宽度显示，接近 3.5:6.5 的可用宽度分配。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认评分固定位置、标题左对齐、竖线跟随标题和第一名左右留白。
+
+## 2026-06-05 - 7.4c follow-up / 榜单第一名与普通项层级微调
+
+完成内容：
+- 榜单第一名新增专用 Movie / TV 海报模板，尺寸从普通项 180x270 放大到 216x324；普通项海报保持 180x270。
+- 普通双列项标题、评分、简介和 meta 字号按反馈整体下调；日期、标签、导演、演员改为小于简介字号，简介改为更高对比的主文本色。
+- 第一行标题 / 原名区域改为嵌套底部对齐的标题组，竖线加粗到 2px，并把竖线只在标题 / 原名文本组内垂直居中；标题、竖线、原名之间缩到约两个空格的视觉距离。
+- 导演 / 演员行从固定双列改为导演 Auto + 最大宽度 + 演员紧随的流式结构，导演过长时先截断，演员与导演末尾保持固定间距。
+- 榜单 Movie 右上角 `+ 想看` / `取消想看` 按钮改用榜单专用样式：整体高度从 20px 提到 22px，`+ 想看` 默认更窄，`取消想看` 只同步增高不额外收窄。
+- 在第一名区域和下方普通双列区域之间新增横向分隔线，Movie / TV 分别按是否存在第一名控制显示。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认第一名 20% 放大、普通项字号、竖线垂直居中和导演 / 演员流式间距。
+
+## 2026-06-05 - 7.4c follow-up / 榜单视觉二次微调
+
+完成内容：
+- 榜单 Movie / TV 海报从 240x360 缩小到 180x270，同步降低外层行高和海报列宽，减少榜单双列项占屏面积。
+- 榜单第一名和普通项外层卡片背景改为透明，去掉海报与右侧信息区背后的大圆角玻璃矩形，只保留内容本身和双列中线。
+- 榜单原名样式改为与片名 / 剧名同一字体、字号、字重和颜色。
+- 日期、标签、导演、演员统一为同一 meta 文本样式，字号从 12.5 提到 13.5，颜色改为 `BrushForegroundSecondary`，并同步标签分隔符颜色。
+- 恢复当前 XAML 中遗留的静态中文乱码点：多选筛选 `全部`、隐藏 TabItem `影片搜索` / `AI推荐`。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认海报缩小后的信息密度、右侧简介高度和无背景状态下的可读性。
+
+## 2026-06-05 - 7.4c follow-up / 榜单海报与四行信息布局反馈修复
+
+完成内容：
+- 榜单 Movie / TV 顶部第一名和普通双列项统一改为左侧详情页式海报、右侧四行信息结构。
+- 榜单海报复用详情页大海报尺寸、圆角、w780 解码、palette shadow 和大海报占位模板；左上角排名标签保留，右上角改为影片搜索海报同款 Movie 想看按钮 / TV 当前想看标签。
+- 右侧第一行改为评分、标题、竖线、原名；评分标签复用首页 AI 推荐评分 chip 质感并放大，第一名使用更大尺寸。
+- 第二行改为日期 + 媒体库海报标签行式类型标签；第三行改为导演 + 演员，长文本截断并提供 tooltip；第四行改为内部可滚动简介。
+- 榜单简介滚轮处理复制影片识别修正弹窗“修正为电影”候选简介逻辑：简介可滚时内部消费滚轮，简介不可滚时交给外层榜单滚动。
+- 修复本轮 XAML 写回暴露的影片发现页静态中文属性损坏点，恢复 Tab、榜单菜单、清除筛选、布局切换和分页 tooltip 文案。
+
+验证：
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认榜单大海报密度、两列宽度、行距和简介滚轮手感。
+
+## 2026-06-05 - 7.4c follow-up / 榜单二次测试反馈修复
+
+完成内容：
+- 榜单加载 / 切换加载层补齐与影片搜索一致的 34px 转圈加载动画，并将榜单内容卡片显式设为箭头光标，避免加载中出现可点击手势误导。
+- `榜单` Tab 从非榜单 Tab 悬停时不打开菜单；点击时先切换到榜单页，再在榜单 Tab 下方打开多级菜单。
+- 榜单分页按钮 / 页码移动到 Movie / TV 各自 `ScrollViewer` 内容末尾，按影片搜索列表分页结构使用 `Grid MinHeight=ScrollViewer.ActualHeight`，内容不足时靠底，内容超出时随滚动到末尾。
+- 榜单二级菜单中 `趋势榜` 子菜单项文字居中到与 `热门榜` / `高分榜` 同一视觉列，右侧箭头间距由 8px 收紧到 4px。
+- 空关键词切换 `搜索方式` 时不再触发 Movie / TV 结果重载；该保护走共同 `SelectedSearchType` setter，因此电视剧同样接入。
+- 搜索工具栏排序菜单改为按当前 Movie / TV 媒介绑定 `ActiveSearchSortOptions`，TV 模式下写入 `SelectedTvSortOption`，修复空关键词按非相关度排序无法进入 TV discover 的问题。
+
+验证：
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+
+未做事项：
+- 未修改 TMDB 搜索 / 榜单请求形态、榜单排序、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认榜单菜单、分页和加载层的主观位置。
+
+## 2026-06-05 - 7.4b follow-up / 搜索海报标题日期对齐根因修复
+
+完成内容：
+- 重新核对 Movie 搜索内联海报模板和 TV 搜索 `DiscoveryTvSeriesCardViewModel` 资源模板，确认用户截图看到的是搜索海报卡片模板，不是媒体库模板或列表模板。
+- 将 Movie / TV 搜索海报底部信息区从 `StackPanel + 内部评分 Grid` 改为整卡宽度的三列 `Grid`：左列标题 / 日期 / 标签，中间固定 8px 间距，右列评分 chip。
+- 底部 `Grid` 显式 `HorizontalAlignment="Stretch"` 并使用 `Margin="8,0,8,10"`；标题和日期显式放在第 0 列并左对齐，评分 chip 继续在右列右对齐。
+- 本轮不再照抄媒体库底部 `StackPanel`，因为搜索海报比媒体库多一个评分 chip；必须让左侧文字和右侧评分共享同一个整卡宽度坐标基准。
+
+验证：
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+
+未做事项：
+- 未修改搜索服务、TMDB 请求、筛选语义、榜单、AI 推荐、扫描、播放器、数据库 schema、migration 或 database update。
+- 未启动完整桌面应用做人工截图验收；仍需在实际窗口确认标题 / 日期左边框和评分右边框的视觉对齐。
+
 ## 2026-06-05 - 7.4b follow-up / 搜索卡片与列表二次测试反馈修复
 
 完成内容：
