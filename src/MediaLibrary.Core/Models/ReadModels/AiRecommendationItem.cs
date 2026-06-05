@@ -29,6 +29,10 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
 
     public string Overview { get; set; } = string.Empty;
 
+    public string DirectorText { get; set; } = string.Empty;
+
+    public string ActorsText { get; set; } = string.Empty;
+
     public string Country { get; set; } = string.Empty;
 
     public string Language { get; set; } = string.Empty;
@@ -123,20 +127,153 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
         ? ReleaseDate.Value.ToString("yyyy-MM-dd")
         : ReleaseYear?.ToString() ?? "年份 -";
 
+    public string TitleOriginalLineText => string.IsNullOrWhiteSpace(OriginalTitle)
+        ? Title
+        : $"{Title} | {OriginalTitle}";
+
+    public string OriginalTitleDisplayText => FormatDisplayPart(OriginalTitle);
+
+    public string TitleOriginalSeparatorText => string.IsNullOrWhiteSpace(OriginalTitle) ? string.Empty : " | ";
+
+    public string RecommendationTagLineText => JoinDisplayParts(Tags, EmotionTagsText, SceneTagsText);
+
+    public string RecommendationTagGroupOneText => GetRecommendationTagPart(0);
+
+    public string RecommendationTagSeparatorAfterOneText => GetRecommendationTagParts().Length > 1 ? " | " : string.Empty;
+
+    public string RecommendationTagGroupTwoText => GetRecommendationTagPart(1);
+
+    public string RecommendationTagSeparatorAfterTwoText => GetRecommendationTagParts().Length > 2 ? " | " : string.Empty;
+
+    public string RecommendationTagGroupThreeText => GetRecommendationTagPart(2);
+
+    public string DirectorDisplayText => $"导演：{FormatDisplayValue(DirectorText)}";
+
+    public string ActorsDisplayText => $"演员：{FormatDisplayValue(ActorsText)}";
+
     public string WeightedAverageRatingText
     {
         get
         {
             if (!TryGetWeightedAverageRating(out var score))
             {
-                return "-";
+                return "--";
             }
 
-            return $"{score:0.0}";
+            return $"{RoundRatingForDisplay(score):0.0}";
         }
     }
 
-    public bool IsHighWeightedAverageRating => TryGetWeightedAverageRating(out var score) && score >= 8d;
+    public bool IsHighWeightedAverageRating => TryGetWeightedAverageRating(out var score)
+                                                && RoundRatingForDisplay(score) >= 8d;
+
+    public bool ApplyMetadataDetails(MetadataSearchCandidate details)
+    {
+        var changed = false;
+
+        if (details.TmdbId > 0 && TmdbId is not > 0)
+        {
+            TmdbId = details.TmdbId;
+            changed = true;
+        }
+
+        if (ShouldFillText(Title, details.Title))
+        {
+            Title = details.Title.Trim();
+            changed = true;
+        }
+
+        if (ShouldFillText(OriginalTitle, details.OriginalTitle))
+        {
+            OriginalTitle = details.OriginalTitle.Trim();
+            changed = true;
+        }
+
+        if (!ReleaseYear.HasValue && details.ReleaseYear.HasValue)
+        {
+            ReleaseYear = details.ReleaseYear;
+            changed = true;
+        }
+
+        if (!ReleaseDate.HasValue && details.ReleaseDate.HasValue)
+        {
+            ReleaseDate = details.ReleaseDate;
+            changed = true;
+        }
+
+        if (ShouldFillText(PosterRemoteUrl, details.PosterRemoteUrl))
+        {
+            PosterRemoteUrl = details.PosterRemoteUrl.Trim();
+            changed = true;
+        }
+
+        if (ShouldFillText(Overview, details.Overview))
+        {
+            Overview = details.Overview.Trim();
+            changed = true;
+        }
+
+        if (ShouldFillText(DirectorText, details.DirectorText))
+        {
+            DirectorText = details.DirectorText.Trim();
+            changed = true;
+        }
+
+        if (ShouldFillText(ActorsText, details.ActorsText))
+        {
+            ActorsText = details.ActorsText.Trim();
+            changed = true;
+        }
+
+        if (ShouldFillText(Country, details.Country))
+        {
+            Country = details.Country.Trim();
+            changed = true;
+        }
+
+        if (ShouldFillText(Language, details.Language))
+        {
+            Language = details.Language.Trim();
+            changed = true;
+        }
+
+        if (!RuntimeMinutes.HasValue && details.RuntimeMinutes.HasValue)
+        {
+            RuntimeMinutes = details.RuntimeMinutes;
+            changed = true;
+        }
+
+        if (ShouldFillText(ImdbId, details.ImdbId))
+        {
+            ImdbId = details.ImdbId.Trim();
+            changed = true;
+        }
+
+        if (!TmdbRating.HasValue && details.TmdbRating.HasValue)
+        {
+            TmdbRating = details.TmdbRating;
+            changed = true;
+        }
+
+        if (!TmdbVoteCount.HasValue && details.TmdbVoteCount.HasValue)
+        {
+            TmdbVoteCount = details.TmdbVoteCount;
+            changed = true;
+        }
+
+        if (ShouldFillText(Tags, details.GenresText))
+        {
+            Tags = details.GenresText.Trim();
+            changed = true;
+        }
+
+        if (changed)
+        {
+            NotifyDisplayMetadataChanged();
+        }
+
+        return changed;
+    }
 
     private bool TryGetWeightedAverageRating(out double score)
     {
@@ -163,6 +300,96 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
             ? ratings.Sum(x => x.Score * x.Votes) / totalVotes
             : ratings.Average(x => x.Score);
         return true;
+    }
+
+    private static double RoundRatingForDisplay(double score)
+    {
+        return Math.Round(score, 1, MidpointRounding.AwayFromZero);
+    }
+
+    private static string JoinDisplayParts(params string?[] values)
+    {
+        var parts = values
+            .Select(FormatDisplayPart)
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToArray();
+
+        return parts.Length == 0 ? "-" : string.Join(" | ", parts);
+    }
+
+    private string GetRecommendationTagPart(int index)
+    {
+        var parts = GetRecommendationTagParts();
+        if (parts.Length == 0)
+        {
+            return index == 0 ? "-" : string.Empty;
+        }
+
+        return index < parts.Length ? parts[index] : string.Empty;
+    }
+
+    private string[] GetRecommendationTagParts()
+    {
+        return
+        [
+            .. new[] { Tags, EmotionTagsText, SceneTagsText }
+                .Select(FormatDisplayPart)
+                .Where(part => !string.IsNullOrWhiteSpace(part))
+        ];
+    }
+
+    private static string FormatDisplayPart(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    private static string FormatDisplayValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    }
+
+    private static bool ShouldFillText(string? currentValue, string? nextValue)
+    {
+        return IsMissingDisplayValue(currentValue) && !IsMissingDisplayValue(nextValue);
+    }
+
+    private static bool IsMissingDisplayValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), "-", StringComparison.Ordinal);
+    }
+
+    private void NotifyDisplayMetadataChanged()
+    {
+        OnPropertyChanged(nameof(TmdbId));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(OriginalTitle));
+        OnPropertyChanged(nameof(ReleaseYear));
+        OnPropertyChanged(nameof(ReleaseDate));
+        OnPropertyChanged(nameof(PosterRemoteUrl));
+        OnPropertyChanged(nameof(Overview));
+        OnPropertyChanged(nameof(DirectorText));
+        OnPropertyChanged(nameof(ActorsText));
+        OnPropertyChanged(nameof(Country));
+        OnPropertyChanged(nameof(Language));
+        OnPropertyChanged(nameof(RuntimeMinutes));
+        OnPropertyChanged(nameof(ImdbId));
+        OnPropertyChanged(nameof(TmdbRating));
+        OnPropertyChanged(nameof(TmdbVoteCount));
+        OnPropertyChanged(nameof(Tags));
+        OnPropertyChanged(nameof(ReleaseDateText));
+        OnPropertyChanged(nameof(TitleOriginalLineText));
+        OnPropertyChanged(nameof(OriginalTitleDisplayText));
+        OnPropertyChanged(nameof(TitleOriginalSeparatorText));
+        OnPropertyChanged(nameof(RecommendationTagLineText));
+        OnPropertyChanged(nameof(RecommendationTagGroupOneText));
+        OnPropertyChanged(nameof(RecommendationTagSeparatorAfterOneText));
+        OnPropertyChanged(nameof(RecommendationTagGroupTwoText));
+        OnPropertyChanged(nameof(RecommendationTagSeparatorAfterTwoText));
+        OnPropertyChanged(nameof(RecommendationTagGroupThreeText));
+        OnPropertyChanged(nameof(DirectorDisplayText));
+        OnPropertyChanged(nameof(ActorsDisplayText));
+        OnPropertyChanged(nameof(WeightedAverageRatingText));
+        OnPropertyChanged(nameof(IsHighWeightedAverageRating));
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

@@ -451,6 +451,11 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding AiRecommendationViewModel.IsPreferenceDialogOpen}" Value="True">
+                    <Setter Property="IsHitTestVisible" Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="DiscoverySearchTabButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscoveryManualTabButtonStyle}">

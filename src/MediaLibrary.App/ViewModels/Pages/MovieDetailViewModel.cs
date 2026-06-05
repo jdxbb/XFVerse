@@ -1321,9 +1321,9 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         PosterDisplayUrl = recommendation.PosterRemoteUrl;
         Country = MovieMetadataDisplayText.LocalizeCountries(recommendation.Country);
         Language = MovieMetadataDisplayText.LocalizeLanguages(recommendation.Language);
-        DirectorText = "-";
+        DirectorText = string.IsNullOrWhiteSpace(recommendation.DirectorText) ? "-" : recommendation.DirectorText;
         WriterText = "-";
-        ActorsText = "-";
+        ActorsText = string.IsNullOrWhiteSpace(recommendation.ActorsText) ? "-" : recommendation.ActorsText;
         ProductionCompanyText = "-";
         RuntimeText = FormatRuntimeMinutes(recommendation.RuntimeMinutes);
         if (shouldAutoClassify)
@@ -3443,6 +3443,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             }
 
             ApplyMovieCreditsForDisplay(details);
+            if (_movieId is null
+                && _externalRecommendation?.TmdbId == tmdbId
+                && _externalRecommendation.ApplyMetadataDetails(details))
+            {
+                _dataRefreshService.NotifyRecommendationChanged();
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

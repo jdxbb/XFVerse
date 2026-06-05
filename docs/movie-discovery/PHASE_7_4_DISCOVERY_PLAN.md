@@ -1,17 +1,159 @@
 # Phase 7.4 影片发现执行计划
 
-Last updated: 2026-06-05
+Last updated: 2026-06-06
 
 本文件是 Phase 7.4 的唯一详细执行计划。后续进入 7.4 任一小阶段前，必须先阅读本文件，再按小阶段要求读取对应文档、代码和设计草图。
 
 ## 阶段状态
 
-- 状态：7.4a、7.4b、7.4c 已完成；7.4d 待开始。
+- 状态：7.4a、7.4b、7.4c 已完成；7.4d-1、7.4d-2、7.4d-3、7.4d-4、7.4d-5 已完成。
 - 当前范围：`影片发现` 页面，以及其中嵌入的 `AI 推荐` Tab。
 - 主要规格来源：`DesignDraft/page-spec/movie-discovery-page.md`。
 - 业务边界：7.4 可以完善搜索方式、卡片状态投影和 UI 偏好，但不能修改推荐算法，也不能让 TV 进入 Movie AI 推荐、观影洞察、画像、人格或推荐 fingerprint 链路。
 
 ## 执行记录
+
+### 2026-06-06 - 7.4d-5 / AI 推荐海报信息区测试反馈修复
+
+完成了什么：
+
+- AI 推荐三海报从 240x360 放大到 312x468，保持 w780 海报请求、DecodePixelWidth=780 和高质量缩放；海报内部去掉标题、评分、日期、标签、渐变和状态按钮，只保留纯海报与占位图。
+- 海报下方新增无背景、无边框的信息区：第一行 `电影名 | 原名`，第二行 `yyyy-MM-dd` 日期，第三行 `类型标签 | 情绪标签 | 场景标签`，第四行按榜单样式显示 `导演：xx` 与 `演员：xx`，第五行显示推荐理由并保留最大高度与滚动溢出提示。
+- 评分徽章移到信息区右侧，跨第一、第二行垂直居中，并与信息区右边缘对齐。
+- 自定义偏好双段开关移除选中态上的 hover 覆盖，选中颜色继续使用媒体库布局切换同款 `BrushAccent / BrushOnAccent` 语义。
+- 推荐项 read model 增加标题原名行、三类标签行、导演/演员展示行；推荐服务投影库内 Movie 与外部 TMDB 候选的导演/演员，并在推荐缓存快照中保留完整上映日期、导演和演员。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+- `git diff --check` 无 whitespace error，仅保留既有 LF/CRLF 提示。
+
+不属于本次：
+
+- 不改 AI 推荐生成算法、候选排序、推荐 prompt、推荐 fingerprint、TV 推荐、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认 312x468 海报密度、信息区五行截断、评分徽章对齐和开关选中态观感。
+
+Known Issues：
+
+- Blocker：无。
+- Deferred：标记 `不想看` 后仍沿用既有行为移除当前卡片，不做即时补位。
+- Noise：旧外部推荐缓存若缺少完整上映日期或演职员字段，需换一批或刷新推荐后由新快照完整带出；库内缓存会尽量从 Movie 元数据回填。
+
+### 2026-06-06 - 7.4d-4 / AI 推荐测试反馈二次修复
+
+完成了什么：
+
+- AI 推荐区默认光标显式设回箭头，只在海报点击层、菜单项、操作按钮和工具按钮保留手型，避免推荐理由、空白区域和非点击容器显示点击手势。
+- 顶部右侧工具条外部按钮间距继续加大，并缩小自定义偏好双段开关与编辑图标按钮之间的距离；按钮间距保持固定两档，展开导航栏为 26px，收起导航栏为 35px，不再用伸缩列平均分配额外空间。
+- 状态提示文案按测试反馈统一调整：默认提示改为 `为你量身“定制”下一部影片`，推荐成功改为 `已为你推荐 N 部影片`，无候选补充失败提示改为 `本次没有补充到新的候选影片，请稍后重试`，缺少偏好种子提示改为 `先标记几部影片，让 AI 更懂你`。
+- 状态提示统一去掉句尾句号，并在 `StatusMessage` 赋值入口兜底裁剪句尾句号或省略号，覆盖从推荐预览状态和旧缓存消息回填的文本。
+- 删除 `已看影片不需要再加入想看`、`已取消想看`、`已加入想看`、`已标记为不想看`、`已取消不想看` 等操作成功提示；相关操作仍保留状态变更和数据刷新。
+- 自定义偏好弹窗说明改为 `偏好设置仅影响 AI 推荐，不会覆盖你的其他过滤规则。保存后，下一次推荐将生效`。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+- `git diff --check` 无 whitespace error，仅保留既有 LF/CRLF 提示。
+
+不属于本次：
+
+- 不改 AI 推荐生成算法、候选排序、推荐 prompt、推荐 fingerprint、TV 推荐、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认光标、顶部工具条间距和弹窗说明文案。
+
+Known Issues：
+
+- Blocker：无。
+- Deferred：标记 `不想看` 后仍沿用既有行为移除当前卡片，不做即时补位。
+- Noise：旧缓存中已持久化的外部错误消息可能仍带旧措辞，但页面状态栏会裁剪句尾句号。
+
+### 2026-06-06 - 7.4d-3 / AI 推荐测试反馈修复
+
+完成了什么：
+
+- AI 推荐评分无数据占位符从 `-` 调整为 `--`，并继续复用同一个 `AiRecommendationItem.WeightedAverageRatingText` 绑定路径，覆盖影片发现 AI 推荐和首页 AI 推荐预览。
+- 库内 AI 推荐项补齐 `RatingSources` 中的 TMDB 与 OMDb/IMDb 评分投影；本地 fallback、推荐缓存快照恢复和预览缓存读取也保留或回填评分字段，避免详情页有评分但推荐卡片显示占位符。
+- 推荐海报容器不再整体设置手型光标，只保留实际按钮手型；点击海报区域进入详情的既有行为保留。
+- 顶部右侧工具条按钮间距加大；自定义偏好组件拆成 `自定义偏好` 标签 + `开 / 关` 双段开关，编辑入口拆成独立纯图标按钮。
+- 修正推荐缓存快照恢复中一处既有 `已看 / 未看` 乱码兜底文案。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+不属于本次：
+
+- 不改 AI 推荐生成算法、候选排序、prompt、推荐 fingerprint、TV 推荐、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认顶部工具条间距、双段开关选中态、纯图标按钮悬停态和推荐海报点击手感。
+
+Known Issues：
+
+- Blocker：无。
+- Deferred：标记 `不想看` 后仍沿用既有行为移除当前卡片，不做即时补位。
+- Noise：直接消费旧候选池快照时，如快照本身缺失评分字段，仍可能需要新一轮推荐刷新或候选补充后完全带出补齐后的评分字段。
+
+### 2026-06-06 - 7.4d-2 / AI 推荐三海报布局与卡片交互
+
+完成了什么：
+
+- AI 推荐结果区从普通 WrapPanel 卡片改为三列海报展示；三张推荐海报使用等星间距布局，中间海报保持水平居中，左右海报与页面左右边距保持对称。
+- 推荐海报主体复用电影详情页 240x360 海报结构、20px 圆角、双层投影、w780 海报加载和大海报占位模板。
+- 海报左上角显示电影名，右上角纵向放置 `+ 想看 / 取消想看` 与 `不想看 / 取消不想看` 两个搜索海报同款胶囊按钮，按钮右边缘对齐。
+- 点击海报主体、标题和海报标签区域进入电影详情页；点击两个状态按钮只执行对应按钮命令。
+- 海报底部左侧四行依次显示日期、AI 类型、情绪、场景标签；右侧评分徽章使用影片搜索海报同款评分样式，并与右上角按钮右边缘对齐。
+- 海报下方新增略宽于海报的推荐理由区域，使用现代化自动显隐滚动条和溢出提示。
+- `想看` 写入失败时恢复原 `不想看` 状态，保证两个状态按钮在异常路径下仍保持互斥语义。
+
+验证：
+
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+不属于本次：
+
+- 不改推荐算法、候选来源、候选排序、AI 标签生成、推荐 fingerprint、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未新增 TV AI 推荐，也未让 TV 进入 Movie AI 推荐、观影洞察、画像、人格或推荐 fingerprint。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认三海报在目标分辨率下的视觉密度、按钮悬停态和推荐理由滚动条手感。
+
+Known Issues：
+
+- Blocker：无。
+- Deferred：标记 `不想看` 后仍沿用既有行为移除当前卡片，不做即时补位。
+- Noise：未做完整窗口截图验收前，不同窗口宽度下星间距压缩效果仍需人工确认。
+
+### 2026-06-06 - 7.4d-1 / AI 推荐顶部工具条与自定义偏好弹窗
+
+完成了什么：
+
+- AI 推荐页顶部去掉重复的 `AI 推荐 / 观影偏好` 标题，只保留左侧状态提示文本。
+- 顶部工具条从左到右调整为：提示文本、`播放源：全部 / 有播放源 / 无播放源`、`观看状态：全部 / 已看 / 未看`、自定义偏好开关组件、`换一批`。
+- 播放源筛选默认改为 `全部`；观看状态默认保持 `未看`。`有播放源` 仍映射到库内已有播放源，`无播放源` 仍映射到库外无播放源候选。
+- 筛选按钮和菜单使用媒体库同密度的 28px 玻璃按钮 / 菜单样式。
+- 自定义偏好组件改为左侧标签 + 开关 + 齿轮入口，开关负责启停，齿轮打开偏好弹窗。
+- 自定义偏好弹窗遮罩改为透明遮罩；发现页 AI 推荐弹窗打开时 Tab 头不响应点击，离开发现页或切换导航页时会自动关闭弹窗。
+- AI 推荐 prompt 中的筛选说明从 `入库范围` 调整为 `播放源筛选`，只改提示语义，不改变本地候选生成、去重、过滤和推荐安全门。
+- AI 推荐页去掉整页大圆角外层包裹，推荐卡片和弹窗面板使用较小圆角。
+
+验证：
+
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+不属于本次：
+
+- 不改推荐算法、候选来源、候选排序、AI 标签规则、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未新增 TV AI 推荐，也未让 TV 进入 Movie AI 推荐、观影洞察、画像、人格或推荐 fingerprint。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认顶部工具条横向间距、弹窗遮罩命中区域和开关交互。
+
+Known Issues：
+
+- Blocker：无。
+- Deferred：推荐卡片主体视觉仍沿用现有结构，后续如需彻底对齐影片发现卡片节奏可单独处理。
+- Noise：未做完整窗口截图验收前，齿轮悬停态和不同窗口宽度下的工具条压缩效果仍需人工确认。
 
 ### 2026-06-06 - 7.4c follow-up / 榜单 Tab 悬停下拉延时
 
@@ -1025,3 +1167,249 @@ Validation:
 
 - `dotnet build MediaLibrary.sln`.
 - `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is expected to include `AddTvSeriesRatingSources` in this authorized follow-up.
+
+## 2026-06-06 - 7.4d-6 / AI Recommendation Loading And Info Layout Follow-up
+
+Scope:
+
+- Show the shared loading spinner slightly above center when AI recommendations are loading and no recommendation item is currently displayed.
+- Resize the recommendation poster from `312x468` to `280.8x421.2`; keep the remote poster decode at `w780 / DecodePixelWidth=780`.
+- Resize the recommendation info area from `312` to `343.2` width and keep it centered relative to the poster.
+- Align the custom-preference switch hover behavior with the media-library layout toggle: selected state uses `BrushAccent / BrushOnAccent`; hover only lowers opacity to `0.92`.
+- Render title/original-title and recommendation tags as split inline runs so title separators keep spaces and tag separators can use the media-library poster divider color `#7DD3FC`.
+- Increase recommendation-reason type from `12` to `12.5`, set line height to `18`, and keep a half-line gap from the director/actor row.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, fingerprint, TV recommendation, scanner, player, schema, migration, database update, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+- Manual WPF check remains required for spinner position, switch hover color, 3-column spacing, and tag separator color.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full window screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved.
+
+## 2026-06-06 - 7.4d-7 / AI Recommendation Tab Crash Fix
+
+Scope:
+
+- Fixed the AI recommendation tab crash reported after the 7.4d-6 layout change.
+- Evidence from Windows Application log: WPF threw `XamlParseException` because `Run.Text` defaulted to a source-updating binding against the read-only `AiRecommendationItem.TitleOriginalSeparatorText` property.
+- Set all recommendation title/tag `Run.Text` bindings to explicit `Mode=OneWay`.
+
+Explicitly Not Done:
+
+- No recommendation service, AI request, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+- `git diff --check` reported only existing LF/CRLF warnings.
+
+Known Issues:
+
+- Blocker: None known after build.
+- Deferred: User-side click-through verification for opening the AI recommendation tab is still required.
+- Noise: The historical Windows event log still contains the pre-fix crash entry; it is useful evidence but not a new post-fix failure.
+
+## 2026-06-06 - 7.4d-8 / AI Recommendation Spacing And Switch Follow-up
+
+Scope:
+
+- Kept the recommendation poster at `280.8x421.2` after the user clarified it should not be reduced further.
+- Matched the custom-preference switch hover behavior to the media-library layout segment buttons: transparent default button background, selected Accent state, and no hover visual trigger.
+- Moved each recommendation poster/info block down slightly with a top margin on the item container.
+- Moved the info area down further relative to the poster.
+- Let the recommendation reason panel stretch to the full info-area width and increased reason text to `13` with line height `19`.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, service, prompt, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+- `git diff --check` reported only existing LF/CRLF warnings.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual WPF check is still required for the final spacing and switch hover parity.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved.
+
+## 2026-06-06 - 7.4d-9 / AI Recommendation Hover, Separators And Metadata Refresh Follow-up
+
+Scope:
+
+- Matched the custom-preference switch hover behavior to the visible media-library segment hover pattern: unselected switch halves use glass hover background plus accent border, while the selected half keeps the Accent state.
+- Moved the recommendation poster/info blocks down slightly and kept the current `280.8x421.2` poster size unchanged.
+- Reduced the vertical gaps between date/tag and tag/director rows.
+- Added vertical separators between the three recommendation items; separators sit in the center gutter so the distance to neighboring posters is balanced.
+- Added recommendation metadata backfill for director, actors and other non-reason fields. The detail page now writes hydrated TMDB details back to the source recommendation item and notifies recommendation refresh.
+- Added recommendation-service hydration before cached/pool/generated items are returned, using existing TMDB detail cache paths and avoiding recommendation reason overwrite.
+- Extended library-matched recommendation backfill to cover title/original title, full date, poster, overview, tags, country, language, runtime, identifiers and ratings where missing.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, fingerprint, TV recommendation, scanner, player, schema, migration, database update, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+- Manual WPF check remains required for switch hover parity, separator spacing, and external-detail return refresh.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full WPF click-through and screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved; LF/CRLF warnings still appear in git checks.
+
+## 2026-06-06 - 7.4d-10 / AI Recommendation Switch Border And Separator Alignment Follow-up
+
+Scope:
+
+- Fixed the custom-preference switch hover border clipping by giving the switch host an inset content area and drawing the hover border inside that area.
+- Realigned recommendation item separators by giving the outer layout the same fixed item column width as the recommendation info area, so separators sit at the true midpoint between neighboring posters and info areas.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual WPF check remains required for the exact hover border and separator position.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full WPF screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved; LF/CRLF warnings still appear in git checks.
+
+## 2026-06-06 - 7.4d-15 / Custom Preference Dialog Size And Scroll Follow-up
+
+Scope:
+
+- Enlarged the custom preference dialog to a fixed `624 x 384` panel, preserving the previous approximate aspect ratio while preventing content from increasing dialog height.
+- Reworked the dialog body from a vertical stack to fixed grid rows so the preference input owns the remaining space and scrolls instead of pushing the action buttons downward.
+- Applied the AI recommendation modern scrollbar style to the multiline preference input.
+- Aligned the close button vertically with the title row and increased it to a `38 x 38` icon button.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- XML reader validation passed for `RecommendationsPage.xaml`.
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual WPF check remains required for exact dialog sizing and scrollbar hover/reveal feel.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full WPF screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved; LF/CRLF warnings still appear in git checks.
+
+## 2026-06-06 - 7.4d-14 / Rating Highlight Display-Value Consistency Follow-up
+
+Scope:
+
+- Fixed AI recommendation rating highlight logic so the high-score color is based on the displayed one-decimal value rather than the raw weighted score.
+- Checked other rating badge highlight paths for the same pattern.
+- Updated Movie Discovery movie cards, Movie Discovery TV cards and Media Library movie cards so high-score color uses the displayed one-decimal value while preserving raw rating values for sorting.
+- Centralized Movie Discovery rating display rounding in `DiscoveryRatingPresenter`.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Search confirmed no remaining direct `IsHigh... >= 8` / `IsHigh... is >= 8` raw-value checks in the inspected read-model/view-model rating badge paths.
+- Manual WPF check remains required for AI recommendation, Discovery and Media Library rating badge colors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full WPF screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved; LF/CRLF warnings still appear in git checks.
+
+## 2026-06-06 - 7.4d-13 / AI Recommendation Info Font Size Follow-up
+
+Scope:
+
+- Unified AI recommendation info-row text size for date, recommendation tags, director and actors to `11`.
+- Kept director/actor text at normal weight while sharing the same base meta size and line metrics as the date/tag rows.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual WPF check remains required for final typography balance.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full WPF screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved; LF/CRLF warnings still appear in git checks.
+
+## 2026-06-06 - 7.4d-12 / AI Recommendation Expanded Poster Style Parity Follow-up
+
+Scope:
+
+- Removed the expanded-sidebar poster `RenderTransform` scaling path because it could alter clipping and shadow presentation.
+- In expanded-sidebar mode, the recommendation poster now uses direct 0.95 proportional dimensions for the card, clip radius, palette shadow, fallback shadow, shadow padding, blur radius and shadow depth.
+- Collapsed-sidebar poster values remain unchanged.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual WPF check remains required to confirm expanded and collapsed poster styling differ only by size.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full WPF screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved; LF/CRLF warnings still appear in git checks.
+
+## 2026-06-06 - 7.4d-11 / AI Recommendation Expanded Sidebar Responsive Layout Follow-up
+
+Scope:
+
+- Kept the collapsed-sidebar AI recommendation layout unchanged.
+- In expanded-sidebar mode, reduced the poster visual scale to `0.95` of the current size and narrowed the info area from `343.2` to `326.04`.
+- Reworked the recommendation item row to use three equal-width cells, with separators at cell boundaries so the separator remains centered between neighboring cards after responsive width changes.
+- Increased the recommendation reason viewport to four and a half lines (`MaxHeight=86` with line height `19`) so content longer than four lines scrolls while showing a half-line overflow cue.
+
+Explicitly Not Done:
+
+- No recommendation algorithm, prompt, database, schema, migration, scanner, player, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Manual WPF check remains required for expanded/collapsed sidebar sizing and the four-and-a-half-line reason scroll cue.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Full WPF screenshot validation was not performed in this coding pass.
+- Noise: Existing unrelated workspace edits remain unstaged and are preserved; LF/CRLF warnings still appear in git checks.

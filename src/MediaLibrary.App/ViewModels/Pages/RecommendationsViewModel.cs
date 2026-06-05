@@ -21,25 +21,30 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private const int CandidatePoolLowWatermark = 9;
     private const string CandidatePoolRefillWaitingMessage = "正在补充推荐候选，请稍候";
     private const string CandidatePoolRefillFailedMessage = "候选补充失败，请稍后重试";
-    private const string CandidatePoolRefillNoCandidatesMessage = "本次没有补充到新的候选影片，请稍后再试";
+    private const string CandidatePoolRefillNoCandidatesMessage = "本次没有补充到新的候选影片，请稍后重试";
     private static readonly string AiPoolDiagnosticLogPath = DiagnosticLogPathResolver.Resolve("ai-pool-debug.log");
     private static readonly object AiPoolDiagnosticFileLock = new();
     private const string RefreshBatchText = "换一批";
     private const string RetryRecommendationText = "重试";
-    private const string RecommendationIncompleteMessage = "AI 推荐本次请求未完成，请稍后重试。";
-    private const string RecommendationIncompletePreservedMessage = "AI 推荐本次更新未完成，已保留当前结果。";
-    private const string MissingRecommendationSeedMessage = "先标记几部影片，AI 才能理解你的偏好";
-    private const string MissingRecommendationSeedHelpMessage = "你可以先在资源库或影片详情中标记已看、喜爱或想看。";
+    private const string RecommendationIncompleteMessage = "AI 推荐本次请求未完成，请稍后重试";
+    private const string RecommendationIncompletePreservedMessage = "AI 推荐本次更新未完成，已保留当前结果";
+    private const string MissingRecommendationSeedMessage = "先标记几部影片，让 AI 更懂你";
     private const string EmptyRecommendationMessage = "当前筛选条件下暂无可推荐影片";
+    private const string PlaybackSourceAll = "全部";
+    private const string PlaybackSourceWithSource = "有播放源";
+    private const string PlaybackSourceWithoutSource = "无播放源";
+    private const string WatchFilterAll = "全部";
+    private const string WatchFilterWatched = "已看";
+    private const string WatchFilterUnwatched = "未看";
     private readonly IRecommendationService _recommendationService;
     private readonly IUserCollectionService _userCollectionService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IRecommendationPreferenceService _recommendationPreferenceService;
     private int _batchSeed;
-    private string _selectedLibraryScope = "仅外部候选";
-    private string _selectedWatchFilter = "未看";
-    private string _statusMessage = "AI 推荐会基于你的已看记录生成。";
+    private string _selectedLibraryScope = PlaybackSourceAll;
+    private string _selectedWatchFilter = WatchFilterUnwatched;
+    private string _statusMessage = "为你量身“定制”下一部影片";
     private string _refreshBatchButtonText = RefreshBatchText;
     private bool _isLoading;
     private bool _isRecommendationError;
@@ -63,18 +68,22 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
         IRecommendationPreferenceService recommendationPreferenceService)
-        : base("AI 推荐", "基于已看记录生成 3 部推荐，并标明已有播放源 / 外部候选。")
+        : base("AI 推荐", "基于已看记录生成 3 部推荐，并按播放源和观看状态筛选。")
     {
         _recommendationService = recommendationService;
         _userCollectionService = userCollectionService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _recommendationPreferenceService = recommendationPreferenceService;
+        Recommendations.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowEmptyLoadingSpinner));
         _dataRefreshService.DataChanged += OnDataChanged;
 
         OpenMovieCommand = new RelayCommand(OpenMovie);
         AddWantToWatchCommand = new AsyncRelayCommand(AddWantToWatchAsync, CanToggleWantToWatch);
         ToggleNotInterestedCommand = new AsyncRelayCommand(ToggleNotInterestedAsync, CanToggleNotInterested);
+        SelectLibraryScopeCommand = new RelayCommand(value => SelectedLibraryScope = GetPlaybackSourceOptionValue(value));
+        SelectWatchFilterCommand = new RelayCommand(value => SelectedWatchFilter = GetWatchFilterOptionValue(value));
+        SetCustomPreferenceEnabledCommand = new RelayCommand(SetCustomPreferenceEnabled, _ => CanEditCustomPreference);
         EditPreferenceCommand = new AsyncRelayCommand(OpenPreferenceDialogAsync, () => CanEditCustomPreference);
         ConfirmPreferenceCommand = new AsyncRelayCommand(ConfirmPreferenceAsync, () => CanConfirmPreference);
         CancelPreferenceCommand = new RelayCommand(CancelPreferenceDialog);
@@ -86,15 +95,31 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     public ObservableCollection<AiRecommendationItem> Recommendations { get; } = [];
 
-    public IReadOnlyList<string> LibraryScopeOptions { get; } = ["不区分来源", "仅已有播放源", "仅外部候选"];
+    public IReadOnlyList<string> LibraryScopeOptions { get; } =
+    [
+        PlaybackSourceAll,
+        PlaybackSourceWithSource,
+        PlaybackSourceWithoutSource
+    ];
 
-    public IReadOnlyList<string> WatchFilterOptions { get; } = ["全部", "已看", "未看"];
+    public IReadOnlyList<string> WatchFilterOptions { get; } =
+    [
+        WatchFilterAll,
+        WatchFilterWatched,
+        WatchFilterUnwatched
+    ];
 
     public RelayCommand OpenMovieCommand { get; }
 
     public AsyncRelayCommand AddWantToWatchCommand { get; }
 
     public AsyncRelayCommand ToggleNotInterestedCommand { get; }
+
+    public RelayCommand SelectLibraryScopeCommand { get; }
+
+    public RelayCommand SelectWatchFilterCommand { get; }
+
+    public RelayCommand SetCustomPreferenceEnabledCommand { get; }
 
     public AsyncRelayCommand EditPreferenceCommand { get; }
 
@@ -114,6 +139,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             if (SetProperty(ref _selectedLibraryScope, value))
             {
                 _batchSeed = 0;
+                OnPropertyChanged(nameof(PlaybackSourceButtonText));
                 _ = RequestReloadAsync(forceRefresh: false);
             }
         }
@@ -127,15 +153,20 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             if (SetProperty(ref _selectedWatchFilter, value))
             {
                 _batchSeed = 0;
+                OnPropertyChanged(nameof(WatchStatusButtonText));
                 _ = RequestReloadAsync(forceRefresh: false);
             }
         }
     }
 
+    public string PlaybackSourceButtonText => $"播放源：{SelectedLibraryScope}";
+
+    public string WatchStatusButtonText => $"观看状态：{SelectedWatchFilter}";
+
     public string StatusMessage
     {
         get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
+        private set => SetProperty(ref _statusMessage, NormalizeStatusMessage(value));
     }
 
     public string RefreshBatchButtonText
@@ -154,10 +185,13 @@ public sealed class RecommendationsViewModel : PageViewModelBase
                 RefreshBatchCommand.RaiseCanExecuteChanged();
                 ToggleNotInterestedCommand.RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(CanChangeFilters));
+                OnPropertyChanged(nameof(ShowEmptyLoadingSpinner));
                 OnCustomPreferenceBusyStateChanged();
             }
         }
     }
+
+    public bool ShowEmptyLoadingSpinner => IsLoading && Recommendations.Count == 0;
 
     public bool CanChangeFilters => !IsLoading
                                    && !_isRecommendationError
@@ -177,6 +211,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             if (SetProperty(ref _isCustomPreferenceEnabled, value))
             {
                 OnPropertyChanged(nameof(CustomPreferenceToggleText));
+                OnPropertyChanged(nameof(CustomPreferenceSwitchText));
+                OnPropertyChanged(nameof(IsCustomPreferenceDisabled));
                 OnPropertyChanged(nameof(CanClearPreference));
                 ClearPreferenceCommand.RaiseCanExecuteChanged();
                 if (!_isApplyingPreferenceState)
@@ -191,6 +227,10 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         ? "自定义偏好已启用"
         : "自定义偏好未启用";
 
+    public string CustomPreferenceSwitchText => IsCustomPreferenceEnabled ? "开" : "关";
+
+    public bool IsCustomPreferenceDisabled => !IsCustomPreferenceEnabled;
+
     public bool IsPreferenceDialogOpen
     {
         get => _isPreferenceDialogOpen;
@@ -199,6 +239,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             if (SetProperty(ref _isPreferenceDialogOpen, value))
             {
                 RefreshBatchCommand.RaiseCanExecuteChanged();
+                SetCustomPreferenceEnabledCommand.RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(CanChangeFilters));
             }
         }
@@ -268,6 +309,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     private void OnCustomPreferenceBusyStateChanged()
     {
+        SetCustomPreferenceEnabledCommand.RaiseCanExecuteChanged();
         EditPreferenceCommand.RaiseCanExecuteChanged();
         ConfirmPreferenceCommand.RaiseCanExecuteChanged();
         ClearPreferenceCommand.RaiseCanExecuteChanged();
@@ -286,6 +328,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     public override void Deactivate()
     {
         _isActive = false;
+        ClosePreferenceDialog();
     }
 
     private void OnDataChanged(object? sender, AppDataChangedEventArgs e)
@@ -329,6 +372,22 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         ApplyCustomPreference(preference);
     }
 
+    private static string NormalizeStatusMessage(string value)
+    {
+        var normalized = value.Trim();
+        while (normalized.Length > 0 && IsTrimmedStatusEnding(normalized[^1]))
+        {
+            normalized = normalized[..^1].TrimEnd();
+        }
+
+        return normalized;
+    }
+
+    private static bool IsTrimmedStatusEnding(char value)
+    {
+        return value is '。' or '.' or '…';
+    }
+
     private async Task SaveCustomPreferenceEnabledAsync(bool isEnabled, bool previousValue)
     {
         try
@@ -341,8 +400,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
                 });
             ApplyCustomPreference(saved);
             StatusMessage = isEnabled
-                ? "自定义推荐偏好已开启，下次刷新或换一批生效。"
-                : "自定义推荐偏好已关闭，下次刷新或换一批生效。";
+                ? "自定义推荐偏好已开启，下一次推荐将生效"
+                : "自定义推荐偏好已关闭，下一次推荐将生效";
         }
         catch (Exception exception)
         {
@@ -356,7 +415,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
                 _isApplyingPreferenceState = false;
             }
 
-            StatusMessage = $"自定义推荐偏好保存失败：{exception.Message}";
+            StatusMessage = $"自定义推荐偏好已保存失败：{exception.Message}";
         }
     }
 
@@ -373,8 +432,18 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         }
         catch (Exception exception)
         {
-            StatusMessage = $"自定义推荐偏好加载失败：{exception.Message}";
+            StatusMessage = $"自定义推荐偏好已加载失败：{exception.Message}";
         }
+    }
+
+    private void SetCustomPreferenceEnabled(object? value)
+    {
+        if (!CanEditCustomPreference)
+        {
+            return;
+        }
+
+        IsCustomPreferenceEnabled = bool.TryParse(value?.ToString(), out var isEnabled) && isEnabled;
     }
 
     private async Task ConfirmPreferenceAsync()
@@ -382,8 +451,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         if (!CanConfirmPreference)
         {
             StatusMessage = IsDraftPreferenceTooLong
-                ? $"自定义推荐偏好不能超过 {CustomPreferenceMaxLength} 个字符。"
-                : "自定义推荐偏好没有变化。";
+                ? $"自定义推荐偏好不能超过 {CustomPreferenceMaxLength} 个字符"
+                : "自定义推荐偏好没有变化";
             return;
         }
 
@@ -398,11 +467,11 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             ApplyCustomPreference(saved);
             _originalCustomPreferenceText = saved.Text;
             IsPreferenceDialogOpen = false;
-            StatusMessage = "推荐偏好已保存，下次刷新或换一批生效。";
+            StatusMessage = "推荐偏好已保存，下一次推荐将生效";
         }
         catch (Exception exception)
         {
-            StatusMessage = $"自定义推荐偏好保存失败：{exception.Message}";
+            StatusMessage = $"自定义推荐偏好已保存失败：{exception.Message}";
         }
     }
 
@@ -411,6 +480,14 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         DraftCustomPreferenceText = _savedCustomPreferenceText;
         _originalCustomPreferenceText = _savedCustomPreferenceText;
         IsPreferenceDialogOpen = false;
+    }
+
+    public void ClosePreferenceDialog()
+    {
+        if (IsPreferenceDialogOpen)
+        {
+            CancelPreferenceDialog();
+        }
     }
 
     private async Task ClearPreferenceAsync()
@@ -429,7 +506,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             _originalCustomPreferenceText = string.Empty;
             DraftCustomPreferenceText = string.Empty;
             IsPreferenceDialogOpen = false;
-            StatusMessage = "推荐偏好已清空，下次刷新或换一批生效。";
+            StatusMessage = "推荐偏好已清空，下一次推荐将生效";
         }
         catch (Exception exception)
         {
@@ -463,6 +540,28 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private string NormalizePreferenceText(string? text)
     {
         return _recommendationPreferenceService.NormalizeText(text);
+    }
+
+    private static string GetPlaybackSourceOptionValue(object? value)
+    {
+        var text = value?.ToString();
+        return text switch
+        {
+            PlaybackSourceWithSource => PlaybackSourceWithSource,
+            PlaybackSourceWithoutSource => PlaybackSourceWithoutSource,
+            _ => PlaybackSourceAll
+        };
+    }
+
+    private static string GetWatchFilterOptionValue(object? value)
+    {
+        var text = value?.ToString();
+        return text switch
+        {
+            WatchFilterWatched => WatchFilterWatched,
+            WatchFilterUnwatched => WatchFilterUnwatched,
+            _ => WatchFilterAll
+        };
     }
 
     private async Task RefreshBatchAsync()
@@ -605,7 +704,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             }
 
             StatusMessage = forceRefresh
-                ? "正在生成新一批推荐，请稍候。"
+                ? "正在生成新一批推荐，请稍候"
                 : BuildLoadingStatusMessage(targetCombinationKey);
 
             var recommendations = await _recommendationService.GetRecommendationsAsync(
@@ -715,17 +814,14 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             if (IsErrorState(state))
             {
                 return string.IsNullOrWhiteSpace(state.Message)
-                    ? "AI 推荐生成失败，请稍后重试。"
+                    ? "AI 推荐生成失败，请稍后重试"
                     : state.Message;
             }
 
             if (string.Equals(state.Status, RecommendationStatusMissingSeed, StringComparison.OrdinalIgnoreCase)
                 || !state.CanRequest)
             {
-                var message = string.IsNullOrWhiteSpace(state.Message)
-                    ? MissingRecommendationSeedMessage
-                    : state.Message;
-                return $"{message}{Environment.NewLine}{MissingRecommendationSeedHelpMessage}";
+                return MissingRecommendationSeedMessage;
             }
 
             if (state.IsPending)
@@ -738,30 +834,30 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
         if (Recommendations.Count == 0)
         {
-            if (SelectedLibraryScope == "仅外部候选" && SelectedWatchFilter == "已看")
+            if (SelectedLibraryScope == PlaybackSourceWithoutSource && SelectedWatchFilter == WatchFilterWatched)
             {
-                return "仅外部候选 + 已看的筛选条件下没有可推荐影片；只有已标记已看的外部候选影片会进入该组合。";
+                return "无播放源 + 已看的筛选条件下没有可推荐影片；只有已标记已看的无播放源候选影片会进入该组合";
             }
 
-            if (SelectedLibraryScope == "仅已有播放源" && SelectedWatchFilter == "未看")
+            if (SelectedLibraryScope == PlaybackSourceWithSource && SelectedWatchFilter == WatchFilterUnwatched)
             {
-                return "已有播放源的未看影片不足，建议切换到不区分来源。";
+                return "有播放源的未看影片不足，建议切换到全部";
             }
 
             return SelectedWatchFilter switch
             {
-                "已看" => "当前没有符合条件的已看影片。",
-                "未看" => "当前筛选条件下可推荐影片不足，请调整筛选条件。",
-                _ => "当前筛选条件下可推荐影片不足，请调整筛选条件。"
+                WatchFilterWatched => "当前没有符合条件的已看影片",
+                WatchFilterUnwatched => "当前筛选条件下可推荐影片不足，请调整筛选条件",
+                _ => "当前筛选条件下可推荐影片不足，请调整筛选条件"
             };
         }
 
         if (Recommendations.Count < 3)
         {
-            return $"当前筛选条件下新推荐不足，已展示可用结果（{Recommendations.Count} 部）。";
+            return $"当前筛选条件下新推荐不足，已展示可用结果（{Recommendations.Count} 部）";
         }
 
-        return $"已生成 {Recommendations.Count} 条推荐；当前筛选为“{SelectedLibraryScope} + {SelectedWatchFilter}”。";
+        return $"已为你推荐 {Recommendations.Count} 部影片";
     }
 
     private static bool IsEmptyState(AiRecommendationPreviewState state)
@@ -819,7 +915,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private string BuildLoadingStatusMessage(string targetCombinationKey)
     {
         return IsDisplayedCombination(targetCombinationKey)
-            ? "正在根据新的偏好更新推荐..."
+            ? "正在根据新的偏好更新推荐"
             : "正在等待 AI 分析并推荐影片";
     }
 
@@ -861,7 +957,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             return;
         }
 
-        StatusMessage = "正在后台补充推荐候选...";
+        StatusMessage = "正在后台补充推荐候选";
         StartLowWaterCandidatePoolRefill(queryOptions, requestVersion, trigger, state);
     }
 
@@ -964,7 +1060,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
             if (DateTime.UtcNow == DateTime.MinValue)
             {
-                StatusMessage = "推荐候选后台补充未完成，当前结果已保留。";
+                StatusMessage = "推荐候选后台补充未完成，当前结果已保留";
             }
         }
     }
@@ -1111,7 +1207,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
             SetRetryMode(true);
             StatusMessage = string.IsNullOrWhiteSpace(state.Message)
-                ? "AI 推荐生成失败，请稍后重试。"
+                ? "AI 推荐生成失败，请稍后重试"
                 : state.Message;
             return;
         }
@@ -1176,25 +1272,23 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
         if (item.IsWatched)
         {
-            StatusMessage = "已看影片不需要再加入想看。";
             return;
         }
 
         var previousState = item.IsWantToWatch;
+        var previousNotInterested = item.IsNotInterested;
         try
         {
             if (previousState)
             {
                 await _userCollectionService.RemoveWantToWatchAsync(item, changeSource: "Recommendation");
                 item.IsWantToWatch = false;
-                StatusMessage = $"已取消想看：{item.Title}";
             }
             else
             {
                 await _userCollectionService.AddWantToWatchAsync(item, changeSource: "Recommendation");
                 item.IsWantToWatch = true;
                 item.IsNotInterested = false;
-                StatusMessage = $"已加入想看：{item.Title}";
             }
 
             AddWantToWatchCommand.RaiseCanExecuteChanged();
@@ -1208,6 +1302,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         catch (Exception exception)
         {
             item.IsWantToWatch = previousState;
+            item.IsNotInterested = previousNotInterested;
             AddWantToWatchCommand.RaiseCanExecuteChanged();
             ToggleNotInterestedCommand.RaiseCanExecuteChanged();
             StatusMessage = $"想看状态更新失败：{exception.Message}";
@@ -1237,12 +1332,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             {
                 item.IsWantToWatch = false;
                 Recommendations.Remove(item);
-                StatusMessage = "已标记为不想看。";
             }
-            else
-            {
-                StatusMessage = "已取消不想看。";
-            }
+            StatusMessage = BuildRecommendationStatusMessage();
 
             AddWantToWatchCommand.RaiseCanExecuteChanged();
             ToggleNotInterestedCommand.RaiseCanExecuteChanged();
@@ -1428,8 +1519,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     {
         return SelectedWatchFilter switch
         {
-            "全部" => RecommendationWatchFilter.IncludeWatched,
-            "已看" => RecommendationWatchFilter.WatchedOnly,
+            WatchFilterAll => RecommendationWatchFilter.IncludeWatched,
+            WatchFilterWatched => RecommendationWatchFilter.WatchedOnly,
             _ => RecommendationWatchFilter.UnwatchedOnly
         };
     }
@@ -1438,8 +1529,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     {
         return SelectedLibraryScope switch
         {
-            "仅已有播放源" => RecommendationLibraryScope.InLibraryOnly,
-            "仅外部候选" => RecommendationLibraryScope.OutsideLibraryOnly,
+            PlaybackSourceWithSource => RecommendationLibraryScope.InLibraryOnly,
+            PlaybackSourceWithoutSource => RecommendationLibraryScope.OutsideLibraryOnly,
             _ => RecommendationLibraryScope.All
         };
     }

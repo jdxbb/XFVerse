@@ -31,16 +31,16 @@ internal static class DiscoveryRatingPresenter
                 : ratings.Average(rating => rating.Score);
             if (IsValidScore(weightedScore))
             {
-                return new DiscoveryRatingPresentation(weightedScore, weightedScore.ToString("0.0"));
+                return new DiscoveryRatingPresentation(weightedScore, FormatRatingText(weightedScore));
             }
         }
 
         if (hasTmdbScore)
         {
-            return new DiscoveryRatingPresentation(tmdbScore!.Value, tmdbScore.Value.ToString("0.0"));
+            return new DiscoveryRatingPresentation(tmdbScore!.Value, FormatRatingText(tmdbScore.Value));
         }
 
-        return new DiscoveryRatingPresentation(omdbRating!.ScoreValue, omdbRating.ScoreValue.ToString("0.0"));
+        return new DiscoveryRatingPresentation(omdbRating!.ScoreValue, FormatRatingText(omdbRating.ScoreValue));
     }
 
     public static DiscoveryRatingPresentation Build(
@@ -70,6 +70,21 @@ internal static class DiscoveryRatingPresenter
     private static bool IsValidScore(double? score)
     {
         return score is > 0d and <= 10d;
+    }
+
+    public static bool IsHighDisplayRating(double? score)
+    {
+        return IsValidScore(score) && RoundRatingForDisplay(score!.Value) >= 8d;
+    }
+
+    private static string FormatRatingText(double score)
+    {
+        return RoundRatingForDisplay(score).ToString("0.0");
+    }
+
+    private static double RoundRatingForDisplay(double score)
+    {
+        return Math.Round(score, 1, MidpointRounding.AwayFromZero);
     }
 }
 

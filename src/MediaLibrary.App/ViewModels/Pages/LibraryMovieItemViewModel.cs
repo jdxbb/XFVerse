@@ -114,9 +114,10 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public bool HasRating => PrimaryRatingValue.HasValue;
 
-    public string RatingDisplayText => HasRating ? PrimaryRatingValue!.Value.ToString("0.0") : "--";
+    public string RatingDisplayText => HasRating ? FormatRatingDisplayText(PrimaryRatingValue!.Value) : "--";
 
-    public bool IsHighRating => PrimaryRatingValue is >= 8d;
+    public bool IsHighRating => PrimaryRatingValue.HasValue
+                                && RoundRatingForDisplay(PrimaryRatingValue.Value) >= 8d;
 
     public string RatingSourceText => string.IsNullOrWhiteSpace(PrimaryRatingSourceName) ? "评分" : PrimaryRatingSourceName;
 
@@ -404,6 +405,16 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
         OnPropertyChanged(nameof(RatingDisplayText));
         OnPropertyChanged(nameof(IsHighRating));
         OnPropertyChanged(nameof(RatingSourceText));
+    }
+
+    private static string FormatRatingDisplayText(double score)
+    {
+        return RoundRatingForDisplay(score).ToString("0.0");
+    }
+
+    private static double RoundRatingForDisplay(double score)
+    {
+        return Math.Round(score, 1, MidpointRounding.AwayFromZero);
     }
 
     private string MissingSingleTagFallback

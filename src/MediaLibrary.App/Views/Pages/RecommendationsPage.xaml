@@ -1,174 +1,954 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.RecommendationsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
-    <Border Style="{StaticResource PageCardStyle}">
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
+             Cursor="Arrow">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="RecommendationPosterSurfaceBrush" Color="#202938" />
+        <SolidColorBrush x:Key="RecommendationPosterTextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="RecommendationPosterMutedTextBrush" Color="#D8DEE9" />
+        <SolidColorBrush x:Key="RecommendationPosterAccentBrush" Color="#E2E8F0" />
+        <SolidColorBrush x:Key="RecommendationPosterAccentTextBrush" Color="#111827" />
+        <SolidColorBrush x:Key="RecommendationPosterActiveBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="RecommendationTagDividerBrush" Color="#7DD3FC" />
+
+        <Style x:Key="RecommendationFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSmallButtonStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="MinWidth" Value="86" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="MenuButton_PreviewMouseLeftButtonDown" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Cursor" Value="Arrow" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassPrimaryButtonStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="MinWidth" Value="86" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Cursor" Value="Arrow" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationToolbarFilterGapButtonStyle" TargetType="Button" BasedOn="{StaticResource RecommendationFilterButtonStyle}">
+            <Setter Property="Margin" Value="26,0,0,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="Margin" Value="35,0,0,0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationToolbarPrimaryGapButtonStyle" TargetType="Button" BasedOn="{StaticResource RecommendationPrimaryButtonStyle}">
+            <Setter Property="Margin" Value="26,0,0,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="Margin" Value="35,0,0,0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationFilterMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource MenuItemStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="ItemChrome"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                Margin="{TemplateBinding Margin}"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RecommendationFilterContextMenuStyle" TargetType="ContextMenu" BasedOn="{StaticResource ContextMenuStyle}">
+            <Setter Property="Padding" Value="7" />
+            <Setter Property="Background" Value="{DynamicResource BrushPopupBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}"
+                                Effect="{StaticResource ShadowPopup}"
+                                SnapsToDevicePixels="True">
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceSwitchHostStyle" TargetType="Border">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Padding" Value="1" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <Style x:Key="RecommendationToolbarPreferenceGapHostStyle" TargetType="Border" BasedOn="{StaticResource RecommendationPreferenceSwitchHostStyle}">
+            <Setter Property="Margin" Value="26,0,0,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="Margin" Value="35,0,0,0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceSwitchStyle" TargetType="Button">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="MinWidth" Value="44" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
+                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushDisabledBorder}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceSwitchOnStyle" TargetType="Button" BasedOn="{StaticResource RecommendationPreferenceSwitchStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushGlassButtonHover}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassAccentHover}" />
+                </Trigger>
+                <DataTrigger Binding="{Binding IsCustomPreferenceEnabled}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceSwitchOffStyle" TargetType="Button" BasedOn="{StaticResource RecommendationPreferenceSwitchStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushGlassButtonHover}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassAccentHover}" />
+                </Trigger>
+                <DataTrigger Binding="{Binding IsCustomPreferenceDisabled}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceGearButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                    <Setter Property="Cursor" Value="Arrow" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceDialogCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="MinWidth" Value="38" />
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="RecommendationItemCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <Style x:Key="RecommendationChipStyle" TargetType="Border">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+        </Style>
+
+        <Style x:Key="RecommendationPosterTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="20" />
+            <Setter Property="MaxHeight" Value="20" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="RecommendationPosterMetaTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="MaxHeight" Value="16" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="RecommendationInfoCrewTextStyle" TargetType="TextBlock" BasedOn="{StaticResource RecommendationPosterMetaTextStyle}">
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+
+        <Style x:Key="RecommendationPosterRatingBadgeStyle" TargetType="Border">
+            <Setter Property="MinWidth" Value="42" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{StaticResource RecommendationPosterAccentBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.9" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+
+        <Style x:Key="RecommendationPosterRatingTextStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Foreground" Value="{StaticResource RecommendationPosterAccentTextBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource RecommendationPosterActiveBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPosterActionButtonBaseStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Padding" Value="7,0" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Background" Value="{StaticResource RecommendationPosterAccentBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource RecommendationPosterAccentTextBrush}" />
+            <Setter Property="Opacity" Value="0.92" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Opacity="{TemplateBinding Opacity}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.FontSize="{TemplateBinding FontSize}"
+                                              TextElement.FontWeight="{TemplateBinding FontWeight}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPosterWantButtonStyle" TargetType="Button" BasedOn="{StaticResource RecommendationPosterActionButtonBaseStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="False">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RecommendationPosterActiveBrush}" />
+                    <Setter Property="Foreground" Value="#111827" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPosterNotInterestedButtonStyle" TargetType="Button" BasedOn="{StaticResource RecommendationPosterActionButtonBaseStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsNotInterested}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RecommendationPosterActiveBrush}" />
+                    <Setter Property="Foreground" Value="#111827" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border Width="5"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="2.5"
+                                Opacity="0.58" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RecommendationModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RecommendationModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="5" />
+            <Setter Property="MinWidth" Value="5" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Width="{TemplateBinding Width}" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Style="{StaticResource RecommendationModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource RecommendationModernScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Style="{StaticResource RecommendationModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="IsMouseCaptureWithin" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}"
+                             Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationReasonPanelStyle" TargetType="Border">
+            <Setter Property="MaxHeight" Value="86" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <Style x:Key="RecommendationInfoAreaStyle" TargetType="Grid">
+            <Setter Property="Width" Value="343.2" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                    <Setter Property="Width" Value="326.04" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPosterHostStyle" TargetType="Grid">
+            <Setter Property="Width" Value="280.8" />
+            <Setter Property="Height" Value="421.2" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                    <Setter Property="Width" Value="266.76" />
+                    <Setter Property="Height" Value="400.14" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPosterClipMaskStyle" TargetType="Border">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                    <Setter Property="CornerRadius" Value="17.1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPosterPaletteShadowImageStyle" TargetType="Image">
+            <Setter Property="Width" Value="421.2" />
+            <Setter Property="Height" Value="561.6" />
+            <Setter Property="Canvas.Left" Value="-70.2" />
+            <Setter Property="Canvas.Top" Value="-70.2" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.BlurRadius" Value="35.1" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.CardHeight" Value="421.2" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.CardWidth" Value="280.8" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.CornerRadius" Value="18" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Direction" Value="270" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.InnerMargin" Value="0,4.5,0,0" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.IsEnabled" Value="True" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Opacity" Value="0.40" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Padding" Value="70.2" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.QuantizeColor" Value="True" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.ShadowColor" Value="#192230" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.ShadowDepth" Value="9" />
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+            <Setter Property="Stretch" Value="Fill" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                    <Setter Property="Width" Value="400.14" />
+                    <Setter Property="Height" Value="533.52" />
+                    <Setter Property="Canvas.Left" Value="-66.69" />
+                    <Setter Property="Canvas.Top" Value="-66.69" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.BlurRadius" Value="33.345" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.CardHeight" Value="400.14" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.CardWidth" Value="266.76" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.CornerRadius" Value="17.1" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.InnerMargin" Value="0,4.275,0,0" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.Padding" Value="66.69" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.ShadowDepth" Value="8.55" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPosterDropShadowImageStyle" TargetType="Image">
+            <Setter Property="Width" Value="421.2" />
+            <Setter Property="Height" Value="561.6" />
+            <Setter Property="Canvas.Left" Value="-70.2" />
+            <Setter Property="Canvas.Top" Value="-70.2" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.BlurRadius" Value="16.2" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.CardHeight" Value="421.2" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.CardWidth" Value="280.8" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.CornerRadius" Value="18" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Direction" Value="270" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.IsEnabled" Value="True" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Opacity" Value="0.24" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Padding" Value="70.2" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.ShadowColor" Value="#000000" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.ShadowDepth" Value="4.5" />
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+            <Setter Property="Stretch" Value="Fill" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                    <Setter Property="Width" Value="400.14" />
+                    <Setter Property="Height" Value="533.52" />
+                    <Setter Property="Canvas.Left" Value="-66.69" />
+                    <Setter Property="Canvas.Top" Value="-66.69" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.BlurRadius" Value="15.39" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.CardHeight" Value="400.14" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.CardWidth" Value="266.76" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.CornerRadius" Value="17.1" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.Padding" Value="66.69" />
+                    <Setter Property="helpers:PosterCachedShadowBehavior.ShadowDepth" Value="4.275" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceDialogPanelStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
+            <Setter Property="Width" Value="624" />
+            <Setter Property="Height" Value="384" />
+            <Setter Property="MaxHeight" Value="384" />
+            <Setter Property="Padding" Value="26" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <Style x:Key="RecommendationPreferenceInputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="22" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
         <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <TextBlock VerticalAlignment="Center"
+                       MaxHeight="38"
+                       LineHeight="18"
+                       LineStackingStrategy="BlockLineHeight"
+                       Text="{Binding StatusMessage}"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="Wrap"
+                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding StatusMessage}"
+                       Style="{StaticResource BodyMutedTextStyle}" />
 
-                <StackPanel>
-                    <TextBlock Text="AI 推荐 / 观影偏好" Style="{StaticResource CardTitleTextStyle}" />
-                    <TextBlock Margin="0,8,0,0" Text="{Binding StatusMessage}" Style="{StaticResource BodyMutedTextStyle}" />
-                    <TextBlock Margin="0,6,0,0"
-                               Text="基于已看记录生成 3 部推荐，并标明已有播放源 / 外部候选。"
-                               Style="{StaticResource BodyMutedTextStyle}" />
-                </StackPanel>
+            <StackPanel Grid.Column="1"
+                        Margin="20,0,0,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button Content="{Binding PlaybackSourceButtonText}"
+                        IsEnabled="{Binding CanChangeFilters}"
+                        Click="OpenButtonContextMenu"
+                        Style="{StaticResource RecommendationFilterButtonStyle}">
+                    <Button.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                     Style="{StaticResource RecommendationFilterContextMenuStyle}">
+                            <MenuItem Header="全部" Command="{Binding SelectLibraryScopeCommand}" CommandParameter="全部" Style="{StaticResource RecommendationFilterMenuItemStyle}" />
+                            <MenuItem Header="有播放源" Command="{Binding SelectLibraryScopeCommand}" CommandParameter="有播放源" Style="{StaticResource RecommendationFilterMenuItemStyle}" />
+                            <MenuItem Header="无播放源" Command="{Binding SelectLibraryScopeCommand}" CommandParameter="无播放源" Style="{StaticResource RecommendationFilterMenuItemStyle}" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
 
-                <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
-                    <StackPanel Width="180">
-                        <TextBlock Text="来源范围" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox AutomationProperties.Name="来源范围"
-                                  ItemsSource="{Binding LibraryScopeOptions}"
-                                  IsEnabled="{Binding CanChangeFilters}"
-                                  SelectedItem="{Binding SelectedLibraryScope}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
+                <Button Content="{Binding WatchStatusButtonText}"
+                        IsEnabled="{Binding CanChangeFilters}"
+                        Click="OpenButtonContextMenu"
+                        Style="{StaticResource RecommendationToolbarFilterGapButtonStyle}">
+                    <Button.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                     Style="{StaticResource RecommendationFilterContextMenuStyle}">
+                            <MenuItem Header="全部" Command="{Binding SelectWatchFilterCommand}" CommandParameter="全部" Style="{StaticResource RecommendationFilterMenuItemStyle}" />
+                            <MenuItem Header="已看" Command="{Binding SelectWatchFilterCommand}" CommandParameter="已看" Style="{StaticResource RecommendationFilterMenuItemStyle}" />
+                            <MenuItem Header="未看" Command="{Binding SelectWatchFilterCommand}" CommandParameter="未看" Style="{StaticResource RecommendationFilterMenuItemStyle}" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+
+                <Border Style="{StaticResource RecommendationToolbarPreferenceGapHostStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <Border MinWidth="84"
+                                Padding="10,0"
+                                BorderBrush="{DynamicResource BrushBorder}"
+                                BorderThickness="0,0,1,0">
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="自定义偏好"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource BrushForegroundPrimary}" />
+                        </Border>
+                        <Button Content="开"
+                                Command="{Binding SetCustomPreferenceEnabledCommand}"
+                                CommandParameter="True"
+                                IsEnabled="{Binding CanEditCustomPreference}"
+                                Style="{StaticResource RecommendationPreferenceSwitchOnStyle}" />
+                        <Button Content="关"
+                                Command="{Binding SetCustomPreferenceEnabledCommand}"
+                                CommandParameter="False"
+                                IsEnabled="{Binding CanEditCustomPreference}"
+                                Style="{StaticResource RecommendationPreferenceSwitchOffStyle}" />
                     </StackPanel>
+                </Border>
+                <Button Margin="6,0,0,0"
+                        ToolTip="编辑自定义偏好"
+                        IsEnabled="{Binding CanEditCustomPreference}"
+                        Command="{Binding EditPreferenceCommand}"
+                        Style="{StaticResource RecommendationPreferenceGearButtonStyle}">
+                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Text="&#xE713;" />
+                </Button>
 
-                    <StackPanel Width="150" Margin="12,0,0,0">
-                        <TextBlock Text="观影筛选" Style="{StaticResource BodyMutedTextStyle}" />
-                        <ComboBox AutomationProperties.Name="观影筛选"
-                                  ItemsSource="{Binding WatchFilterOptions}"
-                                  IsEnabled="{Binding CanChangeFilters}"
-                                  SelectedItem="{Binding SelectedWatchFilter}"
-                                  Style="{StaticResource FormComboBoxStyle}" />
-                    </StackPanel>
+                <Button Content="{Binding RefreshBatchButtonText}"
+                        Command="{Binding RefreshBatchCommand}"
+                        Style="{StaticResource RecommendationToolbarPrimaryGapButtonStyle}" />
+            </StackPanel>
+        </Grid>
 
-                    <StackPanel Width="160" Margin="12,0,0,0">
-                        <TextBlock Text="自定义偏好" Style="{StaticResource BodyMutedTextStyle}" />
-                        <CheckBox Content="{Binding CustomPreferenceToggleText}"
-                                  IsEnabled="{Binding CanEditCustomPreference}"
-                                  IsChecked="{Binding IsCustomPreferenceEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                  Style="{StaticResource FormCheckBoxStyle}" />
-                    </StackPanel>
-
-                    <Button Width="100"
-                            Margin="12,20,0,0"
-                            VerticalAlignment="Top"
-                            Content="编辑偏好"
-                            IsEnabled="{Binding CanEditCustomPreference}"
-                            Command="{Binding EditPreferenceCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" />
-
-                    <Button Width="110"
-                            Margin="12,20,0,0"
-                            VerticalAlignment="Top"
-                            Content="{Binding RefreshBatchButtonText}"
-                            Command="{Binding RefreshBatchCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" />
-                </WrapPanel>
-            </Grid>
-
-            <ScrollViewer Grid.Row="1" Margin="0,20,0,0" VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Recommendations}">
+        <ScrollViewer Grid.Row="2"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+            <ScrollViewer.Resources>
+                <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource RecommendationModernScrollBarStyle}" />
+            </ScrollViewer.Resources>
+                <ItemsControl AlternationCount="3"
+                              Cursor="Arrow"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding Recommendations}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel />
+                            <UniformGrid Columns="3"
+                                         Rows="1"
+                                         HorizontalAlignment="Stretch" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="{x:Type ContentPresenter}">
+                            <Setter Property="HorizontalAlignment" Value="Stretch" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Width="310" Margin="0,0,18,18" Style="{StaticResource CompactCardStyle}">
-                                <StackPanel>
-                                    <Border Height="220" CornerRadius="18" Background="{DynamicResource BrushSurfaceAlt}">
-                                        <Grid>
-                                            <Control IsHitTestVisible="False"
-                                                     Template="{StaticResource PosterPlaceholderTemplate}" />
-                                            <Image helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}" Stretch="UniformToFill" />
-                                        </Grid>
-                                    </Border>
-                                    <TextBlock Margin="0,14,0,0" Text="{Binding Title}" TextWrapping="Wrap" Style="{StaticResource SectionTitleTextStyle}" />
-                                    <WrapPanel Margin="0,8,0,0">
-                                        <Border Margin="0,0,8,8" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushAccentSoft}">
-                                            <TextBlock Text="{Binding ScopeText}" Style="{StaticResource BodyTextStyle}" />
-                                        </Border>
-                                        <Border Margin="0,0,8,8" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushSurfaceAlt}">
-                                            <TextBlock Text="{Binding AvailabilityText}" Style="{StaticResource BodyTextStyle}" />
-                                        </Border>
-                                        <Border Margin="0,0,8,8" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushSurfaceAlt}">
-                                            <TextBlock Text="{Binding WatchStateText}" Style="{StaticResource BodyTextStyle}" />
-                                        </Border>
-                                    </WrapPanel>
-                                    <TextBlock Margin="0,8,0,0" Text="{Binding Reason}" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
-                                    <TextBlock Margin="0,10,0,0" Text="{Binding Tags}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <UniformGrid Margin="0,16,0,0" Columns="3">
-                                        <Button Margin="0,0,8,0"
-                                                Content="{Binding DetailButtonText}"
-                                                Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource PrimaryButtonStyle}" />
-                                        <Button Margin="8,0,0,0"
-                                                Content="{Binding WantToWatchButtonText}"
-                                                Command="{Binding DataContext.AddWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                            <Grid Margin="0,26,0,22"
+                                  Cursor="Arrow"
+                                  HorizontalAlignment="Stretch">
+                                <Border Width="1"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Stretch"
+                                        Background="{DynamicResource BrushBorder}"
+                                        Opacity="0.65">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Path=(ItemsControl.AlternationIndex), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="2">
                                                     <Setter Property="Visibility" Value="Collapsed" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                        <Button Margin="8,0,0,0"
-                                                Content="{Binding NotInterestedButtonText}"
-                                                Command="{Binding DataContext.ToggleNotInterestedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                    </UniformGrid>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+                                <StackPanel Cursor="Arrow"
+                                            HorizontalAlignment="Center">
+                                    <Grid Style="{StaticResource RecommendationPosterHostStyle}"
+                                          MouseLeftButtonUp="RecommendationPoster_MouseLeftButtonUp">
+                                        <Border x:Name="RecommendationPosterClipMask"
+                                                Style="{StaticResource RecommendationPosterClipMaskStyle}" />
+                                        <Canvas ClipToBounds="False"
+                                                IsHitTestVisible="False">
+                                            <Image x:Name="RecommendationPosterPaletteShadowHost"
+                                                   Style="{StaticResource RecommendationPosterPaletteShadowImageStyle}" />
+                                            <Image Style="{StaticResource RecommendationPosterDropShadowImageStyle}" />
+                                        </Canvas>
+                                        <Grid>
+                                            <Grid.OpacityMask>
+                                                <VisualBrush Visual="{Binding ElementName=RecommendationPosterClipMask}" />
+                                            </Grid.OpacityMask>
+                                            <Border Background="{DynamicResource BrushGlassSurfaceAlt}" />
+                                            <Control IsHitTestVisible="False"
+                                                     Template="{StaticResource PosterPlaceholderLargeTemplate}" />
+                                            <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="780"
+                                                   helpers:PosterCacheImageBehavior.PreferredTmdbImageSize="w780"
+                                                   helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                                                   helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=RecommendationPosterPaletteShadowHost}"
+                                                   helpers:PosterPaletteShadowBehavior.TargetName="RecommendationPosterPaletteShadowHost"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Stretch="UniformToFill" />
+                                        </Grid>
+                                    </Grid>
+
+                                    <Grid Margin="0,18,0,0"
+                                          Style="{StaticResource RecommendationInfoAreaStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding TitleOriginalLineText}"
+                                                   Style="{StaticResource RecommendationPosterTitleTextStyle}">
+                                            <Run Text="{Binding Title, Mode=OneWay}" />
+                                            <Run Text="{Binding TitleOriginalSeparatorText, Mode=OneWay}" />
+                                            <Run Text="{Binding OriginalTitleDisplayText, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Grid.Row="1"
+                                                   Margin="0,4,0,0"
+                                                   Text="{Binding ReleaseDateText}"
+                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding ReleaseDateText}"
+                                                   Style="{StaticResource RecommendationPosterMetaTextStyle}" />
+                                        <Border Grid.Row="0"
+                                                Grid.RowSpan="2"
+                                                Grid.Column="2"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource RecommendationPosterRatingBadgeStyle}">
+                                            <TextBlock Text="{Binding WeightedAverageRatingText}"
+                                                       Style="{StaticResource RecommendationPosterRatingTextStyle}" />
+                                        </Border>
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.ColumnSpan="3"
+                                                   Margin="0,2,0,0"
+                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding RecommendationTagLineText}"
+                                                   Style="{StaticResource RecommendationPosterMetaTextStyle}">
+                                            <Run Text="{Binding RecommendationTagGroupOneText, Mode=OneWay}" />
+                                            <Run Text="{Binding RecommendationTagSeparatorAfterOneText, Mode=OneWay}"
+                                                 Foreground="{StaticResource RecommendationTagDividerBrush}" />
+                                            <Run Text="{Binding RecommendationTagGroupTwoText, Mode=OneWay}" />
+                                            <Run Text="{Binding RecommendationTagSeparatorAfterTwoText, Mode=OneWay}"
+                                                 Foreground="{StaticResource RecommendationTagDividerBrush}" />
+                                            <Run Text="{Binding RecommendationTagGroupThreeText, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <Grid Grid.Row="3"
+                                              Grid.ColumnSpan="3"
+                                              Margin="0,2,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="16" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock MaxWidth="118"
+                                                       Text="{Binding DirectorDisplayText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding DirectorDisplayText}"
+                                                       Style="{StaticResource RecommendationInfoCrewTextStyle}" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding ActorsDisplayText}"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding ActorsDisplayText}"
+                                                       Style="{StaticResource RecommendationInfoCrewTextStyle}" />
+                                        </Grid>
+                                        <Border Grid.Row="4"
+                                                Grid.ColumnSpan="3"
+                                                Cursor="Arrow"
+                                                Style="{StaticResource RecommendationReasonPanelStyle}">
+                                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                          VerticalScrollBarVisibility="Auto"
+                                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                                                          helpers:TextScrollOverflowCueBehavior.IsEnabled="True">
+                                                <ScrollViewer.Resources>
+                                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource RecommendationModernScrollBarStyle}" />
+                                                </ScrollViewer.Resources>
+                                                <TextBlock Margin="0"
+                                                           Text="{Binding Reason}"
+                                                           TextWrapping="Wrap"
+                                                           FontSize="13"
+                                                           LineHeight="19"
+                                                           Foreground="{DynamicResource BrushForegroundSecondary}" />
+                                            </ScrollViewer>
+                                        </Border>
+                                    </Grid>
                                 </StackPanel>
-                            </Border>
+                            </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </ScrollViewer>
+        </ScrollViewer>
 
-            <Border Grid.RowSpan="2"
-                    Background="#99000000">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsPreferenceDialogOpen}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Border Width="520"
-                        Padding="22"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource PageCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="自定义推荐偏好" Style="{StaticResource CardTitleTextStyle}" />
-                        <TextBlock Margin="0,10,0,0"
-                                   Text="这些偏好会影响 AI 推荐，但不会覆盖不想看、已看过滤、推荐范围过滤等规则。保存后将在下次刷新或换一批时生效。"
+        <Grid Grid.Row="2"
+              Panel.ZIndex="5"
+              IsHitTestVisible="False">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowEmptyLoadingSpinner}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Control Width="38"
+                     Height="38"
+                     Margin="0,-72,0,0"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Template="{StaticResource LoadingSpinnerTemplate}" />
+        </Grid>
+
+        <Border Grid.RowSpan="3"
+                Panel.ZIndex="10"
+                Background="Transparent">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsPreferenceDialogOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource RecommendationPreferenceDialogPanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="14" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid MinHeight="38">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Text="自定义推荐偏好"
+                                   Style="{StaticResource CardTitleTextStyle}" />
+                        <Button Grid.Column="1"
+                                ToolTip="关闭"
+                                Command="{Binding CancelPreferenceCommand}"
+                                Style="{StaticResource RecommendationPreferenceDialogCloseButtonStyle}">
+                            <TextBlock FontFamily="Segoe MDL2 Assets"
+                                       FontSize="12"
+                                       Text="&#xE711;" />
+                        </Button>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="8" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="18" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="偏好设置仅影响 AI 推荐，不会覆盖你的其他过滤规则。保存后，下一次推荐将生效"
+                                   MaxHeight="42"
                                    TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis"
                                    Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBox Margin="0,16,0,0"
-                                 MinHeight="140"
+                        <TextBox Grid.Row="2"
                                  MaxLength="{Binding CustomPreferenceMaxLength}"
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
                                  Text="{Binding DraftCustomPreferenceText, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource FormTextBoxStyle}" />
-                        <TextBlock Margin="0,8,0,0"
+                                 Style="{StaticResource RecommendationPreferenceInputTextBoxStyle}">
+                            <TextBox.Resources>
+                                <Style TargetType="{x:Type ScrollBar}"
+                                       BasedOn="{StaticResource RecommendationModernScrollBarStyle}" />
+                            </TextBox.Resources>
+                        </TextBox>
+                        <TextBlock Grid.Row="4"
                                    HorizontalAlignment="Right"
                                    Text="{Binding DraftCustomPreferenceCountText}"
                                    Style="{StaticResource BodyMutedTextStyle}" />
-                        <UniformGrid Margin="0,18,0,0" Columns="3">
+                        <UniformGrid Grid.Row="6" Columns="3">
                             <Button Margin="0,0,8,0"
                                     Content="清空"
                                     Command="{Binding ClearPreferenceCommand}"
@@ -182,9 +962,9 @@
                                     Command="{Binding ConfirmPreferenceCommand}"
                                     Style="{StaticResource PrimaryButtonStyle}" />
                         </UniformGrid>
-                    </StackPanel>
-                </Border>
+                    </Grid>
+                </Grid>
             </Border>
-        </Grid>
-    </Border>
+        </Border>
+    </Grid>
 </UserControl>

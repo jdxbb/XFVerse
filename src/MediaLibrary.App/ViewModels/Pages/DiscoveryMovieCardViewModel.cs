@@ -177,7 +177,7 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         private set => SetProperty(ref _ratingValue, value);
     }
 
-    public bool IsHighRating => RatingValue is >= 8d;
+    public bool IsHighRating => DiscoveryRatingPresenter.IsHighDisplayRating(RatingValue);
 
     public bool IsHighWeightedAverageRating => IsHighRating;
 

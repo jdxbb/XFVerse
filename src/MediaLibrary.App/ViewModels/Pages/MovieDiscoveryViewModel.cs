@@ -608,6 +608,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             OnPropertyChanged(nameof(IsRankingTabSelected));
             OnPropertyChanged(nameof(IsAiRecommendationTabSelected));
 
+            if (value != AiRecommendationTabIndex)
+            {
+                _aiRecommendationViewModel.ClosePreferenceDialog();
+            }
+
             if (value == RankingTabIndex)
             {
                 _ = EnsureRankingsActivatedAsync();
@@ -1617,6 +1622,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             _openAiRecommendationsOnNextActivation = false;
             _hasActivatedDiscoveryPage = true;
             SelectedTabIndex = AiRecommendationTabIndex;
+            _ = EnsureAiRecommendationsActivatedAsync();
             return;
         }
 
@@ -1641,6 +1647,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         _searchCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource?.Cancel();
+        _hasActivatedAiRecommendations = false;
+        _aiRecommendationViewModel.Deactivate();
     }
 
     private void SetSearchLayout(bool isPosterLayout)
