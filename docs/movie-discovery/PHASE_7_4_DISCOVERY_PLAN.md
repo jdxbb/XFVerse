@@ -13,6 +13,50 @@ Last updated: 2026-06-05
 
 ## 执行记录
 
+### 2026-06-05 - 7.4c follow-up / 榜单与空关键词 Discover 测试反馈修复
+
+完成了什么：
+
+- 榜单页移除顶部圆角筛选卡片；榜单媒体类型、榜单类型和趋势时间统一迁移到顶层 `榜单` Tab 的多级下拉菜单。
+- `榜单` Tab 下拉菜单按媒体库标签菜单方式向右展开，一级为电影 / 电视剧，二级为热门榜 / 高分榜 / 趋势榜，趋势榜三级为今日趋势 / 本周趋势。
+- 从其它 Tab 点击 `榜单` 仅切换页面；已在榜单页时悬停或点击 `榜单` 才打开下拉菜单。
+- 榜单分页复制影片搜索分页组件，改为 chevron 图标按钮和页码文本。
+- 榜单双列结果分隔线改为连续单条竖线，榜单结果卡片默认光标改为箭头。
+- 空关键词搜索在排序不是 `相关度` 时调用 TMDB `/discover/movie` 或 `/discover/tv`；排序、类型、地区、语言、单年代日期范围尽量下推到 TMDB discover，其它状态类筛选继续本地过滤。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+不属于本次：
+
+- 不改 AI 推荐、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 不把 TMDB discover 不支持的筛选条件伪造成远端过滤；仍保留本地过滤闭环。
+
+### 2026-06-05 - 7.4b follow-up / 搜索卡片与列表二次测试反馈修复
+
+完成了什么：
+
+- Movie / TV 搜索海报卡片底部标题、日期和标签统一对齐左上角类型标签左边框。
+- 搜索海报评分 chip 改为和类型标签一致的浅色背景、无边框质感，圆角降为 6px；Movie / TV 无评分统一显示 `--`。
+- Movie 海报右上角想看按钮和 TV 海报右上角 `当前想看` 标签固定为 20px 高度并顶部对齐。
+- Movie 搜索卡片和列表只展示 TMDB 类型标签；本地已入库影片不再把 AI 标签、情绪标签或场景标签回填到搜索结果。
+- Movie / TV 搜索列表使用媒体库同款 14px 行间距，并在标题行补齐导演 / 演员字段。
+- Movie 搜索通过 TMDB details 补齐导演 / 演员；TV 搜索通过 Series details 补齐导演 / 演员。
+- 媒体库 Movie 列表评分改为 TMDB/IMDb 加权值，双源时来源显示 `TMDB/IMDb`，与搜索页加权评分口径一致。
+
+验证：
+
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+不属于本次：
+
+- 不改 TMDB 搜索请求形态、搜索筛选规则、榜单排序、AI 推荐、扫描识别、播放器、数据库 schema、migration 或 database update。
+- 不新增 TV series 级想看切换；TV 仍只展示已有想看季状态。
+
 ### 2026-06-05 - 7.4b follow-up / 工具栏、结果区域与想看摘要测试反馈修复
 
 完成了什么：
@@ -673,3 +717,37 @@ Last updated: 2026-06-05
 - 触碰共享 ResourceDictionary 时，需要做受影响 lazy-loaded view 的 build 或页面加载验证。
 - 如果实现 TV 人物搜索，必须记录为受限 Discovery 搜索行为变更；应使用 TV-capable TMDB credits，不能把 Movie `movie_credits` 结果复用为 TV 行。
 - 不把私有样本名、本地完整路径、账号、token、完整远端 URL 写入文档或日志。
+## Follow-up Round 6 Addendum - Search Poster Edge Alignment
+
+Scope:
+
+- Align Discovery Movie/TV search poster media-type chip edge spacing to the Media Library poster card.
+- Keep right-top Movie action and TV state chips on the same 8px edge margin as Media Library.
+- Align poster title, release date and tag/type line to the media-type chip left border.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln`.
+- Manual WPF window check for Movie and TV search poster cards remains required.
+
+## Follow-up Round 5 Addendum - Rating Consistency And Search Card Polish
+
+Scope:
+
+- Fix Discovery search poster/list card alignment and rating badge sizing reported after testing.
+- Allow existing local movies to refresh persisted TMDB and OMDb/IMDb rating sources from real-time Discovery search/ranking enrichment.
+- Add a series-level TV rating persistence table because the user explicitly allowed it if needed for local TV rating consistency.
+
+Acceptance:
+
+- Movie/TV poster card title and date align to the left edge of the media-type chip.
+- Rating badges are larger, bold and fixed-height.
+- Movie want/cancel-want and TV current-want chips share the media-type chip height and vertically center their text.
+- A local movie found in Discovery can update `RatingSources` so media-library/detail ratings can match the refreshed search result.
+- A local TV series found in Discovery can update `TvSeriesRatingSources`; media-library TV projections and TV detail rating reads use that persisted series-level data.
+- No database update is executed by the agent; applying the generated migration remains an operator action.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln`.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is expected to include `AddTvSeriesRatingSources` in this authorized follow-up.

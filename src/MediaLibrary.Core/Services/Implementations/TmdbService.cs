@@ -42,6 +42,28 @@ public sealed class TmdbService : ITmdbService
     private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeriesDetailResult>> TvSeriesDetailCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeasonDetailResult>> TvSeasonDetailCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CacheEntry<TmdbTvSeriesExternalIdsResult>> TvSeriesExternalIdsCache = new(StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> MovieDiscoverSortValues = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "popularity.asc",
+        "popularity.desc",
+        "primary_release_date.asc",
+        "primary_release_date.desc",
+        "original_title.asc",
+        "original_title.desc",
+        "vote_average.asc",
+        "vote_average.desc"
+    };
+    private static readonly IReadOnlySet<string> TvDiscoverSortValues = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "first_air_date.asc",
+        "first_air_date.desc",
+        "name.asc",
+        "name.desc",
+        "popularity.asc",
+        "popularity.desc",
+        "vote_average.asc",
+        "vote_average.desc"
+    };
     private static readonly ExternalApiAdaptiveThrottle TmdbHttpThrottle = new(
         TmdbProvider,
         "tmdb-http",
@@ -535,6 +557,36 @@ public sealed class TmdbService : ITmdbService
         }
     }
 
+    public Task<TmdbMovieDiscoveryPage> DiscoverMoviesAsync(
+        int page,
+        string sortBy,
+        IReadOnlyCollection<int>? genreIds = null,
+        IReadOnlyCollection<string>? originCountryCodes = null,
+        string originalLanguage = "",
+        string primaryReleaseDateGte = "",
+        string primaryReleaseDateLte = "",
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        var safeSortBy = NormalizeDiscoverSortBy(sortBy, MovieDiscoverSortValues, "popularity.desc");
+        var queryParameters = CreateDiscoverQueryParameters(safeLanguage, safePage, safeSortBy);
+        AddEscapedQueryParameter(queryParameters, "include_adult", "false");
+        AddEscapedQueryParameter(queryParameters, "include_video", "false");
+        AddPipeJoinedQueryParameter(queryParameters, "with_genres", genreIds);
+        AddPipeJoinedQueryParameter(queryParameters, "with_origin_country", originCountryCodes);
+        AddEscapedQueryParameter(queryParameters, "with_original_language", originalLanguage);
+        AddEscapedQueryParameter(queryParameters, "primary_release_date.gte", primaryReleaseDateGte);
+        AddEscapedQueryParameter(queryParameters, "primary_release_date.lte", primaryReleaseDateLte);
+
+        return GetDiscoveryListPageAsync(
+            $"discover/movie?{string.Join("&", queryParameters)}",
+            safePage,
+            "tmdb-movie-discover",
+            cancellationToken);
+    }
+
     public Task<TmdbMovieDiscoveryPage> GetPopularMoviesAsync(
         int page,
         string language = TmdbLanguage,
@@ -701,6 +753,37 @@ public sealed class TmdbService : ITmdbService
             requestStopwatch.Stop();
             AiPerfDiagnostics.RecordExternalCall("tmdb-discovery-tv-person-search", requestStopwatch.Elapsed, isError);
         }
+    }
+
+    public Task<TmdbTvSeriesSearchPage> DiscoverTvSeriesAsync(
+        int page,
+        string sortBy,
+        IReadOnlyCollection<int>? genreIds = null,
+        IReadOnlyCollection<string>? originCountryCodes = null,
+        string originalLanguage = "",
+        string firstAirDateGte = "",
+        string firstAirDateLte = "",
+        string language = TmdbLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var safePage = Math.Clamp(page, 1, 500);
+        var safeLanguage = NormalizeLanguage(language);
+        var safeSortBy = NormalizeDiscoverSortBy(sortBy, TvDiscoverSortValues, "popularity.desc");
+        var queryParameters = CreateDiscoverQueryParameters(safeLanguage, safePage, safeSortBy);
+        AddEscapedQueryParameter(queryParameters, "include_adult", "false");
+        AddPipeJoinedQueryParameter(queryParameters, "with_genres", genreIds);
+        AddPipeJoinedQueryParameter(queryParameters, "with_origin_country", originCountryCodes);
+        AddEscapedQueryParameter(queryParameters, "with_original_language", originalLanguage);
+        AddEscapedQueryParameter(queryParameters, "first_air_date.gte", firstAirDateGte);
+        AddEscapedQueryParameter(queryParameters, "first_air_date.lte", firstAirDateLte);
+        var queryString = $"discover/tv?{string.Join("&", queryParameters)}";
+
+        return GetTvSeriesPageAsync(
+            queryString,
+            safePage,
+            BuildTmdbTvListCacheKey($"discover-{HashCachePart(queryString)}", safePage, safeLanguage),
+            "tmdb-tv-discover",
+            cancellationToken);
     }
 
     public async Task<TmdbTvSeriesDetailResult?> GetTvSeriesDetailsAsync(
@@ -1289,6 +1372,76 @@ public sealed class TmdbService : ITmdbService
     private static string NormalizeLanguage(string language)
     {
         return string.IsNullOrWhiteSpace(language) ? TmdbLanguage : language.Trim();
+    }
+
+    private static string NormalizeDiscoverSortBy(
+        string sortBy,
+        IReadOnlySet<string> allowedSortValues,
+        string fallback)
+    {
+        return allowedSortValues.Contains(sortBy) ? sortBy : fallback;
+    }
+
+    private static List<string> CreateDiscoverQueryParameters(
+        string language,
+        int page,
+        string sortBy)
+    {
+        var queryParameters = new List<string>();
+        AddEscapedQueryParameter(queryParameters, "language", language);
+        AddEscapedQueryParameter(queryParameters, "page", page.ToString(CultureInfo.InvariantCulture));
+        AddEscapedQueryParameter(queryParameters, "sort_by", sortBy);
+        return queryParameters;
+    }
+
+    private static void AddEscapedQueryParameter(
+        ICollection<string> queryParameters,
+        string name,
+        string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        queryParameters.Add($"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value.Trim())}");
+    }
+
+    private static void AddPipeJoinedQueryParameter(
+        ICollection<string> queryParameters,
+        string name,
+        IEnumerable<int>? values)
+    {
+        if (values is null)
+        {
+            return;
+        }
+
+        AddEscapedQueryParameter(
+            queryParameters,
+            name,
+            string.Join("|", values.Where(value => value > 0).Distinct()));
+    }
+
+    private static void AddPipeJoinedQueryParameter(
+        ICollection<string> queryParameters,
+        string name,
+        IEnumerable<string>? values)
+    {
+        if (values is null)
+        {
+            return;
+        }
+
+        AddEscapedQueryParameter(
+            queryParameters,
+            name,
+            string.Join(
+                "|",
+                values
+                    .Select(value => value?.Trim() ?? string.Empty)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)));
     }
 
     private static string AppendQueryParameter(string requestUri, string name, string value)

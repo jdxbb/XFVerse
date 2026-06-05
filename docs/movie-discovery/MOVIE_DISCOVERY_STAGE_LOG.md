@@ -1,5 +1,26 @@
 # 影片发现阶段日志
 
+## 2026-06-05 - 7.4b follow-up / 搜索卡片与列表二次测试反馈修复
+
+完成内容：
+- 影片搜索 Movie / TV 海报卡片底部标题、日期、标签左边距统一为 8px，对齐左上角 Movie / TV 类型标签左边框。
+- 搜索海报评分标签改为与左上角类型标签一致的浅色 chip 质感，圆角降为 6px；无评分统一显示 `--`。
+- Movie 海报右上角 `+ 想看` / `取消想看` 按钮和 TV 海报右上角 `当前想看` 标签固定为 20px 高度，与左上角类型标签顶部对齐。
+- Movie 搜索结果不再从本地状态回填 AI 类型、情绪或场景标签；搜索卡片和列表只使用 TMDB 类型标签，入库影片也不混入本地 AI 标签。
+- Movie / TV 搜索列表增加 14px 条目间距，并补齐媒体库式标题行右侧的导演 / 演员字段。
+- Movie 搜索详情补全条件从仅缺 IMDb 扩展为缺 IMDb、缺导演演员或缺 TMDB 类型时拉取 TMDB 详情；TV 搜索继续复用 Series detail 水合导演 / 演员。
+- 媒体库 Movie 列表评分由优先 OMDb 单源显示改为 TMDB/IMDb 加权评分；双源时来源显示为 `TMDB/IMDb`，与搜索页评分口径一致。
+
+验证：
+- `git diff --check` passed，仅有 LF 将被 Git 转 CRLF 的提示。
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+
+未做事项：
+- 未修改 TMDB 搜索请求形态、筛选规则、榜单排序、AI 推荐、扫描识别、播放器、数据库 schema、migration 或 database update。
+- 未新增 TV series 级 `+ 想看` / `取消想看` 操作；TV 仍只展示已有想看季状态。
+- 未启动完整桌面应用做人工截图验收。
+
 ## 2026-06-05 - 7.4b follow-up / 工具栏、结果区域与想看摘要测试反馈修复
 
 完成内容：
@@ -1126,6 +1147,86 @@ Validation:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 
+# Phase 7.4b Follow-up Round 8 Search Poster Rating Grid Alignment
+
+Completed:
+
+- Reworked Discovery search poster bottom layout around the card's own extra rating badge instead of copying the Media Library bottom margin.
+- Movie and TV search poster bottom containers now use `Margin="8,0,8,10"` so title/date/tag left edges align with the top-left media chip border.
+- The bottom rating Grid now stretches across the full available card width, so the rating badge right edge aligns with the top-right action/state chip border.
+
+Not done:
+
+- No search behavior, rating persistence, schema, migration, database update, commit or push was changed in this follow-up.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Round 7 Search Poster Title Date Layout Parity
+
+Completed:
+
+- Compared Media Library poster layout against Discovery search poster layout.
+- Media Library title/date/type line uses a bottom `StackPanel` with `Margin="10"`; Discovery search had drifted to a different left margin while retaining a rating-badge grid.
+- Discovery Movie and TV search poster title/date/type line containers now use the same `Margin="10"` baseline as Media Library.
+- Removed extra explicit title/date text alignment properties that Media Library does not use.
+
+Not done:
+
+- No search behavior, rating persistence, schema, migration, database update, commit or push was changed in this follow-up.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Round 6 Search Poster Edge Alignment
+
+Completed:
+
+- Discovery Movie and TV search poster cards now use the same 8px top-left media-type chip margin as the Media Library poster card.
+- Discovery Movie and TV search poster right-top action/state chips were checked and already use the same 8px edge margin as Media Library.
+- Poster title, release date and tag/type line now use the same 8px left content edge as the top-left media-type chip.
+
+Not done:
+
+- No business logic, TMDB calls, rating refresh behavior, schema, migration, database update, commit or push was changed in this follow-up.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4b Follow-up Round 5 Search Card Rating Consistency
+
+Completed:
+
+- Movie search poster/list cards now keep the category chip, title/date text, rating badge and want action on a consistent 10px left/top visual grid.
+- Search rating badges are larger, bold and fixed-height, matching the requested no-more-than-two-line footprint.
+- Movie `+ want` / cancel-want actions and TV current-want labels now use the same 20px chip height as the media type chip.
+- Movie search and ranking enrichment now allow existing local movies to refresh TMDB and OMDb/IMDb rating sources from real-time Discovery results.
+- Movie rating refresh updates `RatingSources` and related movie collection rating snapshots without touching media files, playback sources or library visibility.
+- TV search/ranking cards now support weighted TMDB + OMDb/IMDb rating presentation and rating sorting through `RatingValue`.
+- Added `TvSeriesRatingSources` so existing local TV series can persist series-level TMDB and OMDb/IMDb ratings refreshed from Discovery.
+- TV detail query and media-library TV projections now read persisted series rating sources first, then keep existing external lookup as fallback.
+
+Not done:
+
+- No database update was executed.
+- No scan, AI recommendation, playback, subtitle, watch insight or recommendation algorithm behavior was changed.
+- No season-level or episode-level rating persistence was introduced; the new table is series-level only.
+
+Known Issues:
+
+- Blocker: None after build validation.
+- Deferred: Actual window validation is still needed for poster chip/title alignment, TV current-want vertical centering and rating badge visual size.
+- Noise: TV series ratings are persisted only for existing local `TvSeries` rows; unadded external TV search results remain in-memory search results.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `dotnet ef migrations add AddTvSeriesRatingSources --project src/MediaLibrary.Core/MediaLibrary.Core.csproj --startup-project src/MediaLibrary.Core/MediaLibrary.Core.csproj` succeeded.
+- Migration adds only `TvSeriesRatingSources`, its FK to `TvSeries`, and a unique `(TvSeriesId, SourceName)` index.
+
 # Phase 7.4b Follow-up Poster Pager Placement
 
 Completed:
@@ -1230,6 +1331,34 @@ Known Issues:
 Validation:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+# Phase 7.4c Follow-up 榜单与 Discover 搜索反馈修复
+
+Completed:
+
+- 榜单页顶部圆角筛选卡片已移除，榜单内容区直接作为页面主体显示。
+- 顶层 `榜单` Tab 在已进入榜单页后支持悬停 / 点击打开多级菜单；从其它 Tab 点击 `榜单` 仍只切换到榜单页。
+- 榜单下拉菜单复用媒体库标签菜单的子菜单视觉和向右展开行为；一级仅保留 `电影`、`电视剧`，二级为 `热门榜`、`高分榜`、`趋势榜`，趋势榜三级为 `今日趋势`、`本周趋势`。
+- 榜单分页改为与影片搜索一致的上一页 / 下一页 chevron 图标按钮和页码文本组件。
+- 榜单双列结果的中间分隔线改为 ItemsControl 背景中的单条连续竖线，不再由每一行各自绘制短线。
+- 榜单结果卡片默认光标改回箭头；按钮仍保留自身交互光标。
+- 空关键词搜索在排序不是 `相关度` 时改走 TMDB `/discover/movie` 或 `/discover/tv`，并向 TMDB 传递可表达的排序、类型、地区、语言和单年代日期范围；本地状态类筛选继续复用现有结果池过滤。
+
+Not done:
+
+- 未改变 AI 推荐、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未把 TMDB discover 无法表达的 `其它`、多年代组合、入库状态、播放源、观看状态和收藏状态强行转换为远端过滤；这些仍由本地过滤完成。
+
+Known Issues:
+
+- Blocker: None after build validation.
+- Deferred: 仍需实际窗口人工确认榜单 Tab 多级菜单的位置、悬停体验和连续竖线视觉效果。
+- Noise: Movie `片名` discover 排序使用 TMDB `original_title`，TV `剧名` discover 排序使用 TMDB `name`。
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
 
 # Phase 7.4b Follow-up Round 1 Regression Fixes
 

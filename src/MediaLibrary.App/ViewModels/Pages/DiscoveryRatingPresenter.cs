@@ -15,20 +15,22 @@ internal static class DiscoveryRatingPresenter
         var hasOmdbScore = omdbRating is not null && IsValidScore(omdbRating.ScoreValue);
         if (!hasTmdbScore && !hasOmdbScore)
         {
-            return new DiscoveryRatingPresentation(null, "暂无评分");
+            return new DiscoveryRatingPresentation(null, "--");
         }
 
-        if (hasTmdbScore
-            && hasOmdbScore
-            && tmdbVotes is > 0
-            && omdbRating?.VoteCount is > 0)
+        if (hasTmdbScore && hasOmdbScore)
         {
-            var effectiveTmdbVotes = Math.Min(tmdbVotes.Value, VoteWeightCap);
-            var effectiveOmdbVotes = Math.Min(omdbRating.VoteCount.Value, VoteWeightCap);
-            var weightSum = effectiveTmdbVotes + effectiveOmdbVotes;
-            if (weightSum > 0)
+            var ratings = new[]
             {
-                var weightedScore = (tmdbScore!.Value * effectiveTmdbVotes + omdbRating.ScoreValue * effectiveOmdbVotes) / weightSum;
+                (Score: tmdbScore!.Value, Votes: Math.Min(Math.Max(tmdbVotes ?? 0, 0), VoteWeightCap)),
+                (Score: omdbRating!.ScoreValue, Votes: Math.Min(Math.Max(omdbRating.VoteCount ?? 0, 0), VoteWeightCap))
+            };
+            var totalVotes = ratings.Sum(rating => rating.Votes);
+            var weightedScore = totalVotes > 0
+                ? ratings.Sum(rating => rating.Score * rating.Votes) / totalVotes
+                : ratings.Average(rating => rating.Score);
+            if (IsValidScore(weightedScore))
+            {
                 return new DiscoveryRatingPresentation(weightedScore, weightedScore.ToString("0.0"));
             }
         }

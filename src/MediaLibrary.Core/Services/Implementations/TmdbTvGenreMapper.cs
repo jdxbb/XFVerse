@@ -75,6 +75,21 @@ public static class TmdbTvGenreMapper
         return labels.Count == 0 ? string.Empty : string.Join("、", labels);
     }
 
+    public static bool TryGetGenreId(string label, out int genreId)
+    {
+        foreach (var pair in GenreNames)
+        {
+            if (string.Equals(pair.Value, label, StringComparison.Ordinal))
+            {
+                genreId = pair.Key;
+                return true;
+            }
+        }
+
+        genreId = 0;
+        return false;
+    }
+
     public static string NormalizeGenreNames(string? genresText)
     {
         if (string.IsNullOrWhiteSpace(genresText))

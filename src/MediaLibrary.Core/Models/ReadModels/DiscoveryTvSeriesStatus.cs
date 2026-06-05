@@ -41,4 +41,8 @@ public sealed class DiscoveryTvSeriesStatus
     public string Country { get; set; } = string.Empty;
 
     public string Language { get; set; } = string.Empty;
+
+    public string DirectorText { get; set; } = string.Empty;
+
+    public string ActorsText { get; set; } = string.Empty;
 }

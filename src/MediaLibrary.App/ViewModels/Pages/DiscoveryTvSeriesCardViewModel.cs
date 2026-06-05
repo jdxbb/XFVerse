@@ -22,6 +22,13 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
     private LibraryVisibilityState _libraryVisibilityState = LibraryVisibilityState.Auto;
     private int? _totalSeasonCount;
     private bool _hasLoadedSeasonCount;
+    private string _directorText = string.Empty;
+    private string _actorsText = string.Empty;
+    private double? _tmdbRating;
+    private int? _tmdbVoteCount;
+    private MovieRatingItem? _omdbRating;
+    private string _ratingText = "--";
+    private double? _ratingValue;
 
     public DiscoveryTvSeriesCardViewModel(TmdbTvSeriesSearchItem source, int searchOrder, bool showRank = false)
     {
@@ -36,11 +43,12 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
         GenresText = TmdbTvGenreMapper.MapGenreIds(source.GenreIds);
         OriginalLanguage = source.OriginalLanguage;
         OriginCountries = source.OriginCountries;
-        TmdbRating = source.TmdbRating;
-        TmdbVoteCount = source.TmdbVoteCount;
+        _tmdbRating = source.TmdbRating;
+        _tmdbVoteCount = source.TmdbVoteCount;
         Popularity = source.Popularity;
         SearchOrder = searchOrder;
         HasRank = showRank;
+        RefreshRating();
     }
 
     public int TmdbSeriesId { get; }
@@ -67,9 +75,17 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
 
     public IReadOnlyList<string> OriginCountries { get; }
 
-    public double? TmdbRating { get; }
+    public double? TmdbRating
+    {
+        get => _tmdbRating;
+        private set => SetProperty(ref _tmdbRating, value);
+    }
 
-    public int? TmdbVoteCount { get; }
+    public int? TmdbVoteCount
+    {
+        get => _tmdbVoteCount;
+        private set => SetProperty(ref _tmdbVoteCount, value);
+    }
 
     public double? Popularity { get; }
 
@@ -236,6 +252,10 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
 
     public string DisplayTags => string.IsNullOrWhiteSpace(GenresText) ? "暂无类型" : GenresText;
 
+    public string DirectorText => $"导演 {FormatCrewText(_directorText)}";
+
+    public string CastText => $"演员 {FormatCrewText(_actorsText)}";
+
     public string OverviewText => string.IsNullOrWhiteSpace(Overview) ? "暂无简介" : Overview;
 
     public bool HasPoster => !string.IsNullOrWhiteSpace(PosterRemoteUrl);
@@ -265,27 +285,31 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
         }
     }
 
-    public string RatingText
+    public MovieRatingItem? OmdbRating
     {
-        get
-        {
-            if (TmdbRating is not > 0)
-            {
-                return "暂无评分";
-            }
-
-            var voteText = TmdbVoteCount is > 0 ? $" · {TmdbVoteCount} 票" : string.Empty;
-            return $"TMDB 剧集评分 {TmdbRating.Value:0.0}{voteText}";
-        }
+        get => _omdbRating;
+        private set => SetProperty(ref _omdbRating, value);
     }
 
-    public string RatingBadgeText => TmdbRating is > 0 ? TmdbRating.Value.ToString("0.0") : "暂无评分";
+    public string RatingText
+    {
+        get => _ratingText;
+        private set => SetProperty(ref _ratingText, value);
+    }
+
+    public string RatingBadgeText => RatingText;
 
     public string WeightedAverageRatingText => RatingBadgeText;
 
     public string RatingDisplayText => RatingBadgeText;
 
-    public bool IsHighRating => TmdbRating is >= 8d;
+    public double? RatingValue
+    {
+        get => _ratingValue;
+        private set => SetProperty(ref _ratingValue, value);
+    }
+
+    public bool IsHighRating => RatingValue is >= 8d;
 
     public bool IsHighWeightedAverageRating => IsHighRating;
 
@@ -378,6 +402,8 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             PosterRemoteUrl = string.IsNullOrWhiteSpace(status.PosterRemoteUrl) ? PosterRemoteUrl : status.PosterRemoteUrl;
             GenresText = string.IsNullOrWhiteSpace(status.GenresText) ? GenresText : status.GenresText;
             FirstAirYear = status.FirstAirYear ?? FirstAirYear;
+            _directorText = string.IsNullOrWhiteSpace(status.DirectorText) ? _directorText : status.DirectorText;
+            _actorsText = string.IsNullOrWhiteSpace(status.ActorsText) ? _actorsText : status.ActorsText;
         }
 
         OnPropertyChanged(nameof(TvSeriesId));
@@ -392,6 +418,8 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
         OnPropertyChanged(nameof(HasPoster));
         OnPropertyChanged(nameof(GenresText));
         OnPropertyChanged(nameof(DisplayTags));
+        OnPropertyChanged(nameof(DirectorText));
+        OnPropertyChanged(nameof(CastText));
         NotifyTagPresentationChanged();
         OnPropertyChanged(nameof(FirstAirYear));
         OnPropertyChanged(nameof(YearText));
@@ -425,6 +453,18 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             NotifyTagPresentationChanged();
         }
 
+        if (string.IsNullOrWhiteSpace(_directorText) && !string.IsNullOrWhiteSpace(details.DirectorText))
+        {
+            _directorText = details.DirectorText;
+            OnPropertyChanged(nameof(DirectorText));
+        }
+
+        if (string.IsNullOrWhiteSpace(_actorsText) && !string.IsNullOrWhiteSpace(details.ActorsText))
+        {
+            _actorsText = details.ActorsText;
+            OnPropertyChanged(nameof(CastText));
+        }
+
         if (!FirstAirYear.HasValue && details.FirstAirYear.HasValue)
         {
             FirstAirYear = details.FirstAirYear;
@@ -433,6 +473,24 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             OnPropertyChanged(nameof(ReleaseDateText));
             OnPropertyChanged(nameof(ListDateRuntimeText));
         }
+
+        if (details.TmdbRating.HasValue)
+        {
+            TmdbRating = details.TmdbRating;
+        }
+
+        if (details.TmdbVoteCount.HasValue)
+        {
+            TmdbVoteCount = details.TmdbVoteCount;
+        }
+
+        RefreshRating();
+    }
+
+    public void SetOmdbRating(MovieRatingItem? rating)
+    {
+        OmdbRating = rating;
+        RefreshRating();
     }
 
     public void MarkSeasonCountUnavailable()
@@ -532,5 +590,22 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             .Where(character => !char.IsWhiteSpace(character))
             .Take(remaining);
         return $"{new string(chars.ToArray())}{TagOverflowMarker}";
+    }
+
+    private static string FormatCrewText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    }
+
+    private void RefreshRating()
+    {
+        var presentation = DiscoveryRatingPresenter.Build(TmdbRating, TmdbVoteCount, OmdbRating);
+        RatingValue = presentation.Value;
+        RatingText = presentation.Text;
+        OnPropertyChanged(nameof(RatingBadgeText));
+        OnPropertyChanged(nameof(WeightedAverageRatingText));
+        OnPropertyChanged(nameof(RatingDisplayText));
+        OnPropertyChanged(nameof(IsHighRating));
+        OnPropertyChanged(nameof(IsHighWeightedAverageRating));
     }
 }

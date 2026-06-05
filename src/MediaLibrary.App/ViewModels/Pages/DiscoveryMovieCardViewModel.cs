@@ -15,7 +15,9 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
     private bool _isWatched;
     private bool _isFavorite;
     private bool _isNotInterested;
-    private string _ratingText = "暂无评分";
+    private string _ratingText = "--";
+    private string _directorText = string.Empty;
+    private string _actorsText = string.Empty;
     private double? _ratingValue;
     private MovieRatingItem? _omdbRating;
 
@@ -79,6 +81,14 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
     public string Country { get; private set; }
 
     public string Language { get; private set; }
+
+    public string DirectorText => $"导演 {FormatCrewText(_directorText)}";
+
+    public string CastText => $"演员 {FormatCrewText(_actorsText)}";
+
+    public bool NeedsDetailsSnapshot => string.IsNullOrWhiteSpace(_directorText)
+                                        || string.IsNullOrWhiteSpace(_actorsText)
+                                        || string.IsNullOrWhiteSpace(GenresText);
 
     public int? RuntimeMinutes { get; private set; }
 
@@ -146,6 +156,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         get => _omdbRating;
         private set => SetProperty(ref _omdbRating, value);
     }
+
+    public bool CanEnrichExternalOmdbRating => HasLocalMovie || OmdbRating is null;
 
     public string RatingText
     {
@@ -258,7 +270,6 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         IsWantToWatch = status.IsWantToWatch;
         IsFavorite = status.IsFavorite;
         IsNotInterested = status.IsNotInterested;
-
         if (status.HasLocalMovie)
         {
             Title = string.IsNullOrWhiteSpace(status.Title) ? Title : status.Title;
@@ -268,19 +279,17 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             PosterRemoteUrl = string.IsNullOrWhiteSpace(status.PosterRemoteUrl) ? PosterRemoteUrl : status.PosterRemoteUrl;
             Overview = string.IsNullOrWhiteSpace(status.Overview) ? Overview : status.Overview;
             GenresText = string.IsNullOrWhiteSpace(status.GenresText) ? GenresText : status.GenresText;
-            DisplayTags = !string.IsNullOrWhiteSpace(status.LocalTypeTags)
-                ? status.LocalTypeTags
-                : !string.IsNullOrWhiteSpace(status.AiTagsText)
-                    ? status.AiTagsText
-                    : GenresText;
-            EmotionTagsText = !string.IsNullOrWhiteSpace(status.LocalEmotionTags) ? status.LocalEmotionTags : status.EmotionTagsText;
-            SceneTagsText = status.SceneTagsText;
+            DisplayTags = GenresText;
+            EmotionTagsText = string.Empty;
+            SceneTagsText = string.Empty;
             Country = string.IsNullOrWhiteSpace(status.Country) ? Country : status.Country;
             Language = string.IsNullOrWhiteSpace(status.Language) ? Language : status.Language;
+            _directorText = string.IsNullOrWhiteSpace(status.DirectorText) ? _directorText : status.DirectorText;
+            _actorsText = string.IsNullOrWhiteSpace(status.ActorsText) ? _actorsText : status.ActorsText;
             RuntimeMinutes = status.RuntimeMinutes ?? RuntimeMinutes;
             ImdbId = string.IsNullOrWhiteSpace(status.ImdbId) ? ImdbId : status.ImdbId;
-            TmdbRating = status.TmdbRating ?? TmdbRating;
-            TmdbVoteCount = status.TmdbVoteCount ?? TmdbVoteCount;
+            TmdbRating ??= status.TmdbRating;
+            TmdbVoteCount ??= status.TmdbVoteCount;
             if (status.OmdbScoreValue.HasValue)
             {
                 SetOmdbRating(
@@ -298,7 +307,7 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             }
             else
             {
-                RefreshRating();
+                SetOmdbRating(null);
             }
 
             OnPropertyChanged(nameof(Title));
@@ -318,6 +327,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(EmotionTagsText));
             OnPropertyChanged(nameof(SceneTagsText));
             NotifyTagPresentationChanged();
+            OnPropertyChanged(nameof(DirectorText));
+            OnPropertyChanged(nameof(CastText));
             OnPropertyChanged(nameof(ListDateRuntimeText));
             OnPropertyChanged(nameof(RuntimeText));
             OnPropertyChanged(nameof(IsInLibrary));
@@ -355,7 +366,6 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         IsWantToWatch = false;
         IsFavorite = false;
         IsNotInterested = false;
-
         NotifyLibraryStatusChanged();
         OnPropertyChanged(nameof(WatchStateText));
     }
@@ -413,6 +423,27 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(Language));
         }
 
+        if (string.IsNullOrWhiteSpace(GenresText) && !string.IsNullOrWhiteSpace(details.GenresText))
+        {
+            GenresText = details.GenresText;
+            DisplayTags = GenresText;
+            OnPropertyChanged(nameof(GenresText));
+            OnPropertyChanged(nameof(DisplayTags));
+            NotifyTagPresentationChanged();
+        }
+
+        if (string.IsNullOrWhiteSpace(_directorText) && !string.IsNullOrWhiteSpace(details.DirectorText))
+        {
+            _directorText = details.DirectorText;
+            OnPropertyChanged(nameof(DirectorText));
+        }
+
+        if (string.IsNullOrWhiteSpace(_actorsText) && !string.IsNullOrWhiteSpace(details.ActorsText))
+        {
+            _actorsText = details.ActorsText;
+            OnPropertyChanged(nameof(CastText));
+        }
+
         if (!RuntimeMinutes.HasValue && details.RuntimeMinutes.HasValue)
         {
             RuntimeMinutes = details.RuntimeMinutes;
@@ -421,13 +452,13 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(ListDateRuntimeText));
         }
 
-        if (!TmdbRating.HasValue && details.TmdbRating.HasValue)
+        if (details.TmdbRating.HasValue)
         {
             TmdbRating = details.TmdbRating;
             OnPropertyChanged(nameof(TmdbRating));
         }
 
-        if (!TmdbVoteCount.HasValue && details.TmdbVoteCount.HasValue)
+        if (details.TmdbVoteCount.HasValue)
         {
             TmdbVoteCount = details.TmdbVoteCount;
             OnPropertyChanged(nameof(TmdbVoteCount));
@@ -575,5 +606,10 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             .Where(character => !char.IsWhiteSpace(character))
             .Take(remaining);
         return $"{new string(chars.ToArray())}{TagOverflowMarker}";
+    }
+
+    private static string FormatCrewText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     }
 }

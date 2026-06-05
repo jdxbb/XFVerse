@@ -17,7 +17,8 @@
         <SolidColorBrush x:Key="DiscoveryWantRemoveBrush" Color="#F5C84B" />
 
         <Style x:Key="DiscoveryLibraryMediaChipStyle" TargetType="Border">
-            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Padding" Value="7,0" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Background" Value="{StaticResource DiscoveryLibraryMediaCardAccentBrush}" />
             <Setter Property="Opacity" Value="0.9" />
@@ -27,6 +28,9 @@
             <Setter Property="Foreground" Value="{StaticResource DiscoveryLibraryMediaCardAccentTextBrush}" />
             <Setter Property="FontSize" Value="10" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="LineHeight" Value="12" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
@@ -53,12 +57,13 @@
 
         <Style x:Key="DiscoverySearchRatingBadgeStyle" TargetType="Border">
             <Setter Property="MinWidth" Value="42" />
-            <Setter Property="Height" Value="24" />
-            <Setter Property="Padding" Value="8,2" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{StaticResource DiscoveryLibraryMediaCardAccentBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.9" />
             <Setter Property="HorizontalAlignment" Value="Right" />
         </Style>
 
@@ -66,8 +71,10 @@
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="FontSize" Value="13.5" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Foreground" Value="{StaticResource DiscoveryLibraryMediaCardAccentTextBrush}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
                     <Setter Property="Foreground" Value="#F5C84B" />
@@ -76,8 +83,9 @@
         </Style>
 
         <Style x:Key="DiscoverySearchWantChipButtonStyle" TargetType="Button">
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="MinHeight" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Padding" Value="7,0" />
             <Setter Property="Background" Value="{StaticResource DiscoveryWantAddBrush}" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -121,6 +129,8 @@
 
         <Style x:Key="DiscoveryCurrentWantChipStyle" TargetType="Border" BasedOn="{StaticResource DiscoveryLibraryMediaChipStyle}">
             <Setter Property="Background" Value="{StaticResource DiscoveryWantRemoveBrush}" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Padding" Value="7,0" />
         </Style>
 
         <Style x:Key="DiscoverySearchBoxStyle" TargetType="TextBox" BasedOn="{StaticResource SearchBoxStyle}">
@@ -214,6 +224,85 @@
 
         <Style x:Key="DiscoveryShortFilterContextMenuStyle" TargetType="ContextMenu" BasedOn="{StaticResource DiscoveryFilterContextMenuStyle}">
             <Setter Property="MaxHeight" Value="292" />
+        </Style>
+
+        <Style x:Key="DiscoveryFilterSubmenuItemStyle" TargetType="MenuItem">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Padding" Value="18,5,8,5" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Grid>
+                            <Border x:Name="ItemChrome"
+                                    MinWidth="{TemplateBinding MinWidth}"
+                                    MinHeight="{TemplateBinding MinHeight}"
+                                    Margin="{TemplateBinding Margin}"
+                                    Padding="{TemplateBinding Padding}"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    SnapsToDevicePixels="True">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter ContentSource="Header"
+                                                      RecognizesAccessKey="True"
+                                                      VerticalAlignment="Center" />
+                                    <TextBlock x:Name="SubmenuArrow"
+                                               Grid.Column="1"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="›"
+                                               Foreground="{DynamicResource BrushForegroundMuted}" />
+                                </Grid>
+                            </Border>
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Placement="Custom"
+                                   PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                   PopupAnimation="Fade"
+                                   VerticalOffset="-7">
+                                <Border Background="{DynamicResource BrushPopupBackground}"
+                                        BorderBrush="{DynamicResource BrushBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="10"
+                                        Effect="{StaticResource ShadowPopup}">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                            </Trigger>
+                            <Trigger Property="IsSubmenuOpen" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="DiscoveryModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
@@ -605,10 +694,57 @@
                                             Command="{Binding SelectDiscoveryTabCommand}"
                                             CommandParameter="0"
                                             Style="{StaticResource DiscoverySearchTabButtonStyle}" />
-                                    <Button Content="榜单"
-                                            Command="{Binding SelectDiscoveryTabCommand}"
-                                            CommandParameter="1"
-                                            Style="{StaticResource DiscoveryRankingTabButtonStyle}" />
+                                    <Button x:Name="RankingTabButton"
+                                            Content="榜单"
+                                            Click="RankingTabButton_Click"
+                                            MouseEnter="RankingTabButton_MouseEnter"
+                                            Style="{StaticResource DiscoveryRankingTabButtonStyle}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         Style="{StaticResource DiscoveryFilterContextMenuStyle}">
+                                                <MenuItem Header="电影" Style="{StaticResource DiscoveryFilterSubmenuItemStyle}">
+                                                    <MenuItem Header="热门榜"
+                                                              Command="{Binding SelectRankingPresetCommand}"
+                                                              CommandParameter="电影|热门榜"
+                                                              Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                    <MenuItem Header="高分榜"
+                                                              Command="{Binding SelectRankingPresetCommand}"
+                                                              CommandParameter="电影|高分榜"
+                                                              Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                    <MenuItem Header="趋势榜" Style="{StaticResource DiscoveryFilterSubmenuItemStyle}">
+                                                        <MenuItem Header="今日趋势"
+                                                                  Command="{Binding SelectRankingPresetCommand}"
+                                                                  CommandParameter="电影|趋势榜|今日趋势"
+                                                                  Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                        <MenuItem Header="本周趋势"
+                                                                  Command="{Binding SelectRankingPresetCommand}"
+                                                                  CommandParameter="电影|趋势榜|本周趋势"
+                                                                  Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                    </MenuItem>
+                                                </MenuItem>
+                                                <MenuItem Header="电视剧" Style="{StaticResource DiscoveryFilterSubmenuItemStyle}">
+                                                    <MenuItem Header="热门榜"
+                                                              Command="{Binding SelectRankingPresetCommand}"
+                                                              CommandParameter="电视剧|热门榜"
+                                                              Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                    <MenuItem Header="高分榜"
+                                                              Command="{Binding SelectRankingPresetCommand}"
+                                                              CommandParameter="电视剧|高分榜"
+                                                              Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                    <MenuItem Header="趋势榜" Style="{StaticResource DiscoveryFilterSubmenuItemStyle}">
+                                                        <MenuItem Header="今日趋势"
+                                                                  Command="{Binding SelectRankingPresetCommand}"
+                                                                  CommandParameter="电视剧|趋势榜|今日趋势"
+                                                                  Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                        <MenuItem Header="本周趋势"
+                                                                  Command="{Binding SelectRankingPresetCommand}"
+                                                                  CommandParameter="电视剧|趋势榜|本周趋势"
+                                                                  Style="{StaticResource DiscoveryFilterMenuItemStyle}" />
+                                                    </MenuItem>
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
                                     <Button Content="AI推荐"
                                             Command="{Binding SelectDiscoveryTabCommand}"
                                             CommandParameter="2"
@@ -734,14 +870,14 @@
             <Setter Property="Padding" Value="14" />
             <Setter Property="Margin" Value="0,0,0,16" />
             <Setter Property="CornerRadius" Value="12" />
-            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Cursor" Value="Arrow" />
         </Style>
 
         <Style x:Key="DiscoveryRankingItemCardStyle" TargetType="Border" BasedOn="{StaticResource DiscoveryListItemStyle}">
             <Setter Property="Padding" Value="10" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="MinHeight" Value="214" />
-            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Cursor" Value="Arrow" />
         </Style>
 
         <Style x:Key="DiscoveryRankingPosterFrameStyle" TargetType="Border">
@@ -754,10 +890,6 @@
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="VerticalAlignment" Value="Top" />
             <Setter Property="Margin" Value="8" />
-        </Style>
-
-        <Style x:Key="DiscoveryRankingPagerButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscoveryToolbarButtonStyle}">
-            <Setter Property="MinWidth" Value="82" />
         </Style>
 
         <ItemsPanelTemplate x:Key="DiscoveryPosterItemsPanelTemplate">
@@ -913,8 +1045,8 @@
                         <TextBlock Text="{Binding CurrentWantTagText}"
                                    Style="{StaticResource DiscoveryLibraryMediaChipTextStyle}" />
                     </Border>
-                    <StackPanel VerticalAlignment="Bottom" Margin="10,0,8,10">
-                        <Grid>
+                    <StackPanel VerticalAlignment="Bottom" Margin="8,0,8,10">
+                        <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="8" />
@@ -1746,8 +1878,8 @@
                                                                         Command="{Binding DataContext.ToggleSearchWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                         CommandParameter="{Binding}"
                                                                         Style="{StaticResource DiscoverySearchWantChipButtonStyle}" />
-                                                                <StackPanel VerticalAlignment="Bottom" Margin="10,0,8,10">
-                                                                    <Grid>
+                                                                <StackPanel VerticalAlignment="Bottom" Margin="8,0,8,10">
+                                                                    <Grid HorizontalAlignment="Stretch">
                                                                         <Grid.ColumnDefinitions>
                                                                             <ColumnDefinition Width="*" />
                                                                             <ColumnDefinition Width="8" />
@@ -1889,6 +2021,11 @@
                                             </Grid.RowDefinitions>
                                             <ItemsControl Grid.Row="0"
                                                           ItemsSource="{Binding SearchMovies}">
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="Margin" Value="0,0,0,14" />
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border MinHeight="74"
@@ -1937,11 +2074,79 @@
                                                                 <StackPanel Grid.Column="1"
                                                                             Margin="8,0,6,0"
                                                                             VerticalAlignment="Center">
-                                                                    <TextBlock Text="{Binding TitleWithOriginalText}"
-                                                                               TextTrimming="CharacterEllipsis"
-                                                                               TextWrapping="NoWrap"
-                                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding TitleWithOriginalText}"
-                                                                               Style="{StaticResource DiscoveryLibraryMediaTitleTextStyle}" />
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="48*" />
+                                                                            <ColumnDefinition Width="12" />
+                                                                            <ColumnDefinition Width="52*" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Text="{Binding TitleWithOriginalText}"
+                                                                                   VerticalAlignment="Bottom"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   TextWrapping="NoWrap"
+                                                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding TitleWithOriginalText}"
+                                                                                   Style="{StaticResource DiscoveryLibraryMediaTitleTextStyle}" />
+                                                                        <Grid Grid.Column="2">
+                                                                            <Grid.Style>
+                                                                                <Style TargetType="Grid">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Grid.Style>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="1.8*" />
+                                                                                <ColumnDefinition Width="10" />
+                                                                                <ColumnDefinition Width="3.2*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Text="{Binding DirectorText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding DirectorText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                            <TextBlock Grid.Column="2"
+                                                                                       Text="{Binding CastText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding CastText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                        </Grid>
+                                                                        <Grid Grid.Column="2">
+                                                                            <Grid.Style>
+                                                                                <Style TargetType="Grid">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Grid.Style>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="1.6*" />
+                                                                                <ColumnDefinition Width="10" />
+                                                                                <ColumnDefinition Width="3.4*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Text="{Binding DirectorText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding DirectorText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                            <TextBlock Grid.Column="2"
+                                                                                       Text="{Binding CastText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding CastText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                        </Grid>
+                                                                    </Grid>
                                                                     <Border Margin="0,5,0,0"
                                                                             helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListTagToolTipText}"
                                                                             helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding ListTagLine}"
@@ -2153,6 +2358,11 @@
                                             </Grid.RowDefinitions>
                                             <ItemsControl Grid.Row="0"
                                                           ItemsSource="{Binding SearchTvSeries}">
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="Margin" Value="0,0,0,14" />
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -2202,11 +2412,79 @@
                                                                 <StackPanel Grid.Column="1"
                                                                             Margin="8,0,6,0"
                                                                             VerticalAlignment="Center">
-                                                                    <TextBlock Text="{Binding TitleWithOriginalText}"
-                                                                               TextTrimming="CharacterEllipsis"
-                                                                               TextWrapping="NoWrap"
-                                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding TitleWithOriginalText}"
-                                                                               Style="{StaticResource DiscoveryLibraryMediaTitleTextStyle}" />
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="48*" />
+                                                                            <ColumnDefinition Width="12" />
+                                                                            <ColumnDefinition Width="52*" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Text="{Binding TitleWithOriginalText}"
+                                                                                   VerticalAlignment="Bottom"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   TextWrapping="NoWrap"
+                                                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding TitleWithOriginalText}"
+                                                                                   Style="{StaticResource DiscoveryLibraryMediaTitleTextStyle}" />
+                                                                        <Grid Grid.Column="2">
+                                                                            <Grid.Style>
+                                                                                <Style TargetType="Grid">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Grid.Style>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="1.8*" />
+                                                                                <ColumnDefinition Width="10" />
+                                                                                <ColumnDefinition Width="3.2*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Text="{Binding DirectorText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding DirectorText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                            <TextBlock Grid.Column="2"
+                                                                                       Text="{Binding CastText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding CastText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                        </Grid>
+                                                                        <Grid Grid.Column="2">
+                                                                            <Grid.Style>
+                                                                                <Style TargetType="Grid">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Grid.Style>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="1.6*" />
+                                                                                <ColumnDefinition Width="10" />
+                                                                                <ColumnDefinition Width="3.4*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Text="{Binding DirectorText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding DirectorText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                            <TextBlock Grid.Column="2"
+                                                                                       Text="{Binding CastText}"
+                                                                                       VerticalAlignment="Bottom"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       TextWrapping="NoWrap"
+                                                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding CastText}"
+                                                                                       Style="{StaticResource DiscoveryLibraryMediaMutedTextStyle}" />
+                                                                        </Grid>
+                                                                    </Grid>
                                                                     <Border Margin="0,5,0,0"
                                                                             helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListTagToolTipText}"
                                                                             helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding ListTagLine}"
@@ -2306,111 +2584,7 @@
                 </TabItem>
                 <TabItem Header="榜单" Style="{StaticResource DiscoveryTabItemStyle}">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="14" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
                         <Border Style="{StaticResource GlassPageCardStyle}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="16" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel>
-                                    <WrapPanel>
-                                        <Button Margin="0,0,8,8"
-                                                Content="{Binding SelectedRankingMediaType, StringFormat=影视：{0}}"
-                                                Click="OpenButtonContextMenu"
-                                                Style="{StaticResource DiscoveryToolbarButtonStyle}">
-                                            <Button.ContextMenu>
-                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
-                                                             ItemsSource="{Binding RankingMediaTypeOptions}"
-                                                             Style="{StaticResource DiscoveryFilterContextMenuStyle}">
-                                                    <ContextMenu.ItemContainerStyle>
-                                                        <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
-                                                            <Setter Property="Header" Value="{Binding}" />
-                                                            <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectRankingMediaTypeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                            <Setter Property="CommandParameter" Value="{Binding}" />
-                                                        </Style>
-                                                    </ContextMenu.ItemContainerStyle>
-                                                </ContextMenu>
-                                            </Button.ContextMenu>
-                                        </Button>
-
-                                        <Button Margin="0,0,8,8"
-                                                Content="{Binding ActiveRankingTitle, StringFormat=榜单：{0}}"
-                                                Click="OpenButtonContextMenu"
-                                                Style="{StaticResource DiscoveryToolbarButtonStyle}">
-                                            <Button.ContextMenu>
-                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
-                                                             ItemsSource="{Binding RankingTypeOptions}"
-                                                             Style="{StaticResource DiscoveryFilterContextMenuStyle}">
-                                                    <ContextMenu.ItemContainerStyle>
-                                                        <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
-                                                            <Setter Property="Header" Value="{Binding}" />
-                                                            <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectRankingTypeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                            <Setter Property="CommandParameter" Value="{Binding}" />
-                                                        </Style>
-                                                    </ContextMenu.ItemContainerStyle>
-                                                </ContextMenu>
-                                            </Button.ContextMenu>
-                                        </Button>
-
-                                        <Button Margin="0,0,8,8"
-                                                Content="{Binding ActiveRankingTimeText, StringFormat=时间：{0}}"
-                                                Click="OpenButtonContextMenu"
-                                                IsEnabled="{Binding IsActiveRankingTimeSelectable}"
-                                                Style="{StaticResource DiscoveryToolbarButtonStyle}">
-                                            <Button.ContextMenu>
-                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
-                                                             ItemsSource="{Binding TrendingTimeOptions}"
-                                                             Style="{StaticResource DiscoveryFilterContextMenuStyle}">
-                                                    <ContextMenu.ItemContainerStyle>
-                                                        <Style TargetType="MenuItem" BasedOn="{StaticResource DiscoveryFilterMenuItemStyle}">
-                                                            <Setter Property="Header" Value="{Binding}" />
-                                                            <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTrendingTimeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                            <Setter Property="CommandParameter" Value="{Binding}" />
-                                                        </Style>
-                                                    </ContextMenu.ItemContainerStyle>
-                                                </ContextMenu>
-                                            </Button.ContextMenu>
-                                        </Button>
-                                    </WrapPanel>
-
-                                    <TextBlock Margin="0,2,0,0"
-                                               FontSize="12"
-                                               LineHeight="18"
-                                               LineStackingStrategy="BlockLineHeight"
-                                               MaxHeight="36"
-                                               Text="{Binding ActiveRankingStatusMessage}"
-                                               TextTrimming="CharacterEllipsis"
-                                               TextWrapping="Wrap"
-                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding ActiveRankingStatusMessage}"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBlock Margin="0,4,0,0"
-                                               LineHeight="{StaticResource LineHeightBody}"
-                                               LineStackingStrategy="BlockLineHeight"
-                                               MaxHeight="44"
-                                               Text="{Binding ActiveRankingSummaryText}"
-                                               TextTrimming="CharacterEllipsis"
-                                               TextWrapping="Wrap"
-                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding ActiveRankingSummaryText}"
-                                               Style="{StaticResource BodyTextStyle}" />
-                                </StackPanel>
-
-                                <Border Grid.Column="2"
-                                        VerticalAlignment="Center"
-                                        Style="{StaticResource DiscoveryBadgeStyle}">
-                                    <TextBlock Text="{Binding ActiveRankingPageStatusText}" Style="{StaticResource DiscoveryBadgeTextStyle}" />
-                                </Border>
-                            </Grid>
-                        </Border>
-
-                        <Border Grid.Row="2" Style="{StaticResource GlassPageCardStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="*" />
@@ -2592,6 +2766,16 @@
                                         </Border>
 
                                         <ItemsControl ItemsSource="{Binding RankingRows}">
+                                            <ItemsControl.Template>
+                                                <ControlTemplate TargetType="ItemsControl">
+                                                    <Grid>
+                                                        <Border Width="1"
+                                                                HorizontalAlignment="Center"
+                                                                Background="{DynamicResource BrushBorder}" />
+                                                        <ItemsPresenter />
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </ItemsControl.Template>
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Grid Margin="0,0,0,14" MinHeight="210">
@@ -2698,9 +2882,6 @@
                                                             </StackPanel>
                                                             </Grid>
                                                         </Border>
-
-                                                        <Border Grid.Column="1" Background="{DynamicResource BrushBorder}" />
-
                                                         <Border Grid.Column="2"
                                                                 DataContext="{Binding RightItem}"
                                                                 Margin="14,0,0,0">
@@ -2963,6 +3144,16 @@
                                         </Border>
 
                                         <ItemsControl ItemsSource="{Binding RankingTvRows}">
+                                            <ItemsControl.Template>
+                                                <ControlTemplate TargetType="ItemsControl">
+                                                    <Grid>
+                                                        <Border Width="1"
+                                                                HorizontalAlignment="Center"
+                                                                Background="{DynamicResource BrushBorder}" />
+                                                        <ItemsPresenter />
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </ItemsControl.Template>
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Grid Margin="0,0,0,14" MinHeight="210">
@@ -3063,9 +3254,6 @@
                                                             </StackPanel>
                                                             </Grid>
                                                         </Border>
-
-                                                        <Border Grid.Column="1" Background="{DynamicResource BrushBorder}" />
-
                                                         <Border Grid.Column="2"
                                                                 DataContext="{Binding RightItem}"
                                                                 Margin="14,0,0,0"
@@ -3174,7 +3362,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                                 <StackPanel Grid.Row="1"
-                                            Margin="0,14,0,0"
+                                            Margin="0,4,0,0"
                                             HorizontalAlignment="Center"
                                             Orientation="Horizontal">
                                     <StackPanel.Style>
@@ -3190,23 +3378,43 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <Button MinWidth="88"
-                                            Content="上一页"
-                                            Command="{Binding GoPreviousRankingPageCommand}"
+                                    <Button Command="{Binding GoPreviousRankingPageCommand}"
                                             IsEnabled="{Binding CanGoPreviousRankingPage}"
-                                            Style="{StaticResource DiscoveryRankingPagerButtonStyle}" />
+                                            Style="{StaticResource DiscoveryPagerIconButtonStyle}"
+                                            ToolTip="上一页">
+                                        <Viewbox Width="16" Height="16">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M 15 5 L 8 12 L 15 19"
+                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      StrokeThickness="2.2"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      StrokeLineJoin="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Button>
                                     <TextBlock Margin="14,0"
                                                VerticalAlignment="Center"
                                                Text="{Binding RankingPageStatusText}"
                                                Style="{StaticResource BodyTextStyle}" />
-                                    <Button MinWidth="88"
-                                            Content="下一页"
-                                            Command="{Binding GoNextRankingPageCommand}"
+                                    <Button Command="{Binding GoNextRankingPageCommand}"
                                             IsEnabled="{Binding CanGoNextRankingPage}"
-                                            Style="{StaticResource DiscoveryRankingPagerButtonStyle}" />
+                                            Style="{StaticResource DiscoveryPagerIconButtonStyle}"
+                                            ToolTip="下一页">
+                                        <Viewbox Width="16" Height="16">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M 9 5 L 16 12 L 9 19"
+                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      StrokeThickness="2.2"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      StrokeLineJoin="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Button>
                                 </StackPanel>
                                 <StackPanel Grid.Row="1"
-                                            Margin="0,14,0,0"
+                                            Margin="0,4,0,0"
                                             HorizontalAlignment="Center"
                                             Orientation="Horizontal">
                                     <StackPanel.Style>
@@ -3222,20 +3430,40 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <Button MinWidth="88"
-                                            Content="上一页"
-                                            Command="{Binding GoPreviousRankingPageCommand}"
+                                    <Button Command="{Binding GoPreviousRankingPageCommand}"
                                             IsEnabled="{Binding CanGoPreviousTvRankingPage}"
-                                            Style="{StaticResource DiscoveryRankingPagerButtonStyle}" />
+                                            Style="{StaticResource DiscoveryPagerIconButtonStyle}"
+                                            ToolTip="上一页">
+                                        <Viewbox Width="16" Height="16">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M 15 5 L 8 12 L 15 19"
+                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      StrokeThickness="2.2"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      StrokeLineJoin="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Button>
                                     <TextBlock Margin="14,0"
                                                VerticalAlignment="Center"
                                                Text="{Binding TvRankingPageStatusText}"
                                                Style="{StaticResource BodyTextStyle}" />
-                                    <Button MinWidth="88"
-                                            Content="下一页"
-                                            Command="{Binding GoNextRankingPageCommand}"
+                                    <Button Command="{Binding GoNextRankingPageCommand}"
                                             IsEnabled="{Binding CanGoNextTvRankingPage}"
-                                            Style="{StaticResource DiscoveryRankingPagerButtonStyle}" />
+                                            Style="{StaticResource DiscoveryPagerIconButtonStyle}"
+                                            ToolTip="下一页">
+                                        <Viewbox Width="16" Height="16">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M 9 5 L 16 12 L 9 19"
+                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      StrokeThickness="2.2"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      StrokeLineJoin="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Button>
                                 </StackPanel>
                             </Grid>
                         </Border>

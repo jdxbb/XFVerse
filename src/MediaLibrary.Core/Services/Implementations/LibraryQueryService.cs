@@ -213,12 +213,9 @@ public sealed class LibraryQueryService : ILibraryQueryService
             .Select(
                 x =>
                 {
-                    var primaryRating = x.Ratings
-                        .OrderByDescending(rating => string.Equals(rating.SourceName, "OMDb", StringComparison.OrdinalIgnoreCase))
-                        .ThenByDescending(rating => rating.LastUpdatedAt)
-                        .FirstOrDefault();
                     var tmdbRating = x.Ratings.FirstOrDefault(rating => string.Equals(rating.SourceName, "TMDB", StringComparison.OrdinalIgnoreCase));
                     var omdbRating = x.Ratings.FirstOrDefault(rating => string.Equals(rating.SourceName, "OMDb", StringComparison.OrdinalIgnoreCase));
+                    var primaryRating = BuildMoviePrimaryRating(tmdbRating, omdbRating);
                     var matchingStates = collectionStates
                         .Where(state => MatchesCollectionIdentity(state, x.Id, x.TmdbId, x.ImdbId, x.Title, x.ReleaseYear))
                         .ToList();
@@ -269,10 +266,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         ImdbId = x.ImdbId ?? string.Empty,
                         IdentificationStatus = x.IdentificationStatus,
                         IdentifiedConfidence = x.IdentifiedConfidence,
-                        PrimaryRatingSourceName = GetDisplayRatingSourceName(primaryRating?.SourceName ?? string.Empty),
-                        PrimaryRatingValue = primaryRating?.ScoreValue,
-                        PrimaryRatingScale = primaryRating?.ScoreScale,
-                        PrimaryRatingVoteCount = primaryRating?.VoteCount,
+                        PrimaryRatingSourceName = primaryRating.SourceName,
+                        PrimaryRatingValue = primaryRating.Value,
+                        PrimaryRatingScale = primaryRating.Scale,
+                        PrimaryRatingVoteCount = primaryRating.VoteCount,
                         TmdbRating = tmdbRating?.ScoreValue,
                         TmdbVoteCount = tmdbRating?.VoteCount,
                         OmdbScoreValue = omdbRating?.ScoreValue,
@@ -489,6 +486,12 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 {
                     movieById.TryGetValue(row.MovieId.GetValueOrDefault(), out var movie);
                     var sourceCount = movie?.SourceCount ?? 0;
+                    var primaryRating = BuildMoviePrimaryRating(
+                        row.TmdbRating,
+                        row.TmdbVoteCount,
+                        row.OmdbScoreValue,
+                        row.OmdbScoreScale,
+                        row.OmdbVoteCount);
                     return new LibraryMovieListItem
                     {
                         ItemKind = movie is null
@@ -517,10 +520,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         ImdbId = FirstNonEmpty(movie?.ImdbId, row.ImdbId),
                         IdentificationStatus = movie?.IdentificationStatus ?? IdentificationStatus.ManualConfirmed,
                         IdentifiedConfidence = movie?.IdentifiedConfidence,
-                        PrimaryRatingSourceName = row.OmdbScoreValue.HasValue ? "IMDb" : row.TmdbRating.HasValue ? "TMDB" : string.Empty,
-                        PrimaryRatingValue = row.OmdbScoreValue ?? row.TmdbRating,
-                        PrimaryRatingScale = row.OmdbScoreScale ?? (row.TmdbRating.HasValue ? 10d : null),
-                        PrimaryRatingVoteCount = row.OmdbVoteCount ?? row.TmdbVoteCount,
+                        PrimaryRatingSourceName = primaryRating.SourceName,
+                        PrimaryRatingValue = primaryRating.Value,
+                        PrimaryRatingScale = primaryRating.Scale,
+                        PrimaryRatingVoteCount = primaryRating.VoteCount,
                         TmdbRating = row.TmdbRating,
                         TmdbVoteCount = row.TmdbVoteCount,
                         OmdbScoreValue = row.OmdbScoreValue,
@@ -598,6 +601,34 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     Language = x.Series.Language ?? string.Empty,
                     DirectorText = x.Series.DirectorText ?? string.Empty,
                     ActorsText = x.Series.ActorsText ?? string.Empty,
+                    TmdbRating = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    TmdbVoteCount = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbScoreValue = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    OmdbScoreScale = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreScale)
+                        .FirstOrDefault(),
+                    OmdbVoteCount = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbSourceUrl = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.SourceUrl ?? string.Empty)
+                        .FirstOrDefault() ?? string.Empty,
+                    OmdbLastUpdatedAt = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.LastUpdatedAt ?? rating.CreatedAt)
+                        .FirstOrDefault(),
                     AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
@@ -722,6 +753,12 @@ public sealed class LibraryQueryService : ILibraryQueryService
                 {
                     var hasUserState = x.IsWatched || x.IsWantToWatch || x.IsNotInterested;
                     var isVisibleInLibrary = ResolveIsVisibleInLibrary(false, x.LibraryVisibilityState, hasUserState);
+                    var primaryRating = BuildMoviePrimaryRating(
+                        x.TmdbRating,
+                        x.TmdbVoteCount,
+                        x.OmdbScoreValue,
+                        x.OmdbScoreScale,
+                        x.OmdbVoteCount);
 
                     return new LibraryMovieListItem
                     {
@@ -739,10 +776,10 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         RuntimeMinutes = x.RuntimeMinutes,
                         ImdbId = x.ImdbId,
                         IdentificationStatus = IdentificationStatus.Pending,
-                        PrimaryRatingSourceName = x.OmdbScoreValue.HasValue ? "IMDb" : x.TmdbRating.HasValue ? "TMDB" : string.Empty,
-                        PrimaryRatingValue = x.OmdbScoreValue ?? x.TmdbRating,
-                        PrimaryRatingScale = x.OmdbScoreScale ?? (x.TmdbRating.HasValue ? 10d : null),
-                        PrimaryRatingVoteCount = x.OmdbVoteCount ?? x.TmdbVoteCount,
+                        PrimaryRatingSourceName = primaryRating.SourceName,
+                        PrimaryRatingValue = primaryRating.Value,
+                        PrimaryRatingScale = primaryRating.Scale,
+                        PrimaryRatingVoteCount = primaryRating.VoteCount,
                         TmdbRating = x.TmdbRating,
                         TmdbVoteCount = x.TmdbVoteCount,
                         OmdbScoreValue = x.OmdbScoreValue,
@@ -893,11 +930,107 @@ public sealed class LibraryQueryService : ILibraryQueryService
         return imdbId.Trim().ToLowerInvariant();
     }
 
+    private static PrimaryRatingPresentation BuildMoviePrimaryRating(
+        MovieRatingItem? tmdbRating,
+        MovieRatingItem? omdbRating)
+    {
+        var ratings = new[]
+            {
+                tmdbRating,
+                omdbRating
+            }
+            .Where(rating => rating is not null && IsValidRating(rating))
+            .Select(rating => rating!)
+            .ToList();
+        if (ratings.Count == 0)
+        {
+            return PrimaryRatingPresentation.Empty;
+        }
+
+        var weightedRating = BuildWeightedRating(ratings);
+        var sourceName = ratings.Count > 1
+            ? "TMDB/IMDb"
+            : GetDisplayRatingSourceName(ratings[0].SourceName);
+        var voteCount = ratings.Sum(rating => Math.Max(rating.VoteCount ?? 0, 0));
+        return new PrimaryRatingPresentation(sourceName, weightedRating, 10d, voteCount);
+    }
+
+    private static PrimaryRatingPresentation BuildMoviePrimaryRating(
+        double? tmdbScore,
+        int? tmdbVotes,
+        double? omdbScore,
+        double? omdbScale,
+        int? omdbVotes)
+    {
+        return BuildMoviePrimaryRating(
+            BuildRatingItem("TMDB", tmdbScore, 10d, tmdbVotes),
+            BuildRatingItem("OMDb", omdbScore, omdbScale ?? 10d, omdbVotes));
+    }
+
+    private static MovieRatingItem? BuildRatingItem(
+        string sourceName,
+        double? scoreValue,
+        double scoreScale,
+        int? voteCount)
+    {
+        return scoreValue.HasValue
+            ? new MovieRatingItem
+            {
+                SourceName = sourceName,
+                ScoreValue = scoreValue.Value,
+                ScoreScale = scoreScale,
+                VoteCount = voteCount
+            }
+            : null;
+    }
+
+    private static double? BuildWeightedRating(IEnumerable<MovieRatingItem> ratings)
+    {
+        const int voteWeightCap = 100_000;
+        var normalizedRatings = ratings
+            .Where(IsValidRating)
+            .Select(
+                rating => new
+                {
+                    Rating = NormalizeRatingToTen(rating.ScoreValue, rating.ScoreScale),
+                    Votes = Math.Min(Math.Max(rating.VoteCount ?? 0, 0), voteWeightCap)
+                })
+            .ToList();
+        if (normalizedRatings.Count == 0)
+        {
+            return null;
+        }
+
+        var totalVotes = normalizedRatings.Sum(x => x.Votes);
+        return totalVotes > 0
+            ? normalizedRatings.Sum(x => x.Rating * x.Votes) / totalVotes
+            : normalizedRatings.Average(x => x.Rating);
+    }
+
+    private static bool IsValidRating(MovieRatingItem? rating)
+    {
+        return rating is { ScoreValue: > 0d, ScoreScale: > 0d };
+    }
+
+    private static double NormalizeRatingToTen(double scoreValue, double scoreScale)
+    {
+        return Math.Clamp(scoreValue / scoreScale * 10d, 0d, 10d);
+    }
+
     private static string GetDisplayRatingSourceName(string sourceName)
     {
         return string.Equals(sourceName, "OMDb", StringComparison.OrdinalIgnoreCase)
             ? "IMDb"
             : sourceName;
+    }
+
+    private sealed record PrimaryRatingPresentation(
+        string SourceName,
+        double? Value,
+        double? Scale,
+        int? VoteCount)
+    {
+        public static PrimaryRatingPresentation Empty { get; } = new(string.Empty, null, null, null);
     }
 
     private static async Task<IReadOnlyList<LibraryMovieListItem>> GetTvSeriesLibraryItemsAsync(
@@ -926,6 +1059,34 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     x.Language,
                     x.DirectorText,
                     x.ActorsText,
+                    TmdbRating = x.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    TmdbVoteCount = x.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbScoreValue = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    OmdbScoreScale = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreScale)
+                        .FirstOrDefault(),
+                    OmdbVoteCount = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbSourceUrl = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.SourceUrl ?? string.Empty)
+                        .FirstOrDefault() ?? string.Empty,
+                    OmdbLastUpdatedAt = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.LastUpdatedAt ?? rating.CreatedAt)
+                        .FirstOrDefault(),
                     x.CreatedAt,
                     x.UpdatedAt
                 })
@@ -1077,6 +1238,12 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         .Select(x => x.PosterRemoteUrl)
                         .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
                         ?? string.Empty;
+                    var primaryRating = BuildMoviePrimaryRating(
+                        series.TmdbRating,
+                        series.TmdbVoteCount,
+                        series.OmdbScoreValue,
+                        series.OmdbScoreScale,
+                        series.OmdbVoteCount);
                     return new LibraryMovieListItem
                     {
                         ItemKind = isUnknownSeriesProjection ? LibraryMediaItemKind.Other : LibraryMediaItemKind.Series,
@@ -1110,6 +1277,17 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsWantToWatch = visibleCollectionStates.Any(state => state!.IsWantToWatch),
                         IsNotInterested = visibleCollectionStates.Any(state => state!.IsNotInterested),
                         IsWatched = isWatched,
+                        PrimaryRatingSourceName = primaryRating.SourceName,
+                        PrimaryRatingValue = primaryRating.Value,
+                        PrimaryRatingScale = primaryRating.Scale,
+                        PrimaryRatingVoteCount = primaryRating.VoteCount,
+                        TmdbRating = series.TmdbRating,
+                        TmdbVoteCount = series.TmdbVoteCount,
+                        OmdbScoreValue = series.OmdbScoreValue,
+                        OmdbScoreScale = series.OmdbScoreScale,
+                        OmdbVoteCount = series.OmdbVoteCount,
+                        OmdbSourceUrl = series.OmdbSourceUrl,
+                        OmdbLastUpdatedAt = series.OmdbLastUpdatedAt,
                         SeasonCount = displaySeasons.Count,
                         WatchedSeasonCount = watchedSeasonCount,
                         InLibraryEpisodeCount = inLibraryEpisodeCount,
@@ -1207,6 +1385,12 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     var hasActiveSource = metrics.SourceCount > 0;
                     var visibilityState = state?.LibraryVisibilityState ?? LibraryVisibilityState.Auto;
                     var isVisibleInLibrary = ResolveIsVisibleInLibrary(hasActiveSource, visibilityState, hasUserState);
+                    var primaryRating = BuildMoviePrimaryRating(
+                        season.TmdbRating,
+                        season.TmdbVoteCount,
+                        season.OmdbScoreValue,
+                        season.OmdbScoreScale,
+                        season.OmdbVoteCount);
                     return new LibraryMovieListItem
                     {
                         ItemKind = ResolveTvSeasonItemKind(season.IdentificationStatus),
@@ -1241,6 +1425,17 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         IsWantToWatch = state?.IsWantToWatch == true && isUnwatched,
                         IsNotInterested = state?.IsNotInterested == true,
                         IsWatched = isWatched,
+                        PrimaryRatingSourceName = primaryRating.SourceName,
+                        PrimaryRatingValue = primaryRating.Value,
+                        PrimaryRatingScale = primaryRating.Scale,
+                        PrimaryRatingVoteCount = primaryRating.VoteCount,
+                        TmdbRating = season.TmdbRating,
+                        TmdbVoteCount = season.TmdbVoteCount,
+                        OmdbScoreValue = season.OmdbScoreValue,
+                        OmdbScoreScale = season.OmdbScoreScale,
+                        OmdbVoteCount = season.OmdbVoteCount,
+                        OmdbSourceUrl = season.OmdbSourceUrl,
+                        OmdbLastUpdatedAt = season.OmdbLastUpdatedAt,
                         WatchedEpisodeCount = watchedEpisodeCount,
                         InLibraryEpisodeCount = metrics.InLibraryEpisodeCount,
                         TotalEpisodeCount = totalEpisodeCount,
@@ -1707,6 +1902,20 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public string DirectorText { get; set; } = string.Empty;
 
         public string ActorsText { get; set; } = string.Empty;
+
+        public double? TmdbRating { get; set; }
+
+        public int? TmdbVoteCount { get; set; }
+
+        public double? OmdbScoreValue { get; set; }
+
+        public double? OmdbScoreScale { get; set; }
+
+        public int? OmdbVoteCount { get; set; }
+
+        public string OmdbSourceUrl { get; set; } = string.Empty;
+
+        public DateTime? OmdbLastUpdatedAt { get; set; }
 
         public DateTime? AirDate { get; set; }
 

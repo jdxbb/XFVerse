@@ -29,6 +29,8 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<RatingSource> RatingSources => Set<RatingSource>();
 
+    public DbSet<TvSeriesRatingSource> TvSeriesRatingSources => Set<TvSeriesRatingSource>();
+
     public DbSet<SubtitleBinding> SubtitleBindings => Set<SubtitleBinding>();
 
     public DbSet<OnlineSubtitleBinding> OnlineSubtitleBindings => Set<OnlineSubtitleBinding>();
@@ -60,6 +62,7 @@ public sealed class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TvSeasonConfiguration());
         modelBuilder.ApplyConfiguration(new TvEpisodeConfiguration());
         modelBuilder.ApplyConfiguration(new RatingSourceConfiguration());
+        modelBuilder.ApplyConfiguration(new TvSeriesRatingSourceConfiguration());
         modelBuilder.ApplyConfiguration(new SubtitleBindingConfiguration());
         modelBuilder.ApplyConfiguration(new OnlineSubtitleBindingConfiguration());
         modelBuilder.ApplyConfiguration(new WatchHistoryConfiguration());

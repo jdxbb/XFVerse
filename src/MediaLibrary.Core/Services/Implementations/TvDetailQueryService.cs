@@ -680,28 +680,57 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
     {
         var ratings = new List<MovieRatingItem>();
         var seriesTmdbId = await LoadSeriesTmdbIdAsync(seriesId, cancellationToken);
+        ratings.AddRange(await LoadPersistedSeriesRatingsAsync(seriesId, cancellationToken));
         if (seriesTmdbId is not > 0)
         {
             return BuildRatingPair(ratings);
         }
 
-        var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(seriesTmdbId.Value, cancellationToken: cancellationToken);
-        if (seriesDetails?.TmdbRating is > 0)
+        if (!ratings.Any(rating => string.Equals(rating.SourceName, "TMDB", StringComparison.OrdinalIgnoreCase)))
         {
-            ratings.Add(BuildRatingItem("TMDB", seriesDetails.TmdbRating.Value, seriesDetails.TmdbVoteCount));
+            var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(seriesTmdbId.Value, cancellationToken: cancellationToken);
+            if (seriesDetails?.TmdbRating is > 0)
+            {
+                ratings.Add(BuildRatingItem("TMDB", seriesDetails.TmdbRating.Value, seriesDetails.TmdbVoteCount));
+            }
         }
 
-        var externalIds = await _tmdbService.GetTvSeriesExternalIdsAsync(seriesTmdbId.Value, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(externalIds?.ImdbId))
+        if (!ratings.Any(rating => string.Equals(rating.SourceName, "IMDb", StringComparison.OrdinalIgnoreCase)))
         {
-            var imdbRating = await _omdbService.GetSeriesRatingAsync(externalIds.ImdbId, cancellationToken);
-            if (imdbRating is not null)
+            var externalIds = await _tmdbService.GetTvSeriesExternalIdsAsync(seriesTmdbId.Value, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(externalIds?.ImdbId))
             {
-                ratings.Add(BuildRatingItem("IMDb", imdbRating.ScoreValue, imdbRating.VoteCount, imdbRating.ScoreScale));
+                var imdbRating = await _omdbService.GetSeriesRatingAsync(externalIds.ImdbId, cancellationToken);
+                if (imdbRating is not null)
+                {
+                    ratings.Add(BuildRatingItem("IMDb", imdbRating.ScoreValue, imdbRating.VoteCount, imdbRating.ScoreScale));
+                }
             }
         }
 
         return BuildRatingPair(ratings);
+    }
+
+    private static async Task<IReadOnlyList<MovieRatingItem>> LoadPersistedSeriesRatingsAsync(
+        int seriesId,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        return await dbContext.TvSeriesRatingSources
+            .AsNoTracking()
+            .Where(rating => rating.TvSeriesId == seriesId)
+            .OrderByDescending(rating => rating.LastUpdatedAt ?? rating.CreatedAt)
+            .Select(
+                rating => new MovieRatingItem
+                {
+                    SourceName = rating.SourceName == "OMDb" ? "IMDb" : rating.SourceName,
+                    ScoreValue = rating.ScoreValue,
+                    ScoreScale = rating.ScoreScale,
+                    VoteCount = rating.VoteCount,
+                    SourceUrl = rating.SourceUrl ?? string.Empty,
+                    LastUpdatedAt = rating.LastUpdatedAt ?? rating.CreatedAt
+                })
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<MovieRatingItem> GetSeasonTmdbRatingAsync(

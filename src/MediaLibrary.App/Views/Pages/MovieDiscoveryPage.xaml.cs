@@ -179,15 +179,36 @@ public partial class MovieDiscoveryPage : UserControl
             return;
         }
 
-        CloseOpenMenu();
-        contextMenu.PlacementTarget = button;
-        contextMenu.Placement = PlacementMode.Bottom;
-        contextMenu.Closed -= ContextMenu_Closed;
-        contextMenu.Closed += ContextMenu_Closed;
-        _openMenuButton = button;
-        _openContextMenu = contextMenu;
-        contextMenu.IsOpen = true;
-        AlignContextMenuToButtonCenter(button, contextMenu);
+        OpenContextMenuForButton(button, contextMenu);
+        e.Handled = true;
+    }
+
+    private void RankingTabButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MovieDiscoveryViewModel { IsRankingTabSelected: false } viewModel)
+        {
+            if (viewModel.SelectDiscoveryTabCommand.CanExecute("1"))
+            {
+                viewModel.SelectDiscoveryTabCommand.Execute("1");
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        OpenButtonContextMenu(sender, e);
+    }
+
+    private void RankingTabButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (DataContext is not MovieDiscoveryViewModel { IsRankingTabSelected: true }
+            || sender is not Button { ContextMenu: { } contextMenu } button
+            || IsOpenMenuButton(button))
+        {
+            return;
+        }
+
+        OpenContextMenuForButton(button, contextMenu);
         e.Handled = true;
     }
 
@@ -198,6 +219,20 @@ public partial class MovieDiscoveryPage : UserControl
             _openMenuButton = null;
             _openContextMenu = null;
         }
+    }
+
+    private void OpenContextMenuForButton(Button button, ContextMenu contextMenu)
+    {
+        CloseOpenMenu();
+        contextMenu.PlacementTarget = button;
+        contextMenu.Placement = PlacementMode.Bottom;
+        contextMenu.Closed -= ContextMenu_Closed;
+        contextMenu.Closed += ContextMenu_Closed;
+        _openMenuButton = button;
+        _openContextMenu = contextMenu;
+        contextMenu.IsOpen = true;
+        AlignContextMenuToButtonCenter(button, contextMenu);
+        ConfigureSubmenusToOpenRight(contextMenu);
     }
 
     private bool IsOpenMenuButton(Button button)
@@ -232,6 +267,56 @@ public partial class MovieDiscoveryPage : UserControl
                 contextMenu.HorizontalOffset = Math.Round((button.ActualWidth - contextMenu.ActualWidth) * 0.5);
             },
             DispatcherPriority.Loaded);
+    }
+
+    private static void ConfigureSubmenusToOpenRight(ItemsControl root)
+    {
+        foreach (var menuItem in root.Items.OfType<MenuItem>())
+        {
+            menuItem.SubmenuOpened -= OnSubmenuOpened;
+            menuItem.SubmenuOpened += OnSubmenuOpened;
+            ConfigureSubmenuPopupToOpenRight(menuItem);
+            ConfigureSubmenusToOpenRight(menuItem);
+        }
+    }
+
+    private static void OnSubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        ConfigureSubmenuPopupToOpenRight(menuItem);
+        ConfigureSubmenusToOpenRight(menuItem);
+        _ = menuItem.Dispatcher.BeginInvoke(
+            () => ConfigureSubmenuPopupToOpenRight(menuItem),
+            DispatcherPriority.Loaded);
+    }
+
+    private static void ConfigureSubmenuPopupToOpenRight(MenuItem menuItem)
+    {
+        menuItem.ApplyTemplate();
+        if (menuItem.Template.FindName("PART_Popup", menuItem) is not Popup popup)
+        {
+            return;
+        }
+
+        popup.PlacementTarget = menuItem;
+        popup.Placement = PlacementMode.Custom;
+        popup.CustomPopupPlacementCallback = PlaceSubmenuOnRight;
+        popup.HorizontalOffset = 0;
+        popup.VerticalOffset = -7;
+    }
+
+    private static CustomPopupPlacement[] PlaceSubmenuOnRight(Size popupSize, Size targetSize, Point offset)
+    {
+        return
+        [
+            new CustomPopupPlacement(
+                new Point(targetSize.Width, 0),
+                PopupPrimaryAxis.Horizontal)
+        ];
     }
 
     private void DiscoveryScrollViewer_Loaded(object sender, RoutedEventArgs e)

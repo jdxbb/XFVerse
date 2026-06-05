@@ -32,6 +32,17 @@ public interface ITmdbService
         int page,
         CancellationToken cancellationToken = default);
 
+    Task<TmdbMovieDiscoveryPage> DiscoverMoviesAsync(
+        int page,
+        string sortBy,
+        IReadOnlyCollection<int>? genreIds = null,
+        IReadOnlyCollection<string>? originCountryCodes = null,
+        string originalLanguage = "",
+        string primaryReleaseDateGte = "",
+        string primaryReleaseDateLte = "",
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
     Task<TmdbMovieDiscoveryPage> GetPopularMoviesAsync(
         int page,
         string language = "zh-CN",
@@ -64,6 +75,17 @@ public interface ITmdbService
     Task<TmdbTvSeriesSearchPage> SearchTvSeriesByPersonAsync(
         string query,
         int page,
+        string language = "zh-CN",
+        CancellationToken cancellationToken = default);
+
+    Task<TmdbTvSeriesSearchPage> DiscoverTvSeriesAsync(
+        int page,
+        string sortBy,
+        IReadOnlyCollection<int>? genreIds = null,
+        IReadOnlyCollection<string>? originCountryCodes = null,
+        string originalLanguage = "",
+        string firstAirDateGte = "",
+        string firstAirDateLte = "",
         string language = "zh-CN",
         CancellationToken cancellationToken = default);
 

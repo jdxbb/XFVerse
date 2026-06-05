@@ -43,4 +43,6 @@ public sealed class TvSeries
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<TvSeason> Seasons { get; set; } = new List<TvSeason>();
+
+    public ICollection<TvSeriesRatingSource> RatingSources { get; set; } = new List<TvSeriesRatingSource>();
 }

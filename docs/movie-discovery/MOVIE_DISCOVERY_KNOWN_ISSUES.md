@@ -1,5 +1,40 @@
 # 影片发现 Known Issues
 
+## 2026-06-05 榜单与空关键词 Discover 测试反馈修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需实际窗口人工确认榜单 Tab 悬停 / 点击下拉菜单在不同缩放和侧栏状态下的位置、二级 / 三级菜单展开方向是否与媒体库标签菜单主观一致。
+- TMDB discover 只能直接表达部分筛选条件；`其它`、多年代组合、入库状态、播放源、观看状态和收藏状态继续在本地结果池中过滤。
+
+Noise:
+
+- 空关键词搜索仅在排序不是 `相关度` 时调用 TMDB `/discover/movie` 或 `/discover/tv`；切回 `相关度` 会清空 discover 结果并回到关键词提示。
+- Movie `片名` discover 排序使用 TMDB `original_title`，TV `剧名` discover 排序使用 TMDB `name`；显示层仍沿用现有本地化标题投影。
+- 本轮移除榜单顶部筛选卡片，榜单类型选择入口迁移到顶层 `榜单` Tab 下拉菜单。
+
+## 2026-06-05 搜索卡片与列表二次测试反馈修复
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- 仍需实际窗口人工确认海报卡片标题 / 日期 / 标签左边距与左上角类型标签左边框的主观对齐效果。
+- 仍需实际窗口人工确认 20px 高度的想看按钮、当前想看标签和评分 chip 在不同字体渲染环境下是否与类型标签等高。
+- 仍需实际窗口人工确认搜索列表补入导演 / 演员后，在侧栏展开 / 收起状态下标题截断、导演演员截断和标签行间距是否与媒体库一致。
+
+Noise:
+
+- 搜索结果 Movie 标签展示限定为 TMDB 类型标签；本地 AI 类型、情绪和场景标签仍可在媒体库 / 详情 / AI 推荐相关入口使用，但不参与影片搜索卡片和列表展示。
+- Movie 媒体库列表评分改为 TMDB/IMDb 加权展示后，单源评分仍显示单源值，双源评分才显示 `TMDB/IMDb` 加权值。
+- TV 搜索结果仍不请求 OMDb / IMDb 评分；无评分同样以 `--` 占位。
+
 ## 2026-06-05 工具栏、结果区域与想看摘要测试反馈修复
 
 Blocker:
@@ -399,3 +434,60 @@ Noise:
 - Discovery poster-layout pager is a bottom overlay driven by the internal poster `ListBox` scroll state; it should show when no poster scrolling is needed or when the poster list reaches the bottom.
 - Media Library toolbar sort alignment is calculated from the current sidebar state: collapsed aligns to watched status, expanded aligns to collection status.
 - In Discovery search results, TV `想看` is a display tag for existing want-to-watch seasons only. Absence of the tag means no known want-to-watch season state; it is not a missing `+ 想看` action.
+## Phase 7.4b Follow-up Round 8 Notes
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- Actual WPF window validation is still needed to confirm visual alignment of title/date/tag left edge and rating badge right edge with long text and high/empty ratings.
+
+Noise:
+
+- Discovery search poster cards intentionally diverge from Media Library's bottom `Margin="10"` because Discovery adds a right-side rating badge that must align to the top-right chip border.
+
+## Phase 7.4b Follow-up Round 7 Notes
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- Actual WPF window validation is still needed to confirm Discovery search poster title/date/type line visually matches Media Library with the rating badge present.
+
+Noise:
+
+- Media Library uses `Margin="10"` for the bottom title/date/type text group while the top media-type chip uses `Margin="8"`. Discovery now follows that Media Library baseline.
+
+## Phase 7.4b Follow-up Round 6 Notes
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- Actual WPF window validation is still needed to confirm the perceived poster edge alignment matches Media Library in both Movie and TV search results.
+
+Noise:
+
+- This pass only changes Discovery search poster XAML margins. It does not change ranking, filters, rating persistence or TMDB request behavior.
+
+## Phase 7.4b Follow-up Round 5 Notes
+
+Blocker:
+
+- None after build validation.
+
+Deferred:
+
+- Search card poster/list visual alignment still needs actual WPF window validation, especially title/date left edge, rating badge size and TV current-want vertical centering.
+- Existing databases need the generated `AddTvSeriesRatingSources` migration applied before TV series rating persistence can work at runtime.
+
+Noise:
+
+- Movie Discovery can now refresh existing local movie and TV series ratings from real-time search/ranking enrichment; this intentionally changes rating data, but not media files, playback sources, visibility, watch state or recommendation inputs.
+- TV series rating persistence is series-level only. Season and episode ratings still use the existing on-demand detail query behavior.

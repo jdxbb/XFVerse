@@ -40,19 +40,13 @@ public sealed class DiscoveryMovieStatus
 
     public string GenresText { get; set; } = string.Empty;
 
-    public string AiTagsText { get; set; } = string.Empty;
-
-    public string EmotionTagsText { get; set; } = string.Empty;
-
-    public string LocalTypeTags { get; set; } = string.Empty;
-
-    public string LocalEmotionTags { get; set; } = string.Empty;
-
-    public string SceneTagsText { get; set; } = string.Empty;
-
     public string Country { get; set; } = string.Empty;
 
     public string Language { get; set; } = string.Empty;
+
+    public string DirectorText { get; set; } = string.Empty;
+
+    public string ActorsText { get; set; } = string.Empty;
 
     public int? RuntimeMinutes { get; set; }
 
