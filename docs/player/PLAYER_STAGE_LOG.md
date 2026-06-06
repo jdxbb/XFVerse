@@ -916,3 +916,897 @@ Boundaries kept:
 Verification:
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Manual runtime validation is still required for all restore paths: fullscreen button, `F`, `Esc`, video double-click, caption restore, and OS maximize restore.
+
+## 2026-06-06 Phase 7.5a Player Shell And Bottom Control Bar
+
+Goal: align the player shell and bottom control bar with the Phase 7.5 draft without changing playback core behavior.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `Player.Controls.xaml`
+- `PHASE_7_5_PLAYER_UI_PLAN.md`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Added a left return / close entry to both windowed and fullscreen custom player title bars while keeping existing minimize, maximize / restore, and close controls.
+- Added title tooltips for long playback titles in the top chrome and bottom control bar.
+- Reworked `ControlBarPopup` into a compact bottom bar: play / pause, previous episode, next episode, current time, progress slider, duration, volume area, playback source, subtitles, audio track, and fullscreen.
+- Removed the visible `Stop` button from the final bottom control bar surface. `StopCommand` itself was not changed.
+- Moved playback source, subtitle, audio track, and fullscreen actions into the main bottom control row and kept their existing click handlers / menu-opening behavior.
+- Exposed the existing `ToggleMute()` behavior from the bottom volume icon and kept the existing volume slider binding and feedback popup.
+- Added player-specific control button, label, time, and status text styles in the player resource dictionary.
+
+Boundaries kept:
+- No mpv core, WebDAV, subtitle / audio discovery, playback source switching, WatchHistory, cache lifecycle, database schema, or migration behavior was changed.
+- No subtitle menu content refactor, playback source menu refactor, audio track menu refactor, volume hover popup, brightness / volume side overlay redesign, or online subtitle search window change was included.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only existing line-ending normalization warnings for touched XAML / C# files.
+
+Known Issues:
+- Blocker: none confirmed for 7.5a.
+- Deferred: 7.5b loading / brightness / volume overlays; 7.5c subtitle menu and online subtitle entry; 7.5d playback source and audio menus; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: draft colors are still only structural references, not final player colors.
+
+Next step:
+- Proceed to 7.5b after manual runtime validation of windowed / fullscreen title bar visibility, bottom control bar hit targets, and existing command behavior.
+
+## 2026-06-06 Phase 7.5b Player Loading, Notice, Brightness, And Volume Overlays
+
+Goal: align player loading / prompt overlays, side brightness / volume feedback, and the bottom volume hover popup without changing playback or input business logic.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `PlayerWindowViewModel.cs`
+- `Player.Controls.xaml`
+- `PHASE_7_5_PLAYER_UI_PLAN.md`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Moved the central waiting overlay and bottom notice toast onto player-specific dark overlay styles.
+- Kept the central spinner model and reliable-percent rule; buffering percentage is shown only through existing `BufferingPercent` projection.
+- Differentiated seek overlay text from generic buffering text with a UI-only `正在跳转...` projection.
+- Restyled the left brightness side overlay as a 0-100 vertical meter using player dark resources.
+- Restyled the right volume side overlay as a 0-200 vertical meter with a visible 100% marker and a low-saturation boost range.
+- Added a bottom volume hover popup from the volume area, with icon, vertical 0-200 volume slider, current percentage text, 100% marker, and boost range.
+- Kept the bottom volume icon click as mute / unmute, not as a menu opener.
+- Closed the volume hover popup when player menus open, the control bar hides, the player deactivates, or the cursor leaves the volume hover area.
+
+Boundaries kept:
+- No mpv core, WebDAV, playback state machine, subtitle / audio discovery, playback source switching, WatchHistory, cache lifecycle, database schema, or migration behavior was changed.
+- Existing keyboard and mouse-wheel brightness / volume logic was reused.
+- The hover popup adds UI state only and does not change stored volume, mute, or brightness semantics.
+- No subtitle menu, playback source menu, audio track menu, or online subtitle search window refactor was included.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only line-ending normalization warnings for touched files.
+
+Known Issues:
+- Blocker: none confirmed for 7.5b.
+- Deferred: 7.5c subtitle menu and online subtitle entry; 7.5d playback source and audio menus; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: draft colors remain structural references; player overlays continue to use fixed player dark resources.
+
+Next step:
+- Proceed to 7.5c after manual runtime validation of loading / seek / buffering prompts, wheel brightness / volume side overlays, bottom volume hover popup, and menu-open suppression.
+
+## 2026-06-06 Phase 7.5c Subtitle Menu And Online Subtitle Entry
+
+Goal: align the player subtitle popup menu and online subtitle entry with the Phase 7.5 draft without changing subtitle switching, online binding, or cache semantics.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `Player.Controls.xaml`
+- `PHASE_7_5_PLAYER_UI_PLAN.md`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Reworked the player popup menu styling into player-local dark ContextMenu, MenuItem, submenu, and separator styles based on the Library menu density and right-opening behavior.
+- Applied the player menu styling to the playback source, subtitle, and audio menus so the 7.5c subtitle menu sits in the same interaction shell as adjacent player menus.
+- Changed the subtitle menu top level to show `无字幕`, `内嵌`, `外挂`, and `在线下载字幕`.
+- Kept `内嵌`, `外挂`, and `在线下载字幕` as right-opening submenus with visible loading / empty states.
+- Kept the existing online subtitle search entry and bound / downloaded online subtitle list.
+- Replaced direct online subtitle delete clicks with a lightweight confirmation submenu. The confirmation copy states that the binding or temporary player record is removed and the cached subtitle file is not deleted.
+
+Boundaries kept:
+- Existing `NotifySubtitleMenuOpened`, `OpenOnlineSubtitleSearch`, `OnlineSubtitleMenuItems`, `SelectOnlineSubtitleFromMenu`, and `DeleteOnlineSubtitleFromMenu` flows were reused.
+- No OpenSubtitles API, download, save, bind, cache cleanup, settings, detail-page entry, subtitle memory, mpv core, database schema, migration, or database update behavior was changed.
+- No non-player page was modified; Library menu code was reference-only.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for 7.5c.
+- Deferred: 7.5d playback source and audio menus; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for actual WPF menu placement, hover timing, and delete-confirm submenu feel.
+
+Next step:
+- Proceed to 7.5d after manual runtime validation of subtitle menu grouping, right-opening submenus, current subtitle highlighting, online search entry, online subtitle selection, and delete-confirm copy.
+
+## 2026-06-06 Phase 7.5d Playback Source And Audio Menus
+
+Goal: align playback source and audio track popup menus with the Phase 7.5 draft without changing source selection, media probing, audio discovery, or mpv switching behavior.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PlayerWindowViewModel.cs`
+- `PHASE_7_5_PLAYER_UI_PLAN.md`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Changed the playback source menu to a compact table layout with the header `播放源 / 分辨率 / 码率 / 大小`.
+- Playback source rows now use existing `PlaybackSourceItem` display fields: `FileName`, `ResolutionShortText`, `BitrateText`, `FormattedFileSize`, `SourceTypeText`, `VideoCacheStatusText`, and existing resume text.
+- Kept current source highlighting and the existing `SelectedSource` click path.
+- Removed the raw `FilePath` line from playback source tooltips. Tooltips now use existing source summary and playback history only.
+- Hid raw video-cache error details in the player source menu status row to avoid exposing paths or remote details in the popup.
+- Added a player UI projection for audio-menu state: discovery not ready, switching in progress, and previous switch failure.
+- Audio menu now shows `正在读取音轨...`, `暂无可用音轨`, existing audio rows with current-track highlighting, and the existing switch-failure message when applicable.
+
+Boundaries kept:
+- No playback source selection algorithm, default-source business rule, MediaProbe / ffprobe probing, mpv core, audio memory, database schema, migration, or database update behavior was changed.
+- The new audio state properties are read-only UI projection; audio reading and switching still use the existing refresh and `SelectAudioTrackFromMenu` flows.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for 7.5d.
+- Deferred: 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for actual menu sizing, table alignment, and audio failure message timing.
+
+Next step:
+- Proceed to 7.5e after manual runtime validation of playback source table columns, current source highlighting, source switching, audio loading / empty / selected states, and absence of raw WebDAV URL or account details in the popup.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish
+
+Goal: apply focused player-window control polish after the 7.5a-7.5d UI pass without changing playback, source switching, subtitle, audio, history, or database behavior.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `PlayerWindowViewModel.cs`
+- `Player.Controls.xaml`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Removed the top-left return buttons from normal and fullscreen player captions, shifted the caption title left, and added hover / pressed feedback to non-close caption buttons.
+- Reduced the bottom control bar height, lifted the control bar placement, and removed the duplicate movie title from the bottom bar.
+- Reordered the transport controls so play / pause sits between previous and next.
+- Made disabled player buttons visibly dimmer through shared button styles and glyph foreground binding.
+- Moved the play-state text to the left side of the first control row, aligned with the first button in the second row.
+- Removed the bottom horizontal volume slider so the bottom bar keeps only the volume icon entry point.
+- Changed playback source, subtitle, and audio controls to compact icon-only buttons.
+- Rebuilt the main progress slider with transparent track background, blue played range, and a small hover-only thumb.
+- Removed the loading spinner panel background so loading / buffering keeps only the spinner and text.
+- Reworked the side volume feedback and bottom volume hover meter so the full 0-200 range uses one continuous track, with color changing only after 100%.
+
+Brightness audit:
+- The current brightness setting still uses the mpv `brightness` video equalizer property. UI value 100 maps to mpv brightness 0, and UI value 0 maps to mpv brightness -40.
+- This changes decoded video brightness / levels, not the monitor backlight or a separate dimming overlay, so it can visually feel closer to exposure / level adjustment than true display brightness reduction.
+
+Boundaries kept:
+- No mpv playback lifecycle, media scanning, playback source algorithm, subtitle binding, audio track switching, WatchHistory, settings schema, database schema, migration, or database update behavior was changed.
+- Brightness behavior was audited only in this pass; no alternate dimming implementation was introduced.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming needs a separate design because the current implementation intentionally uses mpv video equalizer brightness; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for exact WPF hover feel, popup lift distance, and progress thumb visibility on real playback windows.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of titlebar buttons, compact bottom controls, icon-only menu buttons, modern progress slider, loading overlay, and volume boost meter behavior.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 2
+
+Goal: refine the player titlebar and bottom control bar after manual visual feedback without changing playback, subtitle, audio, source, history, settings, or database behavior.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `PlayerWindowViewModel.cs`
+- `Player.Controls.xaml`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Added a visible border hover treatment for normal titlebar caption buttons.
+- Restored the close caption hover / pressed colors to the shared pink danger palette.
+- Changed the lifted bottom control bar to a complete rounded rectangle with a full border instead of a top-only rounded panel.
+- Made the resume prompt clear 3 seconds after actual playback starts; the countdown no longer starts during loading.
+- Added conditional tooltip behavior for the bottom `正在播放` status text only when the text is actually trimmed.
+- Removed the movie-title tooltip from normal and fullscreen player titlebars.
+- Kept player chrome visible while the cursor rests on the titlebar, bottom control bar, or volume hover area.
+- Shortened the main progress track to half of its previous available span with a one-third left / two-thirds right trim split.
+- Increased bottom button spacing around the shortened progress layout.
+- Changed the playback source icon to the Segoe MDL2 movie / clapperboard glyph.
+- Made the unplayed half of the progress track visible while keeping only the thumb hover-only.
+
+Boundaries kept:
+- No mpv playback lifecycle, source switching, subtitle binding, audio switching, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No brightness behavior change was included in this follow-up.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for exact WPF hover contrast, conditional tooltip timing, control-bar bottom rounding, and clapperboard glyph rendering on the target Windows font set.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of titlebar hover, close hover color, chrome auto-hide guard zones, resume prompt timeout, shortened progress layout, and status-text tooltip behavior.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 3
+
+Goal: close the remaining player titlebar and progress-bar visual gaps from manual feedback without changing playback, source, subtitle, audio, history, settings, or database behavior.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `Player.Controls.xaml`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Changed the player close caption hover color to the same shared danger hover behavior used by the main software caption close button.
+- Removed hover tooltips from normal and fullscreen titlebar caption buttons, including the dynamically updated maximize / restore button.
+- Extended the bottom control bar slightly downward by increasing its bottom padding and lowering the popup lift.
+- Moved position time, progress track, and duration time into one shortened progress group so the time labels shorten / move with the progress bar.
+- Added a dedicated always-visible progress display layer behind the interactive slider so the full track and played progress remain visible, while only the thumb stays hover-only.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching, subtitle binding, audio switching, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for the ProgressBar indicator width, exact bottom-bar lift, and titlebar hover contrast on the target Windows display.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of close hover color, titlebar no-tooltip behavior, bottom-bar height, grouped shortened progress timing labels, and always-visible progress track.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 4
+
+Goal: fix the remaining player titlebar and bottom spacing issues after repeated visual feedback, while keeping playback behavior and data semantics unchanged.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `Player.Controls.xaml`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Increased the player-local titlebar height from the shared 44px caption token to 46px.
+- Replaced the player close caption button with an independent close-button template so its hover background is drawn with the shared main-window `BrushDanger` color instead of being overridden by the generic player button hover trigger.
+- Moved the bottom playback status row upward by 3px and increased bottom control-bar padding by the same amount.
+- Replaced fixed button margins with weighted spacer columns around the transport, progress, volume, source, subtitle, audio, and fullscreen buttons.
+- Allocated the shortened progress group to half of the available spacing span and distributed the freed space into left / right button gaps using the requested one-third / two-thirds split.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching, subtitle binding, audio switching, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for exact weighted button gaps and close-hover color on the target display.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of player titlebar height, close-hover color, status row position, and weighted bottom button spacing.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 5
+
+Goal: refine the player bottom control-bar width and titlebar button alignment after another manual layout pass, while keeping player behavior unchanged.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Changed the bottom control bar popup from full-width to a centered 75% width of the available player surface.
+- Replaced the previous left / right weighted gap split with uniform `*` spacer columns between every adjacent bottom control group, including the gaps around the progress time labels.
+- Kept the progress time / track / duration group as a single `10*` column inside the shortened control bar.
+- Moved the normal and fullscreen titlebar button stacks 2px left with a right-side margin.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching, subtitle binding, audio switching, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false` passed with 0 warnings and 0 errors.
+- Plain `dotnet build MediaLibrary.sln` was blocked because the app executable was currently running and locked by `MediaLibrary.App`.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for centered 75% control-bar width and uniform gap feel across narrow and wide player windows.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of centered control-bar width, uniform button spacing, and 2px titlebar button offset.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 6
+
+Goal: refine the player control-bar popups and side feedback meters after another visual pass, while keeping playback and source/subtitle/audio behavior unchanged.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `PlayerWindowViewModel.cs`
+- `Player.Controls.xaml`
+- `PlayerMeterBrushConverter.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Centered the volume hover popup to the volume button and narrowed the volume / brightness feedback panels.
+- Removed the volume hover menu's 100% marker, 100% label, visible thumb, and bottom "volume" label prefix; the menu now shows only the percentage.
+- Added a shared player meter brush converter: 0-100 transitions from light blue to the movie progress blue, and boosted volume above 100 transitions from the progress blue to a darker blue.
+- Applied the same meter color logic to the side volume and brightness feedback bars.
+- Removed the playback source menu's top local-cache status row and the separator above the source table header.
+- Renamed the source bitrate header to "视频码率", centered table headers to their fields, removed selected-row checkmarks, removed cache status from the source row secondary text, and capped the source menu height for a short hidden-scroll list.
+- Centered the subtitle menu to the subtitle button, renamed the online group to "在线字幕", added separators between root subtitle groups, centered the root subtitle choices, and replaced selected subtitle checkmarks with the same selected-row color treatment as sources.
+- Moved the titlebar button stack another 2px left through the current XAML margin.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching semantics, subtitle binding semantics, audio switching behavior, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for popup centering, hidden-scroll source list height, exact selected-row contrast, and the boosted-volume color ramp on the target Windows display.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of volume/source/subtitle popup placement, hidden source-list scrolling, feedback panel width, and meter color behavior at 0 / 100 / boosted volume values.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 7
+
+Goal: fix the remaining control-bar popup interaction and vertical meter visibility issues found during manual validation.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `Player.Controls.xaml`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Fixed the vertical player meter template by adding the required `PART_Track`, so WPF can size `PART_Indicator` and show the current volume / brightness color.
+- Removed the visible volume hover slider thumb by replacing the thumb with a zero-size transparent template while keeping the invisible interaction layer.
+- Removed manual checkmarks from the selected audio-track menu row; selection remains represented by the existing selected-row style.
+- Removed the 350ms same-button menu reopen suppression that could eat legitimate source / subtitle / audio menu clicks after a close.
+- Switched the audio-track menu to the same centered-above-button placement path as source and subtitle menus.
+- Reduced bottom control-bar first-open work by setting popup layout before opening and deferring the native popup move to loaded priority.
+- Increased normal and fullscreen titlebar button right margin from 4px to 8px so the left shift is perceptible.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching semantics, subtitle binding semantics, audio switching behavior, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for WPF vertical meter rendering, menu click reliability, first-open control-bar smoothness, and the more visible titlebar button offset.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of volume / brightness current-value colors, audio selected-row styling, menu open-close reliability, and titlebar button offset.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 8
+
+Goal: fix the remaining invisible vertical meter fill and remove bottom control-button hover text.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `Player.Controls.xaml`
+- `PlayerMeterBrushConverter.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Added `PlayerMeterFillHeightConverter` and bound the vertical meter indicator height explicitly to `Value / (Maximum - Minimum) * ActualHeight`.
+- Kept the shared segmented blue brush behavior for brightness, side volume, and bottom volume while making their current filled height independent of WPF's built-in `ProgressBar` vertical template sizing.
+- Removed bottom control-bar button tooltips from previous episode, play / pause, next episode, volume, source, subtitle, audio, and fullscreen buttons.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching semantics, subtitle binding semantics, audio switching behavior, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for actual vertical meter rendering in WPF and for confirming no bottom control button hover text appears.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of brightness / side-volume / bottom-volume fill visibility and tooltip removal.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 9
+
+Goal: correct the volume / brightness meter semantics and reduce high-frequency UI cost in the player control bar, without changing playback behavior.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `PlayerWindowViewModel.cs`
+- `Player.Controls.xaml`
+- `PlayerMeterBrushConverter.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Performance audit findings:
+- Bottom / side volume and brightness feedback were paying for height-based meter updates even though the desired behavior is color-depth change only.
+- Bottom volume popup used both a `ProgressBar` and a `Slider` bound to `Volume`, doubling UI update work during drag.
+- `ShowInteractionFeedbackPopup()` repositioned the full-window transparent feedback popup twice on every wheel / shortcut volume or brightness update.
+- `ShowControlBar()` recalculated and moved the native control-bar popup even when the control bar was already open.
+- Control-bar auto-hide timer restart stopped and started the timer on every high-frequency pointer / wheel path, even though the timer already uses the latest activity tick.
+- Player preference saving created and cancelled a `CancellationTokenSource` plus delayed task for every volume / brightness change during dragging.
+- Meter brush creation allocated a new frozen brush for every feedback update.
+- Volume changes sent `SetMute(false)` repeatedly to the playback engine even when muted state did not change.
+
+Completed:
+- Reverted vertical meters to fixed width / fixed height bars where the whole bar changes color depth; no value-based fill height or apparent thickness / length change is used.
+- Kept the segmented color semantics: below 100 is lighter, 100 is the movie progress blue, above 100 becomes darker.
+- Added cached meter brushes for 0-100 brightness and 0-200 volume to avoid per-tick brush allocation.
+- Removed the extra `ProgressBar` layer from the bottom volume popup; the visible vertical slider now owns the fixed-width colored bar and input handling.
+- Added a 10px volume thumb dot that appears only while the bottom volume slider is hovered or dragged.
+- Changed interaction feedback popup opening so it positions only when first opened, then reuses the existing popup during repeated wheel / shortcut updates.
+- Changed control-bar showing so it positions only when the popup is first opened; size / location updates still go through the existing placement path.
+- Changed the auto-hide timer restart path to avoid stop/start churn while the timer is already running.
+- Replaced player-preference async delay / CTS churn with a single dispatcher debounce timer.
+- Cached the last applied player volume / muted / brightness values so mpv receives only actual changes.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching semantics, subtitle binding semantics, audio switching behavior, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for perceived drag smoothness, the hover-only volume thumb, and whether remaining mpv volume / brightness calls feel smooth on the target machine.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of fixed-width meter color changes, bottom volume drag smoothness, control-bar first-show smoothness, and shortcut / wheel feedback smoothness.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 10
+
+Goal: restore current-value fill semantics for volume / brightness meters and reduce the risk of playback-time control-bar clicks being swallowed by native video input handling.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PlayerWindow.xaml.cs`
+- `Player.Controls.xaml`
+- `PlayerMeterBrushConverter.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Restored fixed-width current-value fill height for side brightness, side volume, and bottom volume, while keeping the bar thickness fixed.
+- Kept the fill color ramp tied to the current value: below 100 is lighter, 100 is the movie progress blue, and boosted volume becomes darker.
+- Kept the bottom volume thumb at a fixed 10px size and visible only while hovering / dragging.
+- Added hand cursor behavior to the bottom volume slider.
+- Added cached control-bar screen bounds with a small hit-test tolerance so native video input handling can more reliably detect that the cursor is over the WPF control bar.
+- Reset native video double-click tracking on control-bar left-button down to prevent rapid control-bar clicks from being mistaken for video double-click gestures.
+
+Performance / input audit note:
+- The highest-risk playback-only click swallowing path is the native video input hook: while video is playing, mouse messages can arrive through the native child-window path before WPF button handling. If the control-bar hit test is stale, the second click in a rapid sequence can be treated as video input. This follow-up keeps a screen-space control-bar bounds cache and clears video double-click state on control-bar clicks without changing playback behavior.
+
+Boundaries kept:
+- No mpv playback lifecycle, playback source switching semantics, subtitle binding semantics, audio switching behavior, WatchHistory, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required while video is actively playing, especially rapid repeated clicks on the bottom control buttons and bottom volume slider drag.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation of current-value fill height, hand cursor on bottom volume slider, and rapid control-bar clicks during active playback.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 11
+
+Goal: address the remaining playback-time control-bar jank and click loss, refine boosted-volume color semantics, and reduce the chrome restore delay.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PlayerWindowViewModel.cs`
+- `PlayerMeterBrushConverter.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Root-cause findings:
+- The low-level mouse hook was handling `WmLButtonDown` to synthesize native-video double-click fullscreen behavior. Because the control bar is a WPF popup over a native video child, this path can misclassify rapid control-bar clicks as video-area input and return `1`, which swallows the click before WPF buttons receive it.
+- Playback position events were dispatched to the UI on every mpv `time-pos` update. Each update refreshed `PositionSeconds`, the visible progress bar, the progress slider, and `PositionText`; this only happens while video is playing, matching the observed pause-vs-playback difference.
+- Chrome restoration over the native video area depended on the cursor poll timer when WPF mouse-move events were not delivered by the native child window; the 80ms poll interval created a visible delay after the chrome was hidden.
+
+Completed:
+- Removed left-button handling from the low-level mouse hook. The hook now only consumes native mouse wheel messages, while double-click fullscreen remains handled through the existing `WmLButtonDblClk` window-message paths.
+- Added UI-side throttling for playback position updates before queuing work to the Dispatcher. Position UI updates now skip same-second repeats that arrive within 125ms, while still updating on second changes and resetting the throttle for each new playback load.
+- Reduced the native-video cursor poll interval from 80ms to 25ms so hidden titlebar / control-bar restoration reacts faster when the cursor moves over the native video child.
+- Updated shared player meter colors so volume above 150 transitions from deep blue toward red. Brightness remains on the 0-100 light-blue to progress-blue curve.
+
+Boundaries kept:
+- No playback source switching semantics, subtitle binding semantics, audio switching behavior, WatchHistory persistence contract, player preference schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only existing LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5e online subtitle search window; 7.5f regression closeout.
+- Noise: manual runtime validation is still required while video is actively playing, especially rapid repeated clicks on bottom buttons, volume drag behavior above 150, and chrome restore latency over the native video area.
+
+Next step:
+- Proceed to 7.5e only after manual runtime validation confirms playback-time clicks are no longer swallowed and chrome restore delay is no longer visible.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 12
+
+Goal: restyle the online subtitle search window to match the correction dialog and media-library filter controls.
+
+Changed files:
+- `OnlineSubtitleSearchWindow.xaml`
+- `OnlineSubtitleSearchWindow.xaml.cs`
+- `OnlineSubtitleSearchViewModel.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Changed the online subtitle search window to a rounded dialog shell with a rounded content surface and an 8px-left-shifted titlebar close button.
+- Removed the duplicated content-area title and the old two-line current playback/source header.
+- Added a single first-row current source line using larger white text, ellipsis trimming, and trimmed-only tooltip behavior.
+- Replaced the old ComboBox search controls with a media-library-style search box, search icon button, and centered popup filter buttons for sort, subtitle type, and language.
+- Localized the subtitle language menu display names to Chinese without changing the OpenSubtitles language codes sent to the API.
+- Replaced quota/total-count footer copy with one trimmed status line.
+- Reworked result rows toward the movie-correction result layout: no poster column, subtitle title plus match score on the first row, two metadata columns split by a vertical divider, and a text-width download button.
+- Kept row download status feedback, but removed the old OpenSubtitles total-count display from the bottom of the window.
+
+Boundaries kept:
+- No OpenSubtitles API contract, search request semantics, download/save/bind behavior, playback subtitle apply behavior, settings schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only existing LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for exact menu alignment, result-row visual parity with the correction dialog, and trimmed tooltip behavior on long source/status/subtitle names.
+
+Next step:
+- Proceed to manual runtime validation of the online subtitle search window before considering 7.5e UI complete.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 13
+
+Goal: finish the online subtitle search dialog polish pass after runtime interaction feedback.
+
+Changed files:
+- `OnlineSubtitleSearchWindow.xaml`
+- `OnlineSubtitleSearchWindow.xaml.cs`
+- `OnlineSubtitleSearchViewModel.cs`
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Added explicit focus clearing for clicks outside text input areas and for the search-box clear button.
+- Removed alphabetical secondary ordering from the language list and kept common languages at the top through an explicit priority list.
+- Added a sort-direction icon button directly after the search button without changing the underlying search fields.
+- Brightened the result-row download button and kept the disabled state distinct for already downloaded rows.
+- Pre-marked results that already match an active cached binding so their button shows `已下载` and is disabled as soon as the results render.
+- Removed per-row download-status text from below the download button; download feedback now stays in the single status line.
+- Reduced result-row height, tightened row spacing, shortened the vertical divider, and fixed the left metadata column width so the divider no longer shifts with text length.
+- Replaced the loading progress bar with a centered spinner and status text in the result area.
+- Kept the search dialog non-draggable by leaving no titlebar `DragMove()` path on this window.
+- Shifted the status line under the search box slightly right.
+- Narrowed the player subtitle menu's online-subtitle second-level rows and changed those rows to centered, fixed-width, ellipsis-trimmed text with trimmed-only tooltips.
+- Added a subtle glass-style dialog surface and button/menu chrome without changing the search/download/binding semantics.
+
+Boundaries kept:
+- No OpenSubtitles API contract, cache layout, binding model, player subtitle application semantics, settings schema, database schema, migration, database update, or non-player page behavior was changed.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for exact glass appearance, input focus clearing, existing-binding disabled state, result-row density, and the narrowed online-subtitle submenu tooltip behavior.
+
+Next step:
+- Run build and migration diff checks, then manually validate the online subtitle search dialog in the player.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 14
+
+Goal: adjust subtitle submenu placement and clarify the online subtitle binding deletion path.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Changed player submenu popup placement from right/top alignment to right/bottom alignment, so subtitle second-level menus expand upward from their menu row instead of downward.
+- Kept the existing online subtitle binding deletion path intact: downloaded/bound online subtitle rows still contain `删除绑定`, temporary rows still contain `移除临时字幕`, and both still use a confirm/cancel submenu before executing.
+
+Boundaries kept:
+- No subtitle binding semantics, cache deletion semantics, database schema, migration, settings schema, OpenSubtitles API behavior, or non-player UI behavior was changed.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for submenu placement near screen edges and for discoverability of the online subtitle delete-binding entry after the narrowed submenu change.
+
+Next step:
+- Run build and migration diff checks, then manually validate subtitle submenu placement and online subtitle delete-binding discoverability.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 15
+
+Goal: fix subtitle submenu upward-placement offset and restore reliable third-level menu opening for online subtitle rows.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Fixed submenu native-window repositioning so the upward submenu placement uses screen-coordinate bottom-right anchoring, avoiding mixed pixel/DIP height math that could offset menus under display scaling.
+- Kept the submenu attached to the right side of the corresponding menu row while placing the popup above that row.
+- Disabled trimmed-name tooltip behavior on online subtitle rows that own third-level menus, so hover opens the third-level submenu instead of competing with a text tooltip.
+
+Boundaries kept:
+- No subtitle binding/delete semantics, cache semantics, database schema, migration, settings schema, OpenSubtitles behavior, or non-player UI behavior was changed.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for submenu positioning under the user's display scaling and for online subtitle third-level menu hover behavior.
+
+Next step:
+- Run build and migration diff checks, then manually validate submenu placement and online subtitle third-level menu opening.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 16
+
+Goal: restore online subtitle third-level menu opening and allow direct switching from downloaded online subtitle rows.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Added an explicit mouse-enter submenu open path for player submenu items, so custom-styled submenu rows actively open their child menu instead of relying only on default WPF hover behavior.
+- Disabled tooltip service on narrowed online-subtitle submenu rows to prevent text hover popups from competing with submenu opening.
+- Added direct left-click switching on cached online subtitle rows. Clicking the downloaded online subtitle row now calls the same switch path as the `切换到此字幕` child command, while clicks inside child menu items still go to those child actions.
+
+Boundaries kept:
+- No subtitle binding/delete semantics, cache semantics, database schema, migration, settings schema, OpenSubtitles behavior, or non-player UI behavior was changed.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for online subtitle row hover, direct row click switching, and delete-binding submenu access.
+
+Next step:
+- Run build and migration diff checks, then manually validate online subtitle third-level menu opening and direct row switching.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 17
+
+Goal: flatten the online subtitle row menu after direct row-click switching became the primary switch action.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Removed the `切换到此字幕` child item from downloaded online subtitle rows.
+- Changed cached online subtitle row click handling to run on direct parent-row mouse down, so a direct click switches immediately and closes the menu instead of opening the child menu.
+- Flattened the delete/remove confirmation menu: the previous fourth-level hint, confirm, and cancel items now appear directly in the online subtitle row's hover submenu.
+- Kept unavailable-cache rows non-switchable while preserving the delete-binding confirmation path.
+
+Boundaries kept:
+- No subtitle binding/delete semantics, cache deletion semantics, database schema, migration, settings schema, OpenSubtitles behavior, or non-player UI behavior was changed.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for direct row-click switching versus hover submenu opening.
+
+Next step:
+- Run build and migration diff checks, then manually validate online subtitle row click and hover behavior.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 18
+
+Goal: widen the online subtitle second-level menu and simplify its hover child menu.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Increased the online subtitle second-level row width and visible title width so downloaded subtitle names have more room before ellipsis.
+- Restored full-name hover text on online subtitle rows while keeping the explicit hover path that opens the third-level menu.
+- Reduced the online subtitle third-level menu to a single action: `删除绑定` for bound subtitles, or `移除临时字幕` for temporary subtitles.
+- Removed the previous third-level explanation, confirm, cancel, and cache-unavailable hint rows so the child menu width adapts to the single action text.
+
+Boundaries kept:
+- No subtitle binding/delete semantics, cache deletion semantics, database schema, migration, settings schema, OpenSubtitles behavior, or non-player UI behavior was changed.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for simultaneous full-name tooltip plus third-level menu display, and for the direct-delete action discoverability.
+
+Next step:
+- Run build and migration diff checks, then manually validate online subtitle row hover tooltip, third-level delete menu, and direct row switching.
+
+## 2026-06-06 Phase 7.5 Player Control Bar Follow-up Polish 19
+
+Goal: restore visible full-text hover for online subtitle rows, compact the online subtitle menu, and reduce subtitle-menu jank after online subtitles are downloaded.
+
+Changed files:
+- `PlayerWindow.xaml.cs`
+- `PLAYER_STAGE_LOG.md`
+
+Root-cause findings:
+- The default menu tooltip path was unreliable once a submenu row was explicitly opened on hover; the row entered submenu mode before the normal tooltip timer could visibly show the full text.
+- After downloading online subtitles, the subtitle menu gained additional submenu rows. The previous submenu placement code configured each submenu popup during `Loaded`, then configured again on hover/open. That meant opening the subtitle menu did extra template lookup and popup setup work for every submenu row even before the user hovered them.
+- The extra online-subtitle row submenus made this heavier than source/audio menus, matching the observation that the menu became sluggish only after online subtitles existed.
+
+Completed:
+- Added an explicit full-text `ToolTip` for online subtitle rows, opened immediately on row hover and placed to the left so it can be visible while the third-level menu opens on the right.
+- Made online subtitle rows more compact with smaller local padding, lower row height, and a smaller font while keeping the widened row/title width.
+- Made the single delete/remove third-level action compact: smaller font, narrow padding, and no forced wide content.
+- Removed eager submenu popup configuration from `Loaded`; popup placement is now configured only when a submenu is actually opened.
+- Removed duplicate subtitle-group submenu-open wiring and let the shared submenu open handler own placement.
+- Simplified the mouse-enter handler so it only opens the submenu; placement work is centralized in `SubmenuOpened`.
+
+Boundaries kept:
+- No subtitle binding/delete semantics, cache deletion semantics, database schema, migration, settings schema, OpenSubtitles behavior, or non-player UI behavior was changed.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for this follow-up.
+- Deferred: true perceptual dimming still needs a separate design; 7.5f regression closeout.
+- Noise: manual runtime validation is still required for hover full-text placement, third-level delete menu width, and subtitle-menu smoothness during active playback.
+
+Next step:
+- Run build and migration diff checks, then manually validate tooltip visibility and subtitle-menu responsiveness after downloading online subtitles.
+
+## 2026-06-06 Phase 7.5f Regression Closeout Audit
+
+Goal: move the online subtitle search dialog title 10px to the right, then run the 7.5f regression / boundary audit and report mismatches without fixing code.
+
+Changed files:
+- `OnlineSubtitleSearchWindow.xaml`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Moved the online subtitle search dialog title row from a 16px left margin to a 26px left margin.
+- Re-read the Phase 7.5 plan, player rewrite plan, player known issues, online subtitle known issues, player page spec, online subtitle search spec, design rules, resource notes, and player screenshots.
+- Audited the current player subtitle menu, online subtitle search window, Settings OpenSubtitles entry, and page-level online subtitle references against the 7.5f boundary.
+- Confirmed the search dialog still opens from the player path, pauses active playback before opening, and does not contain OpenSubtitles credential editing UI.
+- Confirmed Settings remains the OpenSubtitles configuration surface and page-level search found no detail-page online subtitle entry.
+
+Reported mismatches only:
+- The Phase 7.5 plan and player page spec still require the subtitle menu group label `在线下载字幕`, but current player code labels that group `在线字幕`.
+- The Phase 7.5 plan and player page spec require lightweight confirmation for deleting online subtitle bindings, with copy that says cache files are not deleted. Current player code exposes a direct `删除绑定` / `移除临时字幕` action and only reports after deletion that the cache file was retained.
+- External subtitle tooltip construction still appends `完整路径` and `URL` for subtitle items. If a scanned external subtitle uses a WebDAV playback URL, that may violate the full WebDAV URL no-bare-display rule.
+- `PHASE_7_5_PLAYER_UI_PLAN.md` still says `7.5e - 7.5f 尚未实现`, while the stage log contains multiple 7.5e online subtitle search passes and this 7.5f audit.
+
+Boundaries kept:
+- No player playback core, source switching algorithm, subtitle binding semantics, audio switching behavior, OpenSubtitles API contract, cache deletion semantics, settings schema, database schema, migration, or database update behavior was changed.
+- No mismatch found during this audit was fixed in code.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed by build or migration checks.
+- Deferred: true perceptual dimming still needs a separate design; subtitle/audio memory, large WebDAV long-play stutter, active full-file/offline/partial-range cache, and global UI 7.8 closeout remain out of 7.5 scope.
+- Noise: manual runtime validation is still required for the 10px title offset, popup/menu placement under the target DPI, subtitle-menu hover/delete discoverability, and active-playback control responsiveness.
+
+Next step:
+- Decide whether to fix the reported mismatches in a follow-up patch or intentionally update the 7.5 acceptance wording to match the current implemented behavior.
+
+## 2026-06-06 Phase 7.5 Stage End Title Offset
+
+Goal: move the player window top-left title 10px to the right and close Phase 7.5.
+
+Changed files:
+- `PlayerWindow.xaml`
+- `PHASE_7_5_PLAYER_UI_PLAN.md`
+- `PLAYER_STAGE_LOG.md`
+
+Completed:
+- Moved the normal player titlebar title row from a 12px left margin to a 22px left margin.
+- Moved the fullscreen player titlebar title row from a 12px left margin to a 22px left margin, keeping popup / fullscreen title alignment consistent with the normal window.
+- Marked Phase 7.5 as ended in the Phase 7.5 plan and recorded 7.5e / 7.5f validation status.
+- Kept the previous 7.5f audit mismatches as reported items only; this pass did not change subtitle menu wording, online subtitle delete flow, external subtitle tooltip path / URL behavior, or any player business semantics.
+
+Boundaries kept:
+- No mpv playback core, playback source switching, subtitle binding/delete semantics, audio switching behavior, OpenSubtitles API contract, cache deletion behavior, settings schema, database schema, migration, or database update behavior was changed.
+- No non-player page was modified.
+
+Verification:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only LF/CRLF normalization warnings.
+
+Known Issues:
+- Blocker: none confirmed for Phase 7.5 closeout.
+- Deferred: true perceptual dimming still needs a separate design; subtitle/audio memory, large WebDAV long-play stutter, active full-file/offline/partial-range cache, and global UI 7.8 closeout remain out of 7.5 scope.
+- Noise: manual runtime validation is still required for the final 10px player-title offset in normal and fullscreen states, plus popup placement and online subtitle menu behavior under the target DPI.
+
+Next step:
+- Phase 7.5 is closed. Proceed only to a new explicit follow-up phase or to a focused patch for any previously reported audit mismatch.

@@ -1,6 +1,7 @@
 <Window x:Class="MediaLibrary.App.Views.Player.OnlineSubtitleSearchWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="{Binding WindowTitle}"
         Width="980"
@@ -12,11 +13,11 @@
         WindowStyle="None"
         ResizeMode="CanResize"
         AllowsTransparency="False"
-        Background="{DynamicResource BrushPlayerBackground}"
+        Background="{DynamicResource BrushPlayerDialogBackground}"
         Foreground="{DynamicResource BrushPlayerTextPrimary}">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0"
-                            CornerRadius="0"
+                            CornerRadius="22"
                             GlassFrameThickness="0"
                             ResizeBorderThickness="6"
                             UseAeroCaptionButtons="False" />
@@ -44,253 +45,651 @@
         <SolidColorBrush x:Key="BrushInputBackground" Color="{StaticResource ColorPlayerSurface}" />
         <SolidColorBrush x:Key="BrushInputBorder" Color="{StaticResource ColorPlayerBorder}" />
         <SolidColorBrush x:Key="BrushInputFocusBorder" Color="{StaticResource ColorPlayerAccent}" />
+        <SolidColorBrush x:Key="BrushMenuBackground" Color="{StaticResource ColorPlayerPopupBackground}" />
+        <SolidColorBrush x:Key="BrushPopupBackground" Color="{StaticResource ColorPlayerPopupBackground}" />
+        <SolidColorBrush x:Key="BrushGlassButton" Color="#66121A27" />
+        <SolidColorBrush x:Key="BrushGlassButtonHover" Color="#8830475E" />
+        <SolidColorBrush x:Key="BrushGlassButtonPressed" Color="#AA101722" />
+        <SolidColorBrush x:Key="BrushGlassBorder" Color="#663D4A5D" />
+        <SolidColorBrush x:Key="BrushGlassAccentHover" Color="{StaticResource ColorPlayerAccent}" />
+
+        <Style x:Key="OnlineSubtitleSearchBoxStyle" TargetType="TextBox" BasedOn="{StaticResource SearchBoxStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="10,3,30,3" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="OnlineSubtitleToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSmallButtonStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="86" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="MenuButton_PreviewMouseLeftButtonDown" />
+        </Style>
+
+        <Style x:Key="OnlineSubtitleToolbarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="OnlineSubtitleSearchClearButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="MinWidth" Value="22" />
+            <Setter Property="MinHeight" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SearchQuery}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding SearchQuery}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleFilterMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource MenuItemStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="MinWidth" Value="86" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="ItemChrome"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                Margin="{TemplateBinding Margin}"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleFilterContextMenuStyle" TargetType="ContextMenu" BasedOn="{StaticResource ContextMenuStyle}">
+            <Setter Property="Padding" Value="7" />
+            <Setter Property="MaxHeight" Value="420" />
+            <Setter Property="Background" Value="{DynamicResource BrushPopupBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <EventSetter Event="PreviewMouseWheel" Handler="ContextMenu_PreviewMouseWheel" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer MaxHeight="{TemplateBinding MaxHeight}"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleModernScrollThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border Width="6"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="3"
+                                Opacity="0.58" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="MinWidth" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Width="{TemplateBinding Width}" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Style="{StaticResource OnlineSubtitleModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource OnlineSubtitleModernScrollThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Style="{StaticResource OnlineSubtitleModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="IsMouseCaptureWithin" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}"
+                             Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleResultItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="20,0,10,0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="0,1,0,1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <Border Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleResultListStyle" TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Margin" Value="-20,0,-16,0" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Visible" />
+            <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource OnlineSubtitleResultItemStyle}" />
+        </Style>
+
+        <Style x:Key="OnlineSubtitleTrimmedTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="helpers:TrimmedTextToolTipBehavior.FullText"
+                    Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+        </Style>
+
+        <Style x:Key="OnlineSubtitleInfoLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="OnlineSubtitleInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource OnlineSubtitleTrimmedTextStyle}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="OnlineSubtitleResultActionButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassPrimaryButtonStyle}">
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MaxHeight" Value="36" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="16,0" />
+            <Setter Property="Background" Value="#4EA3FF" />
+            <Setter Property="BorderBrush" Value="#79BCFF" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#67B2FF" />
+                    <Setter Property="BorderBrush" Value="#9AD0FF" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#2F8EF2" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#334156" />
+                    <Setter Property="BorderBrush" Value="#46566C" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextMuted}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
-    <Grid Background="{DynamicResource BrushPlayerDialogBackground}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <Border Grid.Row="0"
-                Style="{StaticResource PlayerWindowCaptionStyle}"
-                MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-            <Grid Margin="14,0,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding WindowTitle}"
-                           Style="{StaticResource PlayerWindowCaptionTextStyle}" />
-                <Button Grid.Column="1"
-                        Content="&#xE8BB;"
-                        ToolTip="关闭"
-                        Click="CloseButton_Click"
-                        Style="{StaticResource PlayerWindowCaptionCloseButtonStyle}" />
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="1"
-                Padding="22"
-                Background="{DynamicResource BrushSurface}"
-                BorderBrush="{DynamicResource BrushBorder}"
-                BorderThickness="1,0,1,1">
-            <Grid>
+    <Border BorderBrush="{DynamicResource BrushBorder}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusCard}"
+            Effect="{StaticResource ShadowDialog}"
+            PreviewMouseDown="Root_PreviewMouseDown"
+            SnapsToDevicePixels="True">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Offset="0" Color="#EE1C2736" />
+                <GradientStop Offset="0.56" Color="#E8151D2A" />
+                <GradientStop Offset="1" Color="#F00D131D" />
+            </LinearGradientBrush>
+        </Border.Background>
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid>
-                <StackPanel>
-                    <TextBlock Text="搜索在线字幕"
-                               Style="{StaticResource CardTitleTextStyle}" />
-                    <TextBlock Margin="0,8,0,0"
-                               Text="{Binding ContextSummary}"
-                               Style="{StaticResource BodyMutedTextStyle}" />
-                    <TextBlock Margin="0,4,0,0"
-                               Text="{Binding SafeFileNameHint}"
+            <Border Grid.Row="0"
+                    Style="{StaticResource PlayerWindowCaptionStyle}">
+                <Grid Margin="26,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding WindowTitle}"
+                               Style="{StaticResource PlayerWindowCaptionTextStyle}" />
+                    <Button Grid.Column="1"
+                            Margin="0,0,8,0"
+                            Content="&#xE8BB;"
+                            ToolTip="{x:Null}"
+                            Click="CloseButton_Click"
+                            Style="{StaticResource PlayerWindowCaptionCloseButtonStyle}" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1"
+                    Padding="24,22,24,22"
+                    Background="#A8151D2A">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="16" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="14" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource BrushForegroundPrimary}"
+                               Text="{Binding CurrentSourceDisplayText}"
                                TextTrimming="CharacterEllipsis"
-                               Style="{StaticResource BodyMutedTextStyle}" />
-                </StackPanel>
-            </Grid>
+                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding CurrentSourceDisplayText}" />
 
-            <Grid Grid.Row="1" Margin="0,22,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="180" />
-                    <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="170" />
-                    <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="136" />
-                </Grid.ColumnDefinitions>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="420" />
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                <StackPanel>
-                    <TextBlock Text="语言" Style="{StaticResource BodyTextStyle}" />
-                    <ComboBox ItemsSource="{Binding Languages}"
-                              SelectedItem="{Binding SelectedLanguage}"
-                              DisplayMemberPath="Name"
-                              Style="{StaticResource FormComboBoxStyle}" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="类型" Style="{StaticResource BodyTextStyle}" />
-                    <ComboBox ItemsSource="{Binding Types}"
-                              SelectedItem="{Binding SelectedType}"
-                              DisplayMemberPath="DisplayName"
-                              Style="{StaticResource FormComboBoxStyle}" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="4">
-                    <TextBlock Text="搜索关键词" Style="{StaticResource BodyTextStyle}" />
-                    <TextBox x:Name="SearchTextBox"
-                             Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
-                             KeyDown="SearchTextBox_KeyDown"
-                             Style="{StaticResource FormTextBoxStyle}" />
-                </StackPanel>
-
-                <Button Grid.Column="6"
-                        Margin="0,27,0,0"
-                        Height="40"
-                        Content="搜索"
-                        Command="{Binding SearchCommand}"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-            </Grid>
-
-            <Grid Grid.Row="2" Margin="0,16,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="220" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="排序" Style="{StaticResource BodyTextStyle}" />
-                    <ComboBox ItemsSource="{Binding SortOptions}"
-                              SelectedItem="{Binding SelectedSort}"
-                              DisplayMemberPath="DisplayName"
-                              Style="{StaticResource FormComboBoxStyle}" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Margin="18,24,0,0">
-                    <TextBlock Text="{Binding QuotaHint}"
-                               TextWrapping="Wrap"
-                               Style="{StaticResource BodyMutedTextStyle}" />
-                    <TextBlock Margin="0,6,0,0"
-                               Text="{Binding StatusMessage}"
-                               TextWrapping="Wrap"
-                               Style="{StaticResource BodyMutedTextStyle}" />
-                </StackPanel>
-            </Grid>
-
-            <Grid Grid.Row="3" Margin="0,18,0,0">
-                <ProgressBar Height="4"
-                             VerticalAlignment="Top"
-                             IsIndeterminate="True">
-                    <ProgressBar.Style>
-                        <Style TargetType="ProgressBar">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsLoading}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ProgressBar.Style>
-                </ProgressBar>
-
-                <ListBox Margin="0,12,0,0"
-                         ItemsSource="{Binding Results}">
-                    <ListBox.Style>
-                        <Style TargetType="ListBox" BasedOn="{StaticResource SectionListBoxStyle}">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding HasResults}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ListBox.Style>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
+                        <Grid Grid.Column="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
                             <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="150" />
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding PrimaryText}"
-                                           TextWrapping="Wrap"
-                                           Style="{StaticResource SectionTitleTextStyle}" />
-                                <StackPanel Grid.Column="1"
-                                            HorizontalAlignment="Right">
-                                    <TextBlock HorizontalAlignment="Right"
-                                               Text="{Binding MatchScoreText}"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                    <Button Margin="0,8,0,0"
-                                            MinWidth="92"
-                                            Height="34"
-                                            Content="{Binding DownloadButtonText}"
-                                            Command="{Binding DownloadCommand}"
-                                            Style="{StaticResource PrimaryButtonStyle}" />
-                                    <TextBlock Margin="0,6,0,0"
-                                               MaxWidth="150"
-                                               Text="{Binding DownloadStatus}"
-                                               TextAlignment="Right"
-                                               TextWrapping="Wrap">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsDownloadStatusVisible}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </StackPanel>
-
-                                <TextBlock Grid.Row="1"
-                                           Grid.ColumnSpan="2"
-                                           Margin="0,7,0,0"
-                                           Text="{Binding SecondaryText}"
-                                           TextWrapping="Wrap"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
-
-                                <TextBlock Grid.Row="2"
-                                           Grid.ColumnSpan="2"
-                                           Margin="0,7,0,0"
-                                           Text="{Binding MetricsText}"
-                                           TextWrapping="Wrap"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
-
-                                <StackPanel Grid.Row="3"
-                                            Grid.ColumnSpan="2"
-                                            Margin="0,10,0,0">
-                                    <TextBlock Text="{Binding UploadedAtText}"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                    <ItemsControl Margin="0,8,0,0"
-                                                  ItemsSource="{Binding Tags}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Margin="0,0,8,6"
-                                                        Padding="8,4"
-                                                        CornerRadius="10"
-                                                        Background="{DynamicResource BrushSurfaceRaised}"
-                                                        BorderBrush="{DynamicResource BrushBorder}"
-                                                        BorderThickness="1">
-                                                    <TextBlock Text="{Binding}"
-                                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
+                                <TextBox x:Name="SearchTextBox"
+                                         helpers:TextBoxPlaceholderBehavior.IsEnabled="True"
+                                         helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入搜索关键词"
+                                         Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                         KeyDown="SearchTextBox_KeyDown"
+                                         Style="{StaticResource OnlineSubtitleSearchBoxStyle}">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <Button HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,4,0"
+                                        Command="{Binding ClearSearchQueryCommand}"
+                                        Click="ClearSearchButton_Click"
+                                        Style="{StaticResource OnlineSubtitleSearchClearButtonStyle}">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                                               FontSize="10"
+                                               Text="&#xE711;" />
+                                </Button>
                             </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Grid>
+                            <Button Grid.Column="2"
+                                    VerticalAlignment="Bottom"
+                                    Command="{Binding SearchCommand}"
+                                    Style="{StaticResource OnlineSubtitleToolbarIconButtonStyle}">
+                                <TextBlock FontFamily="Segoe MDL2 Assets"
+                                           FontSize="16"
+                                           RenderTransformOrigin="0.5,0.5"
+                                           Text="&#xE721;">
+                                    <TextBlock.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </Button>
+                            <Button Grid.Column="4"
+                                    VerticalAlignment="Bottom"
+                                    Command="{Binding ToggleSortDirectionCommand}"
+                                    Style="{StaticResource OnlineSubtitleToolbarIconButtonStyle}"
+                                    ToolTip="{Binding SortDirectionButtonToolTip}">
+                                <Viewbox Width="16" Height="16">
+                                    <Canvas Width="26" Height="24">
+                                        <Path Data="{Binding SortDirectionIconData}"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="2"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              StrokeLineJoin="Round" />
+                                    </Canvas>
+                                </Viewbox>
+                            </Button>
+                        </Grid>
 
-            <TextBlock Grid.Row="4"
-                       Margin="0,12,0,0"
-                       Text="{Binding TotalCount, StringFormat=OpenSubtitles 返回总数：{0}}"
-                       Style="{StaticResource BodyMutedTextStyle}" />
-            </Grid>
-        </Border>
-    </Grid>
+                        <Grid Grid.Column="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Content="{Binding SortButtonText}"
+                                    Click="OpenButtonContextMenu"
+                                    Style="{StaticResource OnlineSubtitleToolbarButtonStyle}">
+                                <Button.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                 ItemsSource="{Binding SortOptions}"
+                                                 Style="{StaticResource OnlineSubtitleFilterContextMenuStyle}">
+                                        <ContextMenu.ItemContainerStyle>
+                                            <Style TargetType="MenuItem" BasedOn="{StaticResource OnlineSubtitleFilterMenuItemStyle}">
+                                                <Setter Property="Header" Value="{Binding DisplayName}" />
+                                                <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectSortCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <Setter Property="CommandParameter" Value="{Binding}" />
+                                            </Style>
+                                        </ContextMenu.ItemContainerStyle>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                            <Button Grid.Column="2"
+                                    Content="{Binding TypeButtonText}"
+                                    Click="OpenButtonContextMenu"
+                                    Style="{StaticResource OnlineSubtitleToolbarButtonStyle}">
+                                <Button.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                 ItemsSource="{Binding Types}"
+                                                 Style="{StaticResource OnlineSubtitleFilterContextMenuStyle}">
+                                        <ContextMenu.ItemContainerStyle>
+                                            <Style TargetType="MenuItem" BasedOn="{StaticResource OnlineSubtitleFilterMenuItemStyle}">
+                                                <Setter Property="Header" Value="{Binding DisplayName}" />
+                                                <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectTypeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <Setter Property="CommandParameter" Value="{Binding}" />
+                                            </Style>
+                                        </ContextMenu.ItemContainerStyle>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                            <Button Grid.Column="4"
+                                    Content="{Binding LanguageButtonText}"
+                                    Click="OpenButtonContextMenu"
+                                    Style="{StaticResource OnlineSubtitleToolbarButtonStyle}">
+                                <Button.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                 ItemsSource="{Binding Languages}"
+                                                 Style="{StaticResource OnlineSubtitleFilterContextMenuStyle}">
+                                        <ContextMenu.ItemContainerStyle>
+                                            <Style TargetType="MenuItem" BasedOn="{StaticResource OnlineSubtitleFilterMenuItemStyle}">
+                                                <Setter Property="Header" Value="{Binding Name}" />
+                                                <Setter Property="Command" Value="{Binding PlacementTarget.DataContext.SelectLanguageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <Setter Property="CommandParameter" Value="{Binding}" />
+                                            </Style>
+                                        </ContextMenu.ItemContainerStyle>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+                    <TextBlock Grid.Row="4"
+                               Margin="12,0,0,0"
+                               FontSize="12"
+                               LineHeight="18"
+                               LineStackingStrategy="BlockLineHeight"
+                               Foreground="{DynamicResource BrushForegroundMuted}"
+                               Text="{Binding StatusMessage}"
+                               TextTrimming="CharacterEllipsis"
+                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding StatusMessage}" />
+
+                    <Grid Grid.Row="6">
+                        <StackPanel Margin="0,-42,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Panel.ZIndex="1">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsLoading}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <Control Width="34"
+                                     Height="34"
+                                     Margin="0,0,0,10"
+                                     HorizontalAlignment="Center"
+                                     Template="{StaticResource LoadingSpinnerTemplate}" />
+                            <TextBlock Text="正在搜索在线字幕..."
+                                       TextAlignment="Center"
+                                       Style="{StaticResource BodyMutedTextStyle}" />
+                        </StackPanel>
+
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Text="搜索后会在这里显示字幕结果。">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding HasResults}" Value="False" />
+                                                <Condition Binding="{Binding IsLoading}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <ListBox Margin="0,12,0,0"
+                                 ItemsSource="{Binding Results}">
+                            <ListBox.Resources>
+                                <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource OnlineSubtitleModernScrollBarStyle}" />
+                                <Style TargetType="{x:Type ScrollViewer}">
+                                    <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
+                                </Style>
+                            </ListBox.Resources>
+                            <ListBox.Style>
+                                <Style TargetType="ListBox" BasedOn="{StaticResource OnlineSubtitleResultListStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasResults}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.Style>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid MinHeight="104" Margin="0,5,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Grid Height="92" VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="8" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock FontSize="16"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource BrushForegroundPrimary}"
+                                                           Text="{Binding PrimaryText}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding PrimaryText}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Margin="12,0,0,1"
+                                                           VerticalAlignment="Bottom"
+                                                           Style="{StaticResource BodyMutedTextStyle}"
+                                                           Text="{Binding MatchScoreText}" />
+                                            </Grid>
+
+                                            <Grid Grid.Row="2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="260" />
+                                                    <ColumnDefinition Width="1" />
+                                                    <ColumnDefinition Width="16" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="68" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="5" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="5" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <TextBlock Style="{StaticResource OnlineSubtitleInfoLabelStyle}" Text="上传者" />
+                                                    <TextBlock Grid.Column="1" Style="{StaticResource OnlineSubtitleInfoValueStyle}" Text="{Binding UploaderDisplayText}" />
+                                                    <TextBlock Grid.Row="2" Style="{StaticResource OnlineSubtitleInfoLabelStyle}" Text="上传时间" />
+                                                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource OnlineSubtitleInfoValueStyle}" Text="{Binding UploadedDateDisplayText}" />
+                                                    <TextBlock Grid.Row="4" Style="{StaticResource OnlineSubtitleInfoLabelStyle}" Text="评分" />
+                                                    <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource OnlineSubtitleInfoValueStyle}" Text="{Binding RatingVoteDisplayText}" />
+                                                </Grid>
+
+                                                <Border Grid.Column="1"
+                                                        Height="42"
+                                                        VerticalAlignment="Top"
+                                                        Background="{DynamicResource BrushDivider}"
+                                                        Opacity="0.85" />
+
+                                                <Grid Grid.Column="3">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="62" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="5" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <TextBlock Style="{StaticResource OnlineSubtitleInfoLabelStyle}" Text="语言" />
+                                                    <TextBlock Grid.Column="1" Style="{StaticResource OnlineSubtitleInfoValueStyle}" Text="{Binding LanguageDisplayText}" />
+                                                    <TextBlock Grid.Row="2" Style="{StaticResource OnlineSubtitleInfoLabelStyle}" Text="下载量" />
+                                                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource OnlineSubtitleInfoValueStyle}" Text="{Binding DownloadCountDisplayText}" />
+                                                </Grid>
+                                            </Grid>
+                                        </Grid>
+
+                                        <StackPanel Grid.Column="2"
+                                                    MinWidth="88"
+                                                    VerticalAlignment="Center"
+                                                    HorizontalAlignment="Right">
+                                            <Button HorizontalAlignment="Right"
+                                                    Content="{Binding DownloadButtonText}"
+                                                    Command="{Binding DownloadCommand}"
+                                                    Style="{StaticResource OnlineSubtitleResultActionButtonStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
 </Window>

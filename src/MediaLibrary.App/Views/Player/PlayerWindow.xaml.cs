@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Interop;
@@ -22,7 +24,6 @@ public partial class PlayerWindow : Window
     private const int WmNcHitTest = 0x0084;
     private const int WmGetMinMaxInfo = 0x0024;
     private const int WmSizing = 0x0214;
-    private const int WmLButtonDown = 0x0201;
     private const int WmLButtonDblClk = 0x0203;
     private const int WmMouseWheel = 0x020A;
     private const int WmMouseHWheel = 0x020E;
@@ -36,18 +37,21 @@ public partial class PlayerWindow : Window
     private const int WmszBottom = 6;
     private const int WmszBottomLeft = 7;
     private const int WmszBottomRight = 8;
-    private const int SmCxDoubleClk = 36;
-    private const int SmCyDoubleClk = 37;
     private const int VkEscape = 0x1B;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
     private const long DoubleClickSuppressMilliseconds = 250;
     private const long ControlBarAutoHideMilliseconds = 2500;
+    private const double ControlBarBottomLift = 14d;
+    private const double ControlBarWidthRatio = 0.75d;
+    private const double OnlineSubtitleSubmenuItemMinWidth = 224d;
+    private const double OnlineSubtitleSubmenuHeaderMaxWidth = 176d;
+    private const double OnlineSubtitleMenuFontSize = 11d;
     private const double ResizeHitTestThickness = 6d;
-    private static readonly TimeSpan MenuReopenSuppressionDelay = TimeSpan.FromMilliseconds(350);
     private readonly DispatcherTimer _controlBarTimer;
     private readonly DispatcherTimer _cursorPollTimer;
     private readonly DispatcherTimer _interactionFeedbackTimer;
+    private readonly DispatcherTimer _volumeHoverCloseTimer;
     private POINT? _lastCursorPosition;
     private PlayerWindowViewModel? _viewModel;
     private WindowState _previousState;
@@ -64,8 +68,6 @@ public partial class PlayerWindow : Window
     private bool _isFullScreenChromeVisible = true;
     private double _windowAspectRatio = 1180d / 760d;
     private OnlineSubtitleSearchWindow? _onlineSubtitleSearchWindow;
-    private POINT? _lastVideoClickPoint;
-    private long _lastVideoClickTick;
     private long _lastVideoDoubleClickToggleTick;
     private long _lastControlBarActivityTick;
     private bool _isPlayerCursorHidden;
@@ -74,10 +76,9 @@ public partial class PlayerWindow : Window
     private LowLevelMouseProc? _mouseHookProc;
     private bool _threadFilterMessageInstalled;
     private bool _closeLifecycleStarted;
-    private Button? _recentlyClosedMenuButton;
-    private DateTime _recentlyClosedMenuAtUtc = DateTime.MinValue;
     private Button? _openMenuButton;
     private ContextMenu? _openContextMenu;
+    private Rect _controlBarScreenBounds = Rect.Empty;
 
     public event EventHandler? CloseLifecycleStarted;
 
@@ -92,7 +93,7 @@ public partial class PlayerWindow : Window
 
         _cursorPollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(80)
+            Interval = TimeSpan.FromMilliseconds(25)
         };
         _cursorPollTimer.Tick += OnCursorPollTimerTick;
 
@@ -101,6 +102,12 @@ public partial class PlayerWindow : Window
             Interval = TimeSpan.FromSeconds(1.2)
         };
         _interactionFeedbackTimer.Tick += OnInteractionFeedbackTimerTick;
+
+        _volumeHoverCloseTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(220)
+        };
+        _volumeHoverCloseTimer.Tick += OnVolumeHoverCloseTimerTick;
 
         DataContextChanged += OnDataContextChanged;
         Loaded += (_, _) =>
@@ -156,10 +163,12 @@ public partial class PlayerWindow : Window
         _controlBarTimer.Stop();
         _cursorPollTimer.Stop();
         _interactionFeedbackTimer.Stop();
+        _volumeHoverCloseTimer.Stop();
         ShowPlayerCursor();
         CleanupInputHooks();
         ControlBarPopup.IsOpen = false;
         InteractionFeedbackPopup.IsOpen = false;
+        VolumeHoverPopup.IsOpen = false;
         BufferingOverlayPopup.IsOpen = false;
         OperationNoticePopup.IsOpen = false;
         Hide();
@@ -223,6 +232,7 @@ public partial class PlayerWindow : Window
     {
         NotifyCloseLifecycleStarted();
         CleanupInputHooks();
+        _volumeHoverCloseTimer.Stop();
         StateChanged -= OnWindowStateChanged;
         base.OnClosed(e);
     }
@@ -263,6 +273,82 @@ public partial class PlayerWindow : Window
     private void PlayerCloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void VolumeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        _viewModel.ToggleMute();
+        ShowVolumeFeedback();
+        e.Handled = true;
+    }
+
+    private void VolumeArea_MouseEnter(object sender, MouseEventArgs e)
+    {
+        ShowVolumeHoverPopup();
+    }
+
+    private void VolumeArea_MouseLeave(object sender, MouseEventArgs e)
+    {
+        ScheduleVolumeHoverPopupClose();
+    }
+
+    private void VolumeHoverPopup_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _volumeHoverCloseTimer.Stop();
+    }
+
+    private void VolumeHoverPopup_MouseLeave(object sender, MouseEventArgs e)
+    {
+        ScheduleVolumeHoverPopupClose();
+    }
+
+    private void DisplayStatusTextBlock_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            UpdateTrimmedTextToolTip(textBlock);
+        }
+    }
+
+    private void DisplayStatusTextBlock_TargetUpdated(object sender, DataTransferEventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            UpdateTrimmedTextToolTip(textBlock);
+        }
+    }
+
+    private static void UpdateTrimmedTextToolTip(TextBlock textBlock)
+    {
+        if (string.IsNullOrWhiteSpace(textBlock.Text) || textBlock.ActualWidth <= 0)
+        {
+            textBlock.ToolTip = null;
+            return;
+        }
+
+        var typeface = new Typeface(
+            textBlock.FontFamily,
+            textBlock.FontStyle,
+            textBlock.FontWeight,
+            textBlock.FontStretch);
+        var dpi = VisualTreeHelper.GetDpi(textBlock);
+        var formattedText = new FormattedText(
+            textBlock.Text,
+            CultureInfo.CurrentUICulture,
+            textBlock.FlowDirection,
+            typeface,
+            textBlock.FontSize,
+            textBlock.Foreground,
+            dpi.PixelsPerDip);
+
+        textBlock.ToolTip = formattedText.WidthIncludingTrailingWhitespace > textBlock.ActualWidth + 0.5d
+            ? textBlock.Text
+            : null;
     }
 
     private void PlayerTitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -388,12 +474,12 @@ public partial class PlayerWindow : Window
         if (_isFullScreen || WindowState == WindowState.Maximized)
         {
             button.Content = "\uE923";
-            button.ToolTip = "\u8fd8\u539f";
+            button.ToolTip = null;
             return;
         }
 
         button.Content = "\uE922";
-        button.ToolTip = "\u6700\u5927\u5316";
+        button.ToolTip = null;
     }
 
     private void CaptureWindowAspectRatio()
@@ -406,7 +492,7 @@ public partial class PlayerWindow : Window
 
     private void ShowFullScreenChrome()
     {
-        if (!_isFullScreen)
+        if (!_isFullScreen || _isFullScreenChromeVisible)
         {
             return;
         }
@@ -417,7 +503,7 @@ public partial class PlayerWindow : Window
 
     private void HideFullScreenChrome()
     {
-        if (!_isFullScreen)
+        if (!_isFullScreen || !_isFullScreenChromeVisible)
         {
             return;
         }
@@ -429,6 +515,13 @@ public partial class PlayerWindow : Window
     private void ControlBar_PreviewMouseRightButton(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+    }
+
+    private void ControlBar_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        MarkControlBarActivity();
+        RestartControlBarTimer();
+        RefreshControlBarScreenBoundsFromElement();
     }
 
     private void PlayerSurface_PreviewMouseRightButton(object sender, MouseButtonEventArgs e)
@@ -449,13 +542,6 @@ public partial class PlayerWindow : Window
             e.Handled = true;
             return;
         }
-
-        if (!ShouldSuppressMenuOpen(button))
-        {
-            return;
-        }
-
-        e.Handled = true;
     }
 
     private void SourceMenuButton_Click(object sender, RoutedEventArgs e)
@@ -472,16 +558,10 @@ public partial class PlayerWindow : Window
             return;
         }
 
-        if (ShouldSuppressMenuOpen(button))
-        {
-            e.Handled = true;
-            return;
-        }
-
+        HideVolumeHoverPopup();
         CloseOpenMenu();
         var menu = BuildSourceMenu(_viewModel);
-        menu.PlacementTarget = button;
-        menu.Placement = PlacementMode.Top;
+        PlaceContextMenuCenteredAbove(menu, button);
         menu.Closed += ContextMenu_Closed;
         menu.Closed += (_, _) =>
         {
@@ -510,16 +590,10 @@ public partial class PlayerWindow : Window
             return;
         }
 
-        if (ShouldSuppressMenuOpen(button))
-        {
-            e.Handled = true;
-            return;
-        }
-
+        HideVolumeHoverPopup();
         CloseOpenMenu();
         var menu = BuildSubtitleMenu(_viewModel);
-        menu.PlacementTarget = button;
-        menu.Placement = PlacementMode.Top;
+        PlaceContextMenuCenteredAbove(menu, button);
         menu.Closed += ContextMenu_Closed;
         menu.Closed += (_, _) =>
         {
@@ -548,16 +622,10 @@ public partial class PlayerWindow : Window
             return;
         }
 
-        if (ShouldSuppressMenuOpen(button))
-        {
-            e.Handled = true;
-            return;
-        }
-
+        HideVolumeHoverPopup();
         CloseOpenMenu();
         var menu = BuildAudioTrackMenu(_viewModel);
-        menu.PlacementTarget = button;
-        menu.Placement = PlacementMode.Top;
+        PlaceContextMenuCenteredAbove(menu, button);
         menu.Closed += ContextMenu_Closed;
         menu.Closed += (_, _) =>
         {
@@ -579,30 +647,11 @@ public partial class PlayerWindow : Window
             return;
         }
 
-        _recentlyClosedMenuButton = button;
-        _recentlyClosedMenuAtUtc = DateTime.UtcNow;
         if (ReferenceEquals(_openContextMenu, sender))
         {
             _openMenuButton = null;
             _openContextMenu = null;
         }
-    }
-
-    private bool ShouldSuppressMenuOpen(Button button)
-    {
-        if (!ReferenceEquals(_recentlyClosedMenuButton, button))
-        {
-            return false;
-        }
-
-        if (DateTime.UtcNow - _recentlyClosedMenuAtUtc > MenuReopenSuppressionDelay)
-        {
-            _recentlyClosedMenuButton = null;
-            return false;
-        }
-
-        _recentlyClosedMenuButton = null;
-        return true;
     }
 
     private bool IsOpenMenuButton(Button button)
@@ -784,12 +833,113 @@ public partial class PlayerWindow : Window
         return _isSourceMenuOpen || _isSubtitleMenuOpen || _isAudioTrackMenuOpen;
     }
 
+    private ContextMenu CreatePlayerContextMenu(PlayerWindowViewModel viewModel)
+    {
+        return new ContextMenu
+        {
+            DataContext = viewModel,
+            Style = (Style)FindResource("PlayerMenuStyle")
+        };
+    }
+
+    private ContextMenu FinalizePlayerMenu(ContextMenu menu)
+    {
+        ApplyPlayerMenuStyles(menu);
+        return menu;
+    }
+
+    private static void PlaceContextMenuCenteredAbove(ContextMenu menu, Button button)
+    {
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Custom;
+        menu.CustomPopupPlacementCallback = PlacePopupCenteredAbove;
+        menu.HorizontalOffset = 0d;
+        menu.VerticalOffset = 0d;
+    }
+
+    private static CustomPopupPlacement[] PlacePopupCenteredAbove(Size popupSize, Size targetSize, Point offset)
+    {
+        var horizontal = ((targetSize.Width - popupSize.Width) / 2d) + offset.X;
+        return
+        [
+            new CustomPopupPlacement(
+                new Point(horizontal, -popupSize.Height - 8d + offset.Y),
+                PopupPrimaryAxis.Vertical),
+            new CustomPopupPlacement(
+                new Point(horizontal, targetSize.Height + 8d + offset.Y),
+                PopupPrimaryAxis.Vertical)
+        ];
+    }
+
+    private CustomPopupPlacement[] VolumeHoverPopup_PlacementCallback(Size popupSize, Size targetSize, Point offset)
+    {
+        return PlacePopupCenteredAbove(popupSize, targetSize, offset);
+    }
+
+    private void ApplyPlayerMenuStyles(ItemsControl root)
+    {
+        var menuItemStyle = (Style)FindResource("PlayerMenuItemStyle");
+        var submenuItemStyle = (Style)FindResource("PlayerSubmenuItemStyle");
+        var separatorStyle = (Style)FindResource("PlayerMenuSeparatorStyle");
+
+        foreach (var child in root.Items)
+        {
+            switch (child)
+            {
+                case MenuItem menuItem:
+                    menuItem.Style = menuItem.HasItems ? submenuItemStyle : menuItemStyle;
+                    if (menuItem.HasItems)
+                    {
+                        AttachPlayerSubmenuOpenRight(menuItem);
+                        ApplyPlayerMenuStyles(menuItem);
+                    }
+
+                    break;
+                case Separator separator:
+                    separator.Style = separatorStyle;
+                    break;
+            }
+        }
+    }
+
+    private static void AttachPlayerSubmenuOpenRight(MenuItem menuItem)
+    {
+        menuItem.MouseEnter -= PlayerSubmenuItem_MouseEnter;
+        menuItem.MouseEnter += PlayerSubmenuItem_MouseEnter;
+        menuItem.SubmenuOpened -= PlayerSubmenuItem_SubmenuOpened;
+        menuItem.SubmenuOpened += PlayerSubmenuItem_SubmenuOpened;
+    }
+
+    private static void PlayerSubmenuItem_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        ConfigureSubmenuPopupToOpenRight(menuItem);
+        _ = menuItem.Dispatcher.BeginInvoke(
+            () => ConfigureSubmenuPopupToOpenRight(menuItem),
+            DispatcherPriority.Loaded);
+    }
+
+    private static void PlayerSubmenuItem_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (sender is not MenuItem { HasItems: true, IsEnabled: true } menuItem)
+        {
+            return;
+        }
+
+        if (!menuItem.IsSubmenuOpen)
+        {
+            menuItem.IsSubmenuOpen = true;
+        }
+    }
+
     private ContextMenu BuildSourceMenu(PlayerWindowViewModel viewModel)
     {
-        var menu = new ContextMenu
-        {
-            DataContext = viewModel
-        };
+        var menu = CreatePlayerContextMenu(viewModel);
+        menu.MaxHeight = 188d;
 
         if (viewModel.Sources.Count == 0)
         {
@@ -798,35 +948,23 @@ public partial class PlayerWindow : Window
                 Header = "\u65e0\u53ef\u7528\u64ad\u653e\u6e90",
                 IsEnabled = false
             });
-            return menu;
+            return FinalizePlayerMenu(menu);
         }
 
-        if (viewModel.SelectedSource is not null)
-        {
-            var selectedSource = viewModel.SelectedSource;
-            if (selectedSource.ProtocolType == ProtocolType.WebDav)
-            {
-                menu.Items.Add(CreateVideoCacheStatusItem(selectedSource));
-                menu.Items.Add(new Separator());
-            }
-        }
-
+        menu.Items.Add(CreateSourceTableHeader());
         foreach (var source in viewModel.Sources)
         {
             menu.Items.Add(CreateSourceLeaf(source, viewModel));
         }
 
-        return menu;
+        return FinalizePlayerMenu(menu);
     }
 
-    private static MenuItem CreateVideoCacheStatusItem(PlaybackSourceItem source)
+    private static MenuItem CreateSourceTableHeader()
     {
-        var header = string.IsNullOrWhiteSpace(source.VideoCacheError)
-            ? $"本地缓存：{source.VideoCacheStatusText}"
-            : $"本地缓存：{source.VideoCacheStatusText}（{source.VideoCacheError}）";
         var item = new MenuItem
         {
-            Header = header,
+            Header = CreateSourceTableHeaderContent(),
             IsEnabled = false
         };
         SuppressRightClick(item);
@@ -851,35 +989,106 @@ public partial class PlayerWindow : Window
         return item;
     }
 
-    private static StackPanel CreateSourceMenuHeader(PlaybackSourceItem source, bool isSelected)
+    private static Grid CreateSourceTableHeaderContent()
     {
-        var panel = new StackPanel
+        var grid = CreateSourceTableGrid();
+        AddSourceCell(grid, "播放源", 0, isHeader: true);
+        AddSourceCell(grid, "分辨率", 1, isHeader: true);
+        AddSourceCell(grid, "视频码率", 2, isHeader: true);
+        AddSourceCell(grid, "大小", 3, isHeader: true);
+        return grid;
+    }
+
+    private static Grid CreateSourceMenuHeader(PlaybackSourceItem source, bool isSelected)
+    {
+        var grid = CreateSourceTableGrid();
+        var sourcePanel = new StackPanel
         {
-            MaxWidth = 420d
+            MaxWidth = 280d
         };
 
-        panel.Children.Add(
+        sourcePanel.Children.Add(
             new TextBlock
             {
-                Text = isSelected ? $"\u2713 {source.FileName}" : source.FileName,
+                Text = source.FileName,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
 
-        var summary = source.SourceSummaryText;
-        if (!string.IsNullOrWhiteSpace(summary))
+        var meta = BuildSourceMenuMeta(source);
+        if (!string.IsNullOrWhiteSpace(meta))
         {
-            panel.Children.Add(
-                new TextBlock
-                {
-                    Margin = new Thickness(0d, 3d, 0d, 0d),
-                    FontSize = 12d,
-                    Opacity = 0.72d,
-                    Text = summary,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                });
+            sourcePanel.Children.Add(CreateMutedSourceText(meta));
         }
 
-        return panel;
+        Grid.SetColumn(sourcePanel, 0);
+        grid.Children.Add(sourcePanel);
+        AddSourceCell(grid, FormatSourceColumn(source.ResolutionShortText), 1);
+        AddSourceCell(grid, FormatSourceColumn(source.BitrateText), 2);
+        AddSourceCell(grid, FormatSourceColumn(source.FormattedFileSize), 3);
+        return grid;
+    }
+
+    private static Grid CreateSourceTableGrid()
+    {
+        var grid = new Grid
+        {
+            Width = 540d
+        };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1d, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78d) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92d) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76d) });
+        return grid;
+    }
+
+    private static void AddSourceCell(Grid grid, string text, int column, bool isHeader = false)
+    {
+        var textBlock = new TextBlock
+        {
+            Text = text,
+            FontWeight = isHeader ? FontWeights.SemiBold : FontWeights.Normal,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            TextAlignment = isHeader ? TextAlignment.Center : column == 0 ? TextAlignment.Left : TextAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        textBlock.SetResourceReference(
+            TextBlock.ForegroundProperty,
+            isHeader ? "BrushPlayerTextMuted" : "BrushPlayerTextPrimary");
+
+        Grid.SetColumn(textBlock, column);
+        grid.Children.Add(textBlock);
+    }
+
+    private static TextBlock CreateMutedSourceText(string text)
+    {
+        var textBlock = new TextBlock
+        {
+            Margin = new Thickness(0d, 3d, 0d, 0d),
+            FontSize = 12d,
+            Text = text,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        textBlock.SetResourceReference(TextBlock.ForegroundProperty, "BrushPlayerTextMuted");
+        return textBlock;
+    }
+
+    private static string BuildSourceMenuMeta(PlaybackSourceItem source)
+    {
+        var parts = new[]
+            {
+                source.IsDefault ? "默认源" : string.Empty,
+                source.SourceTypeText,
+                source.ResumeText
+            }
+            .Where(part => !string.IsNullOrWhiteSpace(part));
+
+        return string.Join(" · ", parts);
+    }
+
+    private static string FormatSourceColumn(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     }
 
     private static string BuildSourceToolTip(PlaybackSourceItem source)
@@ -887,8 +1096,7 @@ public partial class PlayerWindow : Window
         var lines = new[]
             {
                 source.SourceSummaryText,
-                source.PlaybackHistoryText,
-                string.IsNullOrWhiteSpace(source.FilePath) ? string.Empty : $"路径：{source.FilePath}"
+                source.PlaybackHistoryText
             }
             .Where(line => !string.IsNullOrWhiteSpace(line));
 
@@ -898,12 +1106,9 @@ public partial class PlayerWindow : Window
     private ContextMenu BuildSubtitleMenu(PlayerWindowViewModel viewModel)
     {
         viewModel.NotifySubtitleMenuOpened();
-        var menu = new ContextMenu
-        {
-            DataContext = viewModel
-        };
+        var menu = CreatePlayerContextMenu(viewModel);
 
-        menu.Items.Add(CreateSubtitleLeaf(viewModel.NoneSubtitle, viewModel));
+        menu.Items.Add(CreateSubtitleLeaf(viewModel.NoneSubtitle, viewModel, "\u65e0\u5b57\u5e55", centerHeader: true));
         menu.Items.Add(new Separator());
 
         var embeddedGroup = CreateRightOpeningSubtitleGroup("\u5185\u5d4c");
@@ -932,6 +1137,7 @@ public partial class PlayerWindow : Window
         }
 
         menu.Items.Add(embeddedGroup);
+        menu.Items.Add(new Separator());
 
         var externalGroup = CreateRightOpeningSubtitleGroup("\u5916\u6302");
         if (viewModel.ExternalSubtitles.Count == 0)
@@ -951,13 +1157,15 @@ public partial class PlayerWindow : Window
         }
 
         menu.Items.Add(externalGroup);
+        menu.Items.Add(new Separator());
 
-        var onlineGroup = CreateRightOpeningSubtitleGroup("\u5728\u7ebf\u4e0b\u8f7d\u5b57\u5e55");
+        var onlineGroup = CreateRightOpeningSubtitleGroup("\u5728\u7ebf\u5b57\u5e55");
         var searchItem = new MenuItem
         {
-            Header = CreateMenuHeader("\u641c\u7d22\u5728\u7ebf\u5b57\u5e55..."),
+            Header = CreateOnlineSubtitleSubmenuHeader("\u641c\u7d22\u5728\u7ebf\u5b57\u5e55"),
             IsEnabled = viewModel.HasPlayableOnlineSubtitleSearchContext
         };
+        ConfigureOnlineSubtitleSubmenuItem(searchItem);
         SuppressRightClick(searchItem);
         searchItem.Click += (_, _) => OpenOnlineSubtitleSearch(viewModel);
         onlineGroup.Items.Add(searchItem);
@@ -965,11 +1173,13 @@ public partial class PlayerWindow : Window
 
         if (viewModel.OnlineSubtitleMenuItems.Count == 0)
         {
-            onlineGroup.Items.Add(new MenuItem
+            var emptyItem = new MenuItem
             {
-                Header = "\u6682\u65e0\u5df2\u4e0b\u8f7d\u5b57\u5e55",
+                Header = CreateOnlineSubtitleSubmenuHeader("\u6682\u65e0\u5df2\u4e0b\u8f7d\u5b57\u5e55"),
                 IsEnabled = false
-            });
+            };
+            ConfigureOnlineSubtitleSubmenuItem(emptyItem);
+            onlineGroup.Items.Add(emptyItem);
         }
         else
         {
@@ -978,43 +1188,50 @@ public partial class PlayerWindow : Window
                 var isSelected = viewModel.IsOnlineSubtitleSelected(subtitle);
                 var item = new MenuItem
                 {
-                    Header = CreateMenuHeader(isSelected ? $"\u2713 {subtitle.DisplayName}" : subtitle.DisplayName),
-                    ToolTip = subtitle.ToolTip,
+                    Header = CreateOnlineSubtitleSubmenuHeader(subtitle.DisplayName, enableTrimmedToolTip: false),
+                    IsChecked = isSelected,
                     IsEnabled = true
                 };
+                ConfigureOnlineSubtitleSubmenuItem(item);
+                ConfigureOnlineSubtitleHoverText(item, subtitle.DisplayName);
                 SuppressRightClick(item);
-                if (subtitle.HasCacheFile)
+                AddOnlineSubtitleDeleteMenuItem(item, subtitle, viewModel);
+                item.PreviewMouseLeftButtonDown += (_, e) =>
                 {
-                    var selectItem = new MenuItem
+                    if (!subtitle.HasCacheFile || !IsDirectMenuItemMouseEvent(item, e.OriginalSource as DependencyObject))
                     {
-                        Header = CreateMenuHeader("\u5207\u6362\u5230\u6b64\u5b57\u5e55")
-                    };
-                    SuppressRightClick(selectItem);
-                    selectItem.Click += (_, _) => viewModel.SelectOnlineSubtitleFromMenu(subtitle);
-                    item.Items.Add(selectItem);
-                }
-                else
-                {
-                    item.Items.Add(new MenuItem
-                    {
-                        Header = "\u7f13\u5b58\u6587\u4ef6\u4e0d\u53ef\u7528\uff0c\u8bf7\u91cd\u65b0\u4e0b\u8f7d",
-                        IsEnabled = false
-                    });
-                }
+                        return;
+                    }
 
-                var deleteItem = new MenuItem
-                {
-                    Header = CreateMenuHeader(subtitle.IsTemporary ? "\u79fb\u9664\u4e34\u65f6\u5b57\u5e55" : "\u5220\u9664\u7ed1\u5b9a")
+                    viewModel.SelectOnlineSubtitleFromMenu(subtitle);
+                    CloseMenuItemToolTip(item);
+                    CloseOpenMenu();
+                    e.Handled = true;
                 };
-                SuppressRightClick(deleteItem);
-                deleteItem.Click += (_, _) => viewModel.DeleteOnlineSubtitleFromMenu(subtitle);
-                item.Items.Add(deleteItem);
                 onlineGroup.Items.Add(item);
             }
         }
 
         menu.Items.Add(onlineGroup);
-        return menu;
+        return FinalizePlayerMenu(menu);
+    }
+
+    private static void AddOnlineSubtitleDeleteMenuItem(
+        MenuItem parent,
+        OnlineSubtitleMenuItemViewModel subtitle,
+        PlayerWindowViewModel viewModel)
+    {
+        var deleteItem = new MenuItem
+        {
+            Header = CreateCompactMenuHeader(subtitle.IsTemporary ? "\u79fb\u9664\u4e34\u65f6\u5b57\u5e55" : "\u5220\u9664\u7ed1\u5b9a"),
+            MinWidth = 0d,
+            MinHeight = 24d,
+            Padding = new Thickness(8d, 4d, 8d, 4d),
+            FontSize = OnlineSubtitleMenuFontSize
+        };
+        SuppressRightClick(deleteItem);
+        deleteItem.Click += (_, _) => viewModel.DeleteOnlineSubtitleFromMenu(subtitle);
+        parent.Items.Add(deleteItem);
     }
 
     private void OpenOnlineSubtitleSearch(PlayerWindowViewModel viewModel)
@@ -1044,16 +1261,8 @@ public partial class PlayerWindow : Window
 
     private static MenuItem CreateRightOpeningSubtitleGroup(string header)
     {
-        var item = new MenuItem { Header = header };
+        var item = new MenuItem { Header = CreateMenuHeader(header, center: true) };
         SuppressRightClick(item);
-        item.Loaded += (_, _) => ConfigureSubmenuPopupToOpenRight(item);
-        item.SubmenuOpened += (_, _) =>
-        {
-            ConfigureSubmenuPopupToOpenRight(item);
-            _ = item.Dispatcher.BeginInvoke(
-                () => ConfigureSubmenuPopupToOpenRight(item),
-                DispatcherPriority.Loaded);
-        };
         return item;
     }
 
@@ -1084,7 +1293,7 @@ public partial class PlayerWindow : Window
         return
         [
             new CustomPopupPlacement(
-                new Point(targetSize.Width, 0d),
+                new Point(targetSize.Width + offset.X, targetSize.Height - popupSize.Height + offset.Y),
                 PopupPrimaryAxis.Horizontal)
         ];
     }
@@ -1107,27 +1316,28 @@ public partial class PlayerWindow : Window
             return;
         }
 
-        var popupTopLeft = menuItem.PointToScreen(new Point(menuItem.ActualWidth, 0d));
+        var popupHeight = Math.Max(1, rect.Bottom - rect.Top);
+        var itemBottomRight = menuItem.PointToScreen(new Point(menuItem.ActualWidth, menuItem.ActualHeight));
         _ = SetWindowPos(
             popupHandle,
             IntPtr.Zero,
-            (int)Math.Round(popupTopLeft.X),
-            (int)Math.Round(popupTopLeft.Y),
+            (int)Math.Round(itemBottomRight.X),
+            (int)Math.Round(itemBottomRight.Y - popupHeight),
             Math.Max(1, rect.Right - rect.Left),
-            Math.Max(1, rect.Bottom - rect.Top),
+            popupHeight,
             SwpNoZOrder | SwpNoActivate);
     }
 
     private static MenuItem CreateSubtitleLeaf(
         PlaybackSubtitleItem subtitle,
-        PlayerWindowViewModel viewModel)
+        PlayerWindowViewModel viewModel,
+        string? displayNameOverride = null,
+        bool centerHeader = false)
     {
-        var text = viewModel.IsSubtitleSelected(subtitle)
-            ? $"\u2713 {subtitle.DisplayName}"
-            : subtitle.DisplayName;
+        var displayName = displayNameOverride ?? subtitle.DisplayName;
         var item = new MenuItem
         {
-            Header = CreateMenuHeader(text),
+            Header = CreateMenuHeader(displayName, centerHeader),
             IsCheckable = true,
             IsChecked = viewModel.IsSubtitleSelected(subtitle),
             ToolTip = subtitle.TooltipText
@@ -1139,19 +1349,32 @@ public partial class PlayerWindow : Window
 
     private ContextMenu BuildAudioTrackMenu(PlayerWindowViewModel viewModel)
     {
-        var menu = new ContextMenu
+        var menu = CreatePlayerContextMenu(viewModel);
+        var statusText = viewModel.AudioTrackMenuStatusText;
+        if (!string.IsNullOrWhiteSpace(statusText))
         {
-            DataContext = viewModel
-        };
+            menu.Items.Add(new MenuItem
+            {
+                Header = CreateMenuHint(statusText),
+                IsEnabled = false
+            });
+
+            if (viewModel.AudioTracks.Count > 0)
+            {
+                menu.Items.Add(new Separator());
+            }
+        }
 
         if (viewModel.AudioTracks.Count == 0)
         {
             menu.Items.Add(new MenuItem
             {
-                Header = "\u97f3\u8f68\u4e0d\u53ef\u7528",
+                Header = viewModel.SelectedSource is not null && !viewModel.IsAudioTrackDiscoveryReady
+                    ? "\u6b63\u5728\u8bfb\u53d6\u97f3\u8f68..."
+                    : "\u6682\u65e0\u53ef\u7528\u97f3\u8f68",
                 IsEnabled = false
             });
-            return menu;
+            return FinalizePlayerMenu(menu);
         }
 
         foreach (var audioTrack in viewModel.AudioTracks)
@@ -1159,19 +1382,16 @@ public partial class PlayerWindow : Window
             menu.Items.Add(CreateAudioTrackLeaf(audioTrack, viewModel));
         }
 
-        return menu;
+        return FinalizePlayerMenu(menu);
     }
 
     private static MenuItem CreateAudioTrackLeaf(
         PlaybackAudioTrackItem audioTrack,
         PlayerWindowViewModel viewModel)
     {
-        var text = viewModel.IsAudioTrackSelected(audioTrack)
-            ? $"\u2713 {audioTrack.DisplayName}"
-            : audioTrack.DisplayName;
         var item = new MenuItem
         {
-            Header = CreateMenuHeader(text),
+            Header = CreateMenuHeader(audioTrack.DisplayName),
             IsCheckable = true,
             IsChecked = viewModel.IsAudioTrackSelected(audioTrack),
             ToolTip = audioTrack.TooltipText
@@ -1192,13 +1412,131 @@ public partial class PlayerWindow : Window
         e.Handled = true;
     }
 
-    private static TextBlock CreateMenuHeader(string text)
+    private static void ConfigureOnlineSubtitleSubmenuItem(MenuItem item)
+    {
+        item.MinWidth = OnlineSubtitleSubmenuItemMinWidth;
+        item.MinHeight = 24d;
+        item.Padding = new Thickness(6d, 4d, 8d, 4d);
+        item.FontSize = OnlineSubtitleMenuFontSize;
+        item.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+    }
+
+    private static void ConfigureOnlineSubtitleHoverText(MenuItem item, string text)
+    {
+        var toolTip = new ToolTip
+        {
+            Content = text,
+            PlacementTarget = item,
+            Placement = PlacementMode.Left,
+            HorizontalOffset = -6d,
+            VerticalOffset = 0d
+        };
+
+        item.ToolTip = toolTip;
+        ToolTipService.SetInitialShowDelay(item, 0);
+        ToolTipService.SetBetweenShowDelay(item, 0);
+        ToolTipService.SetShowDuration(item, 60000);
+        item.MouseEnter += (_, _) =>
+        {
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                toolTip.IsOpen = true;
+            }
+        };
+        item.MouseLeave += (_, _) =>
+        {
+            if (!item.IsSubmenuOpen)
+            {
+                toolTip.IsOpen = false;
+            }
+        };
+        item.SubmenuClosed += (_, _) => toolTip.IsOpen = false;
+    }
+
+    private static void CloseMenuItemToolTip(MenuItem item)
+    {
+        if (item.ToolTip is ToolTip toolTip)
+        {
+            toolTip.IsOpen = false;
+        }
+    }
+
+    private static bool IsDirectMenuItemMouseEvent(MenuItem owner, DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is MenuItem menuItem)
+            {
+                return ReferenceEquals(menuItem, owner);
+            }
+
+            source = VisualTreeHelper.GetParent(source) ?? LogicalTreeHelper.GetParent(source);
+        }
+
+        return false;
+    }
+
+    private static TextBlock CreateOnlineSubtitleSubmenuHeader(string text, bool enableTrimmedToolTip = true)
+    {
+        return CreateMenuHeader(
+            text,
+            center: true,
+            maxWidth: OnlineSubtitleSubmenuHeaderMaxWidth,
+            useTrimmedToolTip: enableTrimmedToolTip,
+            fixedWidth: true,
+            fontSize: OnlineSubtitleMenuFontSize);
+    }
+
+    private static TextBlock CreateCompactMenuHeader(string text)
+    {
+        return CreateMenuHeader(
+            text,
+            maxWidth: 84d,
+            fontSize: OnlineSubtitleMenuFontSize);
+    }
+
+    private static TextBlock CreateMenuHeader(
+        string text,
+        bool center = false,
+        double maxWidth = 360d,
+        bool useTrimmedToolTip = false,
+        bool fixedWidth = false,
+        double? fontSize = null)
+    {
+        var textBlock = new TextBlock
+        {
+            Text = text,
+            MaxWidth = maxWidth,
+            HorizontalAlignment = center ? HorizontalAlignment.Center : HorizontalAlignment.Left,
+            TextAlignment = center ? TextAlignment.Center : TextAlignment.Left,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+
+        if (fixedWidth)
+        {
+            textBlock.Width = maxWidth;
+        }
+
+        if (fontSize.HasValue)
+        {
+            textBlock.FontSize = fontSize.Value;
+        }
+
+        if (useTrimmedToolTip)
+        {
+            TrimmedTextToolTipBehavior.SetFullText(textBlock, text);
+        }
+
+        return textBlock;
+    }
+
+    private static TextBlock CreateMenuHint(string text)
     {
         return new TextBlock
         {
             Text = text,
-            MaxWidth = 360d,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            MaxWidth = 240d,
+            TextWrapping = TextWrapping.Wrap
         };
     }
 
@@ -1294,34 +1632,6 @@ public partial class PlayerWindow : Window
                && TryToggleFullScreenFromVideoPoint(RootLayout.PointFromScreen(new Point(cursorPosition.X, cursorPosition.Y)));
     }
 
-    private bool TryHandleNativeVideoLeftButtonDown(POINT cursorPosition)
-    {
-        if (!IsCursorInsideVideoInteractionArea(cursorPosition))
-        {
-            _lastVideoClickPoint = null;
-            _lastVideoClickTick = 0;
-            return false;
-        }
-
-        var now = Environment.TickCount64;
-        var previousPoint = _lastVideoClickPoint;
-        var previousTick = _lastVideoClickTick;
-        _lastVideoClickPoint = cursorPosition;
-        _lastVideoClickTick = now;
-
-        if (!previousPoint.HasValue
-            || now - previousTick > GetDoubleClickTime()
-            || Math.Abs(cursorPosition.X - previousPoint.Value.X) > GetSystemMetrics(SmCxDoubleClk)
-            || Math.Abs(cursorPosition.Y - previousPoint.Value.Y) > GetSystemMetrics(SmCyDoubleClk))
-        {
-            return false;
-        }
-
-        _lastVideoClickPoint = null;
-        _lastVideoClickTick = 0;
-        return TryToggleFullScreenFromVideoPoint(RootLayout.PointFromScreen(new Point(cursorPosition.X, cursorPosition.Y)));
-    }
-
     private bool TryToggleFullScreenFromVideoPoint(Point point)
     {
         if (!IsActive
@@ -1373,6 +1683,12 @@ public partial class PlayerWindow : Window
             return;
         }
 
+        if (IsCursorInsidePinnedChromeArea())
+        {
+            RestartControlBarTimer();
+            return;
+        }
+
         var idleMilliseconds = Environment.TickCount64 - _lastControlBarActivityTick;
         if (idleMilliseconds < ControlBarAutoHideMilliseconds)
         {
@@ -1386,12 +1702,33 @@ public partial class PlayerWindow : Window
         }
     }
 
+    private bool IsCursorInsidePinnedChromeArea()
+    {
+        if (!TryGetCursorPosition(out var cursorPosition))
+        {
+            return false;
+        }
+
+        return IsCursorInsideControlBar(cursorPosition)
+               || IsCursorInsidePlayerTitleBar(cursorPosition)
+               || (VolumeHoverPopup.IsOpen && IsCursorInsideVolumeHoverArea());
+    }
+
     private void OnInteractionFeedbackTimerTick(object? sender, EventArgs e)
     {
         _interactionFeedbackTimer.Stop();
         VolumeFeedback.Visibility = Visibility.Collapsed;
         BrightnessFeedback.Visibility = Visibility.Collapsed;
         InteractionFeedbackPopup.IsOpen = false;
+    }
+
+    private void OnVolumeHoverCloseTimerTick(object? sender, EventArgs e)
+    {
+        _volumeHoverCloseTimer.Stop();
+        if (!IsCursorInsideVolumeHoverArea())
+        {
+            HideVolumeHoverPopup();
+        }
     }
 
     private void ShowVolumeFeedback()
@@ -1403,6 +1740,7 @@ public partial class PlayerWindow : Window
 
         VolumeFeedbackText.Text = _viewModel.VolumeFeedbackText;
         VolumeFeedbackBar.Value = _viewModel.Volume;
+        VolumeFeedbackBar.Foreground = PlayerMeterBrushConverter.CreateBrush(_viewModel.Volume, 200d);
         BrightnessFeedback.Visibility = Visibility.Collapsed;
         ShowInteractionFeedbackPopup();
         VolumeFeedback.Visibility = Visibility.Visible;
@@ -1418,17 +1756,68 @@ public partial class PlayerWindow : Window
 
         BrightnessFeedbackText.Text = _viewModel.BrightnessText;
         BrightnessFeedbackBar.Value = _viewModel.Brightness;
+        BrightnessFeedbackBar.Foreground = PlayerMeterBrushConverter.CreateBrush(_viewModel.Brightness, 100d);
         VolumeFeedback.Visibility = Visibility.Collapsed;
         ShowInteractionFeedbackPopup();
         BrightnessFeedback.Visibility = Visibility.Visible;
         RestartInteractionFeedbackTimer();
     }
 
+    private void ShowVolumeHoverPopup()
+    {
+        if (_viewModel is null
+            || !IsActive
+            || _closeRequested
+            || !ControlBarPopup.IsOpen
+            || IsAnyPlayerMenuOpen())
+        {
+            return;
+        }
+
+        _volumeHoverCloseTimer.Stop();
+        VolumeHoverPopup.IsOpen = true;
+        MarkControlBarActivity();
+        RestartControlBarTimer();
+    }
+
+    private void ScheduleVolumeHoverPopupClose()
+    {
+        _volumeHoverCloseTimer.Stop();
+        _volumeHoverCloseTimer.Start();
+    }
+
+    private void HideVolumeHoverPopup()
+    {
+        _volumeHoverCloseTimer.Stop();
+        if (VolumeHoverPopup.IsOpen)
+        {
+            VolumeHoverPopup.IsOpen = false;
+        }
+    }
+
+    private bool IsCursorInsideVolumeHoverArea()
+    {
+        if (!TryGetCursorPosition(out var cursorPosition))
+        {
+            return false;
+        }
+
+        return IsCursorInsideElement(VolumeHoverAnchor, cursorPosition)
+               || (VolumeHoverPopup.IsOpen && IsCursorInsideElement(VolumeHoverPopupSurface, cursorPosition));
+    }
+
     private void ShowInteractionFeedbackPopup()
     {
-        UpdateInteractionFeedbackPopupPlacement();
+        if (InteractionFeedbackPopup.IsOpen)
+        {
+            return;
+        }
+
+        UpdateInteractionFeedbackPopupPlacement(moveNativePopup: false);
         InteractionFeedbackPopup.IsOpen = true;
-        UpdateInteractionFeedbackPopupPlacement();
+        _ = Dispatcher.BeginInvoke(
+            () => UpdateInteractionFeedbackPopupPlacement(moveNativePopup: true),
+            DispatcherPriority.Loaded);
     }
 
     private void RestartInteractionFeedbackTimer()
@@ -1503,8 +1892,13 @@ public partial class PlayerWindow : Window
 
     private void RestartControlBarTimer()
     {
-        _controlBarTimer.Stop();
-        if (!IsAnyPlayerMenuOpen() && IsActive)
+        if (IsAnyPlayerMenuOpen() || !IsActive)
+        {
+            _controlBarTimer.Stop();
+            return;
+        }
+
+        if (!_controlBarTimer.IsEnabled)
         {
             StartControlBarTimer(ControlBarAutoHideMilliseconds);
         }
@@ -1532,9 +1926,14 @@ public partial class PlayerWindow : Window
             return;
         }
 
-        UpdateControlBarPopupPlacement();
-        ControlBarPopup.IsOpen = true;
-        UpdateControlBarPopupPlacement();
+        if (!ControlBarPopup.IsOpen)
+        {
+            UpdateControlBarPopupPlacement(moveNativePopup: false);
+            ControlBarPopup.IsOpen = true;
+            _ = Dispatcher.BeginInvoke(
+                () => UpdateControlBarPopupPlacement(moveNativePopup: true),
+                DispatcherPriority.Loaded);
+        }
         ControlBar.Opacity = 1d;
         ControlBar.IsHitTestVisible = true;
     }
@@ -1588,13 +1987,15 @@ public partial class PlayerWindow : Window
     private void HideControlBar()
     {
         _controlBarTimer.Stop();
+        HideVolumeHoverPopup();
         ControlBarPopup.IsOpen = false;
         ControlBar.IsHitTestVisible = false;
+        _controlBarScreenBounds = Rect.Empty;
         HideFullScreenChrome();
         UpdatePlayerCursorForControlBarState();
     }
 
-    private void UpdateControlBarPopupPlacement()
+    private void UpdateControlBarPopupPlacement(bool moveNativePopup = true)
     {
         if (!IsLoaded)
         {
@@ -1602,10 +2003,30 @@ public partial class PlayerWindow : Window
         }
 
         var resizeInset = GetControlBarResizeInset();
-        ControlBar.Width = Math.Max(1d, RootLayout.ActualWidth - (resizeInset * 2d));
-        ControlBarPopup.HorizontalOffset = resizeInset;
-        ControlBarPopup.VerticalOffset = Math.Max(0d, RootLayout.ActualHeight - ControlBar.ActualHeight);
-        MoveControlBarPopupWindow();
+        var availableWidth = GetControlBarAvailableWidth(resizeInset);
+        var controlBarWidth = GetControlBarWidth(availableWidth);
+        ControlBar.Width = controlBarWidth;
+        ControlBarPopup.HorizontalOffset = GetControlBarHorizontalOffset(resizeInset, availableWidth, controlBarWidth);
+        ControlBarPopup.VerticalOffset = Math.Max(0d, RootLayout.ActualHeight - ControlBar.ActualHeight - ControlBarBottomLift);
+        if (moveNativePopup)
+        {
+            MoveControlBarPopupWindow();
+        }
+    }
+
+    private double GetControlBarAvailableWidth(double resizeInset)
+    {
+        return Math.Max(1d, RootLayout.ActualWidth - (resizeInset * 2d));
+    }
+
+    private static double GetControlBarWidth(double availableWidth)
+    {
+        return Math.Max(1d, availableWidth * ControlBarWidthRatio);
+    }
+
+    private static double GetControlBarHorizontalOffset(double resizeInset, double availableWidth, double controlBarWidth)
+    {
+        return resizeInset + Math.Max(0d, (availableWidth - controlBarWidth) / 2d);
     }
 
     private double GetControlBarResizeInset()
@@ -1634,7 +2055,7 @@ public partial class PlayerWindow : Window
         PlayerTitleBarPopup.VerticalOffset = 0d;
     }
 
-    private void UpdateInteractionFeedbackPopupPlacement()
+    private void UpdateInteractionFeedbackPopupPlacement(bool moveNativePopup = true)
     {
         if (!IsLoaded)
         {
@@ -1645,7 +2066,10 @@ public partial class PlayerWindow : Window
         InteractionFeedbackLayer.Height = Math.Max(1d, RootLayout.ActualHeight);
         InteractionFeedbackPopup.HorizontalOffset = 0d;
         InteractionFeedbackPopup.VerticalOffset = 0d;
-        MoveInteractionFeedbackPopupWindow();
+        if (moveNativePopup)
+        {
+            MoveInteractionFeedbackPopupWindow();
+        }
     }
 
     private void UpdatePromptOverlayPopupPlacement()
@@ -1672,20 +2096,25 @@ public partial class PlayerWindow : Window
     {
         if (!ControlBarPopup.IsOpen)
         {
+            _controlBarScreenBounds = Rect.Empty;
             return;
         }
 
         var popupSource = PresentationSource.FromVisual(ControlBar) as HwndSource;
         if (popupSource?.Handle is not { } popupHandle || popupHandle == IntPtr.Zero)
         {
-            _ = Dispatcher.BeginInvoke(UpdateControlBarPopupPlacement, DispatcherPriority.Loaded);
+            _ = Dispatcher.BeginInvoke(
+                () => UpdateControlBarPopupPlacement(moveNativePopup: true),
+                DispatcherPriority.Loaded);
             return;
         }
 
         var resizeInset = GetControlBarResizeInset();
-        var popupWidth = Math.Max(1d, RootLayout.ActualWidth - (resizeInset * 2d));
+        var availableWidth = GetControlBarAvailableWidth(resizeInset);
+        var popupWidth = GetControlBarWidth(availableWidth);
+        var horizontalOffset = GetControlBarHorizontalOffset(resizeInset, availableWidth, popupWidth);
         var popupTopLeft = RootLayout.PointToScreen(
-            new Point(resizeInset, Math.Max(0d, RootLayout.ActualHeight - ControlBar.ActualHeight)));
+            new Point(horizontalOffset, Math.Max(0d, RootLayout.ActualHeight - ControlBar.ActualHeight - ControlBarBottomLift)));
         var transformToDevice = PresentationSource.FromVisual(RootLayout)?.CompositionTarget?.TransformToDevice
                                 ?? Matrix.Identity;
         var popupSize = transformToDevice.Transform(new Point(popupWidth, ControlBar.ActualHeight));
@@ -1698,6 +2127,32 @@ public partial class PlayerWindow : Window
             Math.Max(1, (int)Math.Round(popupSize.X)),
             Math.Max(1, (int)Math.Round(popupSize.Y)),
             SwpNoZOrder | SwpNoActivate);
+        CacheControlBarScreenBounds(popupTopLeft, popupSize);
+    }
+
+    private void RefreshControlBarScreenBoundsFromElement()
+    {
+        if (!ControlBarPopup.IsOpen || ControlBar.ActualWidth <= 0 || ControlBar.ActualHeight <= 0)
+        {
+            _controlBarScreenBounds = Rect.Empty;
+            return;
+        }
+
+        var popupTopLeft = ControlBar.PointToScreen(new Point(0d, 0d));
+        var transformToDevice = PresentationSource.FromVisual(ControlBar)?.CompositionTarget?.TransformToDevice
+                                ?? Matrix.Identity;
+        var popupSize = transformToDevice.Transform(new Point(ControlBar.ActualWidth, ControlBar.ActualHeight));
+        CacheControlBarScreenBounds(popupTopLeft, popupSize);
+    }
+
+    private void CacheControlBarScreenBounds(Point popupTopLeft, Point popupSize)
+    {
+        const double hitTestPadding = 4d;
+        _controlBarScreenBounds = new Rect(
+            popupTopLeft.X - hitTestPadding,
+            popupTopLeft.Y - hitTestPadding,
+            Math.Max(1d, popupSize.X) + (hitTestPadding * 2d),
+            Math.Max(1d, popupSize.Y) + (hitTestPadding * 2d));
     }
 
     private void MoveInteractionFeedbackPopupWindow()
@@ -1710,7 +2165,9 @@ public partial class PlayerWindow : Window
         var popupSource = PresentationSource.FromVisual(InteractionFeedbackLayer) as HwndSource;
         if (popupSource?.Handle is not { } popupHandle || popupHandle == IntPtr.Zero)
         {
-            _ = Dispatcher.BeginInvoke(UpdateInteractionFeedbackPopupPlacement, DispatcherPriority.Loaded);
+            _ = Dispatcher.BeginInvoke(
+                () => UpdateInteractionFeedbackPopupPlacement(moveNativePopup: true),
+                DispatcherPriority.Loaded);
             return;
         }
 
@@ -1809,6 +2266,12 @@ public partial class PlayerWindow : Window
         if (!ControlBarPopup.IsOpen || ControlBar.ActualWidth <= 0 || ControlBar.ActualHeight <= 0)
         {
             return false;
+        }
+
+        if (!_controlBarScreenBounds.IsEmpty
+            && _controlBarScreenBounds.Contains(new Point(cursorPosition.X, cursorPosition.Y)))
+        {
+            return true;
         }
 
         var point = ControlBar.PointFromScreen(new Point(cursorPosition.X, cursorPosition.Y));
@@ -1920,13 +2383,12 @@ public partial class PlayerWindow : Window
     private void OnWindowDeactivated(object? sender, EventArgs e)
     {
         _lastCursorPosition = null;
-        _lastVideoClickPoint = null;
-        _lastVideoClickTick = 0;
         _isSourceMenuOpen = false;
         _isSubtitleMenuOpen = false;
         _isAudioTrackMenuOpen = false;
         _cursorPollTimer.Stop();
         UninstallMouseWheelHook();
+        HideVolumeHoverPopup();
         HideControlBar();
     }
 
@@ -2165,11 +2627,6 @@ public partial class PlayerWindow : Window
         {
             var hookData = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
             var message = wParam.ToInt32();
-            if (message == WmLButtonDown && TryHandleNativeVideoLeftButtonDown(hookData.Point))
-            {
-                return new IntPtr(1);
-            }
-
             if (message is WmMouseWheel or WmMouseHWheel
                 && TryHandleNativeMouseWheel(unchecked((short)((hookData.MouseData >> 16) & 0xffff)), hookData.Point))
             {
@@ -2221,12 +2678,6 @@ public partial class PlayerWindow : Window
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO monitorInfo);
-
-    [DllImport("user32.dll")]
-    private static extern uint GetDoubleClickTime();
-
-    [DllImport("user32.dll")]
-    private static extern int GetSystemMetrics(int nIndex);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(

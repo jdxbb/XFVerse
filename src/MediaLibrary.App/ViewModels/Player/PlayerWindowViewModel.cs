@@ -22,6 +22,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 {
     private const string AudioSwitchingStatusMessage = "\u97f3\u8f68\u5207\u6362\u4e2d...";
     private const string SubtitleSwitchingStatusMessage = "\u6b63\u5728\u5207\u6362\u5b57\u5e55...";
+    private const int EnginePositionUiThrottleMilliseconds = 125;
 
     private enum PlaybackSourceMode
     {
@@ -95,6 +96,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private static readonly TimeSpan SubtitleTrackDiscoveryMaximumWait = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ShutdownWatchHistorySaveTimeout = TimeSpan.FromMilliseconds(1500);
     private static readonly TimeSpan PlayerPreferencesSaveDebounce = TimeSpan.FromMilliseconds(800);
+    private static readonly TimeSpan ResumeMessageDisplayDuration = TimeSpan.FromSeconds(3);
     private const int ResumeDurationToleranceSeconds = 300;
     private const double ResumeDurationToleranceRatio = 0.05d;
 
@@ -110,6 +112,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private readonly IOnlineSubtitleCacheService _onlineSubtitleCacheService;
     private readonly ISettingsService _settingsService;
     private readonly DispatcherTimer _timer;
+    private readonly DispatcherTimer _playerPreferencesSaveTimer;
     private readonly SemaphoreSlim _playbackReloadLock = new(1, 1);
     private readonly SemaphoreSlim _subtitleSwitchLock = new(1, 1);
     private readonly SemaphoreSlim _audioTrackSwitchLock = new(1, 1);
@@ -148,6 +151,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private bool _hasUserSelectedAudioTrack;
     private bool _isApplyingSubtitle;
     private bool _isApplyingAudioTrack;
+    private bool _isAudioTrackDiscoveryReady;
     private bool _hasAppliedAutomaticSubtitleForCurrentMedia;
     private bool _hasAppliedAutomaticAudioTrackForCurrentMedia;
     private DateTime _suppressAutomaticTrackSelectionUntilUtc;
@@ -188,6 +192,9 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private bool _isMpvMediaLoaded;
     private bool _isAwaitingInitialPlaybackProgress;
+    private readonly object _enginePositionUiThrottleLock = new();
+    private DateTime _lastEnginePositionUiUpdateUtc = DateTime.MinValue;
+    private int _lastEnginePositionUiUpdateSecond = -1;
     private int _playbackDiagnosticsVersion;
     private PlaybackSourceMode _currentPlaybackMode = PlaybackSourceMode.None;
     private PlaybackSourceItem? _currentPlaybackSource;
@@ -221,10 +228,15 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private int _volume = 80;
     private int _lastNonZeroVolume = 50;
     private int _brightness = 100;
+    private int? _lastAppliedPlayerVolume;
+    private int? _lastAppliedPlayerBrightness;
+    private bool? _lastAppliedPlayerMuted;
     private bool _isMuted;
     private bool _isApplyingPlayerPreferences;
     private bool _hasUserChangedPlayerPreferencesThisSession;
-    private CancellationTokenSource? _playerPreferencesSaveCts;
+    private bool _hasPendingPlayerPreferencesSave;
+    private string _pendingPlayerPreferencesSaveReason = "preferences";
+    private CancellationTokenSource? _resumeMessageClearCts;
     private int _temporaryOnlineSubtitleId;
 
     public PlayerWindowViewModel(
@@ -267,6 +279,12 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             Interval = TimeSpan.FromSeconds(1)
         };
         _timer.Tick += OnTimerTick;
+
+        _playerPreferencesSaveTimer = new DispatcherTimer
+        {
+            Interval = PlayerPreferencesSaveDebounce
+        };
+        _playerPreferencesSaveTimer.Tick += OnPlayerPreferencesSaveTimerTick;
 
         _ = LoadPlayerPreferencesAsync();
     }
@@ -334,7 +352,13 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     public string StatusMessage
     {
         get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
+        private set
+        {
+            if (SetProperty(ref _statusMessage, value))
+            {
+                OnPropertyChanged(nameof(AudioTrackMenuStatusText));
+            }
+        }
     }
 
     public string ResumeMessage
@@ -412,6 +436,33 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         : $"{AudioTrackButtonPrefix}{_selectedAudioTrack.DisplayName}";
 
     public string AudioTrackButtonToolTip => _selectedAudioTrack?.TooltipText ?? "\u97f3\u8f68\u4e0d\u53ef\u7528";
+
+    public bool IsAudioTrackDiscoveryReady
+    {
+        get => _isAudioTrackDiscoveryReady;
+        private set
+        {
+            if (SetProperty(ref _isAudioTrackDiscoveryReady, value))
+            {
+                OnPropertyChanged(nameof(AudioTrackMenuStatusText));
+            }
+        }
+    }
+
+    public string AudioTrackMenuStatusText
+    {
+        get
+        {
+            if (_isApplyingAudioTrack || HasPendingAudioTrackSwitch())
+            {
+                return AudioSwitchingStatusMessage;
+            }
+
+            return string.Equals(StatusMessage, "\u97f3\u8f68\u5207\u6362\u5931\u8d25\u3002", StringComparison.Ordinal)
+                ? "\u4e0a\u6b21\u97f3\u8f68\u5207\u6362\u5931\u8d25\uff0c\u5df2\u56de\u5230\u5f53\u524d\u97f3\u8f68\u3002"
+                : string.Empty;
+        }
+    }
 
     public string SourceButtonText => SelectedSource is null
         ? "\u64ad\u653e\u6e90"
@@ -534,6 +585,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
                 ApplyVolumeToPlayer();
                 OnPropertyChanged(nameof(VolumeText));
                 OnPropertyChanged(nameof(VolumeFeedbackText));
+                OnPropertyChanged(nameof(IsVolumeBoosted));
                 if (!_isApplyingPlayerPreferences)
                 {
                     _hasUserChangedPlayerPreferencesThisSession = true;
@@ -544,9 +596,11 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public string VolumeText => Volume > 100 ? $"\u589e\u76ca {Volume}%" : $"{Volume}%";
+    public string VolumeText => $"{Volume}%";
 
-    public string VolumeFeedbackText => Volume > 100 ? $"\u97f3\u91cf\u589e\u76ca {Volume}%" : $"\u97f3\u91cf {Volume}%";
+    public string VolumeFeedbackText => $"{Volume}%";
+
+    public bool IsVolumeBoosted => Volume > 100;
 
     public int Brightness
     {
@@ -1206,6 +1260,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         _hasUserSelectedAudioTrack = false;
         _hasAppliedAutomaticAudioTrackForCurrentMedia = false;
         _isApplyingAudioTrack = false;
+        IsAudioTrackDiscoveryReady = false;
         AudioTracks.Clear();
         SetSelectedAudioTrackSilently(null);
     }
@@ -1935,6 +1990,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         {
             await _audioTrackSwitchLock.WaitAsync();
             _isApplyingAudioTrack = true;
+            OnPropertyChanged(nameof(AudioTrackMenuStatusText));
             SuppressAutomaticTrackSelection();
             var statusBeforeAudioSwitch = StatusMessage;
             if (isUserInitiated)
@@ -1968,6 +2024,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             finally
             {
                 _isApplyingAudioTrack = false;
+                OnPropertyChanged(nameof(AudioTrackMenuStatusText));
                 _audioTrackSwitchLock.Release();
             }
 
@@ -2305,6 +2362,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         _pendingAudioTrackSwitchTargetAid = targetAid;
         _pendingAudioTrackSwitchConfirmed = false;
         StatusMessage = AudioSwitchingStatusMessage;
+        OnPropertyChanged(nameof(AudioTrackMenuStatusText));
         SetOperationNotice(PlayerOperationNoticeKind.Audio, AudioSwitchingStatusMessage, "audio-switch-start", TimeSpan.FromSeconds(4));
         MpvPlaybackDiagnostics.Write($"mpv-audio-switch-ui-start targetAid={FormatOptionalTrackId(targetAid)}");
         _ = WatchAudioTrackSwitchTimeoutAsync(sourceId, targetAid, version);
@@ -2399,6 +2457,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         _pendingAudioTrackSwitchTargetAid = null;
         _pendingAudioTrackSwitchConfirmed = false;
         Interlocked.Increment(ref _audioTrackSwitchUiVersion);
+        OnPropertyChanged(nameof(AudioTrackMenuStatusText));
     }
 
     private void FailPendingAudioTrackSwitch(string errorType)
@@ -2511,6 +2570,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
                 $"playback-media-create-start mediaFileId={source.MediaFileId} mode={FormatPlaybackMode(_currentPlaybackMode)} uriKind={uriKind} uriLength={playbackUrl.Length}");
             TracePlayback(
                 $"playback-play-start mediaFileId={source.MediaFileId} mode={FormatPlaybackMode(_currentPlaybackMode)} engine=mpv");
+            ResetEnginePositionUiThrottle();
             _isAwaitingInitialPlaybackProgress = shouldResumePlaying;
             var loadRequest = new PlaybackLoadRequest
             {
@@ -2550,11 +2610,11 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
             if (resumePosition > 5 && updateResumeMessage)
             {
-                ResumeMessage = $"\u5df2\u4ece {FormatTime(resumePosition)} \u7ee7\u7eed\u64ad\u653e";
+                SetResumeMessage($"\u5df2\u4ece {FormatTime(resumePosition)} \u7ee7\u7eed\u64ad\u653e");
             }
             else if (updateResumeMessage)
             {
-                ResumeMessage = string.Empty;
+                ClearResumeMessage();
             }
 
             if (!PlaybackEngineDefersTrackFeatures())
@@ -2648,6 +2708,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             SubscribePlaybackEngine(engine);
             await Task.Run(() => engine.InitializeAsync(_playbackHostHandle));
             _playbackEngine = engine;
+            ResetAppliedPlayerPreferenceCache();
             TracePlayback("playback-engine-selected engine=mpv");
             return true;
         }
@@ -2949,6 +3010,11 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         DispatchPlaybackState(engineIsPlaying);
         if (engineIsPlaying)
         {
+            if (!awaitingInitialProgress)
+            {
+                ScheduleResumeMessageClearAfterPlaybackStarted();
+            }
+
             _ = StartPendingWatchHistoryAfterPlaybackReadyAsync();
         }
 
@@ -3086,6 +3152,11 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private void OnPlaybackEnginePositionChanged(object? sender, PlaybackPositionChangedEventArgs e)
     {
         var playbackSeconds = Math.Max(0d, e.Position.TotalSeconds);
+        if (!ShouldUpdatePositionUi(playbackSeconds))
+        {
+            return;
+        }
+
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is not null && !dispatcher.CheckAccess())
         {
@@ -3094,6 +3165,33 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         }
 
         ApplyEnginePosition(playbackSeconds);
+    }
+
+    private bool ShouldUpdatePositionUi(double playbackSeconds)
+    {
+        var now = DateTime.UtcNow;
+        var positionSecond = (int)Math.Floor(playbackSeconds);
+        lock (_enginePositionUiThrottleLock)
+        {
+            if (positionSecond == _lastEnginePositionUiUpdateSecond
+                && now - _lastEnginePositionUiUpdateUtc < TimeSpan.FromMilliseconds(EnginePositionUiThrottleMilliseconds))
+            {
+                return false;
+            }
+
+            _lastEnginePositionUiUpdateUtc = now;
+            _lastEnginePositionUiUpdateSecond = positionSecond;
+            return true;
+        }
+    }
+
+    private void ResetEnginePositionUiThrottle()
+    {
+        lock (_enginePositionUiThrottleLock)
+        {
+            _lastEnginePositionUiUpdateUtc = DateTime.MinValue;
+            _lastEnginePositionUiUpdateSecond = -1;
+        }
     }
 
     private void OnPlaybackEngineDurationChanged(object? sender, PlaybackDurationChangedEventArgs e)
@@ -3357,11 +3455,20 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             or MainPlaybackUiState.Starting
             or MainPlaybackUiState.Recovering)
         {
-            SetMainPlaybackUiState(IsPlaybackEnginePlaying() ? MainPlaybackUiState.Playing : MainPlaybackUiState.Paused, "initial-playback-progress");
+            var isPlaying = IsPlaybackEnginePlaying();
+            SetMainPlaybackUiState(isPlaying ? MainPlaybackUiState.Playing : MainPlaybackUiState.Paused, "initial-playback-progress");
+            if (isPlaying)
+            {
+                ScheduleResumeMessageClearAfterPlaybackStarted();
+            }
         }
         else
         {
             RefreshBufferingOverlayProjection("initial-playback-progress");
+            if (IsPlaybackEnginePlaying())
+            {
+                ScheduleResumeMessageClearAfterPlaybackStarted();
+            }
         }
     }
 
@@ -3551,6 +3658,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        IsAudioTrackDiscoveryReady = true;
         var preparedTracks = PrepareAudioTrackDisplays(tracks);
         var selectedTrack = SelectedAudioTrack;
         AudioTracks.Clear();
@@ -3991,7 +4099,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
                 PositionSeconds = 0;
                 _isUpdatingPosition = false;
                 OnPropertyChanged(nameof(PositionText));
-                ResumeMessage = string.Empty;
+                ClearResumeMessage();
             }
 
             if (updateUi)
@@ -4340,39 +4448,47 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var previousCts = _playerPreferencesSaveCts;
-        previousCts?.Cancel();
-
-        var cts = new CancellationTokenSource();
-        _playerPreferencesSaveCts = cts;
-        _ = SavePlayerPreferencesAfterDelayAsync(cts, reason);
+        _pendingPlayerPreferencesSaveReason = MergePlayerPreferencesSaveReason(
+            _pendingPlayerPreferencesSaveReason,
+            _hasPendingPlayerPreferencesSave,
+            reason);
+        _hasPendingPlayerPreferencesSave = true;
+        _playerPreferencesSaveTimer.Stop();
+        _playerPreferencesSaveTimer.Start();
     }
 
-    private async Task SavePlayerPreferencesAfterDelayAsync(CancellationTokenSource cts, string reason)
+    private async void OnPlayerPreferencesSaveTimerTick(object? sender, EventArgs e)
     {
-        try
+        _playerPreferencesSaveTimer.Stop();
+        if (_disposed || !_hasPendingPlayerPreferencesSave)
         {
-            await Task.Delay(PlayerPreferencesSaveDebounce, cts.Token);
-            await SavePlayerPreferencesSnapshotAsync(reason, cts.Token);
+            return;
         }
-        catch (OperationCanceledException)
-        {
-        }
-        finally
-        {
-            if (ReferenceEquals(_playerPreferencesSaveCts, cts))
-            {
-                _playerPreferencesSaveCts = null;
-            }
 
-            cts.Dispose();
+        var reason = _pendingPlayerPreferencesSaveReason;
+        _hasPendingPlayerPreferencesSave = false;
+        _pendingPlayerPreferencesSaveReason = "preferences";
+        await SavePlayerPreferencesSnapshotAsync(reason, CancellationToken.None);
+    }
+
+    private static string MergePlayerPreferencesSaveReason(
+        string pendingReason,
+        bool hasPendingReason,
+        string newReason)
+    {
+        if (!hasPendingReason || string.Equals(pendingReason, newReason, StringComparison.Ordinal))
+        {
+            return newReason;
         }
+
+        return "preferences";
     }
 
     private async Task FlushPlayerPreferencesAsync(string reason, TimeSpan timeout)
     {
-        var pendingCts = _playerPreferencesSaveCts;
-        pendingCts?.Cancel();
+        _playerPreferencesSaveTimer.Stop();
+        _hasPendingPlayerPreferencesSave = false;
+        _pendingPlayerPreferencesSaveReason = "preferences";
 
         using var timeoutCts = new CancellationTokenSource(timeout);
         try
@@ -4422,8 +4538,24 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            _playbackEngine?.SetVolume(_isMuted ? 0 : _volume);
-            _playbackEngine?.SetMute(_isMuted);
+            var playbackEngine = _playbackEngine;
+            if (playbackEngine is null)
+            {
+                return;
+            }
+
+            var effectiveVolume = _isMuted ? 0 : _volume;
+            if (_lastAppliedPlayerVolume != effectiveVolume)
+            {
+                playbackEngine.SetVolume(effectiveVolume);
+                _lastAppliedPlayerVolume = effectiveVolume;
+            }
+
+            if (_lastAppliedPlayerMuted != _isMuted)
+            {
+                playbackEngine.SetMute(_isMuted);
+                _lastAppliedPlayerMuted = _isMuted;
+            }
         }
         catch
         {
@@ -4435,12 +4567,26 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            _playbackEngine?.SetBrightness(_brightness);
+            var playbackEngine = _playbackEngine;
+            if (playbackEngine is null || _lastAppliedPlayerBrightness == _brightness)
+            {
+                return;
+            }
+
+            playbackEngine.SetBrightness(_brightness);
+            _lastAppliedPlayerBrightness = _brightness;
         }
         catch
         {
             // Brightness adjustment is best-effort while the playback engine is loading or disposing.
         }
+    }
+
+    private void ResetAppliedPlayerPreferenceCache()
+    {
+        _lastAppliedPlayerVolume = null;
+        _lastAppliedPlayerBrightness = null;
+        _lastAppliedPlayerMuted = null;
     }
 
     private async Task StopPlaybackEngineSafelyAsync()
@@ -4758,6 +4904,95 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         SetOperationNotice(kind, text, reason, duration);
     }
 
+    private void SetResumeMessage(string text)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(() => SetResumeMessage(text));
+            return;
+        }
+
+        CancelResumeMessageClear();
+        ResumeMessage = text;
+    }
+
+    private void ClearResumeMessage()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(ClearResumeMessage);
+            return;
+        }
+
+        CancelResumeMessageClear();
+        ResumeMessage = string.Empty;
+    }
+
+    private void ScheduleResumeMessageClearAfterPlaybackStarted()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(ScheduleResumeMessageClearAfterPlaybackStarted);
+            return;
+        }
+
+        if (_disposed || string.IsNullOrWhiteSpace(ResumeMessage))
+        {
+            return;
+        }
+
+        var previousCts = _resumeMessageClearCts;
+        previousCts?.Cancel();
+
+        var cts = new CancellationTokenSource();
+        _resumeMessageClearCts = cts;
+        _ = ClearResumeMessageAfterDelayAsync(cts);
+    }
+
+    private async Task ClearResumeMessageAfterDelayAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(ResumeMessageDisplayDuration, cts.Token);
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher is not null && !dispatcher.CheckAccess())
+            {
+                await dispatcher.InvokeAsync(() => ClearResumeMessageFromDelay(cts));
+                return;
+            }
+
+            ClearResumeMessageFromDelay(cts);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_resumeMessageClearCts, cts))
+            {
+                _resumeMessageClearCts = null;
+            }
+
+            cts.Dispose();
+        }
+    }
+
+    private void ClearResumeMessageFromDelay(CancellationTokenSource cts)
+    {
+        if (!_disposed && ReferenceEquals(_resumeMessageClearCts, cts))
+        {
+            ResumeMessage = string.Empty;
+        }
+    }
+
+    private void CancelResumeMessageClear()
+    {
+        _resumeMessageClearCts?.Cancel();
+    }
+
     private void RefreshDisplayStatusProjection(string reason)
     {
         DisplayStatusText = ResolveDisplayStatusText();
@@ -4888,6 +5123,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             MainPlaybackUiState.Opening => "\u6b63\u5728\u6253\u5f00\u5a92\u4f53...",
             MainPlaybackUiState.LoadingMetadata => "\u6b63\u5728\u8bfb\u53d6\u5a92\u4f53\u4fe1\u606f...",
             MainPlaybackUiState.Starting => "\u6b63\u5728\u51c6\u5907\u64ad\u653e...",
+            MainPlaybackUiState.Seeking => "\u6b63\u5728\u8df3\u8f6c...",
             MainPlaybackUiState.Recovering => "\u6b63\u5728\u6062\u590d\u64ad\u653e...",
             MainPlaybackUiState.Buffering when BufferingPercent > 0d && BufferingPercent < 99.5d => $"\u7f13\u51b2\u4e2d {BufferingPercent:0}%",
             _ => "\u7f13\u51b2\u4e2d..."
@@ -5103,6 +5339,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     {
         _isStopped = true;
         _isAwaitingInitialPlaybackProgress = false;
+        ClearResumeMessage();
         _timer.Stop();
         if (_mainPlaybackUiState != MainPlaybackUiState.Closing)
         {
@@ -6215,9 +6452,11 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         SetMainPlaybackUiState(MainPlaybackUiState.Closing, "dispose");
         ClearOperationNotice("dispose");
         ResetBufferingState();
+        CancelResumeMessageClear();
         _ = FlushPlayerPreferencesAsync("dispose", TimeSpan.FromMilliseconds(300));
         _disposed = true;
         _timer.Stop();
+        _playerPreferencesSaveTimer.Stop();
         MpvPlaybackDiagnostics.Write("player-r4-timer-stopped");
         _videoCacheService.StatusChanged -= OnVideoCacheStatusChanged;
         DisposePlaybackResources("dispose");
@@ -6248,6 +6487,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
                 UnsubscribePlaybackEngine(_playbackEngine);
                 _playbackEngine.Dispose();
                 _playbackEngine = null;
+                ResetAppliedPlayerPreferenceCache();
             }
         }
         catch

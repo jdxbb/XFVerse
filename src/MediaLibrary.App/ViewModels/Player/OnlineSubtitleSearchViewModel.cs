@@ -31,6 +31,7 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
     private bool _isLoading;
     private int _totalCount;
     private int _totalPages;
+    private bool _isSortAscending;
 
     public OnlineSubtitleSearchViewModel(
         IOpenSubtitlesClientService openSubtitlesClientService,
@@ -47,7 +48,10 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
         _context = context;
         _applySubtitleAsync = applySubtitleAsync;
 
-        Languages = _openSubtitlesClientService.SupportedLanguages;
+        Languages = _openSubtitlesClientService.SupportedLanguages
+            .Select(x => new OpenSubtitlesLanguageOption(x.Code, LocalizeLanguageName(x)))
+            .OrderBy(x => GetLanguagePriority(x.Code))
+            .ToList();
         Types =
         [
             new OnlineSubtitleSearchTypeOption("movie", "电影"),
@@ -68,9 +72,32 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
         _selectedType = Types.First(x => x.Key == context.DefaultType);
         _selectedSort = SortOptions.First();
         _searchQuery = context.InitialQuery;
-        _quotaHint = "下载额度将在下载时根据 OpenSubtitles 返回结果提示。";
+        _quotaHint = string.Empty;
 
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !IsLoading);
+        ClearSearchQueryCommand = new RelayCommand(() => SearchQuery = string.Empty);
+        ToggleSortDirectionCommand = new RelayCommand(ToggleSortDirection);
+        SelectSortCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is OnlineSubtitleSortOption option)
+            {
+                SelectedSort = option;
+            }
+        });
+        SelectTypeCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is OnlineSubtitleSearchTypeOption option)
+            {
+                SelectedType = option;
+            }
+        });
+        SelectLanguageCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is OpenSubtitlesLanguageOption option)
+            {
+                SelectedLanguage = option;
+            }
+        });
     }
 
     public IReadOnlyList<OpenSubtitlesLanguageOption> Languages { get; }
@@ -83,22 +110,58 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
 
     public AsyncRelayCommand SearchCommand { get; }
 
+    public RelayCommand ClearSearchQueryCommand { get; }
+
+    public RelayCommand ToggleSortDirectionCommand { get; }
+
+    public RelayCommand SelectSortCommand { get; }
+
+    public RelayCommand SelectTypeCommand { get; }
+
+    public RelayCommand SelectLanguageCommand { get; }
+
     public string WindowTitle => "搜索在线字幕";
 
     public string ContextSummary => _context.ContextSummary;
 
     public string SafeFileNameHint => _context.SafeFileName;
 
+    public string CurrentSourceDisplayText => $"当前播放源：{SafeFileNameHint}";
+
+    public string SortButtonText => BuildFilterButtonText("排序", SelectedSort?.DisplayName);
+
+    public string TypeButtonText => BuildFilterButtonText("类型", SelectedType?.DisplayName);
+
+    public string LanguageButtonText => BuildFilterButtonText("语言", SelectedLanguage?.Name);
+
+    public string SortDirectionButtonToolTip => BuildFilterButtonText("顺序", _isSortAscending ? "升序" : "降序");
+
+    public string SortDirectionIconData => _isSortAscending
+        ? "M 8 18 L 8 6 M 4 10 L 8 6 L 12 10 M 15 7 H 23 M 15 12 H 21 M 15 17 H 19"
+        : "M 8 6 L 8 18 M 4 14 L 8 18 L 12 14 M 15 7 H 19 M 15 12 H 21 M 15 17 H 23";
+
     public OpenSubtitlesLanguageOption? SelectedLanguage
     {
         get => _selectedLanguage;
-        set => SetProperty(ref _selectedLanguage, value);
+        set
+        {
+            if (SetProperty(ref _selectedLanguage, value))
+            {
+                OnPropertyChanged(nameof(LanguageButtonText));
+            }
+        }
     }
 
     public OnlineSubtitleSearchTypeOption? SelectedType
     {
         get => _selectedType;
-        set => SetProperty(ref _selectedType, value);
+        set
+        {
+            if (SetProperty(ref _selectedType, value))
+            {
+                OnPropertyChanged(nameof(TypeButtonText));
+            }
+        }
     }
 
     public OnlineSubtitleSortOption? SelectedSort
@@ -108,6 +171,7 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedSort, value))
             {
+                OnPropertyChanged(nameof(SortButtonText));
                 ApplySort();
             }
         }
@@ -218,13 +282,16 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
 
             TotalCount = page.TotalCount;
             TotalPages = page.TotalPages;
+            var existingBindings = await GetExistingCachedBindingsAsync(cancellationToken);
             foreach (var item in page.Results)
             {
-                _allResults.Add(new OnlineSubtitleSearchResultViewModel(
+                var result = new OnlineSubtitleSearchResultViewModel(
                     item,
                     ComputeMatchScore(item, request),
                     SelectedLanguage?.Code ?? "zh-cn",
-                    DownloadResultAsync));
+                    DownloadResultAsync);
+                result.IsDownloaded = existingBindings.Any(binding => MatchesExistingCachedBinding(binding, result));
+                _allResults.Add(result);
             }
 
             ApplySort();
@@ -288,6 +355,12 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
                     ? "已存在相同绑定，已直接切换。"
                     : existingApply.Message;
                 StatusMessage = result.DownloadStatus;
+                if (existingApply.Succeeded)
+                {
+                    result.IsDownloaded = true;
+                    result.DownloadStatus = string.Empty;
+                }
+
                 return;
             }
 
@@ -364,6 +437,12 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
                 ? BuildDownloadSuccessMessage(download, binding is null)
                 : applyResult.Message;
             StatusMessage = result.DownloadStatus;
+            if (applyResult.Succeeded && binding is not null)
+            {
+                result.IsDownloaded = true;
+                result.DownloadStatus = string.Empty;
+            }
+
             MpvPlaybackDiagnostics.Write(
                 $"online-subtitle-download-complete bound={(binding is not null).ToString().ToLowerInvariant()} remaining={(download.Remaining?.ToString(CultureInfo.InvariantCulture) ?? "unknown")}");
         }
@@ -402,24 +481,33 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
     private async Task<OnlineSubtitleBindingListItem?> FindExistingCachedBindingAsync(
         OnlineSubtitleSearchResultViewModel result)
     {
+        var bindings = await GetExistingCachedBindingsAsync(CancellationToken.None);
+        return bindings.FirstOrDefault(x => MatchesExistingCachedBinding(x, result));
+    }
+
+    private async Task<IReadOnlyList<OnlineSubtitleBindingListItem>> GetExistingCachedBindingsAsync(CancellationToken cancellationToken)
+    {
         if (!_context.BindingMovieId.HasValue && !_context.BindingEpisodeId.HasValue && !_context.BindingMediaFileId.HasValue)
         {
-            return null;
+            return [];
         }
 
-        var bindings = await _onlineSubtitleBindingService.GetActiveBindingsAsync(
+        return await _onlineSubtitleBindingService.GetActiveBindingsAsync(
             _context.BindingMovieId,
             _context.BindingEpisodeId,
-            _context.BindingMediaFileId);
-        return bindings.FirstOrDefault(
-            x => x.HasCacheFile
-                 && string.Equals(x.Provider, ProviderName, StringComparison.OrdinalIgnoreCase)
-                 && string.Equals(x.ProviderFileId, result.ProviderFileId, StringComparison.OrdinalIgnoreCase))
-               ?? bindings.FirstOrDefault(
-                   x => x.HasCacheFile
-                        && !string.IsNullOrWhiteSpace(result.SubtitleId)
-                        && string.Equals(x.Provider, ProviderName, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(x.ProviderSubtitleId, result.SubtitleId, StringComparison.OrdinalIgnoreCase));
+            _context.BindingMediaFileId,
+            cancellationToken);
+    }
+
+    private static bool MatchesExistingCachedBinding(
+        OnlineSubtitleBindingListItem binding,
+        OnlineSubtitleSearchResultViewModel result)
+    {
+        return binding.HasCacheFile
+               && string.Equals(binding.Provider, ProviderName, StringComparison.OrdinalIgnoreCase)
+               && (string.Equals(binding.ProviderFileId, result.ProviderFileId, StringComparison.OrdinalIgnoreCase)
+                   || (!string.IsNullOrWhiteSpace(result.SubtitleId)
+                       && string.Equals(binding.ProviderSubtitleId, result.SubtitleId, StringComparison.OrdinalIgnoreCase)));
     }
 
     private static string BuildBindingDisplayName(OnlineSubtitleBindingListItem binding)
@@ -521,7 +609,9 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
             Type = type,
             Page = 1,
             OrderBy = orderBy,
-            OrderDirection = string.IsNullOrWhiteSpace(orderBy) ? string.Empty : "desc"
+            OrderDirection = string.IsNullOrWhiteSpace(orderBy)
+                ? string.Empty
+                : _isSortAscending ? "asc" : "desc"
         };
     }
 
@@ -604,7 +694,7 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
     private void ApplySort()
     {
         var sortKey = SelectedSort?.Key ?? "composite";
-        var ordered = sortKey switch
+        IEnumerable<OnlineSubtitleSearchResultViewModel> ordered = sortKey switch
         {
             "downloads" => _allResults
                 .OrderByDescending(x => x.DownloadCount ?? -1)
@@ -623,6 +713,11 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
                 .OrderByDescending(x => x.CompositeScore)
                 .ThenByDescending(x => x.MatchScore)
         };
+
+        if (_isSortAscending)
+        {
+            ordered = ordered.Reverse();
+        }
 
         Results.Clear();
         foreach (var result in ordered)
@@ -652,6 +747,156 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
     private static string FirstNonEmpty(params string?[] values)
     {
         return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+    }
+
+    private void ToggleSortDirection()
+    {
+        _isSortAscending = !_isSortAscending;
+        OnPropertyChanged(nameof(SortDirectionButtonToolTip));
+        OnPropertyChanged(nameof(SortDirectionIconData));
+        ApplySort();
+    }
+
+    private static string BuildFilterButtonText(string label, string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? label
+            : $"{label}：{value}";
+    }
+
+    private static int GetLanguagePriority(string code)
+    {
+        return code.ToLowerInvariant() switch
+        {
+            "zh-cn" => 0,
+            "zh-tw" => 1,
+            "ze" => 2,
+            "zh-ca" => 3,
+            "en" => 4,
+            "ja" => 5,
+            "ko" => 6,
+            "fr" => 7,
+            "de" => 8,
+            "es" => 9,
+            "ru" => 10,
+            "it" => 11,
+            "pt-br" => 12,
+            "pt-pt" => 13,
+            _ => 100
+        };
+    }
+
+    private static string LocalizeLanguageName(OpenSubtitlesLanguageOption language)
+    {
+        return language.Code.ToLowerInvariant() switch
+        {
+            "ab" => "阿布哈兹语",
+            "af" => "南非语",
+            "sq" => "阿尔巴尼亚语",
+            "am" => "阿姆哈拉语",
+            "ar" => "阿拉伯语",
+            "an" => "阿拉贡语",
+            "hy" => "亚美尼亚语",
+            "as" => "阿萨姆语",
+            "at" => "阿斯图里亚斯语",
+            "az-az" => "阿塞拜疆语",
+            "eu" => "巴斯克语",
+            "be" => "白俄罗斯语",
+            "bn" => "孟加拉语",
+            "bs" => "波斯尼亚语",
+            "br" => "布列塔尼语",
+            "bg" => "保加利亚语",
+            "my" => "缅甸语",
+            "ca" => "加泰罗尼亚语",
+            "ze" => "中英双语",
+            "zh-ca" => "粤语中文",
+            "zh-cn" => "简体中文",
+            "zh-tw" => "繁体中文",
+            "hr" => "克罗地亚语",
+            "cs" => "捷克语",
+            "da" => "丹麦语",
+            "pr" => "达里语",
+            "nl" => "荷兰语",
+            "en" => "英语",
+            "eo" => "世界语",
+            "et" => "爱沙尼亚语",
+            "ex" => "埃斯特雷马杜拉语",
+            "fi" => "芬兰语",
+            "fr" => "法语",
+            "gd" => "盖尔语",
+            "gl" => "加利西亚语",
+            "ka" => "格鲁吉亚语",
+            "de" => "德语",
+            "el" => "希腊语",
+            "he" => "希伯来语",
+            "hi" => "印地语",
+            "hu" => "匈牙利语",
+            "is" => "冰岛语",
+            "ig" => "伊博语",
+            "id" => "印尼语",
+            "ia" => "国际语",
+            "ga" => "爱尔兰语",
+            "it" => "意大利语",
+            "ja" => "日语",
+            "kn" => "卡纳达语",
+            "kk" => "哈萨克语",
+            "km" => "高棉语",
+            "ko" => "韩语",
+            "ku" => "库尔德语",
+            "lv" => "拉脱维亚语",
+            "lt" => "立陶宛语",
+            "lb" => "卢森堡语",
+            "mk" => "马其顿语",
+            "ms" => "马来语",
+            "ml" => "马拉雅拉姆语",
+            "ma" => "曼尼普尔语",
+            "mr" => "马拉地语",
+            "mn" => "蒙古语",
+            "me" => "黑山语",
+            "nv" => "纳瓦霍语",
+            "ne" => "尼泊尔语",
+            "se" => "北萨米语",
+            "no" => "挪威语",
+            "oc" => "奥克语",
+            "or" => "奥里亚语",
+            "fa" => "波斯语",
+            "pl" => "波兰语",
+            "pt-pt" => "葡萄牙语",
+            "pt-br" => "葡萄牙语（巴西）",
+            "pm" => "葡萄牙语（莫桑比克）",
+            "ps" => "普什图语",
+            "ro" => "罗马尼亚语",
+            "ru" => "俄语",
+            "sx" => "桑塔利语",
+            "sr" => "塞尔维亚语",
+            "sd" => "信德语",
+            "si" => "僧伽罗语",
+            "sk" => "斯洛伐克语",
+            "sl" => "斯洛文尼亚语",
+            "so" => "索马里语",
+            "az-zb" => "南阿塞拜疆语",
+            "es" => "西班牙语",
+            "sp" => "西班牙语（欧洲）",
+            "ea" => "西班牙语（拉美）",
+            "sw" => "斯瓦希里语",
+            "sv" => "瑞典语",
+            "sy" => "叙利亚语",
+            "tl" => "他加禄语",
+            "ta" => "泰米尔语",
+            "tt" => "鞑靼语",
+            "te" => "泰卢固语",
+            "tm-td" => "德顿语",
+            "th" => "泰语",
+            "tp" => "道本语",
+            "tr" => "土耳其语",
+            "tk" => "土库曼语",
+            "uk" => "乌克兰语",
+            "ur" => "乌尔都语",
+            "uz" => "乌兹别克语",
+            "vi" => "越南语",
+            "cy" => "威尔士语",
+            _ => language.Name
+        };
     }
 
     private static string MapSearchStatus(string message)
@@ -865,6 +1110,7 @@ public sealed class OnlineSubtitleSearchContext
 public sealed class OnlineSubtitleSearchResultViewModel : ViewModelBase
 {
     private bool _isDownloading;
+    private bool _isDownloaded;
     private string _downloadStatus = string.Empty;
 
     public OnlineSubtitleSearchResultViewModel(
@@ -963,6 +1209,19 @@ public sealed class OnlineSubtitleSearchResultViewModel : ViewModelBase
         }
     }
 
+    public bool IsDownloaded
+    {
+        get => _isDownloaded;
+        set
+        {
+            if (SetProperty(ref _isDownloaded, value))
+            {
+                OnPropertyChanged(nameof(DownloadButtonText));
+                DownloadCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public string DownloadStatus
     {
         get => _downloadStatus;
@@ -977,11 +1236,41 @@ public sealed class OnlineSubtitleSearchResultViewModel : ViewModelBase
 
     public bool IsDownloadStatusVisible => !string.IsNullOrWhiteSpace(DownloadStatus);
 
-    public bool CanDownload => !IsDownloading && !string.IsNullOrWhiteSpace(ProviderFileId);
+    public bool CanDownload => !IsDownloading && !IsDownloaded && !string.IsNullOrWhiteSpace(ProviderFileId);
 
-    public string DownloadButtonText => IsDownloading ? "下载中..." : "下载";
+    public string DownloadButtonText => IsDownloaded
+        ? "已下载"
+        : IsDownloading
+            ? "下载中..."
+            : "下载";
 
     public string PrimaryText => ReleaseName;
+
+    public string UploaderDisplayText => FirstNonEmpty(UploaderName, "未知");
+
+    public string UploadedDateDisplayText => UploadedAt.HasValue
+        ? UploadedAt.Value.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.CurrentCulture)
+        : "未知";
+
+    public string RatingVoteDisplayText
+    {
+        get
+        {
+            var rating = Rating.HasValue
+                ? Rating.Value.ToString("0.0", CultureInfo.InvariantCulture)
+                : "未知";
+            var votes = Votes.HasValue
+                ? Votes.Value.ToString("N0", CultureInfo.InvariantCulture)
+                : "未知";
+            return $"{rating}（{votes}票）";
+        }
+    }
+
+    public string LanguageDisplayText => LocalizeLanguageName(LanguageCode, LanguageName);
+
+    public string DownloadCountDisplayText => DownloadCount.HasValue
+        ? DownloadCount.Value.ToString("N0", CultureInfo.InvariantCulture)
+        : "未知";
 
     public string SecondaryText
     {
@@ -1027,7 +1316,41 @@ public sealed class OnlineSubtitleSearchResultViewModel : ViewModelBase
         ? UploadedAt.Value.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.CurrentCulture)
         : "上传时间未知";
 
-    public string MatchScoreText => $"匹配度 {MatchScore}";
+    public string MatchScoreText => $"匹配度：{MatchScore}";
+
+    private static string LocalizeLanguageName(string code, string fallback)
+    {
+        return code.ToLowerInvariant() switch
+        {
+            "ze" => "中英双语",
+            "zh-ca" => "粤语中文",
+            "zh-cn" => "简体中文",
+            "zh-tw" => "繁体中文",
+            "en" => "英语",
+            "ja" => "日语",
+            "ko" => "韩语",
+            "fr" => "法语",
+            "de" => "德语",
+            "es" or "sp" or "ea" => "西班牙语",
+            "it" => "意大利语",
+            "ru" => "俄语",
+            "pt-pt" => "葡萄牙语",
+            "pt-br" => "葡萄牙语（巴西）",
+            "ar" => "阿拉伯语",
+            "hi" => "印地语",
+            "th" => "泰语",
+            "vi" => "越南语",
+            "id" => "印尼语",
+            "tr" => "土耳其语",
+            "pl" => "波兰语",
+            "nl" => "荷兰语",
+            "sv" => "瑞典语",
+            "da" => "丹麦语",
+            "fi" => "芬兰语",
+            "no" => "挪威语",
+            _ => string.IsNullOrWhiteSpace(fallback) ? code : fallback
+        };
+    }
 
     private static double BuildCompositeScore(OpenSubtitlesSearchItem item, int matchScore, string requestedLanguageCode)
     {

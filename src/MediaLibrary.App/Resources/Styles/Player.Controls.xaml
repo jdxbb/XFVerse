@@ -1,5 +1,10 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
+    <SolidColorBrush x:Key="BrushPlayerMenuSelectedBackground" Color="#243750" />
+    <SolidColorBrush x:Key="BrushPlayerMenuSelectedBorder" Color="#4EA3FF" />
+    <helpers:PlayerMeterFillHeightConverter x:Key="PlayerMeterFillHeightConverter" />
+
     <Style x:Key="PlayerButtonStyle" TargetType="Button">
         <Setter Property="MinHeight" Value="{StaticResource ButtonHeight}" />
         <Setter Property="Padding" Value="{StaticResource ButtonPadding}" />
@@ -25,6 +30,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="PlayerButtonChrome" Property="Background" Value="{DynamicResource BrushPlayerSurface}" />
                             <Setter TargetName="PlayerButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerAccent}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
@@ -32,8 +38,9 @@
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="PlayerButtonChrome" Property="Background" Value="{DynamicResource BrushPlayerSurface}" />
-                            <Setter TargetName="PlayerButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
-                            <Setter Property="Foreground" Value="{DynamicResource BrushPlayerDisabled}" />
+                            <Setter TargetName="PlayerButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerDisabled}" />
+                            <Setter TargetName="PlayerButtonChrome" Property="Opacity" Value="0.42" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextMuted}" />
                             <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -53,7 +60,7 @@
     </Style>
 
     <Style x:Key="PlayerWindowCaptionStyle" TargetType="Border">
-        <Setter Property="Height" Value="{StaticResource WindowCaptionHeight}" />
+        <Setter Property="Height" Value="46" />
         <Setter Property="Background" Value="{DynamicResource BrushPlayerSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
         <Setter Property="BorderThickness" Value="0,0,0,1" />
@@ -73,20 +80,18 @@
         <Setter Property="Height" Value="36" />
         <Setter Property="MinWidth" Value="40" />
         <Setter Property="MinHeight" Value="36" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextSecondary}" />
-    </Style>
-
-    <Style x:Key="PlayerWindowCaptionCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayerWindowCaptionButtonStyle}">
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource BrushPlayerDanger}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerDanger}" />
-                <Setter Property="Foreground" Value="{DynamicResource BrushPlayerBackground}" />
+                <Setter Property="Background" Value="{DynamicResource BrushPlayerSurfaceElevated}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerAccent}" />
+                <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
                 <Setter Property="Opacity" Value="0.78" />
@@ -94,23 +99,424 @@
         </Style.Triggers>
     </Style>
 
+    <Style x:Key="PlayerWindowCaptionCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayerWindowCaptionButtonStyle}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="CaptionCloseButtonChrome"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{StaticResource RadiusButton}">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="CaptionCloseButtonChrome" Property="Background" Value="{DynamicResource BrushDanger}" />
+                            <Setter TargetName="CaptionCloseButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushDanger}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="CaptionCloseButtonChrome" Property="Background" Value="{DynamicResource BrushDangerPressed}" />
+                            <Setter TargetName="CaptionCloseButtonChrome" Property="BorderBrush" Value="{DynamicResource BrushDangerPressed}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                            <Setter TargetName="CaptionCloseButtonChrome" Property="Opacity" Value="0.78" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlayerControlBarStatusTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextSecondary}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="PlayerControlBarResumeTextStyle" TargetType="TextBlock" BasedOn="{StaticResource PlayerControlBarStatusTextStyle}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerAccent}" />
+    </Style>
+
+    <Style x:Key="PlayerControlTimeTextStyle" TargetType="TextBlock">
+        <Setter Property="MinWidth" Value="48" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMono}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="PlayerControlGlyphTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="PlayerControlLabelTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="PlayerControlIconButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayerIconButtonStyle}">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="MinWidth" Value="36" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Background" Value="{DynamicResource BrushPlayerSurfaceElevated}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
+    </Style>
+
+    <Style x:Key="PlayerOverlayPanelStyle" TargetType="Border">
+        <Setter Property="MinWidth" Value="220" />
+        <Setter Property="MaxWidth" Value="360" />
+        <Setter Property="Padding" Value="18,14" />
+        <Setter Property="Background" Value="{DynamicResource BrushPlayerPopupBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusPopup}" />
+        <Setter Property="Effect" Value="{StaticResource ShadowPopup}" />
+    </Style>
+
+    <Style x:Key="PlayerFeedbackPanelStyle" TargetType="Border">
+        <Setter Property="Width" Value="58" />
+        <Setter Property="Padding" Value="8,12" />
+        <Setter Property="Background" Value="{DynamicResource BrushPlayerPopupBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Effect" Value="{StaticResource ShadowPopup}" />
+    </Style>
+
+    <Style x:Key="PlayerFeedbackPercentTextStyle" TargetType="TextBlock">
+        <Setter Property="Width" Value="42" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightCaption}" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="PlayerVerticalMeterStyle" TargetType="ProgressBar">
+        <Setter Property="Width" Value="7" />
+        <Setter Property="Height" Value="116" />
+        <Setter Property="Background" Value="{DynamicResource BrushPlayerSliderTrack}" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerSliderProgress}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid x:Name="MeterTemplateRoot"
+                          Width="{TemplateBinding Width}"
+                          Height="{TemplateBinding Height}"
+                          Background="Transparent">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Opacity="0.28" />
+                        <Border Width="{TemplateBinding Width}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Bottom"
+                                Background="{TemplateBinding Foreground}"
+                                CornerRadius="4">
+                            <Border.Height>
+                                <MultiBinding Converter="{StaticResource PlayerMeterFillHeightConverter}">
+                                    <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Value" />
+                                    <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Minimum" />
+                                    <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Maximum" />
+                                    <Binding ElementName="MeterTemplateRoot" Path="ActualHeight" />
+                                </MultiBinding>
+                            </Border.Height>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlayerVerticalSliderStyle" TargetType="Slider">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="128" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerSliderProgress}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid x:Name="VolumeSliderRoot"
+                          Width="{TemplateBinding Width}"
+                          Height="{TemplateBinding Height}"
+                          Background="Transparent">
+                        <Border Width="7"
+                                HorizontalAlignment="Center"
+                                Background="{DynamicResource BrushPlayerSliderTrack}"
+                                CornerRadius="4"
+                                Opacity="0.28" />
+                        <Border Width="7"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Bottom"
+                                Background="{TemplateBinding Foreground}"
+                                CornerRadius="4">
+                            <Border.Height>
+                                <MultiBinding Converter="{StaticResource PlayerMeterFillHeightConverter}">
+                                    <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Value" />
+                                    <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Minimum" />
+                                    <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Maximum" />
+                                    <Binding ElementName="VolumeSliderRoot" Path="ActualHeight" />
+                                </MultiBinding>
+                            </Border.Height>
+                        </Border>
+                        <Track x:Name="PART_Track"
+                               Orientation="Vertical"
+                               IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.DecreaseLarge}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Opacity="0" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb x:Name="VolumeThumb"
+                                       Width="0"
+                                       Height="0"
+                                       Opacity="0">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}"
+                                                     Stroke="{DynamicResource BrushPlayerBackground}"
+                                                     StrokeThickness="1" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.IncreaseLarge}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Opacity="0" />
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="VolumeThumb" Property="Width" Value="10" />
+                            <Setter TargetName="VolumeThumb" Property="Height" Value="10" />
+                            <Setter TargetName="VolumeThumb" Property="Opacity" Value="1" />
+                        </Trigger>
+                        <Trigger SourceName="VolumeThumb" Property="IsDragging" Value="True">
+                            <Setter TargetName="VolumeThumb" Property="Width" Value="10" />
+                            <Setter TargetName="VolumeThumb" Property="Height" Value="10" />
+                            <Setter TargetName="VolumeThumb" Property="Opacity" Value="1" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="PlayerMenuStyle" TargetType="ContextMenu">
         <Setter Property="Background" Value="{DynamicResource BrushPlayerMenuBackground}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
-        <Setter Property="Padding" Value="6" />
+        <Setter Property="Padding" Value="7" />
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="MaxHeight" Value="460" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}"
+                            Effect="{StaticResource ShadowPopup}"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer MaxHeight="{TemplateBinding MaxHeight}"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Hidden"
+                                      PanningDeceleration="0.003"
+                                      PanningMode="VerticalOnly">
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="PlayerMenuItemStyle" TargetType="MenuItem">
-        <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="Margin" Value="0,1" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="ItemChrome"
+                            MinWidth="{TemplateBinding MinWidth}"
+                            MinHeight="{TemplateBinding MinHeight}"
+                            Margin="{TemplateBinding Margin}"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="Transparent"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter ContentSource="Header"
+                                          RecognizesAccessKey="True"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushPlayerSurfaceElevated}" />
+                            <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerAccent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushPlayerMenuSelectedBackground}" />
+                            <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerMenuSelectedBorder}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextMuted}" />
+                            <Setter TargetName="ItemChrome" Property="Background" Value="Transparent" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlayerSubmenuItemStyle" TargetType="MenuItem">
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="Margin" Value="0,1" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextPrimary}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid>
+                        <Border x:Name="ItemChrome"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                Margin="{TemplateBinding Margin}"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                <TextBlock x:Name="SubmenuArrow"
+                                           Grid.Column="1"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Text=">"
+                                           Foreground="{DynamicResource BrushPlayerTextMuted}" />
+                            </Grid>
+                        </Border>
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                               Placement="Custom"
+                               PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                               PopupAnimation="Fade"
+                               VerticalOffset="-7">
+                            <Border Background="{DynamicResource BrushPlayerMenuBackground}"
+                                    BorderBrush="{DynamicResource BrushPlayerBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="7"
+                                    Effect="{StaticResource ShadowPopup}">
+                                <ScrollViewer MaxHeight="360"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Hidden"
+                                              PanningDeceleration="0.003"
+                                              PanningMode="VerticalOnly">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushPlayerSurfaceElevated}" />
+                            <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerAccent}" />
+                            <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushPlayerAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsSubmenuOpen" Value="True">
+                            <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushPlayerSurfaceElevated}" />
+                            <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerAccent}" />
+                            <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushPlayerAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushPlayerMenuSelectedBackground}" />
+                            <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushPlayerMenuSelectedBorder}" />
+                            <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushPlayerMenuSelectedBorder}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextMuted}" />
+                            <Setter TargetName="ItemChrome" Property="Background" Value="Transparent" />
+                            <Setter TargetName="SubmenuArrow" Property="Foreground" Value="{DynamicResource BrushPlayerTextMuted}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlayerMenuSeparatorStyle" TargetType="Separator" BasedOn="{StaticResource MenuSeparatorStyle}">
+        <Setter Property="Margin" Value="8,5" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Height="1"
+                            Background="{DynamicResource BrushPlayerBorder}"
+                            Opacity="0.8" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="PlayerTooltipStyle" TargetType="ToolTip">
@@ -156,10 +562,104 @@
         <Setter Property="BorderThickness" Value="0" />
     </Style>
 
-    <Style x:Key="PlayerSliderStyle" TargetType="Slider">
-        <Setter Property="Foreground" Value="{DynamicResource BrushPlayerSliderProgress}" />
+    <Style x:Key="PlayerHorizontalProgressBarStyle" TargetType="ProgressBar">
+        <Setter Property="Height" Value="4" />
         <Setter Property="Background" Value="{DynamicResource BrushPlayerSliderTrack}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
-        <Setter Property="Height" Value="28" />
+        <Setter Property="Foreground" Value="#4EA3FF" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid Height="{TemplateBinding Height}"
+                          Background="Transparent"
+                          SnapsToDevicePixels="True">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="2" />
+                        <Grid x:Name="PART_Track"
+                              ClipToBounds="True">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="2" />
+                        </Grid>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlayerProgressRepeatButtonStyle" TargetType="RepeatButton">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Height" Value="4" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Height="{TemplateBinding Height}"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlayerSliderStyle" TargetType="Slider">
+        <Setter Property="Foreground" Value="#4EA3FF" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid Height="{TemplateBinding Height}"
+                          Background="Transparent"
+                          SnapsToDevicePixels="True">
+                        <Track x:Name="PART_Track"
+                               VerticalAlignment="Center">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.DecreaseLarge}"
+                                              Background="Transparent"
+                                              Style="{StaticResource PlayerProgressRepeatButtonStyle}" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb x:Name="ProgressThumb"
+                                       Width="0"
+                                       Height="0"
+                                       Opacity="0">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse Fill="#4EA3FF"
+                                                     Stroke="{DynamicResource BrushPlayerBackground}"
+                                                     StrokeThickness="1" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.IncreaseLarge}"
+                                              Background="Transparent"
+                                              Style="{StaticResource PlayerProgressRepeatButtonStyle}" />
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ProgressThumb" Property="Width" Value="10" />
+                            <Setter TargetName="ProgressThumb" Property="Height" Value="10" />
+                            <Setter TargetName="ProgressThumb" Property="Opacity" Value="1" />
+                        </Trigger>
+                        <Trigger SourceName="ProgressThumb" Property="IsDragging" Value="True">
+                            <Setter TargetName="ProgressThumb" Property="Width" Value="10" />
+                            <Setter TargetName="ProgressThumb" Property="Height" Value="10" />
+                            <Setter TargetName="ProgressThumb" Property="Opacity" Value="1" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="ProgressThumb" Property="Opacity" Value="0" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushPlayerDisabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 </ResourceDictionary>
