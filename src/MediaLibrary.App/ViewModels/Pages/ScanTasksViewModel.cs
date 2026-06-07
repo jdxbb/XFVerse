@@ -55,7 +55,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private int _ignoredFileCount;
     private int _errorCount;
     private string _currentStageText = "当前阶段：等待";
-    private string _currentFileText = "尚未开始扫描。";
+    private string _currentFileText = "当前扫描文件：尚未开始扫描。";
     private string _elapsedText = "--";
 
     public ScanTasksViewModel(
@@ -65,7 +65,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         IWebDavService webDavService,
         IScanPathPickerService scanPathPickerService,
         IDataRefreshService dataRefreshService)
-        : base("扫描任务", "管理 WebDAV 连接、扫描路径、扫描进度与最近扫描记录。")
+        : base("扫描任务", "基于WebDAV协议进行扫描")
     {
         _mediaScanService = mediaScanService;
         _localMediaScanService = localMediaScanService;
@@ -77,6 +77,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsRunning);
         SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync, () => !IsRunning);
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, () => !IsRunning);
+        AddWebDavScanPathFromPickerCommand = new AsyncRelayCommand(AddWebDavScanPathFromPickerAsync, () => !IsRunning);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath, () => !IsRunning);
         PickWebDavScanPathCommand = new AsyncRelayCommand(PickWebDavScanPathAsync, () => !IsRunning);
         SaveScanPathCommand = new AsyncRelayCommand(SaveScanPathAsync, () => !IsRunning);
@@ -84,6 +85,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         DeleteScanPathCommand = new AsyncRelayCommand(DeleteScanPathAsync, _ => !IsRunning);
         ToggleScanPathCommand = new AsyncRelayCommand(ToggleScanPathAsync, _ => !IsRunning);
         CancelEditScanPathCommand = new RelayCommand(CancelEditScanPath, () => !IsRunning);
+        AddLocalScanPathFromPickerCommand = new AsyncRelayCommand(AddLocalScanPathFromPickerAsync, () => !IsRunning);
         BeginAddLocalScanPathCommand = new RelayCommand(BeginAddLocalScanPath, () => !IsRunning);
         PickLocalScanPathCommand = new AsyncRelayCommand(PickLocalScanPathAsync, () => !IsRunning);
         SaveLocalScanPathCommand = new AsyncRelayCommand(SaveLocalScanPathAsync, () => !IsRunning);
@@ -101,6 +103,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public ObservableCollection<ScanPathViewModel> LocalScanPaths { get; } = [];
 
+    public ObservableCollection<ScanPathViewModel> PrimaryLocalScanPaths { get; } = [];
+
+    public ObservableCollection<ScanPathViewModel> SecondaryLocalScanPaths { get; } = [];
+
     public ObservableCollection<ScanTaskLogViewModel> RecentLogs { get; } = [];
 
     public AsyncRelayCommand RefreshCommand { get; }
@@ -108,6 +114,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public AsyncRelayCommand SaveConnectionCommand { get; }
 
     public AsyncRelayCommand TestConnectionCommand { get; }
+
+    public AsyncRelayCommand AddWebDavScanPathFromPickerCommand { get; }
 
     public RelayCommand BeginAddScanPathCommand { get; }
 
@@ -122,6 +130,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public AsyncRelayCommand ToggleScanPathCommand { get; }
 
     public RelayCommand CancelEditScanPathCommand { get; }
+
+    public AsyncRelayCommand AddLocalScanPathFromPickerCommand { get; }
 
     public RelayCommand BeginAddLocalScanPathCommand { get; }
 
@@ -494,9 +504,22 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         var paths = await _settingsService.GetLocalScanPathsAsync(cancellationToken);
 
         LocalScanPaths.Clear();
-        foreach (var path in paths)
+        PrimaryLocalScanPaths.Clear();
+        SecondaryLocalScanPaths.Clear();
+        for (var index = 0; index < paths.Count; index++)
         {
-            LocalScanPaths.Add(new ScanPathViewModel(path, null));
+            var path = paths[index];
+            var item = new ScanPathViewModel(path, null);
+            LocalScanPaths.Add(item);
+
+            if (index % 2 == 0)
+            {
+                PrimaryLocalScanPaths.Add(item);
+            }
+            else
+            {
+                SecondaryLocalScanPaths.Add(item);
+            }
         }
 
         LocalScanPathStatusMessage = LocalScanPaths.Count == 0
@@ -620,6 +643,49 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         catch (Exception exception)
         {
             ConnectionStatusMessage = $"测试连接失败：{exception.Message}";
+        }
+    }
+
+    private async Task AddWebDavScanPathFromPickerAsync()
+    {
+        if (!ConnectionId.HasValue)
+        {
+            ScanPathStatusMessage = "请先保存 WebDAV 连接配置。";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(BaseUrl))
+        {
+            ScanPathStatusMessage = "请先填写 WebDAV BaseUrl，再选择远端目录。";
+            return;
+        }
+
+        var selectedPath = await _scanPathPickerService.PickWebDavDirectoryAsync(
+            BuildCurrentWebDavConnectionModel(),
+            "/");
+        if (string.IsNullOrWhiteSpace(selectedPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var saved = await _settingsService.SaveScanPathAsync(
+                new ScanPath
+                {
+                    SourceConnectionId = ConnectionId.Value,
+                    Path = selectedPath,
+                    DisplayName = BuildDisplayNameFromVirtualPath(selectedPath),
+                    IsEnabled = true,
+                    IsRecursive = true
+                });
+
+            await LoadOverviewAsync(CancellationToken.None);
+            ScanPathStatusMessage = $"扫描路径已添加：{saved.DisplayName}";
+        }
+        catch (Exception exception)
+        {
+            ScanPathStatusMessage = exception.Message;
         }
     }
 
@@ -760,6 +826,37 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         LocalScanPathStatusMessage = "正在新增本地目录配置。";
     }
 
+    private async Task AddLocalScanPathFromPickerAsync()
+    {
+        var selectedPath = await _scanPathPickerService.PickLocalDirectoryAsync(string.Empty);
+        if (string.IsNullOrWhiteSpace(selectedPath))
+        {
+            return;
+        }
+
+        var pathExists = Directory.Exists(selectedPath.Trim().Trim('"'));
+        try
+        {
+            var saved = await _settingsService.SaveLocalScanPathAsync(
+                new ScanPath
+                {
+                    Path = selectedPath,
+                    DisplayName = BuildDisplayNameFromLocalPath(selectedPath),
+                    IsEnabled = true,
+                    IsRecursive = true
+                });
+
+            await LoadLocalOverviewAsync(CancellationToken.None);
+            LocalScanPathStatusMessage = pathExists
+                ? $"本地目录配置已添加：{saved.DisplayName}"
+                : $"本地目录配置已添加：{saved.DisplayName}（路径当前不可访问）";
+        }
+        catch (Exception exception)
+        {
+            LocalScanPathStatusMessage = exception.Message;
+        }
+    }
+
     private async Task PickLocalScanPathAsync()
     {
         var selectedPath = await _scanPathPickerService.PickLocalDirectoryAsync(EditingLocalScanPathValue);
@@ -889,7 +986,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         IsRunning = true;
         StatusMessage = "正在扫描本地目录，请稍候。";
         CurrentStageText = "当前阶段：准备扫描";
-        CurrentFileText = "当前文件：--";
+        CurrentFileText = "当前扫描文件：--";
         var progress = new Progress<ScanProgressUpdate>(ApplyScanProgress);
 
         try
@@ -898,20 +995,20 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             ApplyScanResult(result, stopwatch.Elapsed);
             StatusMessage = result.StatusMessage;
             CurrentStageText = "当前阶段：完成";
-            CurrentFileText = "当前文件：--";
+            CurrentFileText = "当前扫描文件：--";
             _dataRefreshService.NotifyScanChanged();
         }
         catch (OperationCanceledException)
         {
             StatusMessage = "本地扫描已取消。";
             CurrentStageText = "当前阶段：已取消";
-            CurrentFileText = "当前文件：--";
+            CurrentFileText = "当前扫描文件：--";
         }
         catch (Exception exception)
         {
             StatusMessage = $"本地扫描失败：{exception.GetType().Name}";
             CurrentStageText = "当前阶段：失败";
-            CurrentFileText = "当前文件：--";
+            CurrentFileText = "当前扫描文件：--";
         }
         finally
         {
@@ -939,7 +1036,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         IsRunning = true;
         StatusMessage = "正在扫描已启用的 WebDAV 路径，请稍候。";
         CurrentStageText = "当前阶段：准备扫描";
-        CurrentFileText = "当前文件：--";
+        CurrentFileText = "当前扫描文件：--";
         var progress = new Progress<ScanProgressUpdate>(ApplyScanProgress);
 
         try
@@ -948,20 +1045,20 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             ApplyScanResult(result, stopwatch.Elapsed);
             StatusMessage = result.StatusMessage;
             CurrentStageText = "当前阶段：完成";
-            CurrentFileText = "当前文件：--";
+            CurrentFileText = "当前扫描文件：--";
             _dataRefreshService.NotifyScanChanged();
         }
         catch (OperationCanceledException)
         {
             StatusMessage = "扫描已取消。";
             CurrentStageText = "当前阶段：已取消";
-            CurrentFileText = "当前文件：--";
+            CurrentFileText = "当前扫描文件：--";
         }
         catch (Exception exception)
         {
             StatusMessage = $"扫描失败：{exception.GetType().Name}";
             CurrentStageText = "当前阶段：失败";
-            CurrentFileText = "当前文件：--";
+            CurrentFileText = "当前扫描文件：--";
         }
         finally
         {
@@ -994,7 +1091,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         IgnoredFileCount = 0;
         ErrorCount = 0;
         CurrentStageText = "当前阶段：等待";
-        CurrentFileText = "当前文件：--";
+        CurrentFileText = "当前扫描文件：--";
         ElapsedText = "--";
     }
 
@@ -1004,8 +1101,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             ? "当前阶段：处理中"
             : $"当前阶段：{update.StageText}";
         CurrentFileText = string.IsNullOrWhiteSpace(update.CurrentItemName)
-            ? "当前文件：--"
-            : $"当前文件：{update.CurrentItemName}";
+            ? "当前扫描文件：--"
+            : $"当前扫描文件：{update.CurrentItemName}";
         ScannedCount = update.ScannedCount;
         NewFileCount = update.NewFileCount;
         UpdatedFileCount = update.UpdatedFileCount;
@@ -1044,6 +1141,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         RefreshCommand.RaiseCanExecuteChanged();
         SaveConnectionCommand.RaiseCanExecuteChanged();
         TestConnectionCommand.RaiseCanExecuteChanged();
+        AddWebDavScanPathFromPickerCommand.RaiseCanExecuteChanged();
         BeginAddScanPathCommand.RaiseCanExecuteChanged();
         PickWebDavScanPathCommand.RaiseCanExecuteChanged();
         SaveScanPathCommand.RaiseCanExecuteChanged();
@@ -1051,6 +1149,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         DeleteScanPathCommand.RaiseCanExecuteChanged();
         ToggleScanPathCommand.RaiseCanExecuteChanged();
         CancelEditScanPathCommand.RaiseCanExecuteChanged();
+        AddLocalScanPathFromPickerCommand.RaiseCanExecuteChanged();
         BeginAddLocalScanPathCommand.RaiseCanExecuteChanged();
         PickLocalScanPathCommand.RaiseCanExecuteChanged();
         SaveLocalScanPathCommand.RaiseCanExecuteChanged();

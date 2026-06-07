@@ -5,612 +5,734 @@
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              xmlns:pages="clr-namespace:MediaLibrary.App.Views.Pages">
     <UserControl.Resources>
-        <Style x:Key="ScanEmptyStateStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
-            <Setter Property="Padding" Value="18" />
-            <Setter Property="Visibility" Value="Collapsed" />
+        <Storyboard x:Key="ScanStatusLightStoryboard"
+                    AutoReverse="True"
+                    RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                             From="0.42"
+                             To="1"
+                             Duration="0:0:1.05" />
+        </Storyboard>
+
+        <Style x:Key="ScanPageScrollViewerStyle" TargetType="ScrollViewer">
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
         </Style>
 
-        <Style x:Key="ScanDraftPanelStyle" TargetType="Border">
-            <Setter Property="Padding" Value="16" />
+        <Style x:Key="ScanModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border x:Name="ThumbChrome"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="4"
+                                Opacity="0.58" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ThumbChrome" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="ThumbChrome" Property="Opacity" Value="1" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ScanModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="MinWidth" Value="8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Opacity="0" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Margin="2,0"
+                                           Style="{StaticResource ScanModernScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Opacity="0" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}"
+                             Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto" />
+                    <Setter Property="MinWidth" Value="0" />
+                    <Setter Property="Height" Value="8" />
+                    <Setter Property="MinHeight" Value="8" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource ScanModernScrollBarStyle}" />
+
+        <Style x:Key="ScanOuterCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
+            <Setter Property="Padding" Value="18" />
+        </Style>
+
+        <Style x:Key="ScanInnerCardStyle" TargetType="Border">
+            <Setter Property="Padding" Value="14" />
             <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
             <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
 
-        <Style x:Key="ScanDraftSubPanelStyle" TargetType="Border" BasedOn="{StaticResource ScanDraftPanelStyle}">
+        <Style x:Key="ScanSmallSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
+            <Setter Property="FontSize" Value="15" />
+        </Style>
+
+        <Style x:Key="ScanCompactTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ScanFieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="ScanEmptyStateStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
             <Setter Property="Padding" Value="14" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+
+        <Style x:Key="ScanPathListScrollViewerStyle" TargetType="ScrollViewer" BasedOn="{StaticResource ScanPageScrollViewerStyle}">
+            <Setter Property="MaxHeight" Value="238" />
+        </Style>
+
+        <Style x:Key="ScanPathRowStyle" TargetType="Border">
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceRaised}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+
+        <Style x:Key="ScanRemoveIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="28" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="ToolTip" Value="移除路径" />
+        </Style>
+
+        <Style x:Key="ScanMetricCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+            <Setter Property="MinHeight" Value="70" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Padding" Value="10" />
+        </Style>
+
+        <Style x:Key="ScanMetricIconStyle" TargetType="TextBlock">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Margin" Value="0,0,9,0" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ScanIndeterminateProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceRaised}" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid x:Name="ProgressRoot"
+                              ClipToBounds="True"
+                              Height="{TemplateBinding Height}">
+                            <Border Background="{TemplateBinding Background}"
+                                    CornerRadius="5" />
+                            <Border x:Name="AnimatedIndicator"
+                                    Width="210"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="5"
+                                    Opacity="0">
+                                <Border.RenderTransform>
+                                    <TranslateTransform X="-230" />
+                                </Border.RenderTransform>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsIndeterminate" Value="True">
+                                <Setter TargetName="AnimatedIndicator" Property="Opacity" Value="1" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard x:Name="ScanProgressStoryboard">
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetName="AnimatedIndicator"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                             From="-230"
+                                                             To="920"
+                                                             Duration="0:0:1.25" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="ScanProgressStoryboard" />
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="7*" />
-            <ColumnDefinition Width="24" />
-            <ColumnDefinition Width="3*" />
-        </Grid.ColumnDefinitions>
+    <ScrollViewer Style="{StaticResource ScanPageScrollViewerStyle}">
+        <Grid MinWidth="1080">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="7*" MinWidth="700" />
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="3*" MinWidth="330" />
+                </Grid.ColumnDefinitions>
 
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
-                <RowDefinition Height="18" />
-                <RowDefinition Height="252" />
-            </Grid.RowDefinitions>
-
-            <Border Style="{StaticResource PageCardStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="18" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="112" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="扫描配置" Style="{StaticResource CardTitleTextStyle}" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Text="管理 WebDAV 与本地目录扫描来源。"
-                                       Style="{StaticResource BodyMutedTextStyle}" />
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Content="刷新"
-                                Command="{Binding RefreshCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                    </Grid>
-
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.1*" MinWidth="360" />
-                            <ColumnDefinition Width="20" />
-                            <ColumnDefinition Width="1.45*" MinWidth="520" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border Style="{StaticResource ScanDraftPanelStyle}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="16" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <DockPanel LastChildFill="False">
-                                        <TextBlock Text="WebDAV 路径" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <Button DockPanel.Dock="Right"
-                                                Content="添加路径"
-                                                Command="{Binding BeginAddScanPathCommand}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                    </DockPanel>
-                                    <TextBlock Grid.Row="1"
-                                               Margin="0,8,0,0"
-                                               Text="{Binding ScanPathStatusMessage}"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-
-                                    <Grid Grid.Row="2" Margin="0,12,0,0">
-                                        <Border>
-                                            <Border.Style>
-                                                <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasScanPaths}" Value="False">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="还没有 WebDAV 扫描路径。"
-                                                       Style="{StaticResource BodyMutedTextStyle}" />
-                                        </Border>
-
-                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                                      VerticalScrollBarVisibility="Auto"
-                                                      helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
-                                            <ScrollViewer.Style>
-                                                <Style TargetType="ScrollViewer">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasScanPaths}" Value="False">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </ScrollViewer.Style>
-                                            <ItemsControl ItemsSource="{Binding ScanPaths}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <controls:ScanPathCard Title="{Binding DisplayName}"
-                                                                               PathText="{Binding Path}"
-                                                                               DetailText="{Binding DetailText}">
-                                                            <controls:ScanPathCard.ActionsContent>
-                                                                <StackPanel Orientation="Horizontal">
-                                                                    <Button Content="编辑"
-                                                                            Command="{Binding DataContext.EditScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
-                                                                            CommandParameter="{Binding}"
-                                                                            Style="{StaticResource SecondaryButtonStyle}" />
-                                                                    <Button Margin="8,0,0,0"
-                                                                            Content="{Binding ToggleText}"
-                                                                            Command="{Binding DataContext.ToggleScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
-                                                                            CommandParameter="{Binding}"
-                                                                            Style="{StaticResource SecondaryButtonStyle}" />
-                                                                    <Button Margin="8,0,0,0"
-                                                                            Content="删除"
-                                                                            Command="{Binding DataContext.DeleteScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
-                                                                            CommandParameter="{Binding}"
-                                                                            Style="{StaticResource SecondaryButtonStyle}" />
-                                                                </StackPanel>
-                                                            </controls:ScanPathCard.ActionsContent>
-                                                        </controls:ScanPathCard>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
-                                    </Grid>
-
-                                    <Border Grid.Row="3"
-                                            Margin="0,12,0,0"
-                                            Style="{StaticResource ScanDraftSubPanelStyle}">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                            </Grid.RowDefinitions>
-
-                                            <DockPanel LastChildFill="False">
-                                                <TextBlock Text="{Binding ScanPathEditorTitle}" Style="{StaticResource SectionTitleTextStyle}" />
-                                                <Button DockPanel.Dock="Right"
-                                                        Content="取消"
-                                                        Command="{Binding CancelEditScanPathCommand}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
-                                            </DockPanel>
-
-                                            <Grid Grid.Row="1" Margin="0,12,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="84" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="10" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock VerticalAlignment="Center" Text="路径" Style="{StaticResource BodyTextStyle}" />
-                                                <TextBox Grid.Column="1"
-                                                         Margin="0"
-                                                         MaxLength="1000"
-                                                         Style="{StaticResource FormTextBoxStyle}"
-                                                         Text="{Binding EditingScanPathValue, UpdateSourceTrigger=PropertyChanged}" />
-                                                <Button Grid.Column="3"
-                                                        Content="选择路径"
-                                                        Command="{Binding PickWebDavScanPathCommand}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
-                                            </Grid>
-
-                                            <Grid Grid.Row="2" Margin="0,10,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="84" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock VerticalAlignment="Center" Text="显示名称" Style="{StaticResource BodyTextStyle}" />
-                                                <TextBox Grid.Column="1"
-                                                         Margin="0"
-                                                         MaxLength="200"
-                                                         Style="{StaticResource FormTextBoxStyle}"
-                                                         Text="{Binding EditingScanPathDisplayName, UpdateSourceTrigger=PropertyChanged}" />
-                                            </Grid>
-
-                                            <Grid Grid.Row="3" Margin="0,10,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <WrapPanel>
-                                                    <CheckBox Content="启用"
-                                                              IsChecked="{Binding EditingScanPathEnabled}"
-                                                              Style="{StaticResource FormCheckBoxStyle}" />
-                                                    <CheckBox Margin="16,0,0,0"
-                                                              Content="递归扫描子目录"
-                                                              IsChecked="{Binding EditingScanPathRecursive}"
-                                                              Style="{StaticResource FormCheckBoxStyle}" />
-                                                </WrapPanel>
-                                                <Button Grid.Column="1"
-                                                        Content="{Binding ScanPathSubmitButtonText}"
-                                                        Command="{Binding SaveScanPathCommand}"
-                                                        Style="{StaticResource PrimaryButtonStyle}" />
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-                                </Grid>
-
-                                <Grid Grid.Row="2">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                    </Grid.RowDefinitions>
-
-                                    <DockPanel LastChildFill="False">
-                                        <TextBlock Text="本地目录" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <Button DockPanel.Dock="Right"
-                                                Content="添加目录"
-                                                Command="{Binding BeginAddLocalScanPathCommand}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                    </DockPanel>
-                                    <TextBlock Grid.Row="1"
-                                               Margin="0,8,0,0"
-                                               Text="{Binding LocalScanPathStatusMessage}"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-
-                                    <Grid Grid.Row="2" Margin="0,12,0,0">
-                                        <Border>
-                                            <Border.Style>
-                                                <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasLocalScanPaths}" Value="False">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="还没有本地目录配置。"
-                                                       Style="{StaticResource BodyMutedTextStyle}" />
-                                        </Border>
-
-                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                                      VerticalScrollBarVisibility="Auto"
-                                                      helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
-                                            <ScrollViewer.Style>
-                                                <Style TargetType="ScrollViewer">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasLocalScanPaths}" Value="False">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </ScrollViewer.Style>
-                                            <ItemsControl ItemsSource="{Binding LocalScanPaths}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <controls:ScanPathCard Title="{Binding DisplayName}"
-                                                                               PathText="{Binding Path}"
-                                                                               DetailText="{Binding DetailText}">
-                                                            <controls:ScanPathCard.ActionsContent>
-                                                                <StackPanel Orientation="Horizontal">
-                                                                    <Button Content="编辑"
-                                                                            Command="{Binding DataContext.EditLocalScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
-                                                                            CommandParameter="{Binding}"
-                                                                            Style="{StaticResource SecondaryButtonStyle}" />
-                                                                    <Button Margin="8,0,0,0"
-                                                                            Content="{Binding ToggleText}"
-                                                                            Command="{Binding DataContext.ToggleLocalScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
-                                                                            CommandParameter="{Binding}"
-                                                                            Style="{StaticResource SecondaryButtonStyle}" />
-                                                                    <controls:LocalScanPathRemovePopover Margin="8,0,0,0"
-                                                                                                          ConfirmCommand="{Binding DataContext.DeleteLocalScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
-                                                                                                          CommandParameter="{Binding}" />
-                                                                </StackPanel>
-                                                            </controls:ScanPathCard.ActionsContent>
-                                                        </controls:ScanPathCard>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
-                                    </Grid>
-                                </Grid>
-                            </Grid>
-                        </Border>
-
-                        <Grid Grid.Column="2">
+                <StackPanel x:Name="LeftColumn">
+                    <Border MinHeight="392" Style="{StaticResource ScanOuterCardStyle}">
+                        <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="1.65*" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="14" />
-                                <RowDefinition Height="0.8*" />
+                                <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <Border Style="{StaticResource ScanDraftPanelStyle}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Text="WebDAV 配置" Style="{StaticResource SectionTitleTextStyle}" />
-                                    <TextBlock Grid.Row="1"
-                                               Margin="0,8,0,0"
-                                               Text="保存和测试是独立操作。"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
+                            <TextBlock Text="WebDAV配置" Style="{StaticResource CardTitleTextStyle}" />
 
-                                    <Grid Grid.Row="2" Margin="0,14,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center" Text="连接名称" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBox Grid.Column="1"
-                                                 Margin="0"
-                                                 MaxLength="120"
-                                                 Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding ConnectionName, UpdateSourceTrigger=PropertyChanged}" />
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Style="{StaticResource ScanInnerCardStyle}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="12" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="10" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Text="添加路径" Style="{StaticResource ScanSmallSectionTitleStyle}" />
+
+                                        <Border Grid.Row="2"
+                                                Padding="10"
+                                                Background="{DynamicResource BrushSurfaceRaised}"
+                                                BorderBrush="{DynamicResource BrushBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Margin="0,0,9,0"
+                                                           VerticalAlignment="Center"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="15"
+                                                           Foreground="{DynamicResource BrushAccent}"
+                                                           Text="&#xE8B7;" />
+                                                <TextBlock Grid.Column="1"
+                                                           VerticalAlignment="Center"
+                                                           Text="选择要添加的路径"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                <Button Grid.Column="2"
+                                                        Content="选择路径"
+                                                        Command="{Binding AddWebDavScanPathFromPickerCommand}"
+                                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Grid Grid.Row="4">
+                                            <Border>
+                                                <Border.Style>
+                                                    <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasScanPaths}" Value="False">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="还没有 WebDAV 扫描路径。"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                            </Border>
+
+                                            <ScrollViewer>
+                                                <ScrollViewer.Style>
+                                                    <Style TargetType="ScrollViewer" BasedOn="{StaticResource ScanPathListScrollViewerStyle}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasScanPaths}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ScrollViewer.Style>
+                                                <ItemsControl ItemsSource="{Binding ScanPaths}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource ScanPathRowStyle}">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="8" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock VerticalAlignment="Center"
+                                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding Path}"
+                                                                               Style="{StaticResource LongFieldTextBlockStyle}"
+                                                                               Text="{Binding Path}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <Button Grid.Column="2"
+                                                                            Content="&#xE711;"
+                                                                            Command="{Binding DataContext.DeleteScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource ScanRemoveIconButtonStyle}" />
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Grid>
                                     </Grid>
+                                </Border>
 
-                                    <Grid Grid.Row="3" Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center" Text="BaseUrl" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBox Grid.Column="1"
-                                                 Margin="0"
-                                                 MaxLength="500"
-                                                 Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
+                                <Border Grid.Column="2" Style="{StaticResource ScanInnerCardStyle}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="14" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="10" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="10" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="14" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
 
-                                    <Grid Grid.Row="4" Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center" Text="用户名" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBox Grid.Column="1"
-                                                 Margin="0"
-                                                 MaxLength="200"
-                                                 Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="账号配置" Style="{StaticResource ScanSmallSectionTitleStyle}" />
+                                            <Ellipse Grid.Column="2"
+                                                     Width="10"
+                                                     Height="10"
+                                                     VerticalAlignment="Center"
+                                                     ToolTip="{Binding ConnectionStatusMessage}">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="#15803D" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasSavedConnection}" Value="False">
+                                                                <Setter Property="Fill" Value="#B91C1C" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsConnectionEnabled}" Value="False">
+                                                                <Setter Property="Fill" Value="#B7791F" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                                <Ellipse.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard Storyboard="{StaticResource ScanStatusLightStoryboard}" />
+                                                    </EventTrigger>
+                                                </Ellipse.Triggers>
+                                            </Ellipse>
+                                        </Grid>
 
-                                    <Grid Grid.Row="5" Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center" Text="密码" Style="{StaticResource BodyTextStyle}" />
-                                        <controls:SensitiveSettingInput Grid.Column="1"
-                                                                        MaxLength="1000"
-                                                                        Text="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
+                                        <Grid Grid.Row="2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="72" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="BaseUrl" Style="{StaticResource ScanFieldLabelStyle}" />
+                                            <TextBox Grid.Column="1"
+                                                     MaxLength="500"
+                                                     Style="{StaticResource ScanCompactTextBoxStyle}"
+                                                     Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" />
+                                        </Grid>
 
-                                    <Grid Grid.Row="6" Margin="0,12,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox VerticalAlignment="Center"
-                                                  Content="启用当前连接"
-                                                  IsChecked="{Binding IsConnectionEnabled}"
-                                                  Style="{StaticResource FormCheckBoxStyle}" />
-                                        <WrapPanel Grid.Column="1">
-                                            <Button Content="保存设置"
+                                        <Grid Grid.Row="4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="72" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="用户名" Style="{StaticResource ScanFieldLabelStyle}" />
+                                            <TextBox Grid.Column="1"
+                                                     MaxLength="200"
+                                                     Style="{StaticResource ScanCompactTextBoxStyle}"
+                                                     Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" />
+                                        </Grid>
+
+                                        <Grid Grid.Row="6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="72" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="密码" Style="{StaticResource ScanFieldLabelStyle}" />
+                                            <controls:SensitiveSettingInput Grid.Column="1"
+                                                                            MaxLength="1000"
+                                                                            Text="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </Grid>
+
+                                        <StackPanel Grid.Row="8"
+                                                    HorizontalAlignment="Right"
+                                                    Orientation="Horizontal">
+                                            <Button Content="保存配置"
                                                     Command="{Binding SaveConnectionCommand}"
                                                     Style="{StaticResource PrimaryButtonStyle}" />
-                                            <Button Margin="12,0,0,0"
+                                            <Button Margin="10,0,0,0"
                                                     Content="测试连接"
                                                     Command="{Binding TestConnectionCommand}"
                                                     Style="{StaticResource SecondaryButtonStyle}" />
-                                        </WrapPanel>
+                                        </StackPanel>
                                     </Grid>
-                                    <TextBlock Grid.Row="7"
-                                               Margin="0,10,0,0"
-                                               Text="{Binding ConnectionStatusMessage}"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
-                                </Grid>
-                            </Border>
-
-                            <Border Grid.Row="2" Style="{StaticResource ScanDraftPanelStyle}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <DockPanel LastChildFill="False">
-                                        <TextBlock Text="{Binding LocalScanPathEditorTitle}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <Button DockPanel.Dock="Right"
-                                                Content="取消"
-                                                Command="{Binding CancelEditLocalScanPathCommand}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                    </DockPanel>
-
-                                    <Grid Grid.Row="1" Margin="0,14,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="84" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="10" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center" Text="目录路径" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBox Grid.Column="1"
-                                                 Margin="0"
-                                                 MaxLength="1000"
-                                                 Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding EditingLocalScanPathValue, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button Grid.Column="3"
-                                                Content="选择目录"
-                                                Command="{Binding PickLocalScanPathCommand}"
-                                                Style="{StaticResource SecondaryButtonStyle}" />
-                                    </Grid>
-
-                                    <Grid Grid.Row="2" Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="84" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center" Text="显示名称" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBox Grid.Column="1"
-                                                 Margin="0"
-                                                 MaxLength="200"
-                                                 Style="{StaticResource FormTextBoxStyle}"
-                                                 Text="{Binding EditingLocalScanPathDisplayName, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
-
-                                    <Grid Grid.Row="3" Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <WrapPanel>
-                                            <CheckBox Content="启用"
-                                                      IsChecked="{Binding EditingLocalScanPathEnabled}"
-                                                      Style="{StaticResource FormCheckBoxStyle}" />
-                                            <CheckBox Margin="16,0,0,0"
-                                                      Content="递归扫描子目录"
-                                                      IsChecked="{Binding EditingLocalScanPathRecursive}"
-                                                      Style="{StaticResource FormCheckBoxStyle}" />
-                                        </WrapPanel>
-                                        <Button Grid.Column="1"
-                                                Content="{Binding LocalScanPathSubmitButtonText}"
-                                                Command="{Binding SaveLocalScanPathCommand}"
-                                                Style="{StaticResource PrimaryButtonStyle}" />
-                                    </Grid>
-                                </Grid>
-                            </Border>
+                                </Border>
+                            </Grid>
                         </Grid>
-                    </Grid>
-                </Grid>
-            </Border>
-
-            <Border Grid.Row="2" Style="{StaticResource PageCardStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <DockPanel LastChildFill="False">
-                        <TextBlock Text="扫描进度" Style="{StaticResource CardTitleTextStyle}" />
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <Button Content="{Binding RunScanButtonText}"
-                                    Command="{Binding RunScanCommand}"
-                                    Style="{StaticResource PrimaryButtonStyle}" />
-                            <Button Margin="12,0,0,0"
-                                    Content="{Binding LocalRunScanButtonText}"
-                                    Command="{Binding RunLocalScanCommand}"
-                                    Style="{StaticResource SecondaryButtonStyle}" />
-                            <Button Margin="12,0,0,0"
-                                    Content="取消扫描"
-                                    Command="{Binding CancelScanCommand}"
-                                    Style="{StaticResource SecondaryButtonStyle}" />
-                        </StackPanel>
-                    </DockPanel>
-
-                    <StackPanel Grid.Row="1" Margin="0,14,0,0">
-                        <ProgressBar Height="12"
-                                     Minimum="0"
-                                     Maximum="100"
-                                     IsIndeterminate="{Binding IsProgressIndeterminate}" />
-                        <TextBlock Margin="0,10,0,0"
-                                   Text="{Binding CurrentStageText}"
-                                   TextWrapping="Wrap"
-                                   Style="{StaticResource BodyTextStyle}" />
-                        <TextBlock Margin="0,4,0,0"
-                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding CurrentFileText}"
-                                   Text="{Binding CurrentFileText}"
-                                   TextTrimming="CharacterEllipsis"
-                                   Style="{StaticResource BodyMutedTextStyle}" />
-                    </StackPanel>
-
-                    <UniformGrid Grid.Row="2" Margin="0,14,0,0" Columns="6">
-                        <StackPanel Margin="0,0,14,0">
-                            <TextBlock Text="已扫描" Style="{StaticResource BodyMutedTextStyle}" />
-                            <TextBlock Text="{Binding ScannedCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                        </StackPanel>
-                        <StackPanel Margin="0,0,14,0">
-                            <TextBlock Text="新增" Style="{StaticResource BodyMutedTextStyle}" />
-                            <TextBlock Text="{Binding NewFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                        </StackPanel>
-                        <StackPanel Margin="0,0,14,0">
-                            <TextBlock Text="更新" Style="{StaticResource BodyMutedTextStyle}" />
-                            <TextBlock Text="{Binding UpdatedFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                        </StackPanel>
-                        <StackPanel Margin="0,0,14,0">
-                            <TextBlock Text="忽略" Style="{StaticResource BodyMutedTextStyle}" />
-                            <TextBlock Text="{Binding IgnoredFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                        </StackPanel>
-                        <StackPanel Margin="0,0,14,0">
-                            <TextBlock Text="错误" Style="{StaticResource BodyMutedTextStyle}" />
-                            <TextBlock Text="{Binding ErrorCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                        </StackPanel>
-                        <StackPanel>
-                            <TextBlock Text="耗时" Style="{StaticResource BodyMutedTextStyle}" />
-                            <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource SectionTitleTextStyle}" />
-                        </StackPanel>
-                    </UniformGrid>
-                </Grid>
-            </Border>
-        </Grid>
-
-        <Border Grid.Column="2" Style="{StaticResource PageCardStyle}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="扫描记录" Style="{StaticResource CardTitleTextStyle}" />
-                    <TextBlock Margin="0,8,0,0"
-                               Text="最近扫描记录按时间倒序显示。"
-                               Style="{StaticResource BodyMutedTextStyle}" />
-                </StackPanel>
-
-                <Grid Grid.Row="1" Margin="0,18,0,0">
-                    <Border>
-                        <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasRecentLogs}" Value="False">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <TextBlock Text="还没有扫描记录。"
-                                   Style="{StaticResource BodyMutedTextStyle}" />
                     </Border>
 
-                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto"
-                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
-                        <ScrollViewer.Style>
-                            <Style TargetType="ScrollViewer">
-                                <Setter Property="Visibility" Value="Visible" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasRecentLogs}" Value="False">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ScrollViewer.Style>
-                        <ItemsControl ItemsSource="{Binding RecentLogs}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <controls:ScanLogCard />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
+                    <Border Margin="0,18,0,0"
+                            MinHeight="262"
+                            Style="{StaticResource ScanOuterCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="14" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="本地配置" Style="{StaticResource CardTitleTextStyle}" />
+                                <Button Grid.Column="1"
+                                        Content="选择路径"
+                                        Command="{Binding AddLocalScanPathFromPickerCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                            </Grid>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <ScrollViewer Grid.Column="0"
+                                              Margin="0,0,14,0"
+                                              MaxHeight="186"
+                                              Style="{StaticResource ScanPageScrollViewerStyle}">
+                                    <ItemsControl ItemsSource="{Binding PrimaryLocalScanPaths}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource ScanPathRowStyle}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="8" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock VerticalAlignment="Center"
+                                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding Path}"
+                                                                   Style="{StaticResource LongFieldTextBlockStyle}"
+                                                                   Text="{Binding Path}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="2"
+                                                                Content="&#xE711;"
+                                                                Command="{Binding DataContext.DeleteLocalScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource ScanRemoveIconButtonStyle}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <Border Grid.Column="1"
+                                        Background="{DynamicResource BrushBorder}" />
+
+                                <ScrollViewer Grid.Column="2"
+                                              Margin="14,0,0,0"
+                                              MaxHeight="186"
+                                              Style="{StaticResource ScanPageScrollViewerStyle}">
+                                    <ItemsControl ItemsSource="{Binding SecondaryLocalScanPaths}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource ScanPathRowStyle}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="8" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock VerticalAlignment="Center"
+                                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding Path}"
+                                                                   Style="{StaticResource LongFieldTextBlockStyle}"
+                                                                   Text="{Binding Path}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="2"
+                                                                Content="&#xE711;"
+                                                                Command="{Binding DataContext.DeleteLocalScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource ScanRemoveIconButtonStyle}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <Border Grid.ColumnSpan="3">
+                                    <Border.Style>
+                                        <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasLocalScanPaths}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="还没有本地目录配置。"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border Margin="0,18,0,0" Style="{StaticResource ScanOuterCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="16" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="12" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="16" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <DockPanel LastChildFill="False">
+                                <TextBlock Text="扫描进度" Style="{StaticResource CardTitleTextStyle}" />
+                                <WrapPanel DockPanel.Dock="Right">
+                                    <Button Content="{Binding RunScanButtonText}"
+                                            Command="{Binding RunScanCommand}"
+                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                    <Button Margin="10,0,0,0"
+                                            Content="{Binding LocalRunScanButtonText}"
+                                            Command="{Binding RunLocalScanCommand}"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                    <Button Margin="10,0,0,0"
+                                            Content="取消扫描"
+                                            Command="{Binding CancelScanCommand}"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                </WrapPanel>
+                            </DockPanel>
+
+                            <ProgressBar Grid.Row="2"
+                                         IsIndeterminate="{Binding IsProgressIndeterminate}"
+                                         Style="{StaticResource ScanIndeterminateProgressBarStyle}" />
+
+                            <StackPanel Grid.Row="4">
+                                <TextBlock Text="{Binding CurrentStageText}"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource BodyTextStyle}" />
+                                <TextBlock Margin="0,5,0,0"
+                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding CurrentFileText}"
+                                           Text="{Binding CurrentFileText}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                            </StackPanel>
+
+                            <UniformGrid Grid.Row="6" Columns="6">
+                                <Border Style="{StaticResource ScanMetricCardStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE8B7;" Style="{StaticResource ScanMetricIconStyle}" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="已扫描" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Text="{Binding ScannedCount}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource ScanMetricCardStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE710;" Style="{StaticResource ScanMetricIconStyle}" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="新增" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Text="{Binding NewFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource ScanMetricCardStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE895;" Style="{StaticResource ScanMetricIconStyle}" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="更新" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Text="{Binding UpdatedFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource ScanMetricCardStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE711;" Style="{StaticResource ScanMetricIconStyle}" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="忽略" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Text="{Binding IgnoredFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource ScanMetricCardStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xEA39;" Style="{StaticResource ScanMetricIconStyle}" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="错误" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Text="{Binding ErrorCount}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource ScanMetricCardStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE916;" Style="{StaticResource ScanMetricIconStyle}" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="耗时" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </UniformGrid>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <Border Grid.Column="2"
+                        Height="{Binding ActualHeight, ElementName=LeftColumn}"
+                        MinHeight="620"
+                        Style="{StaticResource ScanOuterCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="8" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="16" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="扫描记录" Style="{StaticResource CardTitleTextStyle}" />
+                        <TextBlock Grid.Row="2"
+                                   Text="最近扫描记录按时间倒序显示。"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+
+                        <Grid Grid.Row="4">
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasRecentLogs}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="还没有扫描记录。"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                            </Border>
+
+                            <ScrollViewer>
+                                <ScrollViewer.Style>
+                                    <Style TargetType="ScrollViewer" BasedOn="{StaticResource ScanPageScrollViewerStyle}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasRecentLogs}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ScrollViewer.Style>
+                                <ItemsControl ItemsSource="{Binding RecentLogs}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <controls:ScanLogCard />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
-        </Border>
-    </Grid>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

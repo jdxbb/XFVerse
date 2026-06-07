@@ -165,6 +165,68 @@
 - `git diff --check`：无空白错误，仅有既有 CRLF 转换提示。
 - `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
 
+## 扫描任务页布局重构补充
+
+### 阶段目标
+
+- 按扫描任务页草图重构页面信息架构，形成左侧三张配置 / 进度卡片与右侧扫描记录列表。
+
+### 完成内容
+
+- 扫描任务页外层改为可纵向滚动，页面内滚动条统一为自动显隐的现代化细滚动条。
+- 页面副标题改为 `基于WebDAV协议进行扫描`。
+- 左侧改为三张大卡片：`WebDAV配置`、`本地配置`、`扫描进度`。
+- `WebDAV配置` 内部分为左右两张卡片：左侧提供选择并立即添加 WebDAV 路径，右侧提供 BaseUrl、用户名、密码、保存配置和测试连接，并复用 API 配置页呼吸状态灯风格。
+- WebDAV / 本地路径列表行改为路径 + 纯图标移除按钮；路径仅在实际截断时显示完整悬停提示。
+- 本地配置卡片改为左右两列路径列表，中间用竖线分隔，标题右侧提供选择路径入口。
+- 扫描进度卡片改为图标化统计卡片，统计项为已扫描、新增、更新、忽略、错误和耗时；进度条保留 indeterminate 动画，不再显示百分比；当前扫描文件上方保留当前阶段文本。
+- 右侧扫描记录卡片高度绑定左侧内容高度，记录列表内部独立滚动。
+
+### 明确未做事项
+
+- 未修改扫描识别、TMDB / AI 匹配、扫描统计字段来源或批量操作语义。
+- 未新增数据库字段、migration、database update、commit 或 push。
+- 未执行真实 WebDAV / 本地目录选择器的人工点击验收。
+
+### 验证结果
+
+- `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+### Known Issues
+
+- Blocker：无。
+- Deferred：仍需运行时人工确认扫描任务页在目标 DPI / 窗口宽度下的左右栏高度、路径选择弹窗体验和状态灯颜色感知。
+- Noise：路径移除按钮为直接配置移除入口，仅删除软件内路径配置，不删除真实本地文件或 WebDAV 文件。
+
+## 扫描任务页记录列表排版补充
+
+### 阶段目标
+
+- 去掉扫描任务页内容区重复标题，并按真实扫描日志字段优化右侧记录列表。
+
+### 完成内容
+
+- 移除扫描任务页内容区内重复的 `扫描任务` 标题、副标题和刷新按钮，保留主窗口标题栏作为唯一页面标题来源。
+- 右侧扫描记录卡片重排为路径名称 + 状态、目标来源、开始 / 结束 / 耗时、扫描 / 新增 / 更新 / 忽略 / 错误统计、可选原因摘要和错误信息。
+- 记录列表继续复用真实 `ScanTaskLogItem` / `ScanTaskLogViewModel` 字段，不新增假字段或服务层计算。
+
+### 明确未做事项
+
+- 未修改扫描日志写入、扫描统计含义、路径脱敏规则或扫描执行逻辑。
+- 未新增数据库字段、migration、database update、commit 或 push。
+
+### 验证结果
+
+- `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+### Known Issues
+
+- Blocker：无。
+- Deferred：仍需运行时人工确认右侧记录卡在真实长标题、长错误信息和多条原因摘要下的高度与滚动体验。
+- Noise：扫描记录仍按最近日志倒序展示，未引入筛选、分页或清空记录入口。
+
 ## Settings API Cursor Polish Follow-up
 
 ### Stage Goal
