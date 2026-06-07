@@ -90,7 +90,7 @@ public sealed class SettingsService : ISettingsService
         entity.OpenSubtitlesDefaultLanguageCode = string.IsNullOrWhiteSpace(settings.OpenSubtitlesDefaultLanguageCode)
             ? "zh-cn"
             : settings.OpenSubtitlesDefaultLanguageCode.Trim();
-        entity.IsOpenSubtitlesEnabled = settings.IsOpenSubtitlesEnabled;
+        entity.IsOpenSubtitlesEnabled = true;
         entity.UpdatedAt = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -547,7 +547,7 @@ public sealed class SettingsService : ISettingsService
             OpenSubtitlesDefaultLanguageCode = string.IsNullOrWhiteSpace(entity.OpenSubtitlesDefaultLanguageCode)
                 ? "zh-cn"
                 : entity.OpenSubtitlesDefaultLanguageCode,
-            IsOpenSubtitlesEnabled = entity.IsOpenSubtitlesEnabled
+            IsOpenSubtitlesEnabled = true
         };
     }
 

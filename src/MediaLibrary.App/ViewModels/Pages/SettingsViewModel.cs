@@ -2,9 +2,11 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Caches;
+using MediaLibrary.App.Models.Settings;
 using MediaLibrary.App.Services;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
@@ -20,6 +22,7 @@ public sealed class SettingsViewModel : PageViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly IWebDavService _webDavService;
     private readonly IThemeService _themeService;
+    private readonly IAppBehaviorPreferencesService _appBehaviorPreferencesService;
     private readonly ISoftwareCacheManagementService _softwareCacheManagementService;
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly IOpenSubtitlesClientService _openSubtitlesClientService;
@@ -27,7 +30,22 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         Timeout = TimeSpan.FromSeconds(8)
     };
+    private readonly HttpClient _aiApiHttpClient = new()
+    {
+        Timeout = Timeout.InfiniteTimeSpan
+    };
     private const long BytesPerMb = 1024L * 1024L;
+    private const int AiProbeTimeoutSeconds = 20;
+    private const int GeneralSettingsTabIndex = 0;
+    private const int ApiSettingsTabIndex = 1;
+    private const string ThemeSystem = "System";
+    private const string ThemeLight = "Light";
+    private const string ThemeDark = "Dark";
+    private const string CloseWindowBehaviorExit = "exit";
+    private const string CloseWindowBehaviorTray = "tray";
+    private const string ApiConfigStatusSuccess = "success";
+    private const string ApiConfigStatusUntested = "untested";
+    private const string ApiConfigStatusFailure = "failure";
     private int? _connectionId;
     private int? _applicationSettingId;
     private string _connectionName = string.Empty;
@@ -38,6 +56,9 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _tmdbReadAccessToken = string.Empty;
     private string _tmdbApiKey = string.Empty;
     private string _omdbApiKey = string.Empty;
+    private string _loadedTmdbReadAccessToken = string.Empty;
+    private string _loadedTmdbApiKey = string.Empty;
+    private string _loadedOmdbApiKey = string.Empty;
     private string _openSubtitlesEndpoint = "https://api.opensubtitles.com/api/v1";
     private string _openSubtitlesApiKey = string.Empty;
     private string _openSubtitlesUsername = string.Empty;
@@ -47,11 +68,19 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _loadedOpenSubtitlesApiKey = string.Empty;
     private string _loadedOpenSubtitlesUsername = string.Empty;
     private string _loadedOpenSubtitlesPassword = string.Empty;
-    private bool _isOpenSubtitlesEnabled;
+    private string _loadedOpenSubtitlesLanguageCode = "zh-cn";
+    private string _tmdbConfigStatusKind = ApiConfigStatusUntested;
+    private string _omdbConfigStatusKind = ApiConfigStatusUntested;
+    private string _openSubtitlesConfigStatusKind = ApiConfigStatusUntested;
+    private string _aiConfigStatusKind = ApiConfigStatusUntested;
+    private bool _isOpenSubtitlesEnabled = true;
     private OpenSubtitlesLanguageOption? _selectedOpenSubtitlesLanguage;
     private string _aiBaseUrl = string.Empty;
     private string _aiApiKey = string.Empty;
     private string _aiModel = string.Empty;
+    private string _loadedAiBaseUrl = string.Empty;
+    private string _loadedAiApiKey = string.Empty;
+    private string _loadedAiModel = string.Empty;
     private string _aiDetailCorrectionModel = "deepseek-v4-pro";
     private string _aiDetailCorrectionTimeoutSeconds = "90";
     private string _aiBatchCorrectionModel = "deepseek-v4-pro";
@@ -66,7 +95,21 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _aiRecommendationTimeoutSeconds = "90";
     private string _aiWatchProfileModel = "deepseek-v4-pro";
     private string _aiWatchProfileTimeoutSeconds = "180";
-    private string _selectedThemeMode = "Light";
+    private string _loadedAiDetailCorrectionModel = "deepseek-v4-pro";
+    private string _loadedAiDetailCorrectionTimeoutSeconds = "90";
+    private string _loadedAiBatchCorrectionModel = "deepseek-v4-pro";
+    private string _loadedAiBatchCorrectionTimeoutSeconds = "75";
+    private string _loadedAiScanTvUncertainRangeModel = "deepseek-v4-flash";
+    private string _loadedAiScanTvUncertainRangeTimeoutSeconds = "300";
+    private string _loadedAiScanTvFullRangeModel = "deepseek-v4-flash";
+    private string _loadedAiScanTvFullRangeTimeoutSeconds = "18";
+    private string _loadedAiScanMovieTaggingModel = "deepseek-v4-flash";
+    private string _loadedAiScanMovieTaggingTimeoutSeconds = "45";
+    private string _loadedAiRecommendationModel = "deepseek-v4-flash";
+    private string _loadedAiRecommendationTimeoutSeconds = "90";
+    private string _loadedAiWatchProfileModel = "deepseek-v4-pro";
+    private string _loadedAiWatchProfileTimeoutSeconds = "180";
+    private string _selectedThemeMode = ThemeLight;
     private string _connectionStatusMessage = "请先保存 WebDAV 连接配置。";
     private string _scanPathStatusMessage = "当前还没有扫描路径。";
     private string _tmdbStatusMessage = "可在这里保存 TMDB 认证信息。";
@@ -86,18 +129,27 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _subtitleCacheUsageText = "在线字幕缓存状态尚未加载。";
     private string _subtitleCacheDetailText = "删除播放器里的在线字幕绑定不会物理删除缓存文件。";
     private string _subtitleCacheStatusMessage = "在线字幕缓存状态尚未加载。";
+    private bool _isPosterCacheClearAvailable;
     private bool _isSubtitleCacheClearAvailable;
+    private string _selectedCloseWindowBehavior = CloseWindowBehaviorExit;
+    private bool _startPlayerFullscreenOnPlay = true;
+    private bool _autoScanWebDavOnStartup;
+    private string _themeToggleIcon = "☀";
+    private string _themeToggleToolTip = "当前浅色主题，切换到深色主题";
     private string _aboutStatusMessage = "XFVerse 影音管理系统";
     private int? _editingScanPathId;
     private string _editingScanPathValue = string.Empty;
     private string _editingScanPathDisplayName = string.Empty;
     private bool _editingScanPathEnabled = true;
     private bool _editingScanPathRecursive = true;
+    private int _selectedSettingsTabIndex = GeneralSettingsTabIndex;
+    private bool _isGeneralSettingsContentReady;
 
     public SettingsViewModel(
         ISettingsService settingsService,
         IWebDavService webDavService,
         IThemeService themeService,
+        IAppBehaviorPreferencesService appBehaviorPreferencesService,
         ISoftwareCacheManagementService softwareCacheManagementService,
         IConfirmationDialogService confirmationDialogService,
         IOpenSubtitlesClientService openSubtitlesClientService)
@@ -106,24 +158,32 @@ public sealed class SettingsViewModel : PageViewModelBase
         _settingsService = settingsService;
         _webDavService = webDavService;
         _themeService = themeService;
+        _appBehaviorPreferencesService = appBehaviorPreferencesService;
         _softwareCacheManagementService = softwareCacheManagementService;
         _confirmationDialogService = confirmationDialogService;
         _openSubtitlesClientService = openSubtitlesClientService;
+        _themeService.ThemeChanged += OnThemeChanged;
 
         ThemeModes = _themeService.ThemeModes;
-        OpenSubtitlesLanguages = _openSubtitlesClientService.SupportedLanguages;
+        OpenSubtitlesLanguages = _openSubtitlesClientService.SupportedLanguages
+            .Select(x => new OpenSubtitlesLanguageOption(x.Code, LocalizeOpenSubtitlesLanguageName(x)))
+            .OrderBy(x => GetOpenSubtitlesLanguagePriority(x.Code))
+            .ThenBy(x => x.Name, StringComparer.CurrentCulture)
+            .ToList();
         _selectedOpenSubtitlesLanguage = OpenSubtitlesLanguages.FirstOrDefault(x => x.Code == "zh-cn")
                                          ?? OpenSubtitlesLanguages.FirstOrDefault();
         SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync);
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync);
-        SaveTmdbSettingsCommand = new AsyncRelayCommand(SaveTmdbSettingsAsync);
+        SaveTmdbSettingsCommand = new AsyncRelayCommand(SaveTmdbSettingsAsync, HasTmdbSettingsChanges);
         TestTmdbConnectionCommand = new AsyncRelayCommand(TestTmdbConnectionAsync);
-        SaveOmdbSettingsCommand = new AsyncRelayCommand(SaveOmdbSettingsAsync);
+        SaveOmdbSettingsCommand = new AsyncRelayCommand(SaveOmdbSettingsAsync, HasOmdbSettingsChanges);
         TestOmdbConnectionCommand = new AsyncRelayCommand(TestOmdbConnectionAsync);
-        SaveOpenSubtitlesSettingsCommand = new AsyncRelayCommand(SaveOpenSubtitlesSettingsAsync);
+        SaveOpenSubtitlesSettingsCommand = new AsyncRelayCommand(SaveOpenSubtitlesSettingsAsync, HasOpenSubtitlesSettingsChanges);
         TestOpenSubtitlesConnectionCommand = new AsyncRelayCommand(TestOpenSubtitlesConnectionAsync);
-        SaveAiSettingsCommand = new AsyncRelayCommand(SaveAiSettingsAsync);
+        SaveAiSettingsCommand = new AsyncRelayCommand(SaveAiSettingsAsync, HasAiSettingsChanges);
+        TestAiSettingsCommand = new AsyncRelayCommand(TestAiSettingsAsync);
         SaveThemeSettingsCommand = new AsyncRelayCommand(SaveThemeSettingsAsync);
+        ToggleThemeSettingsCommand = new AsyncRelayCommand(ToggleThemeSettingsAsync);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath);
         SaveScanPathCommand = new AsyncRelayCommand(SaveScanPathAsync);
         EditScanPathCommand = new RelayCommand(EditScanPath);
@@ -131,11 +191,16 @@ public sealed class SettingsViewModel : PageViewModelBase
         ToggleScanPathCommand = new AsyncRelayCommand(ToggleScanPathAsync);
         CancelEditScanPathCommand = new RelayCommand(CancelEditScanPath);
         SavePosterCacheLimitCommand = new AsyncRelayCommand(SavePosterCacheLimitAsync);
-        ClearPosterCacheCommand = new AsyncRelayCommand(ClearPosterCacheAsync);
+        ClearPosterCacheCommand = new AsyncRelayCommand(ClearPosterCacheAsync, () => IsPosterCacheClearAvailable);
         ClearOtherCacheCommand = new AsyncRelayCommand(ClearOtherCacheAsync, () => IsOtherCacheClearAvailable);
         ClearSubtitleCacheCommand = new AsyncRelayCommand(ClearSubtitleCacheAsync, () => IsSubtitleCacheClearAvailable);
         RefreshSoftwareCacheCommand = new AsyncRelayCommand(RefreshSoftwareCacheAsync);
         ToggleAboutDetailsCommand = new RelayCommand(ToggleAboutDetails);
+        SelectSettingsTabCommand = new RelayCommand(SelectSettingsTab);
+        SelectThemeModeCommand = new AsyncRelayCommand(SelectThemeModeAsync);
+        SelectCloseWindowBehaviorCommand = new AsyncRelayCommand(SelectCloseWindowBehaviorAsync);
+        SetPlayerFullscreenOnPlayCommand = new AsyncRelayCommand(SetPlayerFullscreenOnPlayAsync);
+        SetAutoWebDavScanCommand = new AsyncRelayCommand(SetAutoWebDavScanAsync);
     }
 
     public ObservableCollection<ScanPath> ScanPaths { get; } = [];
@@ -162,7 +227,11 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public AsyncRelayCommand SaveAiSettingsCommand { get; }
 
+    public AsyncRelayCommand TestAiSettingsCommand { get; }
+
     public AsyncRelayCommand SaveThemeSettingsCommand { get; }
+
+    public AsyncRelayCommand ToggleThemeSettingsCommand { get; }
 
     public RelayCommand BeginAddScanPathCommand { get; }
 
@@ -188,6 +257,41 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public RelayCommand ToggleAboutDetailsCommand { get; }
 
+    public RelayCommand SelectSettingsTabCommand { get; }
+
+    public AsyncRelayCommand SelectThemeModeCommand { get; }
+
+    public AsyncRelayCommand SelectCloseWindowBehaviorCommand { get; }
+
+    public AsyncRelayCommand SetPlayerFullscreenOnPlayCommand { get; }
+
+    public AsyncRelayCommand SetAutoWebDavScanCommand { get; }
+
+    public int SelectedSettingsTabIndex
+    {
+        get => _selectedSettingsTabIndex;
+        set
+        {
+            if (!SetProperty(ref _selectedSettingsTabIndex, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(IsGeneralSettingsTabSelected));
+            OnPropertyChanged(nameof(IsApiSettingsTabSelected));
+        }
+    }
+
+    public bool IsGeneralSettingsTabSelected => SelectedSettingsTabIndex == GeneralSettingsTabIndex;
+
+    public bool IsApiSettingsTabSelected => SelectedSettingsTabIndex == ApiSettingsTabIndex;
+
+    public bool IsGeneralSettingsContentReady
+    {
+        get => _isGeneralSettingsContentReady;
+        private set => SetProperty(ref _isGeneralSettingsContentReady, value);
+    }
+
     public int? ConnectionId
     {
         get => _connectionId;
@@ -210,63 +314,479 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public bool IsConnectionEnabled { get => _isConnectionEnabled; set => SetProperty(ref _isConnectionEnabled, value); }
 
-    public string TmdbReadAccessToken { get => _tmdbReadAccessToken; set => SetProperty(ref _tmdbReadAccessToken, value); }
+    public string TmdbReadAccessToken
+    {
+        get => _tmdbReadAccessToken;
+        set
+        {
+            if (SetProperty(ref _tmdbReadAccessToken, value))
+            {
+                OnTmdbInputsChanged();
+            }
+        }
+    }
 
-    public string TmdbApiKey { get => _tmdbApiKey; set => SetProperty(ref _tmdbApiKey, value); }
+    public string TmdbApiKey
+    {
+        get => _tmdbApiKey;
+        set
+        {
+            if (SetProperty(ref _tmdbApiKey, value))
+            {
+                OnTmdbInputsChanged();
+            }
+        }
+    }
 
-    public string OmdbApiKey { get => _omdbApiKey; set => SetProperty(ref _omdbApiKey, value); }
+    public string OmdbApiKey
+    {
+        get => _omdbApiKey;
+        set
+        {
+            if (SetProperty(ref _omdbApiKey, value))
+            {
+                OnOmdbInputsChanged();
+            }
+        }
+    }
 
-    public string OpenSubtitlesEndpoint { get => _openSubtitlesEndpoint; set => SetProperty(ref _openSubtitlesEndpoint, value); }
+    public string OpenSubtitlesEndpoint
+    {
+        get => _openSubtitlesEndpoint;
+        set
+        {
+            if (SetProperty(ref _openSubtitlesEndpoint, value))
+            {
+                OnOpenSubtitlesInputsChanged();
+            }
+        }
+    }
 
-    public string OpenSubtitlesApiKey { get => _openSubtitlesApiKey; set => SetProperty(ref _openSubtitlesApiKey, value); }
+    public string OpenSubtitlesApiKey
+    {
+        get => _openSubtitlesApiKey;
+        set
+        {
+            if (SetProperty(ref _openSubtitlesApiKey, value))
+            {
+                OnOpenSubtitlesInputsChanged();
+            }
+        }
+    }
 
-    public string OpenSubtitlesUsername { get => _openSubtitlesUsername; set => SetProperty(ref _openSubtitlesUsername, value); }
+    public string OpenSubtitlesUsername
+    {
+        get => _openSubtitlesUsername;
+        set
+        {
+            if (SetProperty(ref _openSubtitlesUsername, value))
+            {
+                OnOpenSubtitlesInputsChanged();
+            }
+        }
+    }
 
-    public string OpenSubtitlesPassword { get => _openSubtitlesPassword; set => SetProperty(ref _openSubtitlesPassword, value); }
+    public string OpenSubtitlesPassword
+    {
+        get => _openSubtitlesPassword;
+        set
+        {
+            if (SetProperty(ref _openSubtitlesPassword, value))
+            {
+                OnOpenSubtitlesInputsChanged();
+            }
+        }
+    }
 
-    public bool IsOpenSubtitlesEnabled { get => _isOpenSubtitlesEnabled; set => SetProperty(ref _isOpenSubtitlesEnabled, value); }
+    public bool IsOpenSubtitlesEnabled
+    {
+        get => true;
+        set
+        {
+            if (SetProperty(ref _isOpenSubtitlesEnabled, true))
+            {
+                OnPropertyChanged(nameof(OpenSubtitlesConfigStatusText));
+                OnOpenSubtitlesInputsChanged();
+            }
+        }
+    }
 
     public OpenSubtitlesLanguageOption? SelectedOpenSubtitlesLanguage
     {
         get => _selectedOpenSubtitlesLanguage;
-        set => SetProperty(ref _selectedOpenSubtitlesLanguage, value);
+        set
+        {
+            if (SetProperty(ref _selectedOpenSubtitlesLanguage, value))
+            {
+                OnOpenSubtitlesInputsChanged();
+            }
+        }
     }
 
-    public string AiBaseUrl { get => _aiBaseUrl; set => SetProperty(ref _aiBaseUrl, value); }
+    public string AiBaseUrl
+    {
+        get => _aiBaseUrl;
+        set
+        {
+            if (SetProperty(ref _aiBaseUrl, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiApiKey { get => _aiApiKey; set => SetProperty(ref _aiApiKey, value); }
+    public string AiApiKey
+    {
+        get => _aiApiKey;
+        set
+        {
+            if (SetProperty(ref _aiApiKey, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiModel { get => _aiModel; set => SetProperty(ref _aiModel, value); }
+    public string AiModel
+    {
+        get => _aiModel;
+        set
+        {
+            if (SetProperty(ref _aiModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiDetailCorrectionModel { get => _aiDetailCorrectionModel; set => SetProperty(ref _aiDetailCorrectionModel, value); }
+    public string AiDetailCorrectionModel
+    {
+        get => _aiDetailCorrectionModel;
+        set
+        {
+            if (SetProperty(ref _aiDetailCorrectionModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiDetailCorrectionTimeoutSeconds { get => _aiDetailCorrectionTimeoutSeconds; set => SetProperty(ref _aiDetailCorrectionTimeoutSeconds, value); }
+    public string AiDetailCorrectionTimeoutSeconds
+    {
+        get => _aiDetailCorrectionTimeoutSeconds;
+        set
+        {
+            if (SetProperty(ref _aiDetailCorrectionTimeoutSeconds, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiBatchCorrectionModel { get => _aiBatchCorrectionModel; set => SetProperty(ref _aiBatchCorrectionModel, value); }
+    public string AiBatchCorrectionModel
+    {
+        get => _aiBatchCorrectionModel;
+        set
+        {
+            if (SetProperty(ref _aiBatchCorrectionModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiBatchCorrectionTimeoutSeconds { get => _aiBatchCorrectionTimeoutSeconds; set => SetProperty(ref _aiBatchCorrectionTimeoutSeconds, value); }
+    public string AiBatchCorrectionTimeoutSeconds
+    {
+        get => _aiBatchCorrectionTimeoutSeconds;
+        set
+        {
+            if (SetProperty(ref _aiBatchCorrectionTimeoutSeconds, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiScanTvUncertainRangeModel { get => _aiScanTvUncertainRangeModel; set => SetProperty(ref _aiScanTvUncertainRangeModel, value); }
+    public string AiScanTvUncertainRangeModel
+    {
+        get => _aiScanTvUncertainRangeModel;
+        set
+        {
+            if (SetProperty(ref _aiScanTvUncertainRangeModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiScanTvUncertainRangeTimeoutSeconds { get => _aiScanTvUncertainRangeTimeoutSeconds; set => SetProperty(ref _aiScanTvUncertainRangeTimeoutSeconds, value); }
+    public string AiScanTvUncertainRangeTimeoutSeconds
+    {
+        get => _aiScanTvUncertainRangeTimeoutSeconds;
+        set
+        {
+            if (SetProperty(ref _aiScanTvUncertainRangeTimeoutSeconds, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiScanTvFullRangeModel { get => _aiScanTvFullRangeModel; set => SetProperty(ref _aiScanTvFullRangeModel, value); }
+    public string AiScanTvFullRangeModel
+    {
+        get => _aiScanTvFullRangeModel;
+        set
+        {
+            if (SetProperty(ref _aiScanTvFullRangeModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiScanTvFullRangeTimeoutSeconds { get => _aiScanTvFullRangeTimeoutSeconds; set => SetProperty(ref _aiScanTvFullRangeTimeoutSeconds, value); }
+    public string AiScanTvFullRangeTimeoutSeconds
+    {
+        get => _aiScanTvFullRangeTimeoutSeconds;
+        set
+        {
+            if (SetProperty(ref _aiScanTvFullRangeTimeoutSeconds, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiScanMovieTaggingModel { get => _aiScanMovieTaggingModel; set => SetProperty(ref _aiScanMovieTaggingModel, value); }
+    public string AiScanMovieTaggingModel
+    {
+        get => _aiScanMovieTaggingModel;
+        set
+        {
+            if (SetProperty(ref _aiScanMovieTaggingModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiScanMovieTaggingTimeoutSeconds { get => _aiScanMovieTaggingTimeoutSeconds; set => SetProperty(ref _aiScanMovieTaggingTimeoutSeconds, value); }
+    public string AiScanMovieTaggingTimeoutSeconds
+    {
+        get => _aiScanMovieTaggingTimeoutSeconds;
+        set
+        {
+            if (SetProperty(ref _aiScanMovieTaggingTimeoutSeconds, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiRecommendationModel { get => _aiRecommendationModel; set => SetProperty(ref _aiRecommendationModel, value); }
+    public string AiRecommendationModel
+    {
+        get => _aiRecommendationModel;
+        set
+        {
+            if (SetProperty(ref _aiRecommendationModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiRecommendationTimeoutSeconds { get => _aiRecommendationTimeoutSeconds; set => SetProperty(ref _aiRecommendationTimeoutSeconds, value); }
+    public string AiRecommendationTimeoutSeconds
+    {
+        get => _aiRecommendationTimeoutSeconds;
+        set
+        {
+            if (SetProperty(ref _aiRecommendationTimeoutSeconds, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiWatchProfileModel { get => _aiWatchProfileModel; set => SetProperty(ref _aiWatchProfileModel, value); }
+    public string AiWatchProfileModel
+    {
+        get => _aiWatchProfileModel;
+        set
+        {
+            if (SetProperty(ref _aiWatchProfileModel, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string AiWatchProfileTimeoutSeconds { get => _aiWatchProfileTimeoutSeconds; set => SetProperty(ref _aiWatchProfileTimeoutSeconds, value); }
+    public string AiWatchProfileTimeoutSeconds
+    {
+        get => _aiWatchProfileTimeoutSeconds;
+        set
+        {
+            if (SetProperty(ref _aiWatchProfileTimeoutSeconds, value))
+            {
+                OnAiInputsChanged();
+            }
+        }
+    }
 
-    public string SelectedThemeMode { get => _selectedThemeMode; set => SetProperty(ref _selectedThemeMode, value); }
+    public string SelectedThemeMode
+    {
+        get => _selectedThemeMode;
+        set
+        {
+            if (!SetProperty(ref _selectedThemeMode, NormalizeThemeMode(value)))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(IsSystemThemeSelected));
+            OnPropertyChanged(nameof(IsLightThemeSelected));
+            OnPropertyChanged(nameof(IsDarkThemeSelected));
+        }
+    }
+
+    public bool IsSystemThemeSelected => IsThemeModeSelected(ThemeSystem);
+
+    public bool IsLightThemeSelected => IsThemeModeSelected(ThemeLight);
+
+    public bool IsDarkThemeSelected => IsThemeModeSelected(ThemeDark);
+
+    public string ThemeToggleIcon
+    {
+        get => _themeToggleIcon;
+        private set => SetProperty(ref _themeToggleIcon, value);
+    }
+
+    public string ThemeToggleToolTip
+    {
+        get => _themeToggleToolTip;
+        private set => SetProperty(ref _themeToggleToolTip, value);
+    }
+
+    public string SelectedCloseWindowBehavior
+    {
+        get => _selectedCloseWindowBehavior;
+        private set
+        {
+            if (!SetProperty(ref _selectedCloseWindowBehavior, NormalizeCloseWindowBehavior(value)))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(IsCloseWindowExitSelected));
+            OnPropertyChanged(nameof(IsCloseWindowTraySelected));
+            OnPropertyChanged(nameof(CloseWindowBehaviorText));
+            OnPropertyChanged(nameof(CloseWindowBehaviorDetailText));
+        }
+    }
+
+    public bool IsCloseWindowExitSelected => string.Equals(
+        SelectedCloseWindowBehavior,
+        CloseWindowBehaviorExit,
+        StringComparison.OrdinalIgnoreCase);
+
+    public bool IsCloseWindowTraySelected => string.Equals(
+        SelectedCloseWindowBehavior,
+        CloseWindowBehaviorTray,
+        StringComparison.OrdinalIgnoreCase);
+
+    public string CloseWindowBehaviorText => IsCloseWindowTraySelected ? "缩小到托盘" : "退出软件";
+
+    public string CloseWindowBehaviorDetailText => IsCloseWindowTraySelected
+        ? "关闭主窗口时隐藏到系统托盘，可从托盘恢复或退出。"
+        : "关闭主窗口时直接退出 XFVerse。";
+
+    public bool StartPlayerFullscreenOnPlay
+    {
+        get => _startPlayerFullscreenOnPlay;
+        private set
+        {
+            if (!SetProperty(ref _startPlayerFullscreenOnPlay, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(IsPlayerFullscreenOnPlayEnabled));
+            OnPropertyChanged(nameof(IsPlayerFullscreenOnPlayDisabled));
+            OnPropertyChanged(nameof(AutoFullscreenDetailText));
+        }
+    }
+
+    public bool IsPlayerFullscreenOnPlayEnabled => StartPlayerFullscreenOnPlay;
+
+    public bool IsPlayerFullscreenOnPlayDisabled => !StartPlayerFullscreenOnPlay;
+
+    public string AutoFullscreenDetailText => StartPlayerFullscreenOnPlay
+        ? "点击播放后播放器窗口默认进入全屏。"
+        : "点击播放后播放器以普通窗口打开。";
+
+    public bool AutoScanWebDavOnStartup
+    {
+        get => _autoScanWebDavOnStartup;
+        private set
+        {
+            if (!SetProperty(ref _autoScanWebDavOnStartup, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(IsAutoWebDavScanEnabled));
+            OnPropertyChanged(nameof(IsAutoWebDavScanDisabled));
+            OnPropertyChanged(nameof(AutoWebDavScanDetailText));
+        }
+    }
+
+    public bool IsAutoWebDavScanEnabled => AutoScanWebDavOnStartup;
+
+    public bool IsAutoWebDavScanDisabled => !IsAutoWebDavScanEnabled;
+
+    public string AutoWebDavScanDetailText => AutoScanWebDavOnStartup
+        ? "下次启动时自动执行 WebDAV 扫描。"
+        : "启动时不自动扫描 WebDAV。";
+
+    public string TmdbConfigStatusText =>
+        string.IsNullOrWhiteSpace(TmdbReadAccessToken) && string.IsNullOrWhiteSpace(TmdbApiKey)
+            ? "未配置"
+            : "已配置";
+
+    public string OmdbConfigStatusText => string.IsNullOrWhiteSpace(OmdbApiKey) ? "未配置" : "已配置";
+
+    public string OpenSubtitlesConfigStatusText
+    {
+        get
+        {
+            return string.IsNullOrWhiteSpace(OpenSubtitlesApiKey) ? "缺少 API Key" : "已配置";
+        }
+    }
+
+    public string AiConfigStatusText =>
+        string.IsNullOrWhiteSpace(AiBaseUrl)
+        || string.IsNullOrWhiteSpace(AiApiKey)
+        || string.IsNullOrWhiteSpace(AiModel)
+            ? "未配置"
+            : "已配置";
+
+    public string TmdbConfigStatusKind
+    {
+        get => _tmdbConfigStatusKind;
+        private set => SetProperty(ref _tmdbConfigStatusKind, value);
+    }
+
+    public string OmdbConfigStatusKind
+    {
+        get => _omdbConfigStatusKind;
+        private set => SetProperty(ref _omdbConfigStatusKind, value);
+    }
+
+    public string OpenSubtitlesConfigStatusKind
+    {
+        get => _openSubtitlesConfigStatusKind;
+        private set => SetProperty(ref _openSubtitlesConfigStatusKind, value);
+    }
+
+    public string AiConfigStatusKind
+    {
+        get => _aiConfigStatusKind;
+        private set => SetProperty(ref _aiConfigStatusKind, value);
+    }
 
     public string ConnectionStatusMessage { get => _connectionStatusMessage; set => SetProperty(ref _connectionStatusMessage, value); }
 
@@ -291,6 +811,18 @@ public sealed class SettingsViewModel : PageViewModelBase
     public string PosterCacheMaxMbText { get => _posterCacheMaxMbText; set => SetProperty(ref _posterCacheMaxMbText, value); }
 
     public string PosterCacheStatusMessage { get => _posterCacheStatusMessage; set => SetProperty(ref _posterCacheStatusMessage, value); }
+
+    public bool IsPosterCacheClearAvailable
+    {
+        get => _isPosterCacheClearAvailable;
+        set
+        {
+            if (SetProperty(ref _isPosterCacheClearAvailable, value))
+            {
+                ClearPosterCacheCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
 
     public string OtherCacheUsageText { get => _otherCacheUsageText; set => SetProperty(ref _otherCacheUsageText, value); }
 
@@ -372,11 +904,18 @@ public sealed class SettingsViewModel : PageViewModelBase
         try
         {
             var appSettingTask = _settingsService.GetApplicationSettingAsync(cancellationToken);
+            var behaviorPreferencesTask = _appBehaviorPreferencesService.LoadAsync(cancellationToken);
 
-            await appSettingTask;
+            await Task.WhenAll(appSettingTask, behaviorPreferencesTask);
             ApplyApplicationSetting(appSettingTask.Result);
+            ApplyBehaviorPreferences(behaviorPreferencesTask.Result);
 
             await LoadSoftwareCacheAsync(cancellationToken);
+            IsGeneralSettingsContentReady = true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -386,6 +925,7 @@ public sealed class SettingsViewModel : PageViewModelBase
             OpenSubtitlesStatusMessage = "OpenSubtitles 配置尚未加载。";
             ApiStatusMessage = "大模型配置尚未加载。";
             SoftwareCacheStatusMessage = "软件缓存状态尚未加载。";
+            IsGeneralSettingsContentReady = true;
         }
     }
 
@@ -415,21 +955,29 @@ public sealed class SettingsViewModel : PageViewModelBase
         OpenSubtitlesUsername = applicationSetting.OpenSubtitlesUsername;
         OpenSubtitlesPassword = applicationSetting.OpenSubtitlesPassword;
         _openSubtitlesToken = applicationSetting.OpenSubtitlesToken;
-        _loadedOpenSubtitlesEndpoint = OpenSubtitlesEndpoint;
-        _loadedOpenSubtitlesApiKey = OpenSubtitlesApiKey;
-        _loadedOpenSubtitlesUsername = OpenSubtitlesUsername;
-        _loadedOpenSubtitlesPassword = OpenSubtitlesPassword;
-        IsOpenSubtitlesEnabled = applicationSetting.IsOpenSubtitlesEnabled;
+        IsOpenSubtitlesEnabled = true;
         SelectedOpenSubtitlesLanguage = FindOpenSubtitlesLanguage(applicationSetting.OpenSubtitlesDefaultLanguageCode);
         AiBaseUrl = applicationSetting.AiBaseUrl;
         AiApiKey = applicationSetting.AiApiKey;
         ApplyAiRouting(applicationSetting.AiRouting ?? AiModelRoutingSettings.FromStoredValue(applicationSetting.AiModel));
-        SelectedThemeMode = string.IsNullOrWhiteSpace(applicationSetting.ThemeMode) ? "Light" : applicationSetting.ThemeMode;
+        MarkTmdbInputsAsPersisted();
+        MarkOmdbInputsAsPersisted();
+        MarkOpenSubtitlesInputsAsPersisted();
+        MarkAiInputsAsPersisted();
+        SelectedThemeMode = NormalizeThemeMode(applicationSetting.ThemeMode);
+        UpdateThemePresentation(SelectedThemeMode);
         TmdbStatusMessage = "已加载 TMDB 配置。";
         OmdbStatusMessage = "已加载 OMDb 配置。";
         OpenSubtitlesStatusMessage = "已加载 OpenSubtitles 配置。";
         ApiStatusMessage = "已加载大模型配置。";
-        ThemeStatusMessage = $"当前主题：{SelectedThemeMode}";
+        ThemeStatusMessage = $"当前主题：{FormatThemeMode(SelectedThemeMode)}";
+    }
+
+    private void ApplyBehaviorPreferences(AppBehaviorPreferencesModel preferences)
+    {
+        SelectedCloseWindowBehavior = preferences.CloseWindowBehavior;
+        StartPlayerFullscreenOnPlay = preferences.StartPlayerFullscreenOnPlay;
+        AutoScanWebDavOnStartup = preferences.AutoScanWebDavOnStartup;
     }
 
     private void ApplyAiRouting(AiModelRoutingSettings routing)
@@ -449,6 +997,140 @@ public sealed class SettingsViewModel : PageViewModelBase
         AiRecommendationTimeoutSeconds = routing.Recommendation.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
         AiWatchProfileModel = routing.WatchProfile.Model;
         AiWatchProfileTimeoutSeconds = routing.WatchProfile.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private void OnTmdbInputsChanged()
+    {
+        OnPropertyChanged(nameof(TmdbConfigStatusText));
+        TmdbConfigStatusKind = ApiConfigStatusUntested;
+        SaveTmdbSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private void OnOmdbInputsChanged()
+    {
+        OnPropertyChanged(nameof(OmdbConfigStatusText));
+        OmdbConfigStatusKind = ApiConfigStatusUntested;
+        SaveOmdbSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private void OnOpenSubtitlesInputsChanged()
+    {
+        OnPropertyChanged(nameof(OpenSubtitlesConfigStatusText));
+        OpenSubtitlesConfigStatusKind = ApiConfigStatusUntested;
+        SaveOpenSubtitlesSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private void OnAiInputsChanged()
+    {
+        OnPropertyChanged(nameof(AiConfigStatusText));
+        AiConfigStatusKind = ApiConfigStatusUntested;
+        SaveAiSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool HasTmdbSettingsChanges()
+    {
+        return !StringEqualsPersisted(TmdbReadAccessToken, _loadedTmdbReadAccessToken)
+               || !StringEqualsPersisted(TmdbApiKey, _loadedTmdbApiKey);
+    }
+
+    private bool HasOmdbSettingsChanges()
+    {
+        return !StringEqualsPersisted(OmdbApiKey, _loadedOmdbApiKey);
+    }
+
+    private bool HasOpenSubtitlesSettingsChanges()
+    {
+        return !StringEqualsPersisted(NormalizePersistedText(OpenSubtitlesEndpoint).TrimEnd('/'), _loadedOpenSubtitlesEndpoint.TrimEnd('/'))
+               || !StringEqualsPersisted(OpenSubtitlesApiKey, _loadedOpenSubtitlesApiKey)
+               || !StringEqualsPersisted(OpenSubtitlesUsername, _loadedOpenSubtitlesUsername)
+               || !string.Equals(OpenSubtitlesPassword ?? string.Empty, _loadedOpenSubtitlesPassword ?? string.Empty, StringComparison.Ordinal)
+               || !string.Equals(GetSelectedOpenSubtitlesLanguageCode(), _loadedOpenSubtitlesLanguageCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool HasAiSettingsChanges()
+    {
+        return !StringEqualsPersisted(AiBaseUrl, _loadedAiBaseUrl)
+               || !StringEqualsPersisted(AiApiKey, _loadedAiApiKey)
+               || !StringEqualsPersisted(AiModel, _loadedAiModel)
+               || !StringEqualsPersisted(AiDetailCorrectionModel, _loadedAiDetailCorrectionModel)
+               || !StringEqualsPersisted(AiDetailCorrectionTimeoutSeconds, _loadedAiDetailCorrectionTimeoutSeconds)
+               || !StringEqualsPersisted(AiBatchCorrectionModel, _loadedAiBatchCorrectionModel)
+               || !StringEqualsPersisted(AiBatchCorrectionTimeoutSeconds, _loadedAiBatchCorrectionTimeoutSeconds)
+               || !StringEqualsPersisted(AiScanTvUncertainRangeModel, _loadedAiScanTvUncertainRangeModel)
+               || !StringEqualsPersisted(AiScanTvUncertainRangeTimeoutSeconds, _loadedAiScanTvUncertainRangeTimeoutSeconds)
+               || !StringEqualsPersisted(AiScanTvFullRangeModel, _loadedAiScanTvFullRangeModel)
+               || !StringEqualsPersisted(AiScanTvFullRangeTimeoutSeconds, _loadedAiScanTvFullRangeTimeoutSeconds)
+               || !StringEqualsPersisted(AiScanMovieTaggingModel, _loadedAiScanMovieTaggingModel)
+               || !StringEqualsPersisted(AiScanMovieTaggingTimeoutSeconds, _loadedAiScanMovieTaggingTimeoutSeconds)
+               || !StringEqualsPersisted(AiRecommendationModel, _loadedAiRecommendationModel)
+               || !StringEqualsPersisted(AiRecommendationTimeoutSeconds, _loadedAiRecommendationTimeoutSeconds)
+               || !StringEqualsPersisted(AiWatchProfileModel, _loadedAiWatchProfileModel)
+               || !StringEqualsPersisted(AiWatchProfileTimeoutSeconds, _loadedAiWatchProfileTimeoutSeconds);
+    }
+
+    private void MarkTmdbInputsAsPersisted()
+    {
+        _loadedTmdbReadAccessToken = NormalizePersistedText(TmdbReadAccessToken);
+        _loadedTmdbApiKey = NormalizePersistedText(TmdbApiKey);
+        SaveTmdbSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private void MarkOmdbInputsAsPersisted()
+    {
+        _loadedOmdbApiKey = NormalizePersistedText(OmdbApiKey);
+        SaveOmdbSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private void MarkOpenSubtitlesInputsAsPersisted()
+    {
+        _loadedOpenSubtitlesEndpoint = NormalizePersistedText(OpenSubtitlesEndpoint).TrimEnd('/');
+        _loadedOpenSubtitlesApiKey = NormalizePersistedText(OpenSubtitlesApiKey);
+        _loadedOpenSubtitlesUsername = NormalizePersistedText(OpenSubtitlesUsername);
+        _loadedOpenSubtitlesPassword = OpenSubtitlesPassword ?? string.Empty;
+        _loadedOpenSubtitlesLanguageCode = GetSelectedOpenSubtitlesLanguageCode();
+        SaveOpenSubtitlesSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private void MarkAiInputsAsPersisted()
+    {
+        _loadedAiBaseUrl = NormalizePersistedText(AiBaseUrl);
+        _loadedAiApiKey = NormalizePersistedText(AiApiKey);
+        _loadedAiModel = NormalizePersistedText(AiModel);
+        _loadedAiDetailCorrectionModel = NormalizePersistedText(AiDetailCorrectionModel);
+        _loadedAiDetailCorrectionTimeoutSeconds = NormalizePersistedText(AiDetailCorrectionTimeoutSeconds);
+        _loadedAiBatchCorrectionModel = NormalizePersistedText(AiBatchCorrectionModel);
+        _loadedAiBatchCorrectionTimeoutSeconds = NormalizePersistedText(AiBatchCorrectionTimeoutSeconds);
+        _loadedAiScanTvUncertainRangeModel = NormalizePersistedText(AiScanTvUncertainRangeModel);
+        _loadedAiScanTvUncertainRangeTimeoutSeconds = NormalizePersistedText(AiScanTvUncertainRangeTimeoutSeconds);
+        _loadedAiScanTvFullRangeModel = NormalizePersistedText(AiScanTvFullRangeModel);
+        _loadedAiScanTvFullRangeTimeoutSeconds = NormalizePersistedText(AiScanTvFullRangeTimeoutSeconds);
+        _loadedAiScanMovieTaggingModel = NormalizePersistedText(AiScanMovieTaggingModel);
+        _loadedAiScanMovieTaggingTimeoutSeconds = NormalizePersistedText(AiScanMovieTaggingTimeoutSeconds);
+        _loadedAiRecommendationModel = NormalizePersistedText(AiRecommendationModel);
+        _loadedAiRecommendationTimeoutSeconds = NormalizePersistedText(AiRecommendationTimeoutSeconds);
+        _loadedAiWatchProfileModel = NormalizePersistedText(AiWatchProfileModel);
+        _loadedAiWatchProfileTimeoutSeconds = NormalizePersistedText(AiWatchProfileTimeoutSeconds);
+        SaveAiSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private string GetSelectedOpenSubtitlesLanguageCode()
+    {
+        return string.IsNullOrWhiteSpace(SelectedOpenSubtitlesLanguage?.Code)
+            ? "zh-cn"
+            : SelectedOpenSubtitlesLanguage.Code.Trim();
+    }
+
+    private static bool StringEqualsPersisted(string? current, string? loaded)
+    {
+        return string.Equals(
+            NormalizePersistedText(current),
+            NormalizePersistedText(loaded),
+            StringComparison.Ordinal);
+    }
+
+    private static string NormalizePersistedText(string? value)
+    {
+        return (value ?? string.Empty).Trim();
     }
 
     private AiModelRoutingSettings BuildAiRoutingFromInputs()
@@ -489,7 +1171,7 @@ public sealed class SettingsViewModel : PageViewModelBase
             Username = OpenSubtitlesUsername,
             Password = OpenSubtitlesPassword,
             Token = _openSubtitlesToken,
-            DefaultLanguageCode = SelectedOpenSubtitlesLanguage?.Code ?? "zh-cn"
+            DefaultLanguageCode = GetSelectedOpenSubtitlesLanguageCode()
         };
     }
 
@@ -505,18 +1187,10 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     private bool HasOpenSubtitlesCredentialInputsChanged()
     {
-        return !string.Equals(NormalizeOpenSubtitlesText(OpenSubtitlesEndpoint), NormalizeOpenSubtitlesText(_loadedOpenSubtitlesEndpoint), StringComparison.Ordinal)
+        return !string.Equals(NormalizeOpenSubtitlesText(OpenSubtitlesEndpoint).TrimEnd('/'), NormalizeOpenSubtitlesText(_loadedOpenSubtitlesEndpoint).TrimEnd('/'), StringComparison.Ordinal)
                || !string.Equals(NormalizeOpenSubtitlesText(OpenSubtitlesApiKey), NormalizeOpenSubtitlesText(_loadedOpenSubtitlesApiKey), StringComparison.Ordinal)
                || !string.Equals(NormalizeOpenSubtitlesText(OpenSubtitlesUsername), NormalizeOpenSubtitlesText(_loadedOpenSubtitlesUsername), StringComparison.Ordinal)
                || !string.Equals(OpenSubtitlesPassword ?? string.Empty, _loadedOpenSubtitlesPassword ?? string.Empty, StringComparison.Ordinal);
-    }
-
-    private void MarkOpenSubtitlesInputsAsPersisted()
-    {
-        _loadedOpenSubtitlesEndpoint = OpenSubtitlesEndpoint;
-        _loadedOpenSubtitlesApiKey = OpenSubtitlesApiKey;
-        _loadedOpenSubtitlesUsername = OpenSubtitlesUsername;
-        _loadedOpenSubtitlesPassword = OpenSubtitlesPassword;
     }
 
     private static string NormalizeOpenSubtitlesText(string? value)
@@ -529,6 +1203,13 @@ public sealed class SettingsViewModel : PageViewModelBase
         return errorKind is OpenSubtitlesErrorKind.Unauthorized or OpenSubtitlesErrorKind.Forbidden;
     }
 
+    private static bool IsOpenSubtitlesProbeSuccessful(OpenSubtitlesProbeResult result)
+    {
+        return result.IsApiKeyConfigured
+               && result.IsApiKeyAccepted
+               && (!result.LoginAttempted || result.LoginSucceeded);
+    }
+
     private void ApplyOpenSubtitlesInputs(ApplicationSettingModel settings)
     {
         settings.OpenSubtitlesEndpoint = string.IsNullOrWhiteSpace(OpenSubtitlesEndpoint)
@@ -538,8 +1219,8 @@ public sealed class SettingsViewModel : PageViewModelBase
         settings.OpenSubtitlesUsername = OpenSubtitlesUsername;
         settings.OpenSubtitlesPassword = OpenSubtitlesPassword;
         settings.OpenSubtitlesToken = _openSubtitlesToken;
-        settings.OpenSubtitlesDefaultLanguageCode = SelectedOpenSubtitlesLanguage?.Code ?? "zh-cn";
-        settings.IsOpenSubtitlesEnabled = IsOpenSubtitlesEnabled;
+        settings.OpenSubtitlesDefaultLanguageCode = GetSelectedOpenSubtitlesLanguageCode();
+        settings.IsOpenSubtitlesEnabled = true;
     }
 
     private OpenSubtitlesLanguageOption? FindOpenSubtitlesLanguage(string? code)
@@ -550,6 +1231,141 @@ public sealed class SettingsViewModel : PageViewModelBase
                ?? OpenSubtitlesLanguages.FirstOrDefault(
                    x => string.Equals(x.Code, "zh-cn", StringComparison.OrdinalIgnoreCase))
                ?? OpenSubtitlesLanguages.FirstOrDefault();
+    }
+
+    private static int GetOpenSubtitlesLanguagePriority(string code)
+    {
+        return code.ToLowerInvariant() switch
+        {
+            "zh-cn" => 0,
+            "zh-tw" => 1,
+            "ze" => 2,
+            "zh-ca" => 3,
+            "en" => 4,
+            "ja" => 5,
+            "ko" => 6,
+            "fr" => 7,
+            "de" => 8,
+            "es" => 9,
+            "ru" => 10,
+            "it" => 11,
+            "pt-br" => 12,
+            "pt-pt" => 13,
+            _ => 100
+        };
+    }
+
+    private static string LocalizeOpenSubtitlesLanguageName(OpenSubtitlesLanguageOption language)
+    {
+        return language.Code.ToLowerInvariant() switch
+        {
+            "ab" => "阿布哈兹语",
+            "af" => "南非荷兰语",
+            "sq" => "阿尔巴尼亚语",
+            "am" => "阿姆哈拉语",
+            "ar" => "阿拉伯语",
+            "an" => "阿拉贡语",
+            "hy" => "亚美尼亚语",
+            "as" => "阿萨姆语",
+            "at" => "阿斯图里亚斯语",
+            "az-az" => "阿塞拜疆语",
+            "eu" => "巴斯克语",
+            "be" => "白俄罗斯语",
+            "bn" => "孟加拉语",
+            "bs" => "波斯尼亚语",
+            "br" => "布列塔尼语",
+            "bg" => "保加利亚语",
+            "my" => "缅甸语",
+            "ca" => "加泰罗尼亚语",
+            "ze" => "中英双语",
+            "zh-ca" => "粤语中文",
+            "zh-cn" => "简体中文",
+            "zh-tw" => "繁体中文",
+            "hr" => "克罗地亚语",
+            "cs" => "捷克语",
+            "da" => "丹麦语",
+            "pr" => "达里语",
+            "nl" => "荷兰语",
+            "en" => "英语",
+            "eo" => "世界语",
+            "et" => "爱沙尼亚语",
+            "ex" => "埃斯特雷马杜拉语",
+            "fi" => "芬兰语",
+            "fr" => "法语",
+            "gd" => "盖尔语",
+            "gl" => "加利西亚语",
+            "ka" => "格鲁吉亚语",
+            "de" => "德语",
+            "el" => "希腊语",
+            "he" => "希伯来语",
+            "hi" => "印地语",
+            "hu" => "匈牙利语",
+            "is" => "冰岛语",
+            "ig" => "伊博语",
+            "id" => "印度尼西亚语",
+            "ia" => "国际语",
+            "ga" => "爱尔兰语",
+            "it" => "意大利语",
+            "ja" => "日语",
+            "kn" => "卡纳达语",
+            "kk" => "哈萨克语",
+            "km" => "高棉语",
+            "ko" => "韩语",
+            "ku" => "库尔德语",
+            "lv" => "拉脱维亚语",
+            "lt" => "立陶宛语",
+            "lb" => "卢森堡语",
+            "mk" => "马其顿语",
+            "ms" => "马来语",
+            "ml" => "马拉雅拉姆语",
+            "ma" => "曼尼普尔语",
+            "mr" => "马拉地语",
+            "mn" => "蒙古语",
+            "me" => "黑山语",
+            "nv" => "纳瓦霍语",
+            "ne" => "尼泊尔语",
+            "se" => "北萨米语",
+            "no" => "挪威语",
+            "oc" => "奥克语",
+            "or" => "奥里亚语",
+            "fa" => "波斯语",
+            "pl" => "波兰语",
+            "pt-pt" => "葡萄牙语",
+            "pt-br" => "葡萄牙语（巴西）",
+            "pm" => "葡萄牙语（莫桑比克）",
+            "ps" => "普什图语",
+            "ro" => "罗马尼亚语",
+            "ru" => "俄语",
+            "sx" => "桑塔利语",
+            "sr" => "塞尔维亚语",
+            "sd" => "信德语",
+            "si" => "僧伽罗语",
+            "sk" => "斯洛伐克语",
+            "sl" => "斯洛文尼亚语",
+            "so" => "索马里语",
+            "az-zb" => "南阿塞拜疆语",
+            "es" => "西班牙语",
+            "sp" => "西班牙语（欧洲）",
+            "ea" => "西班牙语（拉美）",
+            "sw" => "斯瓦希里语",
+            "sv" => "瑞典语",
+            "sy" => "叙利亚语",
+            "tl" => "他加禄语",
+            "ta" => "泰米尔语",
+            "tt" => "鞑靼语",
+            "te" => "泰卢固语",
+            "tm-td" => "德顿语",
+            "th" => "泰语",
+            "tp" => "道本语",
+            "tr" => "土耳其语",
+            "tk" => "土库曼语",
+            "uk" => "乌克兰语",
+            "ur" => "乌尔都语",
+            "uz" => "乌兹别克语",
+            "vi" => "越南语",
+            "cy" => "威尔士语",
+            _ => language.Name
+        };
     }
 
     private static string FormatOpenSubtitlesProbeResult(OpenSubtitlesProbeResult result)
@@ -670,10 +1486,15 @@ public sealed class SettingsViewModel : PageViewModelBase
                 settings.TmdbApiKey = TmdbApiKey;
             });
             _applicationSettingId = saved.Id;
+            TmdbReadAccessToken = saved.TmdbReadAccessToken;
+            TmdbApiKey = saved.TmdbApiKey;
+            MarkTmdbInputsAsPersisted();
             TmdbStatusMessage = "TMDB 认证信息已保存。";
+            await TestTmdbConnectionAsync();
         }
         catch (Exception exception)
         {
+            TmdbConfigStatusKind = ApiConfigStatusFailure;
             TmdbStatusMessage = $"保存 TMDB 配置失败：{exception.Message}";
         }
     }
@@ -684,19 +1505,23 @@ public sealed class SettingsViewModel : PageViewModelBase
                                 || !string.IsNullOrWhiteSpace(TmdbApiKey);
         if (!hasTmdbCredential)
         {
+            TmdbConfigStatusKind = ApiConfigStatusFailure;
             TmdbStatusMessage = "请先填写 TMDB Read Access Token 或 API Key。";
             return;
         }
 
         try
         {
+            TmdbConfigStatusKind = ApiConfigStatusUntested;
             TmdbStatusMessage = "正在测试 TMDB 连接...";
             var settings = await _settingsService.GetApplicationSettingAsync();
             await TestTmdbAsync(settings.TmdbBaseUrl);
+            TmdbConfigStatusKind = ApiConfigStatusSuccess;
             TmdbStatusMessage = "TMDB 连接正常。";
         }
         catch (Exception exception)
         {
+            TmdbConfigStatusKind = ApiConfigStatusFailure;
             TmdbStatusMessage = $"TMDB 连接失败：{exception.Message}";
         }
     }
@@ -710,10 +1535,14 @@ public sealed class SettingsViewModel : PageViewModelBase
                 settings.OmdbApiKey = OmdbApiKey;
             });
             _applicationSettingId = saved.Id;
+            OmdbApiKey = saved.OmdbApiKey;
+            MarkOmdbInputsAsPersisted();
             OmdbStatusMessage = "OMDb 认证信息已保存。";
+            await TestOmdbConnectionAsync();
         }
         catch (Exception exception)
         {
+            OmdbConfigStatusKind = ApiConfigStatusFailure;
             OmdbStatusMessage = $"保存 OMDb 配置失败：{exception.Message}";
         }
     }
@@ -722,18 +1551,22 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         if (string.IsNullOrWhiteSpace(OmdbApiKey))
         {
+            OmdbConfigStatusKind = ApiConfigStatusFailure;
             OmdbStatusMessage = "请先填写 OMDb API Key。";
             return;
         }
 
         try
         {
+            OmdbConfigStatusKind = ApiConfigStatusUntested;
             OmdbStatusMessage = "正在测试 OMDb 连接...";
             await TestOmdbAsync();
+            OmdbConfigStatusKind = ApiConfigStatusSuccess;
             OmdbStatusMessage = "OMDb 连接正常。";
         }
         catch (Exception exception)
         {
+            OmdbConfigStatusKind = ApiConfigStatusFailure;
             OmdbStatusMessage = $"OMDb 连接失败：{exception.Message}";
         }
     }
@@ -748,11 +1581,20 @@ public sealed class SettingsViewModel : PageViewModelBase
                 ApplyOpenSubtitlesInputs(settings);
             });
             _applicationSettingId = saved.Id;
+            OpenSubtitlesEndpoint = saved.OpenSubtitlesEndpoint;
+            OpenSubtitlesApiKey = saved.OpenSubtitlesApiKey;
+            OpenSubtitlesUsername = saved.OpenSubtitlesUsername;
+            OpenSubtitlesPassword = saved.OpenSubtitlesPassword;
+            _openSubtitlesToken = saved.OpenSubtitlesToken;
+            IsOpenSubtitlesEnabled = true;
+            SelectedOpenSubtitlesLanguage = FindOpenSubtitlesLanguage(saved.OpenSubtitlesDefaultLanguageCode);
             MarkOpenSubtitlesInputsAsPersisted();
             OpenSubtitlesStatusMessage = "OpenSubtitles 配置已保存。";
+            await TestOpenSubtitlesConnectionAsync();
         }
         catch (Exception exception)
         {
+            OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
             OpenSubtitlesStatusMessage = $"保存 OpenSubtitles 配置失败：{exception.Message}";
         }
     }
@@ -761,46 +1603,211 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         if (string.IsNullOrWhiteSpace(OpenSubtitlesApiKey))
         {
+            OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
             OpenSubtitlesStatusMessage = "请先填写 OpenSubtitles API Key。";
             return;
         }
 
         try
         {
+            OpenSubtitlesConfigStatusKind = ApiConfigStatusUntested;
             OpenSubtitlesStatusMessage = "正在探测 OpenSubtitles API 能力...";
             ClearOpenSubtitlesTokenIfCredentialsChanged();
             var result = await _openSubtitlesClientService.ProbeAsync(BuildOpenSubtitlesOptionsFromInputs());
             if (!string.IsNullOrWhiteSpace(result.Token))
             {
                 _openSubtitlesToken = result.Token;
-                await SaveApplicationSettingsAsync(settings =>
-                {
-                    ApplyOpenSubtitlesInputs(settings);
-                });
-                MarkOpenSubtitlesInputsAsPersisted();
             }
             else if (IsOpenSubtitlesAuthFailure(result.ErrorKind) && !string.IsNullOrWhiteSpace(_openSubtitlesToken))
             {
                 _openSubtitlesToken = string.Empty;
-                await SaveApplicationSettingsAsync(settings =>
-                {
-                    ApplyOpenSubtitlesInputs(settings);
-                });
-                MarkOpenSubtitlesInputsAsPersisted();
             }
 
+            OpenSubtitlesConfigStatusKind = IsOpenSubtitlesProbeSuccessful(result)
+                ? ApiConfigStatusSuccess
+                : ApiConfigStatusFailure;
             OpenSubtitlesStatusMessage = FormatOpenSubtitlesProbeResult(result);
         }
         catch (Exception exception)
         {
+            OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
             OpenSubtitlesStatusMessage = $"OpenSubtitles 探测失败：{exception.GetType().Name}";
         }
     }
 
     private async Task SaveAiSettingsAsync()
     {
-        await SaveApplicationSettingsAsync();
-        ApiStatusMessage = "AI 接口配置已保存。";
+        try
+        {
+            var saved = await SaveApplicationSettingsAsync(settings =>
+            {
+                settings.AiBaseUrl = AiBaseUrl;
+                settings.AiApiKey = AiApiKey;
+                settings.AiModel = AiModel;
+                settings.AiRouting = BuildAiRoutingFromInputs();
+            });
+            _applicationSettingId = saved.Id;
+            AiBaseUrl = saved.AiBaseUrl;
+            AiApiKey = saved.AiApiKey;
+            ApplyAiRouting(saved.AiRouting);
+            MarkAiInputsAsPersisted();
+            ApiStatusMessage = "AI 接口配置已保存。";
+            await TestAiSettingsAsync();
+        }
+        catch (Exception exception)
+        {
+            AiConfigStatusKind = ApiConfigStatusFailure;
+            ApiStatusMessage = $"保存 AI 接口配置失败：{exception.Message}";
+        }
+    }
+
+    private async Task TestAiSettingsAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(AiBaseUrl)
+                || string.IsNullOrWhiteSpace(AiApiKey)
+                || string.IsNullOrWhiteSpace(AiModel))
+            {
+                AiConfigStatusKind = ApiConfigStatusFailure;
+                ApiStatusMessage = "请先填写 AI Base URL、API Key 和默认模型。";
+                return;
+            }
+
+            var endpoint = BuildAiProbeEndpoint(AiBaseUrl);
+            var routing = BuildAiRoutingFromInputs();
+            var models = CollectAiProbeModels(routing);
+            if (models.Count == 0)
+            {
+                AiConfigStatusKind = ApiConfigStatusFailure;
+                ApiStatusMessage = "请至少填写一个可测试的 AI 模型。";
+                return;
+            }
+
+            AiConfigStatusKind = ApiConfigStatusUntested;
+            ApiStatusMessage = $"正在测试 AI 模型：共 {models.Count} 个。";
+            var failures = new List<string>();
+            var successCount = 0;
+
+            for (var index = 0; index < models.Count; index++)
+            {
+                var model = models[index];
+                ApiStatusMessage = $"正在测试 AI 模型 {index + 1}/{models.Count}：{model}";
+                try
+                {
+                    await TestAiModelAsync(endpoint, AiApiKey, model);
+                    successCount++;
+                }
+                catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+                {
+                    failures.Add($"{model}：{FormatAiProbeError(exception)}");
+                }
+            }
+
+            if (failures.Count == 0)
+            {
+                AiConfigStatusKind = ApiConfigStatusSuccess;
+                ApiStatusMessage = $"AI 连接正常，已测试 {successCount} 个去重模型：{string.Join("、", models)}。";
+                return;
+            }
+
+            AiConfigStatusKind = ApiConfigStatusFailure;
+            ApiStatusMessage = $"AI 测试完成，{successCount}/{models.Count} 通过；失败：{string.Join("；", failures)}";
+        }
+        catch (Exception exception)
+        {
+            AiConfigStatusKind = ApiConfigStatusFailure;
+            ApiStatusMessage = $"AI 测试失败：{FormatAiProbeError(exception)}";
+        }
+    }
+
+    private static Uri BuildAiProbeEndpoint(string baseUrl)
+    {
+        var normalized = NormalizePersistedText(baseUrl).TrimEnd('/');
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException("AI Base URL 必须是有效的绝对地址。");
+        }
+
+        var endpoint = normalized.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)
+            ? normalized + "/chat/completions"
+            : normalized + "/v1/chat/completions";
+        return new Uri(endpoint, UriKind.Absolute);
+    }
+
+    private static IReadOnlyList<string> CollectAiProbeModels(AiModelRoutingSettings routing)
+    {
+        var models = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        AddModel(routing.DefaultModel);
+        AddModel(routing.SingleSourceCorrection.Model);
+        AddModel(routing.BatchCorrection.Model);
+        AddModel(routing.ScanTvUncertainRange.Model);
+        AddModel(routing.ScanTvFullRange.Model);
+        AddModel(routing.ScanMovieTagging.Model);
+        AddModel(routing.Recommendation.Model);
+        AddModel(routing.WatchProfile.Model);
+        return models;
+
+        void AddModel(string? model)
+        {
+            var normalized = NormalizePersistedText(model);
+            if (normalized.Length == 0 || !seen.Add(normalized))
+            {
+                return;
+            }
+
+            models.Add(normalized);
+        }
+    }
+
+    private async Task TestAiModelAsync(Uri endpoint, string apiKey, string model)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = model,
+            ["messages"] = new[]
+            {
+                new { role = "system", content = "You are a connectivity test." },
+                new { role = "user", content = "Reply with OK." }
+            },
+            ["temperature"] = 0,
+            ["max_tokens"] = 8
+        };
+
+        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(AiProbeTimeoutSeconds));
+        using var response = await _aiApiHttpClient.SendAsync(request, timeout.Token);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException($"HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeout.Token);
+        if (!document.RootElement.TryGetProperty("choices", out var choices)
+            || choices.ValueKind != JsonValueKind.Array
+            || choices.GetArrayLength() == 0)
+        {
+            throw new InvalidOperationException("响应缺少 choices。");
+        }
+    }
+
+    private static string FormatAiProbeError(Exception exception)
+    {
+        return exception switch
+        {
+            TaskCanceledException => $"请求超时（{AiProbeTimeoutSeconds}s）",
+            HttpRequestException => string.IsNullOrWhiteSpace(exception.Message) ? "HTTP 请求失败" : exception.Message,
+            JsonException => "响应不是有效 JSON",
+            InvalidOperationException => exception.Message,
+            _ => exception.GetType().Name
+        };
     }
 
     private async Task TestTmdbAsync(string configuredBaseUrl)
@@ -904,30 +1911,17 @@ public sealed class SettingsViewModel : PageViewModelBase
         await _themeService.ApplyAndSaveAsync(SelectedThemeMode);
         var settings = await _settingsService.GetApplicationSettingAsync();
         _applicationSettingId = settings.Id;
-        ThemeStatusMessage = $"主题已切换为：{SelectedThemeMode}";
+        SelectedThemeMode = NormalizeThemeMode(settings.ThemeMode);
+        UpdateThemePresentation(SelectedThemeMode);
+        ThemeStatusMessage = $"主题已切换为：{FormatThemeMode(SelectedThemeMode)}";
     }
 
-    private async Task SaveApplicationSettingsAsync()
+    private async Task ToggleThemeSettingsAsync()
     {
-        try
-        {
-            await SaveApplicationSettingsAsync(settings =>
-            {
-                settings.Id = _applicationSettingId;
-                settings.TmdbReadAccessToken = TmdbReadAccessToken;
-                settings.TmdbApiKey = TmdbApiKey;
-                settings.OmdbApiKey = OmdbApiKey;
-                settings.ThemeMode = SelectedThemeMode;
-                settings.AiBaseUrl = AiBaseUrl;
-                settings.AiApiKey = AiApiKey;
-                settings.AiModel = AiModel;
-                settings.AiRouting = BuildAiRoutingFromInputs();
-            });
-        }
-        catch (Exception exception)
-        {
-            ApiStatusMessage = $"保存接口配置失败：{exception.Message}";
-        }
+        SelectedThemeMode = string.Equals(SelectedThemeMode, ThemeDark, StringComparison.OrdinalIgnoreCase)
+            ? ThemeLight
+            : ThemeDark;
+        await SaveThemeSettingsAsync();
     }
 
     private async Task<ApplicationSettingModel> SaveApplicationSettingsAsync(Action<ApplicationSettingModel> configureSettings)
@@ -963,7 +1957,7 @@ public sealed class SettingsViewModel : PageViewModelBase
             OpenSubtitlesPassword = settings.OpenSubtitlesPassword,
             OpenSubtitlesToken = settings.OpenSubtitlesToken,
             OpenSubtitlesDefaultLanguageCode = settings.OpenSubtitlesDefaultLanguageCode,
-            IsOpenSubtitlesEnabled = settings.IsOpenSubtitlesEnabled
+            IsOpenSubtitlesEnabled = true
         };
     }
 
@@ -1108,6 +2102,10 @@ public sealed class SettingsViewModel : PageViewModelBase
         PosterCacheUsageText = FormatFileSize(overview.PosterCache.UsedBytes);
         PosterCacheFileCountText = $"{overview.PosterCache.ItemCount} 个文件";
         PosterCacheMaxMbText = FormatMegabytes(overview.PosterCacheMaxBytes);
+        IsPosterCacheClearAvailable = overview.PosterCache.IsClearable;
+        PosterCacheStatusMessage = overview.PosterCache.IsClearable
+            ? $"可清理 {overview.PosterCache.ClearableItemCount} 个海报缓存文件，预计释放 {FormatFileSize(overview.PosterCache.ClearableBytes)}。"
+            : overview.PosterCache.ClearUnavailableReason;
 
         OtherCacheDescriptionText = overview.OtherCache.Description;
         OtherCacheUsageText = overview.OtherCache.ItemCount > 0
@@ -1295,7 +2293,136 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     private void ToggleAboutDetails()
     {
-        AboutStatusMessage = "关于详情将在后续最终 UI 阶段完善。";
+        AboutStatusMessage = "本地桌面影音库；媒体源文件仍保留在本地目录或 WebDAV 远端。";
+    }
+
+    private void SelectSettingsTab(object? parameter)
+    {
+        if (!int.TryParse(parameter?.ToString(), out var tabIndex)
+            || tabIndex < GeneralSettingsTabIndex
+            || tabIndex > ApiSettingsTabIndex)
+        {
+            return;
+        }
+
+        SelectedSettingsTabIndex = tabIndex;
+    }
+
+    private async Task SelectThemeModeAsync(object? parameter)
+    {
+        var themeMode = NormalizeThemeMode(parameter?.ToString());
+        if (string.Equals(SelectedThemeMode, themeMode, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SelectedThemeMode = themeMode;
+        await SaveThemeSettingsAsync();
+    }
+
+    private async Task SelectCloseWindowBehaviorAsync(object? parameter)
+    {
+        var closeBehavior = NormalizeCloseWindowBehavior(parameter?.ToString());
+        if (string.Equals(SelectedCloseWindowBehavior, closeBehavior, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var preferences = await _appBehaviorPreferencesService.LoadAsync();
+        preferences.CloseWindowBehavior = closeBehavior;
+        await _appBehaviorPreferencesService.SaveAsync(preferences);
+        ApplyBehaviorPreferences(preferences);
+    }
+
+    private async Task SetPlayerFullscreenOnPlayAsync(object? parameter)
+    {
+        var startFullscreen = ParseBooleanParameter(parameter);
+        if (StartPlayerFullscreenOnPlay == startFullscreen)
+        {
+            return;
+        }
+
+        var preferences = await _appBehaviorPreferencesService.LoadAsync();
+        preferences.StartPlayerFullscreenOnPlay = startFullscreen;
+        await _appBehaviorPreferencesService.SaveAsync(preferences);
+        ApplyBehaviorPreferences(preferences);
+    }
+
+    private async Task SetAutoWebDavScanAsync(object? parameter)
+    {
+        var autoScan = ParseBooleanParameter(parameter);
+        if (AutoScanWebDavOnStartup == autoScan)
+        {
+            return;
+        }
+
+        var preferences = await _appBehaviorPreferencesService.LoadAsync();
+        preferences.AutoScanWebDavOnStartup = autoScan;
+        await _appBehaviorPreferencesService.SaveAsync(preferences);
+        ApplyBehaviorPreferences(preferences);
+    }
+
+    private void OnThemeChanged(object? sender, string themeMode)
+    {
+        UpdateThemePresentation(themeMode);
+        ThemeStatusMessage = $"当前主题：{FormatThemeMode(SelectedThemeMode)}";
+    }
+
+    private bool IsThemeModeSelected(string themeMode)
+    {
+        return string.Equals(SelectedThemeMode, themeMode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeThemeMode(string? themeMode)
+    {
+        if (string.Equals(themeMode, ThemeSystem, StringComparison.OrdinalIgnoreCase))
+        {
+            return ThemeSystem;
+        }
+
+        return string.Equals(themeMode, ThemeDark, StringComparison.OrdinalIgnoreCase)
+            ? ThemeDark
+            : ThemeLight;
+    }
+
+    private static string NormalizeCloseWindowBehavior(string? closeWindowBehavior)
+    {
+        return string.Equals(closeWindowBehavior, CloseWindowBehaviorTray, StringComparison.OrdinalIgnoreCase)
+            ? CloseWindowBehaviorTray
+            : CloseWindowBehaviorExit;
+    }
+
+    private static bool ParseBooleanParameter(object? parameter)
+    {
+        if (parameter is bool value)
+        {
+            return value;
+        }
+
+        return bool.TryParse(parameter?.ToString(), out var parsed) && parsed;
+    }
+
+    private static string FormatThemeMode(string themeMode)
+    {
+        return NormalizeThemeMode(themeMode) switch
+        {
+            ThemeSystem => "跟随系统",
+            ThemeDark => "深色",
+            _ => "浅色"
+        };
+    }
+
+    private void UpdateThemePresentation(string? themeMode)
+    {
+        if (string.Equals(themeMode, "Dark", StringComparison.OrdinalIgnoreCase))
+        {
+            ThemeToggleIcon = "☾";
+            ThemeToggleToolTip = "当前深色主题，切换到浅色主题";
+            return;
+        }
+
+        ThemeToggleIcon = "☀";
+        ThemeToggleToolTip = "当前浅色主题，切换到深色主题";
     }
 
     private async Task LoadScanPathsAsync(int sourceConnectionId, CancellationToken cancellationToken)

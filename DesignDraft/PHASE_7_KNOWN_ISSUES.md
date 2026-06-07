@@ -1,6 +1,6 @@
 # Phase 7 Known Issues
 
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 
 This file tracks current blockers, deferred work, risks, noise and user-confirmed non-issues for Phase 7. It should be updated at every Phase 7 substage closeout.
 
@@ -46,7 +46,21 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 
 ### 7.6 Settings / Scan / Cache
 
-- Settings, scan tasks and software cache management need later visual and state alignment.
+- 7.6a established shared UI component shells for sensitive inputs, field rows, API config cards, cache category cards and scan path cards.
+- 7.6b wired the Settings `通用` Tab and software cache management to the 7.6a field-row and cache-card components.
+- 7.6b follow-up aligned the Settings `通用` Tab card hierarchy closer to the sketch: cache settings and behavior settings are now two large section cards with continuous inner row-list panels.
+- 7.6b second follow-up removed the visible full-page Settings card shell, so Settings general and API cards are not nested inside a larger page card; behavior-setting descriptions now use single-line ellipsis with true-truncation Tooltip behavior.
+- 7.6b tab follow-up confirms Settings tabs must reuse Movie Discovery's manual tab-button placement/template; `通用` has no page-level scroll, `API 配置` keeps modern vertical scrolling, and the extra in-page top-right theme toggle is removed.
+- 7.6b detail follow-up confirms non-clickable Settings cards / rows must use an arrow cursor, About is a standalone bottom row with the XFVerse icon, and the poster-cache limit input carries the `MB` unit inside the input chrome.
+- 7.6b confirmed the real software cache UI has only poster, metadata / other and online subtitle cache categories. Do not restore a video-cache management UI.
+- 7.6b now persists theme mode, close-window behavior, play-open fullscreen and startup WebDAV auto-scan. Close-window behavior, player fullscreen and startup WebDAV auto-scan use an App-layer local preference file with no Core schema or migration.
+- 7.6c wired the Settings `API 配置` Tab to shared API config cards, field rows and sensitive inputs. TMDB, OMDb and OpenSubtitles have independent save / test actions; AI has save only because no existing test command is available.
+- 7.6c API detail follow-up confirms sensitive-input reveal buttons live inside the input, API input hover must still scroll the API tab, API field-level helper text is removed, TMDB optional key copy is `API Key（可选）`, API status badges use green / yellow / red breathing lights for test passed / untested / failed, and OpenSubtitles default languages display as Chinese with common languages first.
+- AI connection testing remains Deferred unless a later stage defines a real service contract and safe error wording. Do not add a fake AI test button.
+- 7.6d completed scan task configuration alignment and path-picker work. WebDAV / local path rows reuse `ScanPathCard`; WebDAV directory browsing uses `IWebDavService.ListDirectoryAsync` through an App-layer picker window.
+- ScanTasksPage is confirmed as a no page-level scroll surface for this stage: only WebDAV path list, local path list and history log list scroll internally with the modern scrollbar behavior.
+- 7.6e completed scan progress / history-log visual closeout and local-path remove Popover work. Scan history uses `ScanLogCard`; local scan-path removal uses `LocalScanPathRemovePopover`.
+- 7.6e removed the fake `已识别` / `未识别` placeholder metrics because the current scan progress / result / log read models do not expose stable recognized / unrecognized counts.
 - Cache cleanup copy must stay distinct from deleting real media sources.
 - Do not show fake scan progress or fake pause controls if services do not support them.
 

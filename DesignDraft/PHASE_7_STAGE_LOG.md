@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Stage Log
 
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 
 This is the living Phase 7 handoff log. Keep entries concise and stage-oriented. Do not turn this into a full code diff.
 
@@ -9,6 +9,427 @@ This is the living Phase 7 handoff log. Keep entries concise and stage-oriented.
 - Historical initial UI rebuild docs remain in `docs/ui-redesign/UI_REDESIGN_PLAN.md`, `UI_REDESIGN_STAGE_LOG.md` and `UI_REDESIGN_KNOWN_ISSUES.md`.
 - Phase 7 is a later formal UI rebuild stage, so ongoing Phase 7 maintenance lives in `DesignDraft/PHASE_7_PLAN.md`, this log and `DesignDraft/PHASE_7_KNOWN_ISSUES.md`.
 - Design source docs live in `DesignDraft`, especially `PHASE_6_COVERAGE_MATRIX.md` and `page-spec`.
+
+## Phase 7.6 - Settings / Scan / Cache
+
+### 7.6a - Shared Component Baseline
+
+Completed:
+
+- Added reusable UI shells for 7.6: `SensitiveSettingInput`, `SettingFieldRow`, `ApiConfigCard`, `CacheCategoryCard` and `ScanPathCard`.
+- Reused existing global ResourceDictionary styles and helper behaviors instead of introducing page-local color or spacing rules.
+- Kept long-field handling on the existing true-truncation tooltip behavior and kept sensitive input display / reveal as UI-only presentation.
+- Recorded the 7.6a execution result in `docs/ui-redesign/PHASE_7_6_SETTINGS_SCAN_CACHE_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no SettingsPage or ScanTasksPage layout rewrite yet;
+- no path picker, scan log card, local-path remove Popover or cache workflow implementation;
+- no scanner, API save / test, cache cleanup, Core service, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None.
+
+Non-stage page changes:
+
+- None. The new controls are not wired into accepted pages in 7.6a.
+
+Suggested commit message:
+
+- `Phase 7.6a shared settings scan components`
+
+### 7.6b - Settings General Tab And Cache Management
+
+Completed:
+
+- Rebuilt the Settings `通用` Tab around the Phase 7.6 structure: page title with theme icon, software cache management, behavior settings and About row.
+- Wired the page content `ScrollViewer` to the modern auto-reveal scrollbar behavior.
+- Reused 7.6a `CacheCategoryCard` for the three real software cache categories: poster cache, metadata / other cache and online subtitle cache.
+- Reused 7.6a `SettingFieldRow` for poster-cache size limit and behavior-setting rows.
+- Bound poster cache clearing to the real `IsPosterCacheClearAvailable` state, matching the existing other-cache and subtitle-cache disabled-state behavior.
+- Kept cache cleanup buttons as danger actions and preserved confirmation copy that does not imply deleting media sources.
+- Audited general settings. Theme mode is the only real persisted behavior setting in this slice; close-window behavior, play-open fullscreen and auto WebDAV scan are displayed as disabled / read-only current behavior.
+- Added App-layer theme-change notification so changing theme in Settings also refreshes the main title-bar theme icon and tooltip.
+- Recorded the 7.6b execution result in `docs/ui-redesign/PHASE_7_6_SETTINGS_SCAN_CACHE_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with LF / CRLF warnings only.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Explicit non-goals:
+
+- no API configuration Tab rebuild;
+- no ScanTasksPage, path picker, scan progress, scan log or local-path removal Popover work;
+- no player fullscreen behavior change;
+- no close-to-tray behavior;
+- no auto WebDAV scan scheduler in the initial 7.6b pass; a later follow-up wired startup WebDAV auto-scan as App-layer behavior;
+- no Core scanner, cache-service, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- No Core business logic changed. The only behavior-level adjustment is App UI presentation sync: `IThemeService.ThemeChanged` notifies subscribers after applying a theme resource, and `MainWindowViewModel` refreshes its theme icon.
+
+Non-stage page changes:
+
+- MainWindow title-bar theme icon / tooltip now update when theme changes from Settings.
+- No Player, ScanTasks, Library, Discovery, Detail or OnlineSubtitleSearch pages were edited.
+
+Suggested commit message:
+
+- `Phase 7.6b settings general cache management`
+
+#### 7.6b Follow-up - Settings General Card Structure Alignment
+
+Completed:
+
+- Reworked the Settings `通用` Tab visual hierarchy to better match `01-设置-通用-全屏.png`: two large section cards, one continuous row-list panel inside cache settings, one continuous row-list panel inside behavior settings and an About row inside the behavior section.
+- Removed implementation-stage explanatory copy from the visible general settings card headers.
+- Kept the already approved real cache surface: poster cache, metadata / other cache and online subtitle cache only; no video-cache UI was restored.
+- Added true-truncation tooltip behavior to row labels and primary values where overflow can happen, while leaving ordinary descriptions as wrapping text.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no API configuration rebuild;
+- no scan-task, player, media-library, discovery, detail or online-subtitle page change;
+- no cache-directory opener, video-cache entry, close-to-tray setting, player fullscreen setting or auto WebDAV scan backend;
+- no Core service, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None. This follow-up only changes `SettingsPage.xaml` structure and page-local styles.
+
+#### 7.6b Follow-up - Settings General Sketch Structure Second Pass
+
+Completed:
+
+- Removed the visible full-page `PageCardStyle` shell from `SettingsPage.xaml`, so the `通用` and `API 配置` cards are no longer visually nested inside one large page card.
+- Hid the duplicate in-page Settings title and description; the main shell title remains the page title, while the page retains the settings tabs. The later tab follow-up removed the extra in-page top-right theme button.
+- Tightened the `通用` Tab spacing, section-card padding, row-list padding and row height so the cache section, behavior section and About row match the sketch hierarchy more closely.
+- Changed behavior-setting descriptions to single-line ellipsis with the existing true-truncation tooltip behavior.
+- Confirmed by runtime screenshots that the `通用` Tab now presents two large cards with continuous inner row lists, and the `API 配置` Tab keeps service cards directly in the page content area.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no cache-directory opener, video-cache entry, close-to-tray backend, player-fullscreen setting or auto WebDAV scan backend;
+- no API save / test semantic change and no fake AI test command;
+- no scan-task business logic, player, media-library, discovery, detail or online-subtitle page change;
+- no Core service, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None. This follow-up only changes `SettingsPage.xaml` visual hierarchy and page-local styles.
+
+#### 7.6b Follow-up - Settings Tabs Match Movie Discovery
+
+Completed:
+
+- Changed `SettingsPage.xaml` back to a root `Grid` with the `TabControl` directly inside it, matching Movie Discovery's page-level tab placement.
+- Replaced the visible Settings tab header with a Movie Discovery-style manual tab-button template; the native `TabPanel` is hidden and only backs content selection.
+- Removed the extra in-page top-right theme toggle button. The main window title-bar theme button and the theme controls inside the general settings card remain.
+- Kept the `通用` Tab without page-level scrolling and kept the `API 配置` Tab on a modern vertical scrollbar.
+- Added Settings ViewModel tab-selection state / command only for the manual tab-button template.
+
+Validation:
+
+- First build attempt was blocked by a leftover running `MediaLibrary.App` process locking the app exe.
+- After closing that process, `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no main-window title-bar theme button removal;
+- no theme persistence, cache cleanup, API save / test, scan-task or Core service behavior change;
+- no database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None. The new tab state is UI selection plumbing only.
+
+#### 7.6b Follow-up - Settings General Detail Alignment
+
+Completed:
+
+- Removed the `缓存设置` header's right-side status text and refresh button; software cache status remains loaded by Settings activation.
+- Aligned `缓存设置` and `行为设置` headings with the first-column row labels and added a longer, thicker, darker divider below each heading.
+- Removed the inner rounded row-list containers from both setting cards while keeping lighter row-level separators.
+- Changed right-side cache action buttons from fixed 154px width to text-driven compact widths.
+- Reworked `海报缓存上限`: removed the separate `单位 MB` line, moved `MB` inside the input chrome, reduced input height, tightened the editable area and reduced the corner radius.
+- Moved About out of the behavior settings card into a standalone bottom row and reused the XFVerse app icon geometry.
+- Forced non-clickable Settings card / row surfaces to use the normal arrow cursor so only real controls show clickable affordance.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no cache loading / clearing, theme persistence, close-window, player-fullscreen or auto-scan behavior change;
+- no API configuration, scan-task, player, media-library, discovery, detail or online-subtitle page change;
+- no Core service, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None. This follow-up is Settings general UI layout and local style only.
+
+#### 7.6b Follow-up - Settings Behavior Switches And Local Preferences
+
+Completed:
+
+- Replaced Settings general behavior controls with segmented switches: close window, play-open fullscreen, theme mode and, at that moment, disabled auto WebDAV scan. A later follow-up wired startup WebDAV auto-scan as a real setting.
+- Implemented close-window behavior as the user-defined `退出软件 / 缩小到托盘` choice, not an exit-confirmation dialog setting.
+- Added App-layer local behavior preferences for close-window behavior and play-open fullscreen without Core schema fields or migrations.
+- Added a tray icon lifecycle for the main window when close behavior is set to tray; tray menu can restore the window or exit.
+- Added player-open fullscreen preference wiring so later PlayerWindow opens either fullscreen or normal-window according to Settings.
+- Added `System` theme mode and kept the selected theme mode from being overwritten by the resolved Light / Dark resource.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no auto WebDAV scan scheduler in that specific pass; a later follow-up wired startup WebDAV auto-scan as App-layer behavior.
+- no cache cleanup, API save / test, scan-task, recognition, online-subtitle or Core service behavior change;
+- no database schema, migration, database update, commit or push change;
+- no manual UI runtime test in this pass.
+
+Business logic changes:
+
+- App-layer behavior preference file `app-behavior-preferences.json` now stores close behavior and player-open fullscreen preference.
+- `MainWindow` reads close behavior on close: `exit` exits, `tray` hides to system tray and can be restored or exited from the tray menu.
+- `PlayerWindowService` reads player-open fullscreen preference before creating `PlayerWindow`.
+
+Non-stage page changes:
+
+- `MainWindow` close behavior is now affected by Settings.
+- `PlayerWindow` initial fullscreen state is now affected by Settings. Existing playback controls and close-confirmation flow were not changed.
+
+#### 7.6b Follow-up - Settings Alignment And Startup WebDAV Auto Scan
+
+Completed:
+
+- Fixed Settings general row alignment by using a fixed first column and elastic second column across cache and behavior rows.
+- Changed the WebDAV auto-scan behavior row to a single-line `自动扫描 WebDAV` label and a real enabled segmented switch.
+- Added `AutoScanWebDavOnStartup` to the App-layer behavior preference file.
+- Added `StartupWebDavScanService`, which reads the preference after App startup and runs existing `IMediaScanService.RunScanAsync` in the background when enabled.
+- Reduced Settings section heading row height, moved the heading text slightly downward, moved the About row lower and converted the whole About row into the click target.
+- Removed the middle About-row description text while preserving app icon, label, version and a right-side indicator.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no new scan recognition rule, scan progress popup, pause control, Core schema field, migration, database update, commit or push;
+- no API configuration, cache cleanup, player subtitle, media-library or discovery behavior change;
+- no manual UI runtime test in this pass.
+
+Business logic changes:
+
+- Startup WebDAV auto-scan is now real App-layer behavior: when enabled, App startup queues a background call to existing `IMediaScanService.RunScanAsync` and then sends `NotifyScanChanged`.
+- Existing manual ScanTasksPage scan commands and scanner semantics are unchanged.
+
+Non-stage page changes:
+
+- `App.xaml.cs` startup flow now queues the auto-scan check after normal startup.
+- ScanTasksPage is not edited by this follow-up, but scan refresh notifications can arrive after startup auto-scan completes.
+
+#### 7.6b Follow-up - Settings General Fine Alignment
+
+Completed:
+
+- Moved the Settings general cache / behavior row second column further right by widening the shared first column.
+- Moved the About row lower in the fixed no-scroll general tab layout.
+- Reduced cache / behavior section heading row height by roughly one third and tightened the divider offset.
+- Second fine-tune pass moved the behavior settings card further down and changed the About row from ineffective top-margin spacing to an explicit bottom-anchored visual offset, because the previous final `Auto` row after a `*` spacer kept the row pinned to the available content bottom.
+- Restored Settings general and API visible Chinese text that had become valid XAML but unreadable mojibake during the alignment pass.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="%TEMP%\\XFVerseCodexBuild\\"` passed with 0 warnings and 0 errors.
+- A normal `dotnet build MediaLibrary.sln` reached compilation but was blocked by an already-running `MediaLibrary.App` process locking the Debug output files; that process was not terminated.
+
+Explicit non-goals:
+
+- no manual UI runtime test in this pass;
+- no further cache, theme, close-window, player fullscreen or startup WebDAV auto-scan behavior change;
+- no API save / test, scan-task, player, media-library, discovery, detail or online-subtitle page behavior change;
+- no Core schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None. This follow-up is SettingsPage layout and visible-copy repair only.
+
+### 7.6c - Settings API Configuration Tab
+
+Completed:
+
+- Rebuilt the Settings `API 配置` Tab into four reused `ApiConfigCard` sections: TMDB, OMDb, OpenSubtitles and AI.
+- Reused `SettingFieldRow` for API form rows and `SensitiveSettingInput` for password, token, API key and access-token style fields.
+- Added UI input limits that match current `ApplicationSetting` storage boundaries: TMDB token 2048, TMDB API key 256, OMDb API key 256, OpenSubtitles endpoint 512, OpenSubtitles API key 512, OpenSubtitles username 256, OpenSubtitles password 2048, AI base URL 512, AI API key 2048 and AI model fields 128.
+- Made OpenSubtitles structurally match the TMDB / OMDb cards: status badge, field rows, independent save, independent test and feedback text.
+- Kept OpenSubtitles API-key-only mode explicit and kept username / password optional.
+- Added safe card status projections in `SettingsViewModel` for TMDB, OMDb, OpenSubtitles and AI without exposing credential values.
+- Removed the page-local OpenSubtitles `PasswordBox` sync code-behind path; the shared sensitive input now handles the binding.
+- Added the editable AI default model field and kept the advanced routing list limited to current real AI call paths.
+- Scoped the AI card save command to AI fields only, matching the card-level independent-save model.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with LF / CRLF warnings only.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Explicit non-goals:
+
+- no player subtitle menu, OnlineSubtitleSearchWindow, subtitle download, subtitle binding or delete-binding work;
+- no OpenSubtitles client contract, probe, search or download service change;
+- no detail-page subtitle entry;
+- no ScanTasksPage, path picker, scan log or cache-cleanup business change;
+- no database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- No Core business logic changed. The only App-layer settings behavior change is that the AI card save now persists only AI fields instead of using the old private helper that also wrote unrelated API fields.
+
+Non-stage page changes:
+
+- None. Player, Detail, OnlineSubtitleSearch, ScanTasks and cache-management business pages were not edited.
+
+Suggested commit message:
+
+- `Phase 7.6c settings api configuration cards`
+
+#### 7.6c Follow-up - Settings API Detail Alignment
+
+Completed:
+
+- Routed mouse-wheel events from API TextBox, PasswordBox and closed ComboBox controls back to the API tab ScrollViewer so input hover does not block page scrolling.
+- Moved the sensitive-field reveal button inside `SensitiveSettingInput`, reduced API input chrome height, and let the input field occupy the old external eye-button width.
+- Changed the TMDB optional key label to `API Key（可选）`.
+- Reworked the `ApiConfigCard` status badge into a compact rounded rectangle with a breathing status light: green for test passed, yellow for untested and red for test failed or missing required test input.
+- Removed field-level helper text below API inputs, the default-language selector and the AI advanced routing heading while retaining card-level descriptions.
+- Updated the OpenSubtitles default-language selector to use the modern ComboBox style, Chinese display names and common-language-first ordering.
+- Added App-layer API test status state for TMDB, OMDb and OpenSubtitles. Save returns the badge to untested; successful tests mark passed; failed tests and missing required keys mark failed. AI remains untested because no real AI test command exists.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild\"` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+- No manual UI click test was performed in this pass.
+
+Explicit non-goals:
+
+- no AI test command;
+- no OpenSubtitles probe/search/download contract change;
+- no player subtitle flow, ScanTasksPage, general settings, cache management or media-library behavior change;
+- no Core schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None in Core. App-layer changes are limited to Settings API status projection and OpenSubtitles language display / sorting; stored language codes and existing API save / test service calls are unchanged.
+
+Non-stage page changes:
+
+- None. This follow-up only edited Settings API UI/control code and SettingsViewModel.
+
+Suggested commit message:
+
+- `Phase 7.6c settings api detail alignment`
+
+### 7.6d - Scan Configuration And Path Pickers
+
+Completed:
+
+- Rebuilt the ScanTasks configuration area into structurally matched WebDAV and local-directory sections.
+- Reused `ScanPathCard` for WebDAV / local path rows and `SettingFieldRow` for editor fields.
+- Added WebDAV connection name editing and aligned WebDAV field limits to current storage boundaries: connection name 120, BaseUrl 500, username 200, password 1000, scan path 1000 and display name 200.
+- Replaced the WebDAV password field with `SensitiveSettingInput`, hidden by default.
+- Added App-layer `IScanPathPickerService` / `ScanPathPickerService`; local directory picking uses the system folder picker and does not enter Core.
+- Added `WebDavPathPickerWindow` backed by `IWebDavService.ListDirectoryAsync`. It browses virtual WebDAV directories, supports parent / refresh / enter / select-current actions, and returns only the selected virtual path.
+- Wired WebDAV and local picker commands in `ScanTasksViewModel`. Picker selection only fills the active edit field and optionally derives a safe display name when the display name is empty.
+- Connected the page, path lists, log list and WebDAV picker list to the modern auto-reveal scroll behavior and kept horizontal scrolling disabled.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Explicit non-goals:
+
+- no scan start, cancel, progress-statistics or scan-log visual closeout work;
+- no pause-scan command or fake progress;
+- no scanner recognition algorithm, AI / TMDB / OMDb / OpenSubtitles call semantics or Core write semantics change;
+- no local scan-path remove Popover yet; 7.6e owns the remove confirmation and local-source visibility semantics;
+- no database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- No Core business logic or data model changed. The only new behavior is App-layer UI path picking.
+- `ScanTasksViewModel` now has picker commands and safe default-display-name projections; save operations still use `ISettingsService.SaveScanPathAsync` and `SaveLocalScanPathAsync`.
+
+Non-stage page changes:
+
+- None. Settings, Player, Library, Discovery, Detail and OnlineSubtitleSearch pages were not edited for 7.6d.
+- Shared DI registration was updated for the App-layer scan path picker service.
+
+Suggested commit message:
+
+- `Phase 7.6d scan path pickers`
+
+### 7.6e - Scan Progress, History Logs And Safe Operations
+
+Completed:
+
+- Added `ScanLogCard` for the shared WebDAV / local scan history list. The card keeps the compact task-record structure and displays safe source, target alias, status, start / end time, scan counts, duration, sanitized error summary and reason summary.
+- Added `LocalScanPathRemovePopover` for local scan-path row removal. The Popover is anchored beside the row action, supports explicit cancel / confirm, closes on outside interaction through popup behavior, handles Esc, and uses warning action styling.
+- Kept the existing separated scan commands: `RunScanCommand` for WebDAV, `RunLocalScanCommand` for Local and `CancelScanCommand` for cancellation.
+- Removed the progress-card `已识别` / `未识别` placeholder metrics because the current progress / result / log read models do not expose stable recognized / unrecognized counts.
+- Changed the current-file progress row to single-line ellipsis with true-truncation tooltip behavior. Core progress reporting already reduces current items to file names.
+- Removed WebDAV username display from scan history cards and added App-layer sanitization for history error summaries that replaces WebDAV URLs, credential-like key-value pairs and local paths.
+- Recorded the 7.6e execution result in `docs/ui-redesign/PHASE_7_6_SETTINGS_SCAN_CACHE_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Explicit non-goals:
+
+- no scan recognition accuracy, thresholds, AI recognition rules, TMDB / OMDb requests or OpenSubtitles flow changes;
+- no pause-scan command, fake progress, background scheduler, filesystem watcher or automatic scan behavior;
+- no Player, Detail, Library page structure or cache-cleanup behavior changes;
+- no database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- No Core code or data model changed in 7.6e.
+- Existing `DeleteLocalScanPathAsync` semantics are retained: removing a Local scan path deletes the configuration and marks related Local `MediaFile` software records as `IsDeleted=true` for software visibility. It does not delete physical Local files or WebDAV files.
+- App-layer UI behavior changed only by adding the local-remove confirmation Popover and safe scan-log text projection.
+
+Non-stage page changes:
+
+- None. Settings, Player, Library, Discovery, Detail and OnlineSubtitleSearch pages were not edited for 7.6e.
+- Media-library visibility may reflect the existing Local-path removal semantics after a user confirms removal, but no media-library page or query code changed.
+
+Suggested commit message:
+
+- `Phase 7.6e scan progress logs and safe removal`
 
 ## Phase 7.4e - Discovery Regression Closeout
 
@@ -308,7 +729,12 @@ Suggested commit message:
 - 7.2e audit executed.
 - 7.2-final-assets and subsequent poster / Home / library polish follow-ups have been handled as post-closeout work.
 - 7.3 Plan, 7.3a, 7.3b, 7.3c, 7.3d and 7.3e are complete.
-- Recommended next detail stage: 7.3f regression closeout.
+- 7.6a shared Settings / Scan / Cache component baseline is complete.
+- 7.6b settings general tab and cache management is complete.
+- 7.6c settings API configuration tab is complete.
+- 7.6d scan configuration and path pickers are complete.
+- 7.6e scan run, progress, history logs and safe operations are complete.
+- Recommended next 7.6 stage: 7.6f regression closeout and documentation sync.
 
 ## Maintenance Rule
 

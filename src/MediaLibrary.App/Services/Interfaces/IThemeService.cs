@@ -2,6 +2,8 @@ namespace MediaLibrary.App.Services.Interfaces;
 
 public interface IThemeService
 {
+    event EventHandler<string>? ThemeChanged;
+
     IReadOnlyList<string> ThemeModes { get; }
 
     Task InitializeAsync(CancellationToken cancellationToken = default);

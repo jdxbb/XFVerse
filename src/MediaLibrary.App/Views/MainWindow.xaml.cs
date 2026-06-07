@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -6,6 +7,8 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using MediaLibrary.App.Services;
+using MediaLibrary.App.Services.Implementations;
+using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Main;
 
 namespace MediaLibrary.App.Views;
@@ -19,12 +22,19 @@ public partial class MainWindow : Window
     private const int MonitorDefaultToNearest = 0x00000002;
 
     private HwndSource? _hwndSource;
+    private readonly IAppBehaviorPreferencesService _appBehaviorPreferencesService;
+    private readonly ITrayIconService _trayIconService;
     private Point? _pendingMaximizedDragStart;
     private bool _ignoreNextUserMenuButtonClick;
+    private bool _isExitRequested;
+    private bool _isCloseBehaviorCheckInProgress;
 
     public MainWindow()
     {
         InitializeComponent();
+        _appBehaviorPreferencesService = AppServiceProvider.GetRequiredService<IAppBehaviorPreferencesService>();
+        _trayIconService = AppServiceProvider.GetRequiredService<ITrayIconService>();
+        _trayIconService.Initialize(this, ExitFromTray);
         DataContext = AppServiceProvider.GetRequiredService<MainWindowViewModel>();
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
@@ -34,11 +44,60 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _trayIconService.Dispose();
         _hwndSource?.RemoveHook(WindowProc);
         SourceInitialized -= OnSourceInitialized;
         Loaded -= OnLoaded;
         StateChanged -= OnWindowStateChanged;
         base.OnClosed(e);
+    }
+
+    protected override async void OnClosing(CancelEventArgs e)
+    {
+        if (_isExitRequested)
+        {
+            base.OnClosing(e);
+            return;
+        }
+
+        e.Cancel = true;
+        if (_isCloseBehaviorCheckInProgress)
+        {
+            return;
+        }
+
+        _isCloseBehaviorCheckInProgress = true;
+        try
+        {
+            var preferences = await _appBehaviorPreferencesService.LoadAsync();
+            if (string.Equals(
+                    preferences.CloseWindowBehavior,
+                    AppBehaviorPreferencesService.CloseBehaviorTray,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                Hide();
+                _trayIconService.ShowMainWindowInTray();
+                return;
+            }
+        }
+        catch
+        {
+            // Fall through to a normal application exit when preferences cannot be read.
+        }
+        finally
+        {
+            _isCloseBehaviorCheckInProgress = false;
+        }
+
+        _isExitRequested = true;
+        Close();
+    }
+
+    private void ExitFromTray()
+    {
+        _isExitRequested = true;
+        Show();
+        Close();
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

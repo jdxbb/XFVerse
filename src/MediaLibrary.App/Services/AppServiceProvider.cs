@@ -74,7 +74,11 @@ public static class AppServiceProvider
         services.AddSingleton<INavigationStateService, NavigationStateService>();
         services.AddSingleton<IDataRefreshService, DataRefreshService>();
         services.AddSingleton<IConfirmationDialogService, ConfirmationDialogService>();
+        services.AddSingleton<IScanPathPickerService, ScanPathPickerService>();
         services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<IAppBehaviorPreferencesService, AppBehaviorPreferencesService>();
+        services.AddSingleton<IStartupWebDavScanService, StartupWebDavScanService>();
+        services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddSingleton<IPlayerPreferencesService, PlayerPreferencesService>();
         services.AddSingleton<ILibraryPreferencesService, LibraryPreferencesService>();
         services.AddSingleton<IDiscoveryPreferencesService, DiscoveryPreferencesService>();

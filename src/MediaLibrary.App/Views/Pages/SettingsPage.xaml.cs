@@ -1,78 +1,57 @@
-using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
-using MediaLibrary.App.ViewModels.Pages;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Media3D;
 
 namespace MediaLibrary.App.Views.Pages;
 
 public partial class SettingsPage : UserControl
 {
-    private bool _isSyncingOpenSubtitlesPassword;
-    private INotifyPropertyChanged? _currentViewModel;
-
     public SettingsPage()
     {
         InitializeComponent();
-        Loaded += (_, _) => SyncOpenSubtitlesPasswordBox();
-        DataContextChanged += SettingsPage_DataContextChanged;
     }
 
-    private void OpenSubtitlesPasswordBox_PasswordChanged(object sender, System.Windows.RoutedEventArgs e)
+    private void ApiConfigScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (_isSyncingOpenSubtitlesPassword)
+        if (sender is not ScrollViewer scrollViewer
+            || e.OriginalSource is not DependencyObject source
+            || !ShouldRouteWheelToApiScrollViewer(source))
         {
             return;
         }
 
-        if (DataContext is SettingsViewModel viewModel)
-        {
-            viewModel.OpenSubtitlesPassword = OpenSubtitlesPasswordBox.Password;
-        }
+        scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset - e.Delta);
+        e.Handled = true;
     }
 
-    private void SyncOpenSubtitlesPasswordBox()
+    private static bool ShouldRouteWheelToApiScrollViewer(DependencyObject source)
     {
-        if (DataContext is not SettingsViewModel viewModel)
+        var current = source;
+        while (current is not null)
         {
-            return;
+            if (current is TextBoxBase or PasswordBox)
+            {
+                return true;
+            }
+
+            if (current is ComboBox comboBox)
+            {
+                return !comboBox.IsDropDownOpen;
+            }
+
+            current = GetParent(current);
         }
 
-        if (OpenSubtitlesPasswordBox.Password == viewModel.OpenSubtitlesPassword)
-        {
-            return;
-        }
-
-        _isSyncingOpenSubtitlesPassword = true;
-        try
-        {
-            OpenSubtitlesPasswordBox.Password = viewModel.OpenSubtitlesPassword;
-        }
-        finally
-        {
-            _isSyncingOpenSubtitlesPassword = false;
-        }
+        return false;
     }
 
-    private void SettingsPage_DataContextChanged(object sender, System.Windows.DependencyPropertyChangedEventArgs e)
+    private static DependencyObject? GetParent(DependencyObject source)
     {
-        if (_currentViewModel is not null)
-        {
-            _currentViewModel.PropertyChanged -= ViewModelPropertyChanged;
-        }
-
-        _currentViewModel = e.NewValue as INotifyPropertyChanged;
-        if (_currentViewModel is not null)
-        {
-            _currentViewModel.PropertyChanged += ViewModelPropertyChanged;
-        }
-
-        SyncOpenSubtitlesPasswordBox();
-    }
-
-    private void ViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(SettingsViewModel.OpenSubtitlesPassword))
-        {
-            SyncOpenSubtitlesPasswordBox();
-        }
+        return source is Visual or Visual3D
+            ? VisualTreeHelper.GetParent(source)
+            : LogicalTreeHelper.GetParent(source);
     }
 }

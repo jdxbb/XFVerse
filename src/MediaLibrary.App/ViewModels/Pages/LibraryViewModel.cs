@@ -46,6 +46,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private const string DecadeAll = "全部年代";
     private const string LibraryScopeWithSource = "有播放源";
     private const string LibraryScopeWithoutSource = "无播放源";
+    private const string DefaultLibraryScope = LibraryScopeWithSource;
     private const string RefreshReasonActivate = "activate";
     private const string RefreshReasonManual = "manual-refresh";
     private const string RefreshReasonBatchModeChanged = "batch-mode-changed";
@@ -133,7 +134,7 @@ public sealed class LibraryViewModel : PageViewModelBase
     private string _selectedSortDirection = "降序";
     private string _selectedStatusFilter = FilterAll;
     private string _selectedWatchedFilter = FilterAll;
-    private string _selectedLibraryScope = LibraryScopeAll;
+    private string _selectedLibraryScope = DefaultLibraryScope;
     private string _selectedSourceFilter = SourceFilterAll;
     private string _selectedCollectionStatusFilter = FilterAll;
     private string _selectedContentTypeFilter = ContentTypeAll;
@@ -2043,7 +2044,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         RefreshDecadeFilterState(applyFilters: false);
         SelectedStatusFilter = FilterAll;
         SelectedWatchedFilter = FilterAll;
-        SelectedLibraryScope = LibraryScopeAll;
+        SelectedLibraryScope = DefaultLibraryScope;
         SelectedSourceFilter = SourceFilterAll;
         ResetCollectionStatusFilterToDefault();
         RefreshCollectionStatusFilterState(applyFilters: false);
@@ -2064,7 +2065,7 @@ public sealed class LibraryViewModel : PageViewModelBase
                && string.Equals(SelectedSortDirection, "降序", StringComparison.Ordinal)
                && string.Equals(SelectedStatusFilter, FilterAll, StringComparison.Ordinal)
                && string.Equals(SelectedWatchedFilter, FilterAll, StringComparison.Ordinal)
-               && string.Equals(SelectedLibraryScope, LibraryScopeAll, StringComparison.Ordinal)
+               && string.Equals(SelectedLibraryScope, DefaultLibraryScope, StringComparison.Ordinal)
                && string.Equals(SelectedSourceFilter, SourceFilterAll, StringComparison.Ordinal)
                && IsDefaultCollectionStatusFilter()
                && IsDefaultContentTypeFilterState()

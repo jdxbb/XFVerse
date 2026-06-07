@@ -8,13 +8,17 @@ namespace MediaLibrary.App.Services.Implementations;
 public sealed class PlayerWindowService : IPlayerWindowService
 {
     private readonly IDataRefreshService _dataRefreshService;
+    private readonly IAppBehaviorPreferencesService _appBehaviorPreferencesService;
     private PlayerWindow? _activeWindow;
     private bool _isOpening;
     private bool _closeNotified;
 
-    public PlayerWindowService(IDataRefreshService dataRefreshService)
+    public PlayerWindowService(
+        IDataRefreshService dataRefreshService,
+        IAppBehaviorPreferencesService appBehaviorPreferencesService)
     {
         _dataRefreshService = dataRefreshService;
+        _appBehaviorPreferencesService = appBehaviorPreferencesService;
     }
 
     public event EventHandler? PlayerWindowClosed;
@@ -47,10 +51,12 @@ public sealed class PlayerWindowService : IPlayerWindowService
         PlayerWindow? window = null;
 
         var viewModel = AppServiceProvider.GetRequiredService<PlayerWindowViewModel>();
+        var appBehaviorPreferences = await _appBehaviorPreferencesService.LoadAsync(cancellationToken);
         try
         {
             window = new PlayerWindow
             {
+                StartFullscreenOnOpen = appBehaviorPreferences.StartPlayerFullscreenOnPlay,
                 DataContext = viewModel
             };
             _activeWindow = window;
@@ -125,10 +131,12 @@ public sealed class PlayerWindowService : IPlayerWindowService
         PlayerWindow? window = null;
 
         var viewModel = AppServiceProvider.GetRequiredService<PlayerWindowViewModel>();
+        var appBehaviorPreferences = await _appBehaviorPreferencesService.LoadAsync(cancellationToken);
         try
         {
             window = new PlayerWindow
             {
+                StartFullscreenOnOpen = appBehaviorPreferences.StartPlayerFullscreenOnPlay,
                 DataContext = viewModel
             };
             _activeWindow = window;

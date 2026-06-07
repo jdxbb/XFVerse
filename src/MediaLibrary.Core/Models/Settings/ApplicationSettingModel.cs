@@ -40,5 +40,5 @@ public sealed class ApplicationSettingModel
 
     public string OpenSubtitlesDefaultLanguageCode { get; set; } = "zh-cn";
 
-    public bool IsOpenSubtitlesEnabled { get; set; }
+    public bool IsOpenSubtitlesEnabled { get; set; } = true;
 }

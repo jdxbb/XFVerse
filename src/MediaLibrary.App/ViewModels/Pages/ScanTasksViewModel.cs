@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -19,6 +21,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private readonly ILocalMediaScanService _localMediaScanService;
     private readonly ISettingsService _settingsService;
     private readonly IWebDavService _webDavService;
+    private readonly IScanPathPickerService _scanPathPickerService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly List<ScanTaskLogViewModel> _webDavRecentLogs = [];
     private readonly List<ScanTaskLogViewModel> _localRecentLogs = [];
@@ -60,6 +63,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         ILocalMediaScanService localMediaScanService,
         ISettingsService settingsService,
         IWebDavService webDavService,
+        IScanPathPickerService scanPathPickerService,
         IDataRefreshService dataRefreshService)
         : base("扫描任务", "管理 WebDAV 连接、扫描路径、扫描进度与最近扫描记录。")
     {
@@ -67,18 +71,21 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         _localMediaScanService = localMediaScanService;
         _settingsService = settingsService;
         _webDavService = webDavService;
+        _scanPathPickerService = scanPathPickerService;
         _dataRefreshService = dataRefreshService;
 
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsRunning);
         SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync, () => !IsRunning);
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, () => !IsRunning);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath, () => !IsRunning);
+        PickWebDavScanPathCommand = new AsyncRelayCommand(PickWebDavScanPathAsync, () => !IsRunning);
         SaveScanPathCommand = new AsyncRelayCommand(SaveScanPathAsync, () => !IsRunning);
         EditScanPathCommand = new RelayCommand(EditScanPath, _ => !IsRunning);
         DeleteScanPathCommand = new AsyncRelayCommand(DeleteScanPathAsync, _ => !IsRunning);
         ToggleScanPathCommand = new AsyncRelayCommand(ToggleScanPathAsync, _ => !IsRunning);
         CancelEditScanPathCommand = new RelayCommand(CancelEditScanPath, () => !IsRunning);
         BeginAddLocalScanPathCommand = new RelayCommand(BeginAddLocalScanPath, () => !IsRunning);
+        PickLocalScanPathCommand = new AsyncRelayCommand(PickLocalScanPathAsync, () => !IsRunning);
         SaveLocalScanPathCommand = new AsyncRelayCommand(SaveLocalScanPathAsync, () => !IsRunning);
         EditLocalScanPathCommand = new RelayCommand(EditLocalScanPath, _ => !IsRunning);
         DeleteLocalScanPathCommand = new AsyncRelayCommand(DeleteLocalScanPathAsync, _ => !IsRunning);
@@ -104,6 +111,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public RelayCommand BeginAddScanPathCommand { get; }
 
+    public AsyncRelayCommand PickWebDavScanPathCommand { get; }
+
     public AsyncRelayCommand SaveScanPathCommand { get; }
 
     public RelayCommand EditScanPathCommand { get; }
@@ -115,6 +124,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public RelayCommand CancelEditScanPathCommand { get; }
 
     public RelayCommand BeginAddLocalScanPathCommand { get; }
+
+    public AsyncRelayCommand PickLocalScanPathCommand { get; }
 
     public AsyncRelayCommand SaveLocalScanPathCommand { get; }
 
@@ -373,10 +384,6 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         get => _scannedCount;
         private set => SetProperty(ref _scannedCount, value);
     }
-
-    public string IdentifiedCountText => "--";
-
-    public string UnidentifiedCountText => "--";
 
     public int NewFileCount
     {
@@ -647,6 +654,31 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         ScanPathStatusMessage = $"正在编辑：{scanPath.DisplayName}";
     }
 
+    private async Task PickWebDavScanPathAsync()
+    {
+        if (string.IsNullOrWhiteSpace(BaseUrl))
+        {
+            ScanPathStatusMessage = "请先填写 WebDAV BaseUrl，再选择远端目录。";
+            return;
+        }
+
+        var selectedPath = await _scanPathPickerService.PickWebDavDirectoryAsync(
+            BuildCurrentWebDavConnectionModel(),
+            string.IsNullOrWhiteSpace(EditingScanPathValue) ? "/" : EditingScanPathValue);
+        if (string.IsNullOrWhiteSpace(selectedPath))
+        {
+            return;
+        }
+
+        EditingScanPathValue = selectedPath;
+        if (string.IsNullOrWhiteSpace(EditingScanPathDisplayName))
+        {
+            EditingScanPathDisplayName = BuildDisplayNameFromVirtualPath(selectedPath);
+        }
+
+        ScanPathStatusMessage = "已选择 WebDAV 目录，请确认显示名称后保存。";
+    }
+
     private async Task SaveScanPathAsync()
     {
         if (!ConnectionId.HasValue)
@@ -728,6 +760,23 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         LocalScanPathStatusMessage = "正在新增本地目录配置。";
     }
 
+    private async Task PickLocalScanPathAsync()
+    {
+        var selectedPath = await _scanPathPickerService.PickLocalDirectoryAsync(EditingLocalScanPathValue);
+        if (string.IsNullOrWhiteSpace(selectedPath))
+        {
+            return;
+        }
+
+        EditingLocalScanPathValue = selectedPath;
+        if (string.IsNullOrWhiteSpace(EditingLocalScanPathDisplayName))
+        {
+            EditingLocalScanPathDisplayName = BuildDisplayNameFromLocalPath(selectedPath);
+        }
+
+        LocalScanPathStatusMessage = "已选择本地目录，请确认显示名称后保存。";
+    }
+
     private void EditLocalScanPath(object? parameter)
     {
         if (parameter is not ScanPathViewModel scanPath)
@@ -779,7 +828,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
         await _settingsService.DeleteLocalScanPathAsync(scanPath.Id);
         await LoadLocalOverviewAsync(CancellationToken.None);
-        LocalScanPathStatusMessage = $"已移除本地目录配置：{scanPath.DisplayName}";
+        LocalScanPathStatusMessage = $"已移除本地目录配置：{scanPath.DisplayName}。仅影响软件内配置和相关记录可见性，不删除真实本地文件。";
 
         if (EditingLocalScanPathId == scanPath.Id)
         {
@@ -996,12 +1045,14 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         SaveConnectionCommand.RaiseCanExecuteChanged();
         TestConnectionCommand.RaiseCanExecuteChanged();
         BeginAddScanPathCommand.RaiseCanExecuteChanged();
+        PickWebDavScanPathCommand.RaiseCanExecuteChanged();
         SaveScanPathCommand.RaiseCanExecuteChanged();
         EditScanPathCommand.RaiseCanExecuteChanged();
         DeleteScanPathCommand.RaiseCanExecuteChanged();
         ToggleScanPathCommand.RaiseCanExecuteChanged();
         CancelEditScanPathCommand.RaiseCanExecuteChanged();
         BeginAddLocalScanPathCommand.RaiseCanExecuteChanged();
+        PickLocalScanPathCommand.RaiseCanExecuteChanged();
         SaveLocalScanPathCommand.RaiseCanExecuteChanged();
         EditLocalScanPathCommand.RaiseCanExecuteChanged();
         DeleteLocalScanPathCommand.RaiseCanExecuteChanged();
@@ -1017,6 +1068,38 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     {
         var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
         return utc.ToLocalTime();
+    }
+
+    private WebDavConnectionModel BuildCurrentWebDavConnectionModel()
+    {
+        return new WebDavConnectionModel
+        {
+            Id = ConnectionId,
+            Name = string.IsNullOrWhiteSpace(ConnectionName) ? "WebDAV" : ConnectionName,
+            BaseUrl = BaseUrl,
+            Username = Username,
+            Password = Password,
+            IsEnabled = IsConnectionEnabled
+        };
+    }
+
+    private static string BuildDisplayNameFromVirtualPath(string path)
+    {
+        var fileName = WebDavPathHelper.GetFileName(path);
+        return string.IsNullOrWhiteSpace(fileName) ? "WebDAV 根目录" : fileName;
+    }
+
+    private static string BuildDisplayNameFromLocalPath(string path)
+    {
+        try
+        {
+            var directoryName = new DirectoryInfo(path).Name;
+            return string.IsNullOrWhiteSpace(directoryName) ? "本地目录" : directoryName;
+        }
+        catch
+        {
+            return "本地目录";
+        }
     }
 
     private static string FormatElapsed(TimeSpan elapsed)
@@ -1062,6 +1145,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
         public string ToggleText => IsEnabled ? "停用" : "启用";
 
+        public string DetailText => LastScanAt.HasValue
+            ? $"{EnabledText} · {RecursiveText} · 最近：{LastScanAtText}"
+            : $"{EnabledText} · {RecursiveText}";
+
         public string LastScanAtText => LastScanAt.HasValue
             ? LastScanAt.Value.ToString("yyyy-MM-dd HH:mm")
             : "暂无记录";
@@ -1069,6 +1156,18 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public sealed class ScanTaskLogViewModel
     {
+        private static readonly Regex UrlRegex =
+            new(@"(?i)\b(?:https?|webdavs?)://[^\s;，。]+", RegexOptions.Compiled);
+
+        private static readonly Regex SensitivePairRegex =
+            new(@"(?i)\b(password|passwd|token|api[-_ ]?key|access[-_ ]?token|authorization)\b\s*[:=]\s*[^\s;，。]+", RegexOptions.Compiled);
+
+        private static readonly Regex WindowsPathRegex =
+            new(@"[A-Za-z]:[\\/][^\s;，。]+", RegexOptions.Compiled);
+
+        private static readonly Regex UncPathRegex =
+            new(@"\\\\[^\\/\s]+[\\/][^\s;，。]+", RegexOptions.Compiled);
+
         public ScanTaskLogViewModel(
             ScanTaskLogItem item,
             string baseUrl,
@@ -1097,7 +1196,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             UpdatedFileCount = item.UpdatedFileCount;
             IgnoredFileCount = item.IgnoredFileCount;
             ErrorCount = item.ErrorCount;
-            ErrorMessage = item.ErrorMessage;
+            ErrorMessage = SanitizeLogText(item.ErrorMessage);
             ReasonSummaryText = item.ReasonSummaryText;
             TopReasonSummaryText = item.TopReasonSummaryText;
         }
@@ -1163,6 +1262,26 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 ScanTaskStatus.Cancelled => "已取消",
                 _ => status.ToString()
             };
+        }
+
+        private static string SanitizeLogText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var sanitized = UrlRegex.Replace(value.Trim(), "[WebDAV 地址已隐藏]");
+            sanitized = SensitivePairRegex.Replace(
+                sanitized,
+                match => $"{match.Groups[1].Value}=[已隐藏]");
+            sanitized = WindowsPathRegex.Replace(sanitized, "[本地路径已隐藏]");
+            sanitized = UncPathRegex.Replace(sanitized, "[本地路径已隐藏]");
+
+            const int maxLength = 300;
+            return sanitized.Length <= maxLength
+                ? sanitized
+                : sanitized[..maxLength] + "...";
         }
     }
 }

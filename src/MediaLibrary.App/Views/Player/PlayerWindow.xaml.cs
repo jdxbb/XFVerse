@@ -82,6 +82,8 @@ public partial class PlayerWindow : Window
 
     public event EventHandler? CloseLifecycleStarted;
 
+    public bool StartFullscreenOnOpen { get; set; } = true;
+
     public PlayerWindow()
     {
         InitializeComponent();
@@ -118,13 +120,23 @@ public partial class PlayerWindow : Window
             ShowControlBar();
             RestartControlBarTimer();
             _cursorPollTimer.Start();
+            if (StartFullscreenOnOpen)
+            {
+                EnterFullScreen();
+            }
+            else
+            {
+                CenterWindowOnCurrentMonitor();
+            }
+
+            UpdatePlayerChromeVisibility();
+            UpdatePlayerMaximizeRestoreButton();
         };
         Activated += OnWindowActivated;
         Deactivated += OnWindowDeactivated;
         StateChanged += OnWindowStateChanged;
         LocationChanged += (_, _) => UpdatePopupPlacements();
         SizeChanged += (_, _) => UpdatePopupPlacements();
-        EnterFullScreen();
         UpdatePlayerChromeVisibility();
         UpdatePlayerMaximizeRestoreButton();
     }

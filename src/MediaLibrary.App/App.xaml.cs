@@ -17,6 +17,7 @@ public partial class App : Application
             var themeService = AppServiceProvider.GetRequiredService<IThemeService>();
             themeService.InitializeAsync().GetAwaiter().GetResult();
             base.OnStartup(e);
+            AppServiceProvider.GetRequiredService<IStartupWebDavScanService>().QueueStartupScan();
         }
         catch (Exception exception)
         {

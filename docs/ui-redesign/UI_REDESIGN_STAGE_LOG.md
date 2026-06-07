@@ -115,6 +115,35 @@
 - `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
 - `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
 
+## Settings API Sensitive Input Icon Follow-up
+
+### Stage Goal
+
+- Correct the API settings sensitive-field reveal button icon semantics.
+
+### Completed
+
+- Replaced the incorrect revealed-state font glyph with explicit vector eye icons.
+- Hidden content now shows an open eye icon, and revealed content now shows a closed eye icon.
+- Kept the existing reveal/hide binding and tooltip behavior unchanged.
+
+### Explicitly Not Done
+
+- No API save, test, scan, cache, database, or migration behavior was changed.
+- No database update, commit, or push was performed.
+
+### Verification
+
+- `dotnet build MediaLibrary.sln`: passed, 0 warnings / 0 errors.
+- `git diff --check`: no whitespace errors; existing CRLF conversion warnings only.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`: no output.
+
+### Known Issues
+
+- Blocker: None.
+- Deferred: Runtime UI confirmation is still needed to verify the closed-eye icon reads clearly at the final rendered size.
+- Noise: Existing CRLF conversion warnings may still appear in git checks.
+
 ## 详情页与修正弹窗实测回归修复补充 4
 
 - 季详情 Hero 区恢复原始外层几何，不再增加卡片外边框高度；通过对称减小上下内边距扩展可显示内容区域，并让左侧首行、简介底边和右侧单季信息卡外边框使用同一垂直基线。
@@ -135,6 +164,90 @@
 - `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
 - `git diff --check`：无空白错误，仅有既有 CRLF 转换提示。
 - `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+## Settings API Cursor Polish Follow-up
+
+### Stage Goal
+
+- Fix the API settings tab cursor state so the full panel no longer appears clickable.
+
+### Completed
+
+- Set the API settings content `ScrollViewer` cursor to `Arrow`, overriding the hidden tab item's inherited hand cursor.
+- Kept button styles unchanged so real actions still use the hand cursor.
+
+### Explicitly Not Done
+
+- No API save, test, scan, cache, database, or migration behavior was changed.
+- No database update, commit, or push was performed.
+
+### Verification
+
+- `dotnet build MediaLibrary.sln`: passed, 0 warnings / 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`: no output.
+
+### Known Issues
+
+- Blocker: None.
+- Deferred: Runtime UI confirmation is still needed to verify text inputs keep their normal editing cursor and buttons keep the hand cursor.
+- Noise: Existing CRLF conversion warnings may still appear in git checks.
+
+## AI 推荐加载与媒体库播放源默认值 Follow-up
+
+### 阶段目标
+
+- 修正 AI 推荐加载动画中静态环与动态弧线尺寸不一致的问题。
+- 将媒体库播放源状态默认值改为 `有播放源`，并同步清空筛选和默认状态判定。
+
+### 完成内容
+
+- 共享 `LoadingSpinnerTemplate` 的静态环固定到与动态弧线一致的 `34px` 坐标尺寸，避免 AI 推荐加载时静态圈视觉偏大。
+- 媒体库播放源状态新增默认常量，初始进入和清空筛选后均回到 `有播放源`。
+- `CanClearFilters` / 默认筛选判定同步改为以 `有播放源` 为默认值；实际查询仍沿用现有 `HasActiveSource` 过滤，不改变媒体库删除、移出或播放源语义。
+
+### 明确未做事项
+
+- 未修改推荐算法、AI 请求、候选生成、扫描识别、播放器播放源选择或媒体库记录语义。
+- 未新增数据库字段、migration、database update、commit 或 push。
+
+### 验证结果
+
+- `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
+- `git diff --check`：无空白错误，仅有既有 CRLF 转换提示。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+### Known Issues
+
+- Blocker：无。
+- Deferred：未执行运行时人工 UI 验收；建议确认 AI 推荐空结果加载层的环线尺寸，以及媒体库首次进入 / 清空筛选后按钮显示 `播放源：有播放源`。
+- Noise：共享 `LoadingSpinnerTemplate` 的尺寸修正会同步影响其他使用该模板的加载层。
+
+## AI 推荐加载 Spinner 对齐 Follow-up
+
+### 阶段目标
+
+- 修正 AI 推荐页空结果加载时橙色动态弧线与灰色静态环中心不重合的问题。
+
+### 完成内容
+
+- `LoadingSpinnerTemplate` 改为外层跟随调用方尺寸、内层固定 `34px` 并居中。
+- 灰色静态环和橙色动态弧线现在共用同一个 `34px` 内层坐标系，避免 AI 推荐页 `38px` 调用尺寸下橙色弧线偏向左上。
+
+### 明确未做事项
+
+- 未修改推荐算法、AI 请求、媒体库筛选语义、播放器或扫描识别逻辑。
+- 未新增数据库字段、migration、database update、commit 或 push。
+
+### 验证结果
+
+- `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+### Known Issues
+
+- Blocker：无。
+- Deferred：仍建议运行时人工确认 AI 推荐加载层视觉完全重合。
+- Noise：共享 Spinner 模板调整会同步影响其他使用该模板的加载控件，但坐标系保持一致。
 
 Known Issues：
 
@@ -208,6 +321,65 @@ Known Issues：
 
 - `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
 - `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+## Settings API Config Polish Follow-up
+
+### 阶段目标
+
+- 收口 API 配置页的输入密度、状态提示、保存/测试交互和大模型路由测试能力。
+
+### 完成内容
+
+- API 配置输入框字体缩小，`ApiConfigCard` 标题和右上状态呼吸灯放大，状态圆点颜色加深。
+- 在线字幕配置移除启用开关 UI，设置模型与保存/读取路径固定视为启用；右上状态只展示配置/缺少 API Key/测试结果，不再展示启用或停用状态。
+- 大模型高级路由移除原“模型 / 超时”表头行，每行改为输入框左侧内联显示“模型”和“超时（s）”，并将模型输入框缩短为固定宽度。
+- 大模型配置新增测试按钮，会从默认模型和全部高级路由模型中提取去重模型，并逐个发送轻量连接探测；任一失败会同步右上状态为失败。
+- API 配置页的 TMDB、OMDb、OpenSubtitles 和大模型保存按钮改为仅在输入相对已保存值发生变化时可用。
+- API 配置保存成功后自动执行对应测试；单独点击测试不会保存设置或 token 变更。
+
+### 明确未做事项
+
+- 未修改 TMDB、OMDb、OpenSubtitles 或 AI 生产调用语义。
+- 未新增数据库字段、migration、database update、commit 或 push。
+- 未扩展到扫描任务页或非 API 配置表单的保存按钮。
+
+### 验证结果
+
+- `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+### Known Issues
+
+- Blocker：无。
+- Deferred：仍建议进行运行时人工 UI 验收，确认浅色/深色主题下状态灯、按钮禁用态和高级路由布局与草图密度一致。
+- Noise：大模型测试会对每个去重模型发送一次轻量请求，实际可用性仍取决于用户配置的服务端模型权限和网络状态。
+
+## Settings API And General Tab Polish Follow-up
+
+### 阶段目标
+
+- 微调 API 配置高级路由区视觉密度，并减少通用设置首次打开时字段占位值到真实值的闪烁感。
+
+### 完成内容
+
+- 高级路由设置标题字号调大、字重加重，并整体下移 2px。
+- 高级路由模型输入列由半宽进一步缩短为约三分之一宽度。
+- 通用设置 Tab 首次激活时在应用设置、行为偏好和缓存状态加载完成前保持内容 Hidden；加载完成或加载失败需要展示错误时再显示，避免默认字段先渲染后刷新。
+
+### 明确未做事项
+
+- 未修改 API 测试请求、保存语义、缓存清理语义、扫描逻辑或数据库结构。
+- 未新增 migration、database update、commit 或 push。
+
+### 验证结果
+
+- `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
+
+### Known Issues
+
+- Blocker：无。
+- Deferred：仍需运行时人工确认首次打开设置页时通用 Tab 不再出现字段闪烁。
+- Noise：通用 Tab 首次加载期间会短暂隐藏内容，等待缓存状态加载完成后一次性显示。
 - 最终补丁未执行应用运行时 UI 验收；早期遮罩诊断入口已停止并清理。
 
 ## 详情页 UI 实测回归修复补充

@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Plan
 
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 
 ## Purpose
 
@@ -190,6 +190,23 @@ Scope:
 - scan tasks and safe log display;
 - software cache and subtitle cache management UI;
 - cache cleanup wording that does not imply deleting media sources.
+- 7.6a completed the shared UI component baseline for sensitive inputs, field rows, API config cards, cache category cards and scan path cards. Later 7.6 substages should wire these components before introducing page-specific variants.
+- 7.6b completed the Settings `通用` Tab and cache-management wiring: only poster, metadata / other and online subtitle caches are shown; theme mode, close-window behavior, play-open fullscreen and startup WebDAV auto-scan are now persisted through existing settings / App-layer local preferences.
+- 7.6b added App-layer theme presentation synchronization, App-layer close-window behavior preferences, App-layer player-open fullscreen preferences and startup WebDAV auto-scan triggering. It did not add schema fields, migrations or new scanner recognition behavior.
+- 7.6b follow-up tightened the Settings `通用` Tab against the sketch card hierarchy: cache settings and behavior settings use two large section cards with continuous inner row-list panels, and the real cache / behavior business surface remains unchanged.
+- 7.6b second follow-up removed the visible full-page Settings card shell, hid the duplicate in-page title, tightened the general-tab row density and kept API service cards directly in the page content area instead of nesting them inside a larger page card.
+- 7.6b tab follow-up aligned the Settings tabs with Movie Discovery's root `Grid > TabControl` placement and manual tab-button template, removed the extra in-page top-right theme toggle, kept `通用` without page-level scrolling and kept `API 配置` on the modern vertical scrollbar.
+- 7.6b detail follow-up removed the general settings header refresh controls, tightened the poster-cache limit input with an inline `MB` suffix, removed inner rounded row-list containers, restored arrow cursors for non-clickable setting cards and moved About into a standalone bottom row with the XFVerse icon.
+- 7.6b behavior follow-up changed behavior settings to segmented switches, implemented real close behavior (`exit` / `tray`), real player-open fullscreen preference and real startup WebDAV auto-scan preference through an App-layer JSON file, and added `System` theme mode.
+- 7.6b fine-alignment follow-up moved the general-tab second column further right, moved the behavior settings card lower, changed the About row to an explicit bottom-anchored visual offset, reduced cache / behavior heading height and repaired SettingsPage visible Chinese copy without changing business logic.
+- 7.6c completed the Settings `API 配置` Tab card structure: TMDB, OMDb, OpenSubtitles and AI use shared API config / field-row / sensitive-input components; OpenSubtitles is structurally aligned with TMDB and OMDb; sensitive fields are hidden by default with reveal buttons.
+- 7.6c API detail follow-up moved reveal buttons inside sensitive inputs, made API input hover preserve page scrolling, tightened input height, removed field-level helper text, changed TMDB optional key copy to `API Key（可选）`, added breathing status-light badges for test passed / untested / failed, and localized / reordered the OpenSubtitles default-language selector.
+- 7.6c did not alter OpenSubtitles client contracts or player subtitle flows. AI configuration still has no fake test command; the AI card save is scoped to AI fields only.
+- 7.6d completed the ScanTasksPage configuration and path-picker slice: WebDAV / local path lists reuse `ScanPathCard`, editors reuse `SettingFieldRow`, WebDAV password uses `SensitiveSettingInput`, local folder picking uses an App-layer system folder picker, and WebDAV directory picking uses `IWebDavService.ListDirectoryAsync` through a lightweight picker window.
+- 7.6d did not change scanner run semantics, recognition algorithms, Core write behavior, schema or migrations. Scan progress / history-log visual closeout and local-path remove confirmation remain 7.6e scope.
+- ScanTasksPage is a fixed no page-level scroll surface in 7.6; only path lists and history logs scroll internally with the modern scrollbar behavior.
+- 7.6e completed scan progress, history-log and safe local-removal UI: WebDAV / local scan actions remain separate, cancellation remains the only stop operation, placeholder recognized / unrecognized counts are removed, history logs use `ScanLogCard`, and local scan-path removal uses `LocalScanPathRemovePopover`.
+- 7.6e retained the existing Local scan-path removal semantics: software records under the removed Local path can be marked `IsDeleted=true` for app visibility, but physical Local files and WebDAV files are not deleted. No Core code, schema or migration changed.
 
 Not in scope:
 - fake scan progress if the service cannot provide it;

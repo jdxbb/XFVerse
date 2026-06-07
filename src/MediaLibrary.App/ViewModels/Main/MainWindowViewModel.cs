@@ -56,6 +56,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         NavigationStateService = navigationStateService;
         _settingsService = settingsService;
         _themeService = themeService;
+        _themeService.ThemeChanged += OnThemeChanged;
 
         VisibleNavigationItems =
         [
@@ -437,5 +438,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         ThemeToggleIcon = "☀";
         ThemeToggleToolTip = "当前浅色主题，切换到深色主题";
+    }
+
+    private void OnThemeChanged(object? sender, string themeMode)
+    {
+        UpdateThemePresentation(themeMode);
     }
 }

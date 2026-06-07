@@ -1,0 +1,166 @@
+<Window x:Class="MediaLibrary.App.Views.Dialogs.WebDavPathPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
+        Title="选择 WebDAV 路径"
+        Width="640"
+        Height="560"
+        MinWidth="560"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ShowInTaskbar="False"
+        ShowActivated="True"
+        Background="{DynamicResource BrushDialogBackground}"
+        Style="{StaticResource DialogWindowStyle}"
+        Loaded="Window_Loaded">
+    <Border Style="{StaticResource DialogSurfaceStyle}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="选择 WebDAV 扫描路径"
+                               Style="{StaticResource DialogTitleStyle}" />
+                    <TextBlock Margin="0,8,0,0"
+                               Text="只浏览远端目录层级，选择后仅填入路径编辑框，不会自动保存。"
+                               Style="{StaticResource DialogBodyStyle}" />
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="×"
+                        Click="CancelButton_Click"
+                        Style="{StaticResource DialogCloseButtonStyle}"
+                        ToolTip="关闭" />
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Margin="0,20,0,12"
+                    Padding="14"
+                    Style="{StaticResource CompactCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel MinWidth="0">
+                        <TextBlock Text="当前目录"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding CurrentPath}"
+                                   Style="{StaticResource LongFieldTextBlockStyle}"
+                                   Text="{Binding CurrentPath}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1"
+                                Margin="16,0,0,0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button Content="上一级"
+                                Click="ParentButton_Click"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                        <Button Margin="10,0,0,0"
+                                Content="刷新"
+                                Click="RefreshButton_Click"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="{Binding StatusText}"
+                           TextWrapping="Wrap"
+                           Style="{StaticResource BodyMutedTextStyle}" />
+
+                <Border Grid.Row="1"
+                        Margin="0,12,0,0"
+                        Padding="12"
+                        Style="{StaticResource CompactCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto"
+                                      helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                            <ListBox x:Name="DirectoryList"
+                                     ItemsSource="{Binding DirectoryItems}"
+                                     SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                     Background="{x:Null}"
+                                     BorderThickness="0"
+                                     MouseDoubleClick="DirectoryList_MouseDoubleClick">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8"
+                                                Padding="12"
+                                                CornerRadius="{StaticResource RadiusCompactCard}"
+                                                Background="{DynamicResource BrushSurfaceAlt}"
+                                                BorderBrush="{DynamicResource BrushBorder}"
+                                                BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="12" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="目录"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                <StackPanel Grid.Column="2"
+                                                            MinWidth="0">
+                                                    <TextBlock helpers:TrimmedTextToolTipBehavior.FullText="{Binding Name}"
+                                                               Style="{StaticResource LongFieldTextBlockStyle}"
+                                                               Text="{Binding Name}" />
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding Path}"
+                                                               Style="{StaticResource LongFieldTextBlockStyle}"
+                                                               Text="{Binding Path}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
+
+                        <TextBlock Grid.Row="1"
+                                   Margin="0,10,0,0"
+                                   Text="双击目录进入；也可以直接选择当前目录。"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <StackPanel Grid.Row="3"
+                        Style="{StaticResource DialogButtonRowStyle}">
+                <Button Content="取消"
+                        Click="CancelButton_Click"
+                        IsCancel="True"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+                <Button Margin="10,0,0,0"
+                        Content="进入选中目录"
+                        Click="EnterSelectedButton_Click"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+                <Button Margin="10,0,0,0"
+                        Content="选择当前目录"
+                        Click="SelectCurrentButton_Click"
+                        Style="{StaticResource PrimaryButtonStyle}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
