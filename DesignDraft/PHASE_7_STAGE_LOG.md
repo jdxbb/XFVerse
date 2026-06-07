@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Stage Log
 
-Last updated: 2026-06-07
+Last updated: 2026-06-08
 
 This is the living Phase 7 handoff log. Keep entries concise and stage-oriented. Do not turn this into a full code diff.
 
@@ -9,6 +9,41 @@ This is the living Phase 7 handoff log. Keep entries concise and stage-oriented.
 - Historical initial UI rebuild docs remain in `docs/ui-redesign/UI_REDESIGN_PLAN.md`, `UI_REDESIGN_STAGE_LOG.md` and `UI_REDESIGN_KNOWN_ISSUES.md`.
 - Phase 7 is a later formal UI rebuild stage, so ongoing Phase 7 maintenance lives in `DesignDraft/PHASE_7_PLAN.md`, this log and `DesignDraft/PHASE_7_KNOWN_ISSUES.md`.
 - Design source docs live in `DesignDraft`, especially `PHASE_6_COVERAGE_MATRIX.md` and `page-spec`.
+
+## Phase 7.7 - History / Favorites / Watch Insights
+
+### 7.7a - Audit And Shared UI Baseline
+
+Completed:
+
+- Read the 7.7 detailed plan, Phase 7 rules, Movie Discovery tab alignment notes, existing global styles, `MovieDiscoveryPage` tab template and `SettingsPage` tab template.
+- Added `src/MediaLibrary.App/Resources/Styles/PageTabs.xaml` as the shared 7.7 top-tab baseline: manual tab button, last-tab button, hidden-header tab item fallback, divider and hidden-header tab control styles.
+- Merged `PageTabs.xaml` in `App.xaml` so later 7.7 pages can reference the shared style keys.
+- Kept accepted Movie Discovery and Settings local tab templates untouched. A full shared `TabControl` template would hard-code page-specific visible buttons and commands, so 7.7a only extracts the safe shared style primitives.
+- Recorded the 7.7a execution result in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild77a\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no WatchHistoryPage, FavoritesPage or WatchInsightsPage visual rebuild;
+- no Movie Discovery or Settings retargeting to the new shared styles;
+- no history card, favorite card, insight card, calendar or chart component implementation;
+- no watch-statistics口径, watch-profile, collection service, Core service, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None.
+
+Non-stage page changes:
+
+- `App.xaml` now merges a new ResourceDictionary, but no current page references the new keys; no existing page layout or behavior changes.
+
+Suggested commit message:
+
+- `Phase 7.7a shared top tab baseline`
 
 ## Phase 7.6 - Settings / Scan / Cache
 

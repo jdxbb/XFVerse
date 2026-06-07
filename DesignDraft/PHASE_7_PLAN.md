@@ -215,15 +215,31 @@ Not in scope:
 
 ### 7.7 History / Favorites / Watch Insights
 
+Detailed execution plan:
+- `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`
+
 Scope:
 - watch history, favorites and watch insights final visual alignment;
 - Movie / Episode history and Movie / Season collection display;
 - empty, loading and date-filter states;
 - chart and calendar polish.
 
+Substages:
+- 7.7a audit and shared UI baseline completed: added `PageTabs.xaml` shared top-tab style baseline and kept accepted Discovery / Settings local templates untouched;
+- 7.7b watch history visual alignment and date targeting;
+- 7.7c favorites visual alignment, Movie / Season cards and remove-state handling;
+- 7.7d watch-insights shell, Discovery-style tabs and state baseline;
+- 7.7e profile-analysis tab visual closeout;
+- 7.7f statistics upper area: range, overview and calendar;
+- 7.7g statistics lower area: preference graph, rankings, rhythm and taste combination map;
+- 7.7h regression, docs and closeout.
+
 Not in scope:
 - moving TV into Movie-only recommendation / persona insight semantics;
 - changing watch-statistics business rules without a separate plan.
+
+Confirmed rule:
+- Favorites and Watch Insights tabs must copy Movie Discovery's top tab placement and manual button-strip structure, including divider line, left alignment, fixed-coordinate underline and Shell-title separation.
 
 ### 7.8 Global Visual Consistency / Polish / Regression
 

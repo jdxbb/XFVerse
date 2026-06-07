@@ -1,6 +1,6 @@
 # Phase 7 Known Issues
 
-Last updated: 2026-06-07
+Last updated: 2026-06-08
 
 This file tracks current blockers, deferred work, risks, noise and user-confirmed non-issues for Phase 7. It should be updated at every Phase 7 substage closeout.
 
@@ -66,8 +66,11 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 
 ### 7.7 History / Favorites / Watch Insights
 
-- History, favorites and watch-insights visual consistency remain later Phase 7 work.
+- Dedicated 7.7 plan is tracked in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+- 7.7a completed the shared top-tab style baseline in `PageTabs.xaml`. Later Favorites and Watch Insights work should use those shared style keys for Movie Discovery-style top tabs.
+- History, favorites and watch-insights visual consistency remain later Phase 7 work after 7.7a.
 - Watch-insights and recommendation Movie-only boundaries must be preserved.
+- Movie Discovery and Settings still keep their accepted page-local tab templates. Retargeting accepted pages to `PageTabs.xaml` is deferred unless a later global polish stage explicitly owns the cross-page regression.
 
 ### 7.8 Global Visual Polish
 
