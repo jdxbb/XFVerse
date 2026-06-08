@@ -15,6 +15,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 {
     private const string ProfileTabKey = "profile";
     private const string StatisticsTabKey = "statistics";
+    private const int ProfileTabIndex = 0;
+    private const int StatisticsTabIndex = 1;
     private const int TasteGraphNodeLimit = 6;
     private const int TasteGraphLinkLimit = 12;
     private const double TasteGraphNodeWidth = 138d;
@@ -133,6 +135,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         LoadCommand = new AsyncRelayCommand(() => RefreshStatisticsAsync(StatisticsRefreshSource.Activate, forceRefresh: false));
         SelectProfileTabCommand = new RelayCommand(SelectProfileTab);
         SelectStatisticsTabCommand = new RelayCommand(SelectStatisticsTab);
+        SelectTabCommand = new RelayCommand(SelectTab);
         SelectMonthRangeCommand = new AsyncRelayCommand(
             () => ChangeStatisticsRangeAsync(WatchStatisticsTimeRange.Month),
             () => !IsLoadingStatistics);
@@ -162,6 +165,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public RelayCommand SelectProfileTabCommand { get; }
 
     public RelayCommand SelectStatisticsTabCommand { get; }
+
+    public RelayCommand SelectTabCommand { get; }
 
     public AsyncRelayCommand SelectMonthRangeCommand { get; }
 
@@ -246,6 +251,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(IsProfileTabSelected));
                 OnPropertyChanged(nameof(IsStatisticsTabSelected));
+                OnPropertyChanged(nameof(SelectedTabIndex));
             }
         }
     }
@@ -253,6 +259,22 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public bool IsProfileTabSelected => string.Equals(SelectedTab, ProfileTabKey, StringComparison.Ordinal);
 
     public bool IsStatisticsTabSelected => string.Equals(SelectedTab, StatisticsTabKey, StringComparison.Ordinal);
+
+    public int SelectedTabIndex
+    {
+        get => IsStatisticsTabSelected ? StatisticsTabIndex : ProfileTabIndex;
+        set
+        {
+            if (value == StatisticsTabIndex && !IsStatisticsTabSelected)
+            {
+                SelectStatisticsTab();
+            }
+            else if (value != StatisticsTabIndex && !IsProfileTabSelected)
+            {
+                SelectProfileTab();
+            }
+        }
+    }
 
     public bool IsLoadingStatistics
     {
@@ -268,6 +290,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 NextCalendarMonthCommand.RaiseCanExecuteChanged();
                 ReturnToCurrentCalendarMonthCommand.RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(RefreshButtonText));
+                OnPropertyChanged(nameof(StatisticsModuleState));
+                OnPropertyChanged(nameof(ShowStatisticsModuleState));
             }
         }
     }
@@ -285,6 +309,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ProfileRefreshButtonText));
                 OnPropertyChanged(nameof(CanRefreshProfile));
                 OnPropertyChanged(nameof(IsRefreshing));
+                OnPropertyChanged(nameof(ProfileModuleState));
+                OnPropertyChanged(nameof(ShowProfileModuleState));
             }
         }
     }
@@ -301,6 +327,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             if (SetProperty(ref _statisticsErrorMessage, value))
             {
                 OnPropertyChanged(nameof(HasStatisticsError));
+                OnPropertyChanged(nameof(StatisticsModuleState));
+                OnPropertyChanged(nameof(ShowStatisticsModuleState));
             }
         }
     }
@@ -316,6 +344,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(HasProfileError));
                 OnPropertyChanged(nameof(ShowProfileEmptyState));
+                OnPropertyChanged(nameof(ProfileModuleState));
+                OnPropertyChanged(nameof(ShowProfileModuleState));
             }
         }
     }
@@ -332,6 +362,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(IsProfileInsufficient));
                 OnPropertyChanged(nameof(ShowProfileEmptyState));
                 OnPropertyChanged(nameof(CanRefreshProfile));
+                OnPropertyChanged(nameof(ProfileModuleState));
+                OnPropertyChanged(nameof(ShowProfileModuleState));
                 RefreshProfileCommand.RaiseCanExecuteChanged();
             }
         }
@@ -386,6 +418,41 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public bool HasProfile => Profile?.HasProfile == true;
 
     public bool ShowProfileEmptyState => !HasProfile && (IsProfileInsufficient || HasProfileError);
+
+    public InsightModuleState ProfileModuleState
+    {
+        get
+        {
+            if (IsLoadingProfile)
+            {
+                return new InsightModuleState("loading", "画像生成中", "正在读取或生成画像，这不会刷新统计或推荐。", true);
+            }
+
+            if (HasProfile && HasProfileWarnings)
+            {
+                return new InsightModuleState("cached-fallback", "使用缓存画像", "当前显示可用缓存；警告信息已在画像概览中列出。", true);
+            }
+
+            if (IsProfileInsufficient)
+            {
+                return new InsightModuleState("data-insufficient", "画像数据不足", BuildSafeStatusMessage(ProfileInsufficientReason, "继续观看或标记影片后再生成画像。"), true);
+            }
+
+            if (HasProfileError)
+            {
+                var safeMessage = BuildSafeStatusMessage(ProfileErrorMessage, "画像生成失败，请稍后重试。");
+                return IsConfigMissingMessage(ProfileErrorMessage)
+                    ? new InsightModuleState("config-missing", "画像配置缺失", "画像服务配置缺失，请在设置页检查 AI 接口和观影画像模型。", true)
+                    : new InsightModuleState("generation-failed", "画像生成失败", safeMessage, true);
+            }
+
+            return HasProfile
+                ? new InsightModuleState("ready", "画像已生成", "画像模块已有可展示数据。", false)
+                : new InsightModuleState("empty", "画像尚未生成", "进入页面后会尝试加载画像；数据不足时会显示明确原因。", true);
+        }
+    }
+
+    public bool ShowProfileModuleState => ProfileModuleState.IsVisible;
 
     public string ProfileSummaryText { get; private set; } = string.Empty;
 
@@ -486,6 +553,44 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public bool HasAnyStatisticsData => Statistics.HasAnyData;
 
+    public InsightModuleState StatisticsModuleState
+    {
+        get
+        {
+            if (IsLoadingStatistics)
+            {
+                return new InsightModuleState("loading", "统计刷新中", "正在刷新本地统计，不会触发画像生成或推荐变化。", true);
+            }
+
+            if (HasStatisticsError)
+            {
+                return new InsightModuleState(
+                    "error",
+                    "统计加载失败",
+                    BuildSafeStatusMessage(StatisticsErrorMessage, "统计加载失败，请稍后重试。"),
+                    true);
+            }
+
+            if (!HasAnyStatisticsData)
+            {
+                return new InsightModuleState(
+                    "empty",
+                    "暂无统计数据",
+                    BuildSafeStatusMessage(Statistics.EmptyReason, "识别或标记影片后，这里会显示 Movie-only 统计。"),
+                    true);
+            }
+
+            if (HasWarningMessages)
+            {
+                return new InsightModuleState("cached-fallback", "统计已保留", "部分刷新警告已在统计页内列出，当前统计不会触发画像刷新。", true);
+            }
+
+            return new InsightModuleState("ready", "统计已就绪", "统计模块已有可展示数据。", false);
+        }
+    }
+
+    public bool ShowStatisticsModuleState => StatisticsModuleState.IsVisible;
+
     public bool HasWatchHistoryData => Statistics.HasWatchHistoryData;
 
     public bool HasMonthlyFrequentTags => MonthlyFrequentTags.Count > 0;
@@ -503,6 +608,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public bool HasWatchLikeData => WatchLikeGroups.Any(x => x.Items.Count > 0);
 
     public bool HasProfileKeywords => ProfileKeywords.Count > 0;
+
+    public bool HasProfileSummary => !string.IsNullOrWhiteSpace(ProfileSummaryText);
+
+    public bool HasProfileDna => ProfileDnaItems.Count > 0;
 
     public bool HasProfileWarnings => ProfileWarnings.Count > 0;
 
@@ -605,7 +714,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             }
             else
             {
-                ProfileErrorMessage = $"画像加载失败：{exception.Message}";
+                ProfileErrorMessage = $"画像加载失败：{BuildSafeStatusMessage(exception.Message, "未知错误。")}";
                 ProfileStatusText = "生成失败";
             }
 
@@ -754,7 +863,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         catch (Exception exception)
         {
             stopwatch.Stop();
-            StatisticsErrorMessage = $"统计数据加载失败：{exception.Message}";
+            StatisticsErrorMessage = $"统计数据加载失败：{BuildSafeStatusMessage(exception.Message, "未知错误。")}";
             if (source == StatisticsRefreshSource.DataChanged && _hasLoadedStatistics)
             {
                 StatisticsErrorMessage = string.Empty;
@@ -810,7 +919,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private void ApplyProfile(WatchProfileSnapshot snapshot)
     {
         Profile = snapshot;
-        ProfileErrorMessage = snapshot.ErrorMessage;
+        ProfileErrorMessage = BuildSafeStatusMessage(snapshot.ErrorMessage, string.Empty);
         ProfileInsufficientReason = snapshot.CanGenerateProfile ? string.Empty : snapshot.InsufficientReason;
         ProfileStatusText = BuildProfileStatusText(snapshot);
         LastProfileRefreshedAtText = snapshot.Meta.GeneratedAtUtc == default
@@ -830,8 +939,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         var yAxis = Math.Clamp(snapshot.Quadrant.YAxisScore, -100, 100);
         ProfileXAxisText = xAxis.ToString();
         ProfileYAxisText = yAxis.ToString();
-        ProfileQuadrantPointX = 20d + (xAxis + 100d) / 200d * 340d;
-        ProfileQuadrantPointY = 20d + (100d - yAxis) / 200d * 180d;
+        ProfileQuadrantPointX = 24d + (xAxis + 100d) / 200d * 244d;
+        ProfileQuadrantPointY = 28d + (100d - yAxis) / 200d * 188d;
         ProfileHeroTitle = snapshot.HasProfile
             ? $"你更像：{ProfilePersonaType}"
             : "画像正在学习你的口味";
@@ -1005,6 +1114,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
         WarningMessages.Add(new WarningMessageItem(message));
         OnPropertyChanged(nameof(HasWarningMessages));
+        OnPropertyChanged(nameof(StatisticsModuleState));
+        OnPropertyChanged(nameof(ShowStatisticsModuleState));
     }
 
     private void AddProfileWarning(string message)
@@ -1016,6 +1127,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
         ProfileWarnings.Add(new WarningMessageItem(message));
         OnPropertyChanged(nameof(HasProfileWarnings));
+        OnPropertyChanged(nameof(ProfileModuleState));
+        OnPropertyChanged(nameof(ShowProfileModuleState));
     }
 
     private static string BuildProfileStatusText(WatchProfileSnapshot snapshot)
@@ -1068,6 +1181,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private void ReplaceWarnings(IEnumerable<string> source)
     {
         ReplaceMessages(ProfileWarnings, source);
+        OnPropertyChanged(nameof(ProfileModuleState));
+        OnPropertyChanged(nameof(ShowProfileModuleState));
     }
 
     private void ReplaceDna(IEnumerable<WatchProfileDnaGene> genes)
@@ -1083,6 +1198,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 : BuildDnaTags(gene).Take(3).Select(x => new TagChipItem(x, string.Empty)).ToList();
             ProfileDnaItems.Add(new ProfileDnaItem(
                 gene.Gene,
+                BuildDnaIconText(gene.Gene),
+                BuildDnaSubtitle(gene.Gene),
                 tags,
                 Math.Clamp(gene.Score, 0, 100),
                 gene.Description ?? string.Empty,
@@ -1116,6 +1233,34 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             .Where(x => !string.IsNullOrWhiteSpace(x));
     }
 
+    private static string BuildDnaIconText(string gene)
+    {
+        return gene switch
+        {
+            "类型基因" => "类",
+            "情绪基因" => "绪",
+            "场景基因" => "景",
+            "节奏基因" => "奏",
+            "叙事基因" => "叙",
+            "探索基因" => "探",
+            _ => "因"
+        };
+    }
+
+    private static string BuildDnaSubtitle(string gene)
+    {
+        return gene switch
+        {
+            "类型基因" => "你偏爱的影片类型",
+            "情绪基因" => "你喜欢的情绪体验",
+            "场景基因" => "你常进入的观影场景",
+            "节奏基因" => "你偏好的叙事节奏",
+            "叙事基因" => "你在意的叙事元素",
+            "探索基因" => "你探索新题材的倾向",
+            _ => "画像基因"
+        };
+    }
+
     private void BuildProfileWatchLikeComparison(WatchProfileSnapshot profile)
     {
         ProfileWatchLikeGroups.Clear();
@@ -1129,9 +1274,9 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ? profile.WatchVsLike.OftenWantedTypes
             : Statistics.OftenWantedTop3.Select(x => x.Label).ToList();
 
-        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常观看", BuildProfileListItems(watched)));
-        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常喜爱", BuildProfileListItems(liked)));
-        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常想看", BuildProfileListItems(wanted)));
+        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常观看", "你最常看的类型", BuildProfileListItems(watched)));
+        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常喜爱", "你真正喜欢的类型", BuildProfileListItems(liked)));
+        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常想看", "你最想探索的类型", BuildProfileListItems(wanted)));
         ProfileWatchVsLikeConclusion = string.IsNullOrWhiteSpace(profile.WatchVsLike.Conclusion)
             ? "基于本地统计展示。"
             : profile.WatchVsLike.Conclusion;
@@ -1144,18 +1289,46 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         return labels
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(5)
-            .Select((label, index) => new ProfileListItem(index + 1, label.Trim()))
+            .Take(3)
+            .Select((label, index) => new ProfileListItem(index + 1, label.Trim(), Math.Max(44d, 100d - index * 24d)))
             .ToList();
     }
 
     private void BuildOverview(WatchStatisticsSnapshot snapshot)
     {
         OverviewCards.Clear();
-        OverviewCards.Add(new("已看", snapshot.WatchedCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek), "已"));
-        OverviewCards.Add(new("喜爱", snapshot.FavoriteCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek), "喜"));
-        OverviewCards.Add(new("想看", snapshot.WantToWatchCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek), "想"));
-        OverviewCards.Add(new("不想看", snapshot.NotInterestedCount.ToString(), "部", FormatDelta(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek), "避"));
+        OverviewCards.Add(new(
+            "已看",
+            "已完成观看的影片",
+            snapshot.WatchedCount.ToString(),
+            "部",
+            FormatDelta(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek),
+            "已",
+            "watched"));
+        OverviewCards.Add(new(
+            "喜爱",
+            "主动标记喜欢的影片",
+            snapshot.FavoriteCount.ToString(),
+            "部",
+            FormatDelta(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek),
+            "喜",
+            "favorite"));
+        OverviewCards.Add(new(
+            "想看",
+            "计划稍后观看的影片",
+            snapshot.WantToWatchCount.ToString(),
+            "部",
+            FormatDelta(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek),
+            "想",
+            "want"));
+        OverviewCards.Add(new(
+            "不想看",
+            "明确排除的影片",
+            snapshot.NotInterestedCount.ToString(),
+            "部",
+            FormatDelta(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek),
+            "避",
+            "negative"));
 
         TotalWatchTimeText = FormatSeconds(snapshot.TotalWatchSeconds);
         MonthlyWatchCountText = $"{snapshot.MonthlyWatchCount}部";
@@ -1635,6 +1808,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasRhythmData));
         OnPropertyChanged(nameof(HasTasteCombinationData));
         OnPropertyChanged(nameof(HasWatchLikeData));
+        OnPropertyChanged(nameof(StatisticsModuleState));
+        OnPropertyChanged(nameof(ShowStatisticsModuleState));
     }
 
     private void RaiseStatisticsRangeChanged()
@@ -1695,6 +1870,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(ProfileWatchVsLikeConclusion));
         OnPropertyChanged(nameof(NegativeSummaryText));
         OnPropertyChanged(nameof(HasProfileKeywords));
+        OnPropertyChanged(nameof(HasProfileSummary));
+        OnPropertyChanged(nameof(HasProfileDna));
         OnPropertyChanged(nameof(HasProfileWarnings));
         OnPropertyChanged(nameof(HasProfileCaveats));
         OnPropertyChanged(nameof(HasPreferredGenres));
@@ -1708,6 +1885,63 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasAnyAvoidDirection));
         OnPropertyChanged(nameof(HasFuturePreference));
         OnPropertyChanged(nameof(HasProfileWatchLikeData));
+        OnPropertyChanged(nameof(ProfileModuleState));
+        OnPropertyChanged(nameof(ShowProfileModuleState));
+    }
+
+    private void SelectTab(object? parameter)
+    {
+        var nextIndex = parameter switch
+        {
+            int index => index,
+            string value when int.TryParse(value, out var index) => index,
+            _ => SelectedTabIndex
+        };
+
+        SelectedTabIndex = nextIndex;
+    }
+
+    private static string BuildSafeStatusMessage(string? message, string fallback)
+    {
+        var value = (message ?? string.Empty)
+            .Replace("\r", " ")
+            .Replace("\n", " ")
+            .Trim();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        if (ContainsSensitiveUiFragment(value))
+        {
+            return "错误详情包含受保护的路径、地址或密钥信息，已隐藏。";
+        }
+
+        return value.Length <= 140 ? value : $"{value[..140]}...";
+    }
+
+    private static bool ContainsSensitiveUiFragment(string value)
+    {
+        return value.Contains("://", StringComparison.Ordinal)
+               || value.Contains(@":\", StringComparison.Ordinal)
+               || value.Contains("api_key=", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("apikey=", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("token=", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("password=", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("secret=", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("bearer ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsConfigMissingMessage(string value)
+    {
+        return value.Contains("配置", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("未填写", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("未设置", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("not configured", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("api key", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("model", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("endpoint", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void Log(string message)
@@ -1763,9 +1997,18 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
 public sealed record ProfilePlaceholderCard(string Title, string State, string Description);
 
+public sealed record InsightModuleState(string Kind, string Title, string Message, bool IsVisible);
+
 public sealed record WarningMessageItem(string Text);
 
-public sealed record OverviewMetricCard(string Title, string ValueText, string UnitText, string DeltaText, string IconText)
+public sealed record OverviewMetricCard(
+    string Title,
+    string Subtitle,
+    string ValueText,
+    string UnitText,
+    string DeltaText,
+    string IconText,
+    string Kind)
 {
     public bool HasDelta => !string.IsNullOrWhiteSpace(DeltaText);
 }
@@ -1782,6 +2025,8 @@ public sealed record CalendarDayCell(
     bool IsPlaceholder)
 {
     public bool IsClickable => !IsPlaceholder;
+
+    public string WatchCountText => WatchCount > 0 ? $"{WatchCount}部" : string.Empty;
 
     public static CalendarDayCell Placeholder()
     {
@@ -1803,6 +2048,8 @@ public sealed record RankedTagItem(int Rank, string Label, string DetailText, do
 
 public sealed record ProfileDnaItem(
     string Gene,
+    string IconText,
+    string Subtitle,
     IReadOnlyList<TagChipItem> Tags,
     int Score,
     string Description,
@@ -1813,12 +2060,12 @@ public sealed record ProfileDnaItem(
     public bool HasTags => Tags.Count > 0;
 }
 
-public sealed record ProfileListGroup(string Title, IReadOnlyList<ProfileListItem> Items)
+public sealed record ProfileListGroup(string Title, string Subtitle, IReadOnlyList<ProfileListItem> Items)
 {
     public bool HasItems => Items.Count > 0;
 }
 
-public sealed record ProfileListItem(int Rank, string Label);
+public sealed record ProfileListItem(int Rank, string Label, double ProgressValue);
 
 public sealed record TimeBucketItem(string Label, string WatchText, int WatchCount, double ProgressValue)
 {

@@ -115,6 +115,111 @@ Suggested commit message:
 
 - `Phase 7.7c align favorites UI`
 
+### 7.7d - Watch Insights Shell Tabs And State Baseline
+
+Completed:
+
+- Rebuilt `WatchInsightsPage.xaml` around a root `Grid > TabControl` with hidden native headers and a Movie Discovery-style manual top tab strip for `画像分析` / `观影统计`.
+- Used the 7.7a `PageTabs.xaml` primitives for fixed-width manual tab buttons, selected underline and divider placement while keeping Movie Discovery, Settings and Favorites accepted templates untouched.
+- Removed the old rounded in-page tab button group and kept the page title/subtitle owned by Shell.
+- Gave Profile Analysis and Watch Statistics one main vertical scroll surface each, with `ScrollBarAutoRevealBehavior`, disabled horizontal page scrolling and page-local modern scrollbar styling.
+- Added `SelectedTabIndex` / `SelectTabCommand` as the TabControl binding projection while preserving existing profile/statistics selected-state properties.
+- Added App-layer `InsightModuleState` projection for loading, empty, error, data-insufficient, config-missing, generation-failed and cached-fallback states.
+- Sanitized Watch Insights UI status messages so paths, URLs and secret-like values are not shown in module-state text.
+- Recorded the 7.7d execution result in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild77d\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no final visual rebuild of the five Profile Analysis modules;
+- no final visual rebuild of Watch Statistics overview, calendar or charts;
+- no AI prompt, watch-profile service, watch-statistics service, recommendation, player, scan, collection service, Core business rule, Movie-only boundary, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None in Core services. Changes are App-layer UI state/projections, XAML shell layout and UI status sanitization only.
+
+Non-stage page changes:
+
+- None. Movie Discovery, Settings, Favorites, Watch History, Media Library, detail pages, Player and Shell were not edited in 7.7d.
+
+Suggested commit message:
+
+- `Phase 7.7d align watch insights shell`
+
+### 7.7e - Watch Insights Profile Analysis Visual Closeout
+
+Completed:
+
+- Rebuilt the Profile Analysis tab into five sketch-aligned modules: taste summary, watch DNA, persona, taste quadrant and watch-vs-like comparison.
+- Reworked the summary area as a readable summary/status/refresh/keyword layout while preserving the 7.7d module-state projection for loading, empty, insufficient-data, config-missing, generation-failed and cached-fallback states.
+- Added App-layer display projections for profile DNA icon text, subtitle and progress values without changing watch-profile service output, cache shape or AI generation semantics.
+- Kept persona rendering on the existing WatchPersona asset mapping and adjusted only the visual frame, image sizing and text hierarchy.
+- Reframed the taste quadrant as explanation plus a compact coordinate panel using existing X/Y scores and UI-only coordinate scaling.
+- Rebuilt watch-vs-like as three Top3 groups with progress bars and a wrapped conclusion area.
+- Removed old hidden profile placeholder / fallback visual blocks from the page.
+- Recorded the 7.7e execution result in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild77e\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no AI prompt, AI model selection, profile input aggregation, profile cache fingerprint, recommendation profile, watch-statistics service, player, scan, collection service, Core business rule, Movie-only boundary, database schema, migration, database update, commit or push change.
+- no rebuild of Watch Statistics range, overview, calendar or chart visuals; those remain for 7.7f / 7.7g.
+
+Business logic changes:
+
+- None in Core services. Changes are App-layer profile display projections and XAML visual layout only.
+
+Non-stage page changes:
+
+- None. Movie Discovery, Favorites, Watch History, Settings, Media Library, detail pages, Player and Shell were not edited in 7.7e.
+
+Suggested commit message:
+
+- `Phase 7.7e polish watch insights profile`
+
+### 7.7f - Watch Insights Statistics Upper Area
+
+Completed:
+
+- Rebuilt the Watch Statistics upper area into the sketch-aligned overview and calendar modules.
+- Kept the overview to the four product-approved status cards: watched, favorite, want-to-watch and not-interested. The sketch-only unwatched card was not restored.
+- Moved month / all range switching into the overview header as segmented buttons bound to the existing statistics range commands.
+- Kept the statistics refresh action and last refresh text in the overview header; refresh still calls only the statistics service and does not trigger profile generation or recommendations.
+- Added App-layer overview display projections for status-card subtitle and visual kind without changing statistics service output.
+- Added `StatisticsOverviewCardTemplate`, range button styles, metric panel style and calendar legend swatch style in `WatchInsightsPage.xaml`.
+- Moved total watch time, current-range watch count and high-frequency tags into the overview lower metrics row.
+- Rebuilt the calendar module as month controls, heat legend, weekday row, calendar grid and three right-side monthly metric cards.
+- Replaced calendar heat-level hex colors with existing theme resource keys and kept calendar date clicks routed through the existing Watch History target-date navigation.
+- Recorded the 7.7f execution result in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild77f\"` passed with 0 warnings and 0 errors after clearing prior temporary Codex build output directories from `%TEMP%`.
+
+Explicit non-goals:
+
+- no rebuild of the Watch Statistics lower area: preference graph, tag rankings, viewing rhythm or taste combination map remain for 7.7g.
+- no watch-statistics service semantics, automatic watched algorithm, profile, recommendation, player, scan, collection service, Core business rule, Movie-only boundary, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None in Core services. Changes are App-layer statistics display projections and XAML visual layout only.
+
+Non-stage page changes:
+
+- None. Watch History target-date navigation was reused as-is; Movie Discovery, Favorites, Watch History, Settings, Media Library, detail pages, Player and Shell were not edited in 7.7f.
+
+Suggested commit message:
+
+- `Phase 7.7f polish watch statistics overview`
+
 ## Phase 7.6 - Settings / Scan / Cache
 
 ### 7.6a - Shared Component Baseline

@@ -1,10 +1,150 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.WatchInsightsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True">
     <UserControl.Resources>
-        <Style x:Key="InsightTabButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-            <Setter Property="MinWidth" Value="116" />
-            <Setter Property="Margin" Value="0,0,10,0" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+        <Style x:Key="InsightModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border x:Name="ThumbRoot"
+                                Margin="3"
+                                Background="#66FFFFFF"
+                                CornerRadius="4"
+                                Opacity="0.75" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ThumbRoot" Property="Opacity" Value="1" />
+                                <Setter TargetName="ThumbRoot" Property="Background" Value="#99FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="ThumbRoot" Property="Opacity" Value="1" />
+                                <Setter TargetName="ThumbRoot" Property="Background" Value="#CCFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="InsightModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="InsightModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="MinWidth" Value="10" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track"
+                                   IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                                  Style="{StaticResource InsightModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource InsightModernScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                                  Style="{StaticResource InsightModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WatchInsightsManualProfileTabButtonStyle"
+               TargetType="{x:Type Button}"
+               BasedOn="{StaticResource PageTopManualTabButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsProfileTabSelected, RelativeSource={RelativeSource AncestorType=TabControl}}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WatchInsightsManualStatisticsTabButtonStyle"
+               TargetType="{x:Type Button}"
+               BasedOn="{StaticResource PageTopManualLastTabButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsStatisticsTabSelected, RelativeSource={RelativeSource AncestorType=TabControl}}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WatchInsightsHiddenHeaderTabControlStyle" TargetType="{x:Type TabControl}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabControl}">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="40" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0">
+                                <Border Style="{StaticResource PageTopTabDividerStyle}" />
+                                <StackPanel HorizontalAlignment="Left"
+                                            VerticalAlignment="Bottom"
+                                            Orientation="Horizontal">
+                                    <Button Content="画像分析"
+                                            Command="{Binding DataContext.SelectTabCommand, RelativeSource={RelativeSource TemplatedParent}}"
+                                            CommandParameter="0"
+                                            Style="{StaticResource WatchInsightsManualProfileTabButtonStyle}" />
+                                    <Button Content="观影统计"
+                                            Command="{Binding DataContext.SelectTabCommand, RelativeSource={RelativeSource TemplatedParent}}"
+                                            CommandParameter="1"
+                                            Style="{StaticResource WatchInsightsManualStatisticsTabButtonStyle}" />
+                                </StackPanel>
+                                <TabPanel x:Name="HeaderPanel"
+                                          Height="0"
+                                          HorizontalAlignment="Left"
+                                          IsHitTestVisible="False"
+                                          IsItemsHost="True"
+                                          KeyboardNavigation.TabIndex="1"
+                                          Opacity="0" />
+                            </Grid>
+
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Grid.Row="1"
+                                              Margin="0,22,0,0"
+                                              ContentSource="SelectedContent" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="InsightCardHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource CardTitleTextStyle}">
@@ -28,7 +168,7 @@
         </Style>
 
         <Style x:Key="CalendarDayButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="46" />
+            <Setter Property="MinHeight" Value="52" />
             <Setter Property="Margin" Value="3" />
             <Setter Property="Padding" Value="4" />
             <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
@@ -62,17 +202,21 @@
                     <Setter Property="IsEnabled" Value="False" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding HeatLevel}" Value="1">
-                    <Setter Property="Background" Value="#F6E2E7" />
+                    <Setter Property="Background" Value="{DynamicResource BrushInfoBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushInfoBorder}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding HeatLevel}" Value="2">
-                    <Setter Property="Background" Value="#F0BEC9" />
+                    <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding HeatLevel}" Value="3">
-                    <Setter Property="Background" Value="#DD879B" />
+                    <Setter Property="Background" Value="{DynamicResource BrushWarningBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushWarningBorder}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding HeatLevel}" Value="4">
-                    <Setter Property="Background" Value="#B94D67" />
-                    <Setter Property="Foreground" Value="White" />
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -90,145 +234,432 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="ProfileInnerPanelStyle" TargetType="{x:Type Border}">
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style x:Key="ProfileDnaIconStyle" TargetType="{x:Type Border}">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+        </Style>
+
+        <Style x:Key="ProfileSmallRankStyle" TargetType="{x:Type Border}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+        </Style>
+
+        <Style x:Key="ProfileInlineProgressStyle" TargetType="{x:Type ProgressBar}">
+            <Setter Property="Height" Value="7" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+        </Style>
+
+        <Style x:Key="StatisticsRangeButtonStyle"
+               TargetType="{x:Type Button}"
+               BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="MinWidth" Value="72" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="14,0" />
+        </Style>
+
+        <Style x:Key="StatisticsMonthRangeButtonStyle"
+               TargetType="{x:Type Button}"
+               BasedOn="{StaticResource StatisticsRangeButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMonthRangeSelected}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="StatisticsAllRangeButtonStyle"
+               TargetType="{x:Type Button}"
+               BasedOn="{StaticResource StatisticsRangeButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsAllRangeSelected}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="StatisticsMetricPanelStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource ProfileInnerPanelStyle}">
+            <Setter Property="MinHeight" Value="116" />
+        </Style>
+
+        <Style x:Key="StatisticsLegendSwatchStyle" TargetType="{x:Type Border}">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
         <DataTemplate x:Key="ChipTemplate">
             <Border Style="{StaticResource InsightChipBorderStyle}">
                 <TextBlock Text="{Binding Label}" Style="{StaticResource BodyTextStyle}" />
             </Border>
         </DataTemplate>
-    </UserControl.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        <DataTemplate x:Key="StatisticsOverviewCardTemplate">
+            <Border Margin="0,0,12,12"
+                    MinHeight="156"
+                    Style="{StaticResource StatisticsMetricPanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="StatusIcon"
+                                Width="38"
+                                Height="38"
+                                CornerRadius="12"
+                                Background="{DynamicResource BrushAccentSoft}"
+                                BorderBrush="{DynamicResource BrushBorder}"
+                                BorderThickness="1">
+                            <TextBlock x:Name="StatusIconText"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding IconText}"
+                                       Style="{StaticResource BodyTextStyle}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Margin="0,2,0,0"
+                                       Text="{Binding Subtitle}"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource BodyMutedTextStyle}" />
+                        </StackPanel>
+                    </Grid>
 
-            <StackPanel Orientation="Horizontal">
-                <Button Content="画像分析"
-                        Command="{Binding SelectProfileTabCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource InsightTabButtonStyle}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsProfileTabSelected}" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
-                                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
-                                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <Button Content="观影统计"
-                        Command="{Binding SelectStatisticsTabCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource InsightTabButtonStyle}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsStatisticsTabSelected}" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
-                                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
-                                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-            </StackPanel>
+                    <StackPanel Grid.Row="1"
+                                Margin="0,16,0,0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Bottom">
+                        <TextBlock Text="{Binding ValueText}" Style="{StaticResource MetricTextStyle}" />
+                        <TextBlock Margin="6,12,0,0"
+                                   Text="{Binding UnitText}"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+                    </StackPanel>
 
-        </Grid>
+                    <TextBlock Grid.Row="2"
+                               Margin="0,10,0,0"
+                               Text="{Binding DeltaText}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasDelta}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="watched">
+                    <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushInfoBackground}" />
+                    <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushInfoBorder}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="favorite">
+                    <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
+                    <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="want">
+                    <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushSuccessBackground}" />
+                    <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushSuccessBorder}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="negative">
+                    <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushWarningBackground}" />
+                    <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushWarningBorder}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
 
-        <StackPanel Grid.Row="1" Margin="0,14,0,0">
-            <Border Padding="12"
+        <DataTemplate x:Key="ProfileDnaCardTemplate">
+            <Border Margin="0,0,14,14"
+                    MinHeight="184"
+                    Style="{StaticResource ProfileInnerPanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource ProfileDnaIconStyle}">
+                            <TextBlock HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding IconText}"
+                                       Style="{StaticResource SectionTitleTextStyle}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Gene}" Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Margin="0,4,0,0"
+                                       Text="{Binding Subtitle}"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource BodyMutedTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="0,14,0,0">
+                        <ItemsControl ItemsSource="{Binding Tags}" ItemTemplate="{StaticResource ChipTemplate}">
+                            <ItemsControl.Style>
+                                <Style TargetType="ItemsControl">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasTags}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ItemsControl.Style>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+
+                        <Grid>
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsProgressGene}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <ProgressBar Style="{StaticResource ProfileInlineProgressStyle}"
+                                         Value="{Binding Score, Mode=OneWay}" />
+                            <Grid Grid.Row="1" Margin="0,7,0,0">
+                                <TextBlock Text="{Binding LeftLabel}" Style="{StaticResource BodyMutedTextStyle}" />
+                                <TextBlock HorizontalAlignment="Right"
+                                           Text="{Binding RightLabel}"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <TextBlock Grid.Row="2"
+                               Margin="0,12,0,0"
+                               Text="{Binding Description}"
+                               TextWrapping="Wrap"
+                               Style="{StaticResource BodyMutedTextStyle}" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ProfileWatchLikeGroupTemplate">
+            <Border Margin="0,0,14,0"
+                    MinHeight="214"
+                    Style="{StaticResource ProfileInnerPanelStyle}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock Margin="0,4,0,0"
+                               Text="{Binding Subtitle}"
+                               TextWrapping="Wrap"
+                               Style="{StaticResource BodyMutedTextStyle}" />
+                    <ItemsControl Margin="0,16,0,0" ItemsSource="{Binding Items}">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource ProfileSmallRankStyle}">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding Rank}"
+                                                   Style="{StaticResource BodyTextStyle}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                        <TextBlock Text="{Binding Label}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Style="{StaticResource BodyTextStyle}" />
+                                        <ProgressBar Margin="0,7,0,0"
+                                                     Style="{StaticResource ProfileInlineProgressStyle}"
+                                                     Value="{Binding ProgressValue, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="暂无足够数据">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="InsightModuleStateTemplate">
+            <Border Margin="0,0,0,16"
+                    Padding="16"
                     CornerRadius="12"
                     Background="{DynamicResource BrushSurfaceAlt}"
                     BorderBrush="{DynamicResource BrushBorder}"
                     BorderThickness="1">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding HasStatisticsError}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <TextBlock Text="{Binding StatisticsErrorMessage}" TextWrapping="Wrap" Style="{StaticResource BodyTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border MinWidth="86"
+                            Height="28"
+                            Padding="10,0"
+                            CornerRadius="999"
+                            Background="{DynamicResource BrushAccentSoft}">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding Kind}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Style="{StaticResource BodyTextStyle}" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Margin="14,0,0,0">
+                        <TextBlock Text="{Binding Title}"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="{Binding Message}"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource BodyMutedTextStyle}" />
+                    </StackPanel>
+                </Grid>
             </Border>
+        </DataTemplate>
+    </UserControl.Resources>
 
-            <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding WarningMessages}">
-                <ItemsControl.Style>
-                    <Style TargetType="ItemsControl">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding HasWarningMessages}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ItemsControl.Style>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Margin="0,0,8,8" Padding="10,5" CornerRadius="999" Background="{DynamicResource BrushSurfaceAlt}">
-                            <TextBlock Text="{Binding Text}" Style="{StaticResource BodyMutedTextStyle}" />
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
+    <Grid>
+        <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                    ItemContainerStyle="{StaticResource PageTopTabItemStyle}"
+                    Style="{StaticResource WatchInsightsHiddenHeaderTabControlStyle}">
+            <TabItem Header="画像分析">
+                <ScrollViewer Padding="0,0,8,0"
+                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource InsightModernScrollBarStyle}" />
+                    </ScrollViewer.Resources>
+                    <StackPanel>
+                        <ContentControl Content="{Binding ProfileModuleState}"
+                                        ContentTemplate="{StaticResource InsightModuleStateTemplate}"
+                                        Visibility="{Binding ShowProfileModuleState, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-        <Grid Grid.Row="2" Margin="0,16,0,0">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ScrollViewer.Style>
-                    <Style TargetType="ScrollViewer">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsProfileTabSelected}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ScrollViewer.Style>
-                <StackPanel>
                     <Border Style="{StaticResource PageCardStyle}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="340" />
                             </Grid.ColumnDefinitions>
+
                             <StackPanel>
-                                <TextBlock Text="观影画像概览" Style="{StaticResource InsightCardHeaderStyle}" />
-                                <Border Margin="0,12,0,0"
-                                        Padding="16"
-                                        CornerRadius="14"
-                                        Background="{DynamicResource BrushAccentSoft}"
-                                        BorderBrush="{DynamicResource BrushBorder}"
-                                        BorderThickness="1">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding ProfileHeroTitle}"
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Left">
+                                        <TextBlock Text="观影口味总结" Style="{StaticResource InsightCardHeaderStyle}" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Text="根据你的标记影片生成"
                                                    TextWrapping="Wrap"
-                                                   Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,8,0,0"
-                                                   Text="{Binding ProfileHeroSubtitle}"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource BodyTextStyle}" />
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
                                     </StackPanel>
+                                    <Button DockPanel.Dock="Right"
+                                            Width="120"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            Content="{Binding ProfileRefreshButtonText}"
+                                            Command="{Binding RefreshProfileCommand}"
+                                            Style="{StaticResource PrimaryButtonStyle}" />
+                                </DockPanel>
+
+                                <Border Margin="0,16,0,0"
+                                        MinHeight="142"
+                                        Style="{StaticResource ProfileInnerPanelStyle}">
+                                    <Grid>
+                                        <TextBlock Text="{Binding ProfileSummaryText}"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasProfileSummary}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding ProfileHeroSubtitle}"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasProfileSummary}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
                                 </Border>
-                                <TextBlock Margin="0,8,0,0"
-                                           Text="基于已看、喜爱、想看、不想看和观影历史生成；不包含自定义推荐偏好，也不会影响推荐结果。"
-                                           TextWrapping="Wrap"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
+
                                 <WrapPanel Margin="0,14,0,0">
                                     <Border Style="{StaticResource InsightChipBorderStyle}">
                                         <TextBlock Text="{Binding ProfileStatusText}" Style="{StaticResource BodyTextStyle}" />
@@ -243,41 +674,84 @@
                                         </StackPanel>
                                     </Border>
                                 </WrapPanel>
-                                <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding ProfileWarnings}">
-                                    <ItemsControl.Style>
-                                        <Style TargetType="ItemsControl">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasProfileWarnings}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </ItemsControl.Style>
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Margin="0,0,8,6" Padding="10,5" CornerRadius="999" Background="{DynamicResource BrushSurfaceAlt}">
-                                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
                             </StackPanel>
-                            <Button Grid.Column="1"
-                                    Width="120"
-                                    VerticalAlignment="Top"
-                                    Content="{Binding ProfileRefreshButtonText}"
-                                    Command="{Binding RefreshProfileCommand}"
-                                    Style="{StaticResource PrimaryButtonStyle}" />
+
+                            <Border Grid.Column="2" Style="{StaticResource ProfileInnerPanelStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="核心关键词" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <ItemsControl Margin="0,16,0,0" ItemsSource="{Binding ProfileKeywords}">
+                                        <ItemsControl.Style>
+                                            <Style TargetType="ItemsControl">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasProfileKeywords}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ItemsControl.Style>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource InsightChipBorderStyle}">
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource BodyTextStyle}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Margin="0,16,0,0"
+                                               Text="画像生成后会显示最多 6 个关键词。">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasProfileKeywords}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </Border>
 
-                    <Border>
+                    <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding ProfileWarnings}">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasProfileWarnings}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,8,6"
+                                        Padding="10,5"
+                                        CornerRadius="999"
+                                        Background="{DynamicResource BrushSurfaceAlt}">
+                                    <TextBlock Text="{Binding Text}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Margin="0,18,0,0">
                         <Border.Style>
                             <Style TargetType="Border" BasedOn="{StaticResource InsightEmptyBorderStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -319,41 +793,51 @@
 
                         <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
                             <StackPanel>
-                                <TextBlock Text="口味总结" Style="{StaticResource InsightCardHeaderStyle}" />
-                                <TextBlock Margin="0,12,0,0"
-                                           Text="{Binding ProfileSummaryText}"
+                                <TextBlock Text="观影 DNA" Style="{StaticResource InsightCardHeaderStyle}" />
+                                <TextBlock Margin="0,6,0,0"
+                                           Text="你的口味由这些基因组成。"
                                            TextWrapping="Wrap"
-                                           Style="{StaticResource BodyTextStyle}" />
-                                <ItemsControl Margin="0,14,0,0" ItemsSource="{Binding ProfileKeywords}">
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                <ItemsControl Margin="0,18,0,0"
+                                              ItemTemplate="{StaticResource ProfileDnaCardTemplate}"
+                                              ItemsSource="{Binding ProfileDnaItems}">
+                                    <ItemsControl.Style>
+                                        <Style TargetType="ItemsControl">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasProfileDna}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ItemsControl.Style>
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <WrapPanel />
+                                            <UniformGrid Columns="3" />
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Style="{StaticResource InsightChipBorderStyle}">
-                                                <TextBlock Text="{Binding Label}" Style="{StaticResource BodyTextStyle}" />
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
                         </Border>
 
-                        <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
-                            <StackPanel>
-                                <TextBlock Text="观影人格" Style="{StaticResource InsightCardHeaderStyle}" />
-                                <Grid Margin="0,14,0,0">
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource PageCardStyle}">
+                                <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="210" />
-                                        <ColumnDefinition Width="18" />
+                                        <ColumnDefinition Width="230" />
+                                        <ColumnDefinition Width="22" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
 
-                                    <Border Width="210"
-                                            Height="280"
-                                            CornerRadius="10"
+                                    <Border Width="230"
+                                            Height="306"
+                                            CornerRadius="12"
                                             ClipToBounds="True"
                                             Background="{DynamicResource BrushAccentSoft}">
                                         <Grid>
@@ -372,7 +856,7 @@
                                             </Image>
                                             <Image Source="{Binding PersonaPosterFrameUri}"
                                                    Stretch="Fill"
-                                                   Opacity="0.8"
+                                                   Opacity="0.82"
                                                    IsHitTestVisible="False">
                                                 <Image.Style>
                                                     <Style TargetType="Image">
@@ -403,174 +887,146 @@
                                     </Border>
 
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                        <Border Padding="14" CornerRadius="12" Background="{DynamicResource BrushAccentSoft}">
+                                        <TextBlock Text="你的观影人格" Style="{StaticResource InsightCardHeaderStyle}" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Text="你是哪种观影者？"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                        <Border Margin="0,22,0,0" Style="{StaticResource ProfileInnerPanelStyle}">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding ProfilePersonaType}" Style="{StaticResource SectionTitleTextStyle}" />
-                                                <TextBlock Margin="0,6,0,0" Text="{Binding ProfilePersonaTitle}" Style="{StaticResource BodyTextStyle}" />
+                                                <TextBlock Text="{Binding ProfilePersonaType}" Style="{StaticResource MetricTextStyle}" />
+                                                <TextBlock Margin="0,8,0,0"
+                                                           Text="{Binding ProfilePersonaTitle}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyTextStyle}" />
                                             </StackPanel>
                                         </Border>
-                                        <TextBlock Margin="0,14,0,0"
+                                        <TextBlock Margin="0,16,0,0"
                                                    Text="{Binding ProfilePersonaDescription}"
                                                    TextWrapping="Wrap"
                                                    Style="{StaticResource BodyMutedTextStyle}" />
                                     </StackPanel>
                                 </Grid>
-                            </StackPanel>
-                        </Border>
+                            </Border>
 
-                        <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
-                            <StackPanel>
-                                <TextBlock Text="观影 DNA" Style="{StaticResource InsightCardHeaderStyle}" />
-                                <TextBlock Margin="0,8,0,0"
-                                           Text="六个维度一起解释你的口味，不是单独打分。"
-                                           TextWrapping="Wrap"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
-                                <ItemsControl Margin="0,16,0,0" ItemsSource="{Binding ProfileDnaItems}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <UniformGrid Columns="3" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Margin="0,0,14,14" Style="{StaticResource CompactCardStyle}">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Gene}" Style="{StaticResource SectionTitleTextStyle}" />
-                                                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Tags}" ItemTemplate="{StaticResource ChipTemplate}">
-                                                        <ItemsControl.Style>
-                                                            <Style TargetType="ItemsControl">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding HasTags}" Value="False">
-                                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </ItemsControl.Style>
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <WrapPanel />
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                    </ItemsControl>
-                                                    <Grid Margin="0,10,0,0">
-                                                        <Grid.Style>
-                                                            <Style TargetType="Grid">
-                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsProgressGene}" Value="True">
-                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Grid.Style>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto" />
-                                                            <RowDefinition Height="Auto" />
-                                                        </Grid.RowDefinitions>
-                                                        <ProgressBar Height="8" Maximum="100" Value="{Binding Score, Mode=OneWay}" />
-                                                        <Grid Grid.Row="1" Margin="0,6,0,0">
-                                                            <TextBlock Text="{Binding LeftLabel}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                            <TextBlock HorizontalAlignment="Right" Text="{Binding RightLabel}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                        </Grid>
-                                                    </Grid>
-                                                    <TextBlock Margin="0,10,0,0" Text="{Binding Description}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
+                            <Border Grid.Column="2" Style="{StaticResource PageCardStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="0.95*" />
+                                        <ColumnDefinition Width="18" />
+                                        <ColumnDefinition Width="1.15*" />
+                                    </Grid.ColumnDefinitions>
 
-                        <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="1.4*" />
-                                    <ColumnDefinition Width="18" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="口味定位图" Style="{StaticResource InsightCardHeaderStyle}" />
-                                    <TextBlock Margin="0,8,0,0" Text="定位只表达倾向，不是精确分数。" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <Canvas Margin="0,18,0,0" Width="400" Height="260" Background="{DynamicResource BrushSurfaceAlt}">
-                                        <Border Canvas.Left="20" Canvas.Top="20" Width="170" Height="95" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
+                                    <StackPanel>
+                                        <TextBlock Text="口味象限" Style="{StaticResource InsightCardHeaderStyle}" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Text="你的观影风格更接近哪种？"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                        <Border Margin="0,18,0,0" Style="{StaticResource ProfileInnerPanelStyle}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding ProfileQuadrantName}" Style="{StaticResource SectionTitleTextStyle}" />
+                                                <TextBlock Margin="0,10,0,0"
+                                                           Text="{Binding ProfileQuadrantDescription}"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <Canvas Grid.Column="2"
+                                            Width="310"
+                                            Height="260"
+                                            HorizontalAlignment="Right"
+                                            Background="{DynamicResource BrushSurfaceAlt}">
+                                        <Border Canvas.Left="16" Canvas.Top="18" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
                                             <TextBlock Text="熟悉安全 × 情绪沉浸" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
-                                        <Border Canvas.Left="210" Canvas.Top="20" Width="170" Height="95" Padding="10" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
+                                        <Border Canvas.Left="162" Canvas.Top="18" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
                                             <TextBlock Text="新鲜探索 × 情绪沉浸" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
-                                        <Border Canvas.Left="20" Canvas.Top="135" Width="170" Height="95" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
+                                        <Border Canvas.Left="16" Canvas.Top="152" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
                                             <TextBlock Text="熟悉安全 × 轻松消遣" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
-                                        <Border Canvas.Left="210" Canvas.Top="135" Width="170" Height="95" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
+                                        <Border Canvas.Left="162" Canvas.Top="152" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
                                             <TextBlock Text="新鲜探索 × 轻松消遣" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
-                                        <Line X1="200" Y1="18" X2="200" Y2="232" Stroke="#66B94D67" StrokeThickness="1" />
-                                        <Line X1="18" Y1="125" X2="382" Y2="125" Stroke="#66B94D67" StrokeThickness="1" />
+                                        <Line X1="155" Y1="16" X2="155" Y2="242" Stroke="{DynamicResource BrushAccent}" StrokeThickness="1" Opacity="0.45" />
+                                        <Line X1="14" Y1="130" X2="296" Y2="130" Stroke="{DynamicResource BrushAccent}" StrokeThickness="1" Opacity="0.45" />
                                         <Border Canvas.Left="{Binding ProfileQuadrantPointX}"
                                                 Canvas.Top="{Binding ProfileQuadrantPointY}"
-                                                Padding="8,4"
+                                                Width="18"
+                                                Height="18"
                                                 CornerRadius="999"
                                                 Background="{DynamicResource BrushAccent}"
                                                 BorderBrush="{DynamicResource BrushOnAccent}"
-                                                BorderThickness="2">
-                                            <TextBlock Text="你在这里" Foreground="{DynamicResource BrushOnAccent}" Style="{StaticResource BodyTextStyle}" />
-                                        </Border>
+                                                BorderThickness="2" />
                                     </Canvas>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="当前定位" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBlock Margin="0,6,0,0" Text="{Binding ProfileQuadrantName}" Style="{StaticResource SectionTitleTextStyle}" />
-                                    <TextBlock Margin="0,10,0,0" Text="{Binding ProfileQuadrantDescription}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <Border Margin="0,14,0,0" Padding="10" CornerRadius="12" Background="{DynamicResource BrushSurfaceAlt}">
-                                        <StackPanel>
-                                            <TextBlock Text="横向：熟悉安全 ↔ 新鲜探索" Style="{StaticResource BodyTextStyle}" />
-                                            <TextBlock Margin="0,6,0,0" Text="纵向：轻松消遣 ↔ 情绪沉浸" Style="{StaticResource BodyTextStyle}" />
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
 
                         <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="看得多 vs 真喜欢" Style="{StaticResource InsightCardHeaderStyle}" />
-                                <TextBlock Margin="0,8,0,0" Text="{Binding ProfileWatchVsLikeConclusion}" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
-                                <ItemsControl Margin="0,16,0,0" ItemsSource="{Binding ProfileWatchLikeGroups}">
+                                <TextBlock Margin="0,6,0,0"
+                                           Text="你常看的，不一定是你喜欢的。"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                <ItemsControl Margin="0,18,0,0"
+                                              ItemTemplate="{StaticResource ProfileWatchLikeGroupTemplate}"
+                                              ItemsSource="{Binding ProfileWatchLikeGroups}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <UniformGrid Columns="3" />
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Margin="0,0,14,0" Style="{StaticResource CompactCardStyle}">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
-                                                    <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Items}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                                    <Border Width="22" Height="22" CornerRadius="999" Background="{DynamicResource BrushAccentSoft}">
-                                                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding Rank}" Style="{StaticResource BodyTextStyle}" />
-                                                                    </Border>
-                                                                    <TextBlock Margin="8,0,0,0" Text="{Binding Label}" Style="{StaticResource BodyTextStyle}" />
-                                                                </StackPanel>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <Border Margin="0,16,0,0" Style="{StaticResource ProfileInnerPanelStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="洞察结论：" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="8,0,0,0"
+                                                   Text="{Binding ProfileWatchVsLikeConclusion}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                    </Grid>
+                                </Border>
                             </StackPanel>
                         </Border>
-
                     </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
 
-                    <ItemsControl Visibility="Collapsed" ItemsSource="{Binding ProfileEmptyCards}">
+            </TabItem>
+
+            <TabItem Header="观影统计">
+                <ScrollViewer Padding="0,0,8,0"
+                              helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource InsightModernScrollBarStyle}" />
+                    </ScrollViewer.Resources>
+                <StackPanel>
+                    <ContentControl Content="{Binding StatisticsModuleState}"
+                                    ContentTemplate="{StaticResource InsightModuleStateTemplate}"
+                                    Visibility="{Binding ShowStatisticsModuleState, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <ItemsControl Margin="0,0,0,8" ItemsSource="{Binding WarningMessages}">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasWarningMessages}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel />
@@ -578,160 +1034,69 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Width="360" MinHeight="150" Margin="0,0,16,16" Style="{StaticResource PageCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Title}" Style="{StaticResource InsightCardHeaderStyle}" />
-                                        <Border Margin="0,14,0,0" Padding="10,5" CornerRadius="999" Background="{DynamicResource BrushAccentSoft}" HorizontalAlignment="Left">
-                                            <TextBlock Text="{Binding State}" Style="{StaticResource BodyTextStyle}" />
-                                        </Border>
-                                        <TextBlock Margin="0,14,0,0"
-                                                   Text="{Binding Description}"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource BodyMutedTextStyle}" />
-                                    </StackPanel>
+                                <Border Margin="0,0,8,8"
+                                        Padding="10,5"
+                                        CornerRadius="999"
+                                        Background="{DynamicResource BrushSurfaceAlt}">
+                                    <TextBlock Text="{Binding Text}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-
-                    <Border Visibility="Collapsed" Style="{StaticResource PageCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="看得多 vs 真喜欢" Style="{StaticResource InsightCardHeaderStyle}" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Text="这部分使用本地统计 Top3，不调用 AI。"
-                                       Style="{StaticResource BodyMutedTextStyle}" />
-                            <Grid Margin="0,16,0,0">
-                                <ItemsControl ItemsSource="{Binding WatchLikeGroups}">
-                                    <ItemsControl.Style>
-                                        <Style TargetType="ItemsControl">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasWatchLikeData}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </ItemsControl.Style>
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <UniformGrid Columns="3" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Margin="0,0,14,0" Style="{StaticResource CompactCardStyle}">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
-                                                    <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Items}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Grid Margin="0,0,0,10">
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="28" />
-                                                                        <ColumnDefinition Width="*" />
-                                                                        <ColumnDefinition Width="58" />
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <Border Width="22" Height="22" CornerRadius="999" Background="{DynamicResource BrushAccentSoft}">
-                                                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding Rank}" Style="{StaticResource BodyTextStyle}" />
-                                                                    </Border>
-                                                                    <StackPanel Grid.Column="1" Margin="8,0">
-                                                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
-                                                                        <ProgressBar Margin="0,6,0,0" Height="6" Maximum="100" Value="{Binding ProgressValue, Mode=OneWay}" />
-                                                                    </StackPanel>
-                                                                    <TextBlock Grid.Column="2" Text="{Binding DetailText}" HorizontalAlignment="Right" Style="{StaticResource BodyMutedTextStyle}" />
-                                                                </Grid>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
-                                <Border>
-                                    <Border.Style>
-                                        <Style TargetType="Border" BasedOn="{StaticResource InsightEmptyBorderStyle}">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasWatchLikeData}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <StackPanel>
-                                        <TextBlock Text="暂无足够数据" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,8,0,0" Text="继续观看、标记喜爱或加入想看后，这里会展示真实 Top3。" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ScrollViewer.Style>
-                    <Style TargetType="ScrollViewer">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsStatisticsTabSelected}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ScrollViewer.Style>
-                <StackPanel>
                     <Border Style="{StaticResource PageCardStyle}">
-                        <StackPanel>
-                            <DockPanel>
-                                <StackPanel DockPanel.Dock="Left">
-                                    <TextBlock Text="{Binding OverviewTitle}" Style="{StaticResource InsightCardHeaderStyle}" />
-                                    <TextBlock Margin="0,8,0,0" Text="{Binding OverviewSubtitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                                    <Button MinWidth="64"
-                                            Margin="0,0,8,0"
-                                            Content="本月"
-                                            Command="{Binding SelectMonthRangeCommand}">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsMonthRangeSelected}" Value="True">
-                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
-                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                    <Button MinWidth="64"
-                                            Margin="0,0,12,0"
-                                            Content="全部"
-                                            Command="{Binding SelectAllRangeCommand}">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsAllRangeSelected}" Value="True">
-                                                        <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
-                                                        <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                    <TextBlock Margin="0,0,12,0"
-                                               VerticalAlignment="Center"
-                                               Text="{Binding LastStatisticsRefreshedAtText}"
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <TextBlock Text="洞察总览" Style="{StaticResource InsightCardHeaderStyle}" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Text="你的观影世界，一目了然"
+                                               Style="{StaticResource BodyTextStyle}" />
+                                    <TextBlock Margin="0,4,0,0"
+                                               Text="{Binding OverviewSubtitle}"
+                                               TextWrapping="Wrap"
                                                Style="{StaticResource BodyMutedTextStyle}" />
-                                    <Button MinWidth="110"
-                                            Content="{Binding RefreshButtonText}"
-                                            Command="{Binding RefreshStatisticsCommand}"
-                                            Style="{StaticResource PrimaryButtonStyle}" />
                                 </StackPanel>
-                            </DockPanel>
-                            <Border>
+
+                                <StackPanel Grid.Column="1"
+                                            Margin="22,0,0,0"
+                                            HorizontalAlignment="Right">
+                                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                                        <Button Margin="0,0,8,0"
+                                                Content="本月"
+                                                Command="{Binding SelectMonthRangeCommand}"
+                                                Style="{StaticResource StatisticsMonthRangeButtonStyle}" />
+                                        <Button Margin="0,0,12,0"
+                                                Content="全部"
+                                                Command="{Binding SelectAllRangeCommand}"
+                                                Style="{StaticResource StatisticsAllRangeButtonStyle}" />
+                                        <Button MinWidth="108"
+                                                Content="{Binding RefreshButtonText}"
+                                                Command="{Binding RefreshStatisticsCommand}"
+                                                Style="{StaticResource PrimaryButtonStyle}" />
+                                    </StackPanel>
+                                    <TextBlock Margin="0,8,0,0"
+                                               HorizontalAlignment="Right"
+                                               Text="{Binding LastStatisticsRefreshedAtText}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Border Grid.Row="1">
                                 <Border.Style>
                                     <Style TargetType="Border" BasedOn="{StaticResource InsightEmptyBorderStyle}">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -742,68 +1107,79 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="暂无可统计的已识别影片，状态数量会在识别或标记后显示。" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
+                                <TextBlock Text="暂无可统计的已识别影片，状态数量会在识别或标记后显示。"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
                             </Border>
 
-                            <ItemsControl Margin="0,16,0,0" ItemsSource="{Binding OverviewCards}">
+                            <ItemsControl Grid.Row="2"
+                                          Margin="0,20,0,0"
+                                          ItemTemplate="{StaticResource StatisticsOverviewCardTemplate}"
+                                          ItemsSource="{Binding OverviewCards}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <UniformGrid Columns="4" />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Margin="0,0,10,0" Style="{StaticResource CompactCardStyle}">
-                                            <StackPanel>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="34" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Width="28" Height="28" CornerRadius="8" Background="{DynamicResource BrushAccentSoft}">
-                                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding IconText}" Style="{StaticResource BodyTextStyle}" />
-                                                    </Border>
-                                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Title}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                </Grid>
-                                                <StackPanel Margin="0,12,0,0" Orientation="Horizontal" VerticalAlignment="Bottom">
-                                                    <TextBlock Text="{Binding ValueText}" Style="{StaticResource MetricTextStyle}" />
-                                                    <TextBlock Margin="6,12,0,0" Text="{Binding UnitText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                                </StackPanel>
-                                                <TextBlock Margin="0,8,0,0" Text="{Binding DeltaText}">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding HasDelta}" Value="False">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <UniformGrid Margin="0,16,0,0" Columns="3">
-                                <Border Margin="0,0,10,0" Style="{StaticResource CompactCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding TotalWatchTimeTitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,8,0,0" Text="{Binding TotalWatchTimeText}" Style="{StaticResource SectionTitleTextStyle}" />
-                                    </StackPanel>
+                            <Grid Grid.Row="3" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.05*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="1.05*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="1.7*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Style="{StaticResource StatisticsMetricPanelStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource BrushInfoBackground}" BorderBrush="{DynamicResource BrushInfoBorder}" BorderThickness="1">
+                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="时" Style="{StaticResource BodyTextStyle}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding TotalWatchTimeTitle}" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Margin="0,8,0,0" Text="{Binding TotalWatchTimeText}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
-                                <Border Margin="0,0,10,0" Style="{StaticResource CompactCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding WatchCountTitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,8,0,0" Text="{Binding MonthlyWatchCountText}" Style="{StaticResource SectionTitleTextStyle}" />
-                                    </StackPanel>
+
+                                <Border Grid.Column="2" Style="{StaticResource StatisticsMetricPanelStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushAccent}" BorderThickness="1">
+                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="数" Style="{StaticResource BodyTextStyle}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding WatchCountTitle}" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Margin="0,8,0,0" Text="{Binding MonthlyWatchCountText}" Style="{StaticResource SectionTitleTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
-                                <Border Style="{StaticResource CompactCardStyle}">
+
+                                <Border Grid.Column="4" Style="{StaticResource StatisticsMetricPanelStyle}">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding FrequentTagsTitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding MonthlyFrequentTags}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource BrushSuccessBackground}" BorderBrush="{DynamicResource BrushSuccessBorder}" BorderThickness="1">
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="签" Style="{StaticResource BodyTextStyle}" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FrequentTagsTitle}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Margin="0,4,0,0" Text="当前范围内最高频的标签" Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <ItemsControl Margin="0,14,0,0" ItemsSource="{Binding MonthlyFrequentTags}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
                                                     <WrapPanel />
@@ -812,7 +1188,10 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource InsightChipBorderStyle}">
-                                                        <TextBlock Text="{Binding Label}" Style="{StaticResource BodyTextStyle}" />
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Label}" Style="{StaticResource BodyTextStyle}" />
+                                                            <TextBlock Margin="6,0,0,0" Text="{Binding DetailText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                                        </StackPanel>
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -831,8 +1210,8 @@
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>
-                            </UniformGrid>
-                        </StackPanel>
+                            </Grid>
+                        </Grid>
                     </Border>
 
                     <Border Margin="0,18,0,0" Style="{StaticResource PageCardStyle}">
@@ -840,35 +1219,82 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="2*" />
                                 <ColumnDefinition Width="18" />
-                                <ColumnDefinition Width="300" />
+                                <ColumnDefinition Width="310" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel>
-                                <DockPanel>
-                                    <StackPanel DockPanel.Dock="Left">
-                                        <TextBlock Text="观影日历" Style="{StaticResource InsightCardHeaderStyle}" />
-                                        <TextBlock Margin="0,8,0,0" Text="独立按月份查看，不受统计时间范围影响。" Style="{StaticResource BodyMutedTextStyle}" />
-                                    </StackPanel>
-                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button Content="上一月" Command="{Binding PreviousCalendarMonthCommand}" Style="{StaticResource SecondaryButtonStyle}" />
-                                        <TextBlock Margin="12,0" VerticalAlignment="Center" Text="{Binding CalendarMonthText}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <Button Content="下一月" Command="{Binding NextCalendarMonthCommand}" Style="{StaticResource SecondaryButtonStyle}" />
-                                        <Button Margin="8,0,0,0" Content="回到当前月" Command="{Binding ReturnToCurrentCalendarMonthCommand}">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding ShowReturnToCurrentMonth}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                    </StackPanel>
-                                </DockPanel>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                                <UniformGrid Margin="0,18,0,6" Columns="7">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="观影日历" Style="{StaticResource InsightCardHeaderStyle}" />
+                                        <TextBlock Margin="0,8,0,0"
+                                                   Text="从第一天使用软件开始，你的每一次观影都被记录在这"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="18,0,0,0" HorizontalAlignment="Right">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="上一月"
+                                                    Command="{Binding PreviousCalendarMonthCommand}"
+                                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                            <TextBlock Margin="12,0"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding CalendarMonthText}"
+                                                       Style="{StaticResource SectionTitleTextStyle}" />
+                                            <Button Content="下一月"
+                                                    Command="{Binding NextCalendarMonthCommand}"
+                                                    Style="{StaticResource SecondaryButtonStyle}" />
+                                            <Button Margin="8,0,0,0"
+                                                    Content="回到当前月"
+                                                    Command="{Binding ReturnToCurrentCalendarMonthCommand}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowReturnToCurrentMonth}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </StackPanel>
+                                        <WrapPanel Margin="0,12,0,0" HorizontalAlignment="Right">
+                                            <StackPanel Margin="0,0,12,6" Orientation="Horizontal">
+                                                <Border Style="{StaticResource StatisticsLegendSwatchStyle}" Background="{DynamicResource BrushSurfaceAlt}" />
+                                                <TextBlock Text="无" Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,12,6" Orientation="Horizontal">
+                                                <Border Style="{StaticResource StatisticsLegendSwatchStyle}" Background="{DynamicResource BrushInfoBackground}" BorderBrush="{DynamicResource BrushInfoBorder}" />
+                                                <TextBlock Text="&lt;30分钟" Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,12,6" Orientation="Horizontal">
+                                                <Border Style="{StaticResource StatisticsLegendSwatchStyle}" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushAccent}" />
+                                                <TextBlock Text="30-60分钟" Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,12,6" Orientation="Horizontal">
+                                                <Border Style="{StaticResource StatisticsLegendSwatchStyle}" Background="{DynamicResource BrushWarningBackground}" BorderBrush="{DynamicResource BrushWarningBorder}" />
+                                                <TextBlock Text="1-2小时" Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,0,6" Orientation="Horizontal">
+                                                <Border Style="{StaticResource StatisticsLegendSwatchStyle}" Background="{DynamicResource BrushAccent}" BorderBrush="{DynamicResource BrushAccent}" />
+                                                <TextBlock Text="2小时+" Style="{StaticResource BodyMutedTextStyle}" />
+                                            </StackPanel>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Grid>
+
+                                <UniformGrid Grid.Row="1" Margin="0,18,0,6" Columns="7">
                                     <TextBlock HorizontalAlignment="Center" Text="一" Style="{StaticResource BodyMutedTextStyle}" />
                                     <TextBlock HorizontalAlignment="Center" Text="二" Style="{StaticResource BodyMutedTextStyle}" />
                                     <TextBlock HorizontalAlignment="Center" Text="三" Style="{StaticResource BodyMutedTextStyle}" />
@@ -878,7 +1304,7 @@
                                     <TextBlock HorizontalAlignment="Center" Text="日" Style="{StaticResource BodyMutedTextStyle}" />
                                 </UniformGrid>
 
-                                <ItemsControl ItemsSource="{Binding CalendarCells}">
+                                <ItemsControl Grid.Row="2" ItemsSource="{Binding CalendarCells}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <UniformGrid Columns="7" />
@@ -891,11 +1317,14 @@
                                                     IsEnabled="{Binding IsClickable}"
                                                     Style="{StaticResource CalendarDayButtonStyle}">
                                                 <Grid>
-                                                    <TextBlock Margin="6,4,0,0" Text="{Binding DayText}" Style="{StaticResource BodyTextStyle}" />
+                                                    <TextBlock Margin="6,4,0,0"
+                                                               Text="{Binding DayText}"
+                                                               Style="{StaticResource BodyTextStyle}" />
                                                     <TextBlock Margin="0,0,6,4"
                                                                HorizontalAlignment="Right"
                                                                VerticalAlignment="Bottom"
-                                                               Text="{Binding WatchCount}"
+                                                               Text="{Binding WatchCountText}"
+                                                               TextTrimming="CharacterEllipsis"
                                                                Style="{StaticResource BodyMutedTextStyle}" />
                                                 </Grid>
                                             </Button>
@@ -903,15 +1332,7 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
-                                <StackPanel Margin="0,10,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <TextBlock Margin="0,0,8,0" Text="无" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBlock Margin="0,0,8,0" Text="&lt;30分钟" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBlock Margin="0,0,8,0" Text="30-60分钟" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBlock Margin="0,0,8,0" Text="1-2小时" Style="{StaticResource BodyMutedTextStyle}" />
-                                    <TextBlock Text="2小时+" Style="{StaticResource BodyMutedTextStyle}" />
-                                </StackPanel>
-
-                                <TextBlock Margin="0,10,0,0" Text="{Binding CalendarNoticeMessage}">
+                                <TextBlock Grid.Row="3" Margin="0,10,0,0" Text="{Binding CalendarNoticeMessage}">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -923,27 +1344,56 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                            </StackPanel>
+                            </Grid>
 
                             <StackPanel Grid.Column="2">
-                                <Border Style="{StaticResource CompactCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding MonthlyWatchDaysTitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,8,0,0" Text="{Binding MonthlyWatchDaysText}" Style="{StaticResource SectionTitleTextStyle}" />
-                                    </StackPanel>
+                                <Border Style="{StaticResource StatisticsMetricPanelStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="44" Height="44" CornerRadius="14" Background="{DynamicResource BrushInfoBackground}" BorderBrush="{DynamicResource BrushInfoBorder}" BorderThickness="1">
+                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="天" Style="{StaticResource BodyTextStyle}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding MonthlyWatchDaysTitle}" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Margin="0,8,0,0" Text="{Binding MonthlyWatchDaysText}" Style="{StaticResource SectionTitleTextStyle}" />
+                                            <TextBlock Margin="0,4,0,0" Text="有观影记录的自然日" Style="{StaticResource BodyMutedTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
-                                <Border Margin="0,12,0,0" Style="{StaticResource CompactCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding ContinuousWatchDaysTitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,8,0,0" Text="{Binding ContinuousWatchDaysText}" Style="{StaticResource SectionTitleTextStyle}" />
-                                    </StackPanel>
+                                <Border Margin="0,12,0,0" Style="{StaticResource StatisticsMetricPanelStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="44" Height="44" CornerRadius="14" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushAccent}" BorderThickness="1">
+                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="连" Style="{StaticResource BodyTextStyle}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding ContinuousWatchDaysTitle}" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Margin="0,8,0,0" Text="{Binding ContinuousWatchDaysText}" Style="{StaticResource SectionTitleTextStyle}" />
+                                            <TextBlock Margin="0,4,0,0" Text="本月连续观影天数峰值" Style="{StaticResource BodyMutedTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
-                                <Border Margin="0,12,0,0" Style="{StaticResource CompactCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding MostActiveDateTitle}" Style="{StaticResource BodyMutedTextStyle}" />
-                                        <TextBlock Margin="0,8,0,0" Text="{Binding MostActiveDateText}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        <TextBlock Margin="0,4,0,0" Text="{Binding MostActiveDateWatchText}" Style="{StaticResource BodyMutedTextStyle}" />
-                                    </StackPanel>
+                                <Border Margin="0,12,0,0" Style="{StaticResource StatisticsMetricPanelStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="44" Height="44" CornerRadius="14" Background="{DynamicResource BrushWarningBackground}" BorderBrush="{DynamicResource BrushWarningBorder}" BorderThickness="1">
+                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="活" Style="{StaticResource BodyTextStyle}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding MostActiveDateTitle}" Style="{StaticResource BodyMutedTextStyle}" />
+                                            <TextBlock Margin="0,8,0,0" Text="{Binding MostActiveDateText}" Style="{StaticResource SectionTitleTextStyle}" />
+                                            <TextBlock Margin="0,4,0,0" Text="{Binding MostActiveDateWatchText}" Style="{StaticResource BodyMutedTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </StackPanel>
                         </Grid>
@@ -1280,6 +1730,7 @@
                     </Border>
                 </StackPanel>
             </ScrollViewer>
-        </Grid>
+            </TabItem>
+        </TabControl>
     </Grid>
 </UserControl>

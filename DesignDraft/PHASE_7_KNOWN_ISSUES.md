@@ -70,7 +70,10 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 - 7.7a completed the shared top-tab style baseline in `PageTabs.xaml`. Later Favorites and Watch Insights work should use those shared style keys for Movie Discovery-style top tabs.
 - 7.7b rebuilt Watch History as a date-filtered, scrollable date-group poster grid and copied Media Library poster-card visuals for history items.
 - 7.7c rebuilt Favorites as Movie Discovery-style top tabs and a scrollable Movie / Season poster-card grid with item-level remove loading / failure / disabled state.
-- Watch-insights visual consistency remains later Phase 7 work after 7.7c.
+- 7.7d rebuilt the Watch Insights shell as Movie Discovery-style top tabs with independent profile/statistics scroll surfaces and module-state baseline.
+- 7.7e rebuilt the Watch Insights profile-analysis tab around summary, DNA, persona, quadrant and watch-vs-like modules using App-layer display projections only.
+- 7.7f rebuilt the Watch Insights statistics upper area around range switching, overview cards, monthly metrics and calendar heatmap using App-layer display projections only.
+- Watch-insights statistics lower visual consistency remains later 7.7g work after the 7.7d shell baseline.
 - External Movie favorites without a stable `MovieId` still have no model-level cancel path. 7.7c shows a real disabled reason instead of pretending the action is available; adding a persistent external favorite identifier is deferred to a separate data-model stage.
 - Watch-insights and recommendation Movie-only boundaries must be preserved.
 - Movie Discovery and Settings still keep their accepted page-local tab templates. Retargeting accepted pages to `PageTabs.xaml` is deferred unless a later global polish stage explicitly owns the cross-page regression.

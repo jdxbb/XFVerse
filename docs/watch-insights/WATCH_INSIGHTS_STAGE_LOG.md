@@ -1,5 +1,27 @@
 # Watch Insights Stage Log
 
+## Phase 7.7f Statistics Upper-Area Visual Closeout
+
+Goal: close the Watch Statistics upper area against the Phase 7.7 UI redesign scope without changing statistics service semantics, profile generation, recommendation input, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Rebuilt the statistics upper area into the `洞察总览` and `观影日历` modules.
+- Kept the overview status cards limited to `已看`, `喜爱`, `想看`, and `不想看`; the sketch-only `未看` card remains intentionally excluded.
+- Kept month / all range switching, statistics refresh, calendar month switching, return-to-current-month, and calendar date navigation on existing ViewModel commands.
+- Added App-layer status-card display projections for subtitle and visual kind; statistics service output and cache structure are unchanged.
+- Resourceized calendar heat-level colors through existing theme resource keys instead of page-local hex colors.
+- Reused existing Watch History target-date navigation for calendar date clicks.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild77f\"` passed with 0 warnings and 0 errors after clearing prior temporary Codex build output directories from `%TEMP%`.
+
+Not done:
+
+- No statistics lower-area visual rebuild: preference graph, rankings, viewing rhythm, and taste combination map remain for 7.7g.
+- No statistics service口径 change, profile prompt/model/cache change, recommendation change, TV Watch Insights, mixed Movie + TV profile, database schema change, migration, database update, commit, or push.
+
 ## Phase 4.18 Phase 4 Closeout Boundary Note
 
 Goal: record the Phase 4 full-regression result for Movie Watch Insights after TV support stabilization.
