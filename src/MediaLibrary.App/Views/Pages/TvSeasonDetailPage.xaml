@@ -98,6 +98,15 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="TvSeasonEpisodeOverviewScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
+            <Setter Property="MaxHeight" Value="70" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="PanningMode" Value="VerticalOnly" />
+            <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
+            <Setter Property="helpers:TextScrollOverflowCueBehavior.IsEnabled" Value="True" />
+        </Style>
+
         <DataTemplate x:Key="TvSeasonDetailActionButtonTemplate">
             <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
                 <TextBlock VerticalAlignment="Center"
@@ -515,13 +524,21 @@
                                                    TextTrimming="CharacterEllipsis"
                                                    TextWrapping="NoWrap"
                                                    helpers:TrimmedTextToolTipBehavior.FullText="{Binding Name}" />
-                                        <TextBlock Grid.Row="1"
-                                                   Margin="0,6,0,0"
-                                                   MaxHeight="38"
-                                                   Style="{StaticResource BodyTextStyle}"
-                                                   Text="{Binding OverviewDisplayText}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   TextWrapping="Wrap" />
+                                        <ScrollViewer Grid.Row="1"
+                                                      Margin="0,6,0,0"
+                                                      PreviewMouseWheel="OnOverviewPreviewMouseWheel"
+                                                      Style="{StaticResource TvSeasonEpisodeOverviewScrollViewerStyle}">
+                                            <ScrollViewer.Resources>
+                                                <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource TvSeasonModernScrollBarStyle}" />
+                                            </ScrollViewer.Resources>
+                                            <TextBlock Style="{StaticResource BodyTextStyle}"
+                                                       MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type ScrollViewer}}}"
+                                                       Text="{Binding OverviewDisplayText}"
+                                                       TextTrimming="None"
+                                                       TextWrapping="Wrap"
+                                                       LineHeight="20"
+                                                       LineStackingStrategy="BlockLineHeight" />
+                                        </ScrollViewer>
                                         <StackPanel Grid.Row="2" Margin="0,8,0,0" Orientation="Horizontal">
                                             <TextBlock Margin="0,0,18,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding AirDateText, StringFormat=首播 {0}}" />
                                             <TextBlock Margin="0,0,18,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SourceCountText}" />

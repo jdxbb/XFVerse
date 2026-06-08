@@ -112,6 +112,22 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="ScanCompactPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="12,3" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="ScanCompactSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="12,3" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
         <Style x:Key="ScanFieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="FontSize" Value="12" />
@@ -119,15 +135,45 @@
 
         <Style x:Key="ScanEmptyStateStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
             <Setter Property="Padding" Value="14" />
+            <Setter Property="MinHeight" Value="86" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Visibility" Value="Collapsed" />
         </Style>
 
+        <Style x:Key="ScanEmptyStateTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyMutedTextStyle}">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
         <Style x:Key="ScanPathListScrollViewerStyle" TargetType="ScrollViewer" BasedOn="{StaticResource ScanPageScrollViewerStyle}">
-            <Setter Property="MaxHeight" Value="238" />
+            <Setter Property="MaxHeight" Value="176" />
+        </Style>
+
+        <Style x:Key="ScanAccountStatusBadgeStyle" TargetType="Border">
+            <Setter Property="Padding" Value="11,5" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource BrushWarningBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushWarningBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ConnectionConfigStatusKind}" Value="success">
+                    <Setter Property="Background" Value="{DynamicResource BrushSuccessBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushSuccessBorder}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ConnectionConfigStatusKind}" Value="failure">
+                    <Setter Property="Background" Value="{DynamicResource BrushErrorBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushErrorBorder}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="ScanPathRowStyle" TargetType="Border">
-            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Height" Value="38" />
             <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="Background" Value="{DynamicResource BrushSurfaceRaised}" />
@@ -148,27 +194,36 @@
         </Style>
 
         <Style x:Key="ScanMetricCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
-            <Setter Property="MinHeight" Value="70" />
-            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Width" Value="164" />
+            <Setter Property="MinHeight" Value="58" />
+            <Setter Property="Margin" Value="0" />
             <Setter Property="Padding" Value="10" />
         </Style>
 
         <Style x:Key="ScanMetricIconStyle" TargetType="TextBlock">
-            <Setter Property="Width" Value="26" />
-            <Setter Property="Height" Value="26" />
-            <Setter Property="Margin" Value="0,0,9,0" />
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Margin" Value="0,0,12,0" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="20" />
             <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+            <Setter Property="LineHeight" Value="34" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
             <Setter Property="TextAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="ScanMetricValueTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
+            <Setter Property="Margin" Value="0,2,0,0" />
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="LineHeight" Value="22" />
+        </Style>
+
         <Style x:Key="ScanIndeterminateProgressBarStyle" TargetType="ProgressBar">
-            <Setter Property="Height" Value="10" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurfaceRaised}" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushInfo}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
@@ -176,6 +231,7 @@
                               ClipToBounds="True"
                               Height="{TemplateBinding Height}">
                             <Border Background="{TemplateBinding Background}"
+                                    Opacity="0.28"
                                     CornerRadius="5" />
                             <Border x:Name="AnimatedIndicator"
                                     Width="210"
@@ -213,7 +269,9 @@
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer Style="{StaticResource ScanPageScrollViewerStyle}">
+    <ScrollViewer x:Name="RootScrollViewer"
+                  PreviewMouseWheel="RootScrollViewer_PreviewMouseWheel"
+                  Style="{StaticResource ScanPageScrollViewerStyle}">
         <Grid MinWidth="1080">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -223,12 +281,12 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel x:Name="LeftColumn">
-                    <Border MinHeight="392" Style="{StaticResource ScanOuterCardStyle}">
+                    <Border Style="{StaticResource ScanOuterCardStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="14" />
-                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock Text="WebDAV配置" Style="{StaticResource CardTitleTextStyle}" />
@@ -240,47 +298,44 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <Border Grid.Column="0" Style="{StaticResource ScanInnerCardStyle}">
+                                <Border Grid.Column="0"
+                                        VerticalAlignment="Top"
+                                        Style="{StaticResource ScanInnerCardStyle}">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="12" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="10" />
-                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
 
                                         <TextBlock Text="添加路径" Style="{StaticResource ScanSmallSectionTitleStyle}" />
 
-                                        <Border Grid.Row="2"
-                                                Padding="10"
-                                                Background="{DynamicResource BrushSurfaceRaised}"
-                                                BorderBrush="{DynamicResource BrushBorder}"
-                                                BorderThickness="1"
-                                                CornerRadius="10">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Margin="0,0,9,0"
-                                                           VerticalAlignment="Center"
-                                                           FontFamily="Segoe MDL2 Assets"
-                                                           FontSize="15"
-                                                           Foreground="{DynamicResource BrushAccent}"
-                                                           Text="&#xE8B7;" />
-                                                <TextBlock Grid.Column="1"
-                                                           VerticalAlignment="Center"
-                                                           Text="选择要添加的路径"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           Style="{StaticResource BodyMutedTextStyle}" />
-                                                <Button Grid.Column="2"
-                                                        Content="选择路径"
-                                                        Command="{Binding AddWebDavScanPathFromPickerCommand}"
-                                                        Style="{StaticResource SecondaryButtonStyle}" />
-                                            </Grid>
-                                        </Border>
+                                        <Grid Grid.Row="2" MinHeight="30">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Viewbox Width="18"
+                                                     Height="16"
+                                                     Margin="0,0,9,0"
+                                                     VerticalAlignment="Center">
+                                                <Path Data="M2,5 C2,3.895 2.895,3 4,3 H8 L10,5 H20 C21.105,5 22,5.895 22,7 V19 C22,20.105 21.105,21 20,21 H4 C2.895,21 2,20.105 2,19 Z M4,7 V19 H20 V7 Z"
+                                                      Fill="{DynamicResource BrushAccent}"
+                                                      Stretch="Uniform" />
+                                            </Viewbox>
+                                            <TextBlock Grid.Column="1"
+                                                       VerticalAlignment="Center"
+                                                       Text="选择要添加的路径"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                            <Button Grid.Column="2"
+                                                    Content="选择路径"
+                                                    Command="{Binding AddWebDavScanPathFromPickerCommand}"
+                                                    Style="{StaticResource ScanCompactSecondaryButtonStyle}" />
+                                        </Grid>
 
                                         <Grid Grid.Row="4">
                                             <Border>
@@ -294,10 +349,10 @@
                                                     </Style>
                                                 </Border.Style>
                                                 <TextBlock Text="还没有 WebDAV 扫描路径。"
-                                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                                           Style="{StaticResource ScanEmptyStateTextStyle}" />
                                             </Border>
 
-                                            <ScrollViewer>
+                                            <ScrollViewer PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                                                 <ScrollViewer.Style>
                                                     <Style TargetType="ScrollViewer" BasedOn="{StaticResource ScanPathListScrollViewerStyle}">
                                                         <Setter Property="Visibility" Value="Visible" />
@@ -338,52 +393,62 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Grid.Column="2" Style="{StaticResource ScanInnerCardStyle}">
+                                <Border Grid.Column="2"
+                                        VerticalAlignment="Top"
+                                        Style="{StaticResource ScanInnerCardStyle}">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="14" />
+                                            <RowDefinition Height="18" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="10" />
+                                            <RowDefinition Height="16" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="10" />
+                                            <RowDefinition Height="16" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="14" />
+                                            <RowDefinition Height="18" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
 
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="8" />
-                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="账号配置" Style="{StaticResource ScanSmallSectionTitleStyle}" />
-                                            <Ellipse Grid.Column="2"
-                                                     Width="10"
-                                                     Height="10"
-                                                     VerticalAlignment="Center"
-                                                     ToolTip="{Binding ConnectionStatusMessage}">
-                                                <Ellipse.Style>
-                                                    <Style TargetType="Ellipse">
-                                                        <Setter Property="Fill" Value="#15803D" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding HasSavedConnection}" Value="False">
-                                                                <Setter Property="Fill" Value="#B91C1C" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding IsConnectionEnabled}" Value="False">
+                                            <Border Grid.Column="1"
+                                                    Margin="12,0,0,0"
+                                                    ToolTip="{Binding ConnectionStatusMessage}"
+                                                    Style="{StaticResource ScanAccountStatusBadgeStyle}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Width="10"
+                                                             Height="10"
+                                                             Margin="0,0,8,0"
+                                                             VerticalAlignment="Center">
+                                                        <Ellipse.Style>
+                                                            <Style TargetType="Ellipse">
                                                                 <Setter Property="Fill" Value="#B7791F" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Ellipse.Style>
-                                                <Ellipse.Triggers>
-                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                                                        <BeginStoryboard Storyboard="{StaticResource ScanStatusLightStoryboard}" />
-                                                    </EventTrigger>
-                                                </Ellipse.Triggers>
-                                            </Ellipse>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding ConnectionConfigStatusKind}" Value="success">
+                                                                        <Setter Property="Fill" Value="#15803D" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding ConnectionConfigStatusKind}" Value="failure">
+                                                                        <Setter Property="Fill" Value="#B91C1C" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Ellipse.Style>
+                                                        <Ellipse.Triggers>
+                                                            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                                <BeginStoryboard Storyboard="{StaticResource ScanStatusLightStoryboard}" />
+                                                            </EventTrigger>
+                                                        </Ellipse.Triggers>
+                                                    </Ellipse>
+                                                    <TextBlock helpers:TrimmedTextToolTipBehavior.FullText="{Binding ConnectionConfigStatusText}"
+                                                               FontSize="13"
+                                                               Style="{StaticResource BadgeTextStyle}"
+                                                               Text="{Binding ConnectionConfigStatusText}" />
+                                                </StackPanel>
+                                            </Border>
                                         </Grid>
 
                                         <Grid Grid.Row="2">
@@ -421,17 +486,31 @@
                                                                             Text="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         </Grid>
 
-                                        <StackPanel Grid.Row="8"
-                                                    HorizontalAlignment="Right"
-                                                    Orientation="Horizontal">
-                                            <Button Content="保存配置"
-                                                    Command="{Binding SaveConnectionCommand}"
-                                                    Style="{StaticResource PrimaryButtonStyle}" />
-                                            <Button Margin="10,0,0,0"
-                                                    Content="测试连接"
-                                                    Command="{Binding TestConnectionCommand}"
-                                                    Style="{StaticResource SecondaryButtonStyle}" />
-                                        </StackPanel>
+                                        <Grid Grid.Row="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Margin="0,0,14,0"
+                                                       VerticalAlignment="Center"
+                                                       helpers:TrimmedTextToolTipBehavior.FullText="{Binding ConnectionStatusMessage}"
+                                                       Text="{Binding ConnectionStatusMessage}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Style="{StaticResource BodyMutedTextStyle}" />
+
+                                            <StackPanel Grid.Column="1"
+                                                        HorizontalAlignment="Right"
+                                                        Orientation="Horizontal">
+                                                <Button Content="保存配置"
+                                                        Command="{Binding SaveConnectionCommand}"
+                                                        Style="{StaticResource ScanCompactPrimaryButtonStyle}" />
+                                                <Button Margin="10,0,0,0"
+                                                        Content="测试连接"
+                                                        Command="{Binding TestConnectionCommand}"
+                                                        Style="{StaticResource ScanCompactSecondaryButtonStyle}" />
+                                            </StackPanel>
+                                        </Grid>
                                     </Grid>
                                 </Border>
                             </Grid>
@@ -457,55 +536,25 @@
                                 <Button Grid.Column="1"
                                         Content="选择路径"
                                         Command="{Binding AddLocalScanPathFromPickerCommand}"
-                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                        Style="{StaticResource ScanCompactSecondaryButtonStyle}" />
                             </Grid>
 
                             <Grid Grid.Row="2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="1" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <ScrollViewer Grid.Column="0"
-                                              Margin="0,0,14,0"
-                                              MaxHeight="186"
+                                <ScrollViewer MaxHeight="186"
+                                              PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel"
                                               Style="{StaticResource ScanPageScrollViewerStyle}">
-                                    <ItemsControl ItemsSource="{Binding PrimaryLocalScanPaths}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Style="{StaticResource ScanPathRowStyle}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="8" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock VerticalAlignment="Center"
-                                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding Path}"
-                                                                   Style="{StaticResource LongFieldTextBlockStyle}"
-                                                                   Text="{Binding Path}"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                        <Button Grid.Column="2"
-                                                                Content="&#xE711;"
-                                                                Command="{Binding DataContext.DeleteLocalScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
-                                                                CommandParameter="{Binding}"
-                                                                Style="{StaticResource ScanRemoveIconButtonStyle}" />
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-
-                                <Border Grid.Column="1"
-                                        Background="{DynamicResource BrushBorder}" />
-
-                                <ScrollViewer Grid.Column="2"
-                                              Margin="14,0,0,0"
-                                              MaxHeight="186"
-                                              Style="{StaticResource ScanPageScrollViewerStyle}">
-                                    <ItemsControl ItemsSource="{Binding SecondaryLocalScanPaths}">
+                                    <ItemsControl ItemsSource="{Binding LocalScanPaths}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="Width" Value="312" />
+                                                <Setter Property="Margin" Value="0,0,14,10" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Style="{StaticResource ScanPathRowStyle}">
@@ -543,7 +592,7 @@
                                         </Style>
                                     </Border.Style>
                                     <TextBlock Text="还没有本地目录配置。"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                               Style="{StaticResource ScanEmptyStateTextStyle}" />
                                 </Border>
                             </Grid>
                         </Grid>
@@ -553,37 +602,19 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="16" />
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="12" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="16" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <DockPanel LastChildFill="False">
-                                <TextBlock Text="扫描进度" Style="{StaticResource CardTitleTextStyle}" />
-                                <WrapPanel DockPanel.Dock="Right">
-                                    <Button Content="{Binding RunScanButtonText}"
-                                            Command="{Binding RunScanCommand}"
-                                            Style="{StaticResource PrimaryButtonStyle}" />
-                                    <Button Margin="10,0,0,0"
-                                            Content="{Binding LocalRunScanButtonText}"
-                                            Command="{Binding RunLocalScanCommand}"
-                                            Style="{StaticResource SecondaryButtonStyle}" />
-                                    <Button Margin="10,0,0,0"
-                                            Content="取消扫描"
-                                            Command="{Binding CancelScanCommand}"
-                                            Style="{StaticResource SecondaryButtonStyle}" />
-                                </WrapPanel>
-                            </DockPanel>
+                            <TextBlock Text="扫描进度" Style="{StaticResource CardTitleTextStyle}" />
 
-                            <ProgressBar Grid.Row="2"
-                                         IsIndeterminate="{Binding IsProgressIndeterminate}"
-                                         Style="{StaticResource ScanIndeterminateProgressBarStyle}" />
-
-                            <StackPanel Grid.Row="4">
-                                <TextBlock Text="{Binding CurrentStageText}"
+                            <StackPanel Grid.Row="2">
+                                <ProgressBar IsIndeterminate="{Binding IsProgressIndeterminate}"
+                                             Style="{StaticResource ScanIndeterminateProgressBarStyle}" />
+                                <TextBlock Margin="0,10,0,0"
+                                           Text="{Binding CurrentStageText}"
                                            TextWrapping="Wrap"
                                            Style="{StaticResource BodyTextStyle}" />
                                 <TextBlock Margin="0,5,0,0"
@@ -593,86 +624,142 @@
                                            Style="{StaticResource BodyMutedTextStyle}" />
                             </StackPanel>
 
-                            <UniformGrid Grid.Row="6" Columns="6">
-                                <Border Style="{StaticResource ScanMetricCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="&#xE8B7;" Style="{StaticResource ScanMetricIconStyle}" />
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="已扫描" Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Text="{Binding ScannedCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                                <Border Style="{StaticResource ScanMetricCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="&#xE710;" Style="{StaticResource ScanMetricIconStyle}" />
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="新增" Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Text="{Binding NewFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                                <Border Style="{StaticResource ScanMetricCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="&#xE895;" Style="{StaticResource ScanMetricIconStyle}" />
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="更新" Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Text="{Binding UpdatedFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                                <Border Style="{StaticResource ScanMetricCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="&#xE711;" Style="{StaticResource ScanMetricIconStyle}" />
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="忽略" Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Text="{Binding IgnoredFileCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                                <Border Style="{StaticResource ScanMetricCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="&#xEA39;" Style="{StaticResource ScanMetricIconStyle}" />
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="错误" Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Text="{Binding ErrorCount}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                                <Border Style="{StaticResource ScanMetricCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="&#xE916;" Style="{StaticResource ScanMetricIconStyle}" />
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="耗时" Style="{StaticResource BodyMutedTextStyle}" />
-                                            <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource SectionTitleTextStyle}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </UniformGrid>
+                            <Grid Grid.Row="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="22" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="12" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Row="0"
+                                            Grid.Column="0"
+                                            HorizontalAlignment="Left"
+                                            Style="{StaticResource ScanMetricCardStyle}">
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="&#xE8B2;" Style="{StaticResource ScanMetricIconStyle}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="已扫描" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Text="{Binding ScannedCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Row="0"
+                                            Grid.Column="2"
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource ScanMetricCardStyle}">
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="&#xE710;" Style="{StaticResource ScanMetricIconStyle}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="新增" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Text="{Binding NewFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Row="0"
+                                            Grid.Column="4"
+                                            HorizontalAlignment="Right"
+                                            Style="{StaticResource ScanMetricCardStyle}">
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="&#xE895;" Style="{StaticResource ScanMetricIconStyle}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="更新" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Text="{Binding UpdatedFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Row="2"
+                                            Grid.Column="0"
+                                            HorizontalAlignment="Left"
+                                            Style="{StaticResource ScanMetricCardStyle}">
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="&#xE711;" Style="{StaticResource ScanMetricIconStyle}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="忽略" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Text="{Binding IgnoredFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Row="2"
+                                            Grid.Column="2"
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource ScanMetricCardStyle}">
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="&#xEA39;" Style="{StaticResource ScanMetricIconStyle}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="错误" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Text="{Binding ErrorCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Row="2"
+                                            Grid.Column="4"
+                                            HorizontalAlignment="Right"
+                                            Style="{StaticResource ScanMetricCardStyle}">
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="&#xE916;" Style="{StaticResource ScanMetricIconStyle}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="耗时" Style="{StaticResource BodyMutedTextStyle}" />
+                                                <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource ScanMetricValueTextStyle}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+
+                                <StackPanel Grid.Column="2"
+                                            Width="112"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <Button Content="{Binding RunScanButtonText}"
+                                            Command="{Binding RunScanCommand}"
+                                            Style="{StaticResource ScanCompactPrimaryButtonStyle}" />
+                                    <Button Margin="0,10,0,0"
+                                            Content="{Binding LocalRunScanButtonText}"
+                                            Command="{Binding RunLocalScanCommand}"
+                                            Style="{StaticResource ScanCompactSecondaryButtonStyle}" />
+                                    <Button Margin="0,10,0,0"
+                                            Content="取消扫描"
+                                            Command="{Binding CancelScanCommand}"
+                                            Style="{StaticResource ScanCompactSecondaryButtonStyle}" />
+                                </StackPanel>
+                            </Grid>
                         </Grid>
                     </Border>
                 </StackPanel>
@@ -707,10 +794,10 @@
                                     </Style>
                                 </Border.Style>
                                 <TextBlock Text="还没有扫描记录。"
-                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                           Style="{StaticResource ScanEmptyStateTextStyle}" />
                             </Border>
 
-                            <ScrollViewer>
+                            <ScrollViewer PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                                 <ScrollViewer.Style>
                                     <Style TargetType="ScrollViewer" BasedOn="{StaticResource ScanPageScrollViewerStyle}">
                                         <Setter Property="Visibility" Value="Visible" />

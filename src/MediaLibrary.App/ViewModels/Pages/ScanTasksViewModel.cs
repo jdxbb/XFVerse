@@ -17,6 +17,10 @@ namespace MediaLibrary.App.ViewModels.Pages;
 
 public sealed class ScanTasksViewModel : PageViewModelBase
 {
+    private const string ConnectionConfigStatusUntested = "untested";
+    private const string ConnectionConfigStatusSuccess = "success";
+    private const string ConnectionConfigStatusFailure = "failure";
+
     private readonly IMediaScanService _mediaScanService;
     private readonly ILocalMediaScanService _localMediaScanService;
     private readonly ISettingsService _settingsService;
@@ -29,13 +33,20 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private int? _connectionId;
     private bool _hasConnection;
     private bool _isRunning;
+    private bool _isApplyingConnection;
     private bool _isConnectionEnabled = true;
+    private bool _savedIsConnectionEnabled = true;
     private int? _editingScanPathId;
     private int? _editingLocalScanPathId;
     private string _connectionName = "WebDAV";
+    private string _connectionConfigStatusKind = ConnectionConfigStatusFailure;
+    private string _savedConnectionName = "WebDAV";
     private string _baseUrl = string.Empty;
+    private string _savedBaseUrl = string.Empty;
     private string _username = string.Empty;
+    private string _savedUsername = string.Empty;
     private string _password = string.Empty;
+    private string _savedPassword = string.Empty;
     private string _lastScanAtText = "尚未扫描";
     private string _statusMessage = "点击“开始扫描网盘”后，系统会扫描当前已启用的 WebDAV 路径。";
     private string _connectionStatusMessage = "请先保存 WebDAV 连接配置。";
@@ -75,7 +86,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         _dataRefreshService = dataRefreshService;
 
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsRunning);
-        SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync, () => !IsRunning);
+        SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync, () => !IsRunning && HasConnectionConfigChanges);
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, () => !IsRunning);
         AddWebDavScanPathFromPickerCommand = new AsyncRelayCommand(AddWebDavScanPathFromPickerAsync, () => !IsRunning);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath, () => !IsRunning);
@@ -102,10 +113,6 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public ObservableCollection<ScanPathViewModel> ScanPaths { get; } = [];
 
     public ObservableCollection<ScanPathViewModel> LocalScanPaths { get; } = [];
-
-    public ObservableCollection<ScanPathViewModel> PrimaryLocalScanPaths { get; } = [];
-
-    public ObservableCollection<ScanPathViewModel> SecondaryLocalScanPaths { get; } = [];
 
     public ObservableCollection<ScanTaskLogViewModel> RecentLogs { get; } = [];
 
@@ -165,6 +172,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             if (SetProperty(ref _connectionId, value))
             {
                 OnPropertyChanged(nameof(HasSavedConnection));
+                OnPropertyChanged(nameof(ConnectionConfigStatusText));
+                OnPropertyChanged(nameof(ConnectionConfigStatusKind));
                 RaiseCommandStates();
             }
         }
@@ -183,6 +192,42 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     }
 
     public bool HasSavedConnection => ConnectionId.HasValue;
+
+    public string ConnectionConfigStatusText
+    {
+        get
+        {
+            if (!HasSavedConnection)
+            {
+                return "未配置";
+            }
+
+            if (!IsConnectionEnabled)
+            {
+                return "已停用";
+            }
+
+            return _connectionConfigStatusKind switch
+            {
+                ConnectionConfigStatusSuccess => "测试通过",
+                ConnectionConfigStatusFailure => "测试失败",
+                _ => "已保存未测试"
+            };
+        }
+    }
+
+    public string ConnectionConfigStatusKind => !HasSavedConnection
+        ? ConnectionConfigStatusFailure
+        : IsConnectionEnabled
+            ? _connectionConfigStatusKind
+            : ConnectionConfigStatusUntested;
+
+    public bool HasConnectionConfigChanges =>
+        !string.Equals(NormalizeConnectionInput(ConnectionName), _savedConnectionName, StringComparison.Ordinal)
+        || !string.Equals(NormalizeConnectionInput(BaseUrl), _savedBaseUrl, StringComparison.Ordinal)
+        || !string.Equals(NormalizeConnectionInput(Username), _savedUsername, StringComparison.Ordinal)
+        || !string.Equals(Password ?? string.Empty, _savedPassword, StringComparison.Ordinal)
+        || IsConnectionEnabled != _savedIsConnectionEnabled;
 
     public bool IsRunning
     {
@@ -205,25 +250,49 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public string ConnectionName
     {
         get => _connectionName;
-        set => SetProperty(ref _connectionName, value);
+        set
+        {
+            if (SetProperty(ref _connectionName, value))
+            {
+                OnConnectionConfigInputChanged();
+            }
+        }
     }
 
     public string BaseUrl
     {
         get => _baseUrl;
-        set => SetProperty(ref _baseUrl, value);
+        set
+        {
+            if (SetProperty(ref _baseUrl, value))
+            {
+                OnConnectionConfigInputChanged();
+            }
+        }
     }
 
     public string Username
     {
         get => _username;
-        set => SetProperty(ref _username, value);
+        set
+        {
+            if (SetProperty(ref _username, value))
+            {
+                OnConnectionConfigInputChanged();
+            }
+        }
     }
 
     public string Password
     {
         get => _password;
-        set => SetProperty(ref _password, value);
+        set
+        {
+            if (SetProperty(ref _password, value))
+            {
+                OnConnectionConfigInputChanged();
+            }
+        }
     }
 
     public bool IsConnectionEnabled
@@ -234,6 +303,9 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             if (SetProperty(ref _isConnectionEnabled, value))
             {
                 OnPropertyChanged(nameof(CanRunScan));
+                OnPropertyChanged(nameof(ConnectionConfigStatusText));
+                OnPropertyChanged(nameof(ConnectionConfigStatusKind));
+                OnConnectionConfigInputChanged();
                 RaiseCommandStates();
             }
         }
@@ -375,7 +447,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     public string RunScanButtonText => IsRunning ? "扫描中..." : "开始扫描网盘";
 
-    public string LocalRunScanButtonText => IsRunning ? "扫描中..." : "开始扫描本地文件";
+    public string LocalRunScanButtonText => IsRunning ? "扫描中..." : "开始扫描本地";
 
     public string CurrentFileText
     {
@@ -460,13 +532,26 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     private void ApplyConnection(WebDavConnectionModel connection)
     {
-        ConnectionId = connection.Id;
-        ConnectionName = string.IsNullOrWhiteSpace(connection.Name) ? "WebDAV" : connection.Name;
-        BaseUrl = connection.BaseUrl;
-        Username = connection.Username;
-        Password = connection.Password;
-        IsConnectionEnabled = connection.IsEnabled;
-        HasConnection = connection.Id.HasValue;
+        _isApplyingConnection = true;
+        try
+        {
+            ConnectionId = connection.Id;
+            ConnectionName = string.IsNullOrWhiteSpace(connection.Name) ? "WebDAV" : connection.Name;
+            BaseUrl = connection.BaseUrl;
+            Username = connection.Username;
+            Password = connection.Password;
+            IsConnectionEnabled = connection.IsEnabled;
+            HasConnection = connection.Id.HasValue;
+        }
+        finally
+        {
+            _isApplyingConnection = false;
+        }
+
+        SetConnectionConfigStatusKind(ConnectionId.HasValue
+            ? ConnectionConfigStatusUntested
+            : ConnectionConfigStatusFailure);
+        CaptureConnectionConfigBaseline();
         LastScanAtText = connection.LastScanAt.HasValue
             ? ToLocalDisplayTime(connection.LastScanAt.Value).ToString("yyyy-MM-dd HH:mm:ss")
             : "尚未扫描";
@@ -504,22 +589,13 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         var paths = await _settingsService.GetLocalScanPathsAsync(cancellationToken);
 
         LocalScanPaths.Clear();
-        PrimaryLocalScanPaths.Clear();
-        SecondaryLocalScanPaths.Clear();
-        for (var index = 0; index < paths.Count; index++)
+        foreach (var path in paths
+            .OrderByDescending(x => x.UpdatedAt)
+            .ThenByDescending(x => x.CreatedAt)
+            .ThenBy(x => x.DisplayName, StringComparer.CurrentCulture)
+            .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase))
         {
-            var path = paths[index];
-            var item = new ScanPathViewModel(path, null);
-            LocalScanPaths.Add(item);
-
-            if (index % 2 == 0)
-            {
-                PrimaryLocalScanPaths.Add(item);
-            }
-            else
-            {
-                SecondaryLocalScanPaths.Add(item);
-            }
+            LocalScanPaths.Add(new ScanPathViewModel(path, null));
         }
 
         LocalScanPathStatusMessage = LocalScanPaths.Count == 0
@@ -608,40 +684,51 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 });
 
             ApplyConnection(connection);
-            ConnectionStatusMessage = "WebDAV 连接配置已保存。";
+            ConnectionStatusMessage = "WebDAV 连接配置已保存，正在测试连接。";
+
+            await TestConnectionCoreAsync();
 
             if (ConnectionId.HasValue)
             {
-                await LoadScanPathsAsync(ConnectionId.Value, CancellationToken.None);
-                await LoadOverviewAsync(CancellationToken.None);
+                try
+                {
+                    await LoadScanPathsAsync(ConnectionId.Value, CancellationToken.None);
+                    await LoadOverviewAsync(CancellationToken.None);
+                }
+                catch
+                {
+                    ScanPathStatusMessage = "连接已保存并完成测试，但刷新扫描路径状态失败。";
+                }
             }
         }
         catch (Exception exception)
         {
+            SetConnectionConfigStatusKind(ConnectionConfigStatusFailure);
             ConnectionStatusMessage = exception.Message;
         }
     }
 
     private async Task TestConnectionAsync()
     {
+        await TestConnectionCoreAsync();
+    }
+
+    private async Task TestConnectionCoreAsync()
+    {
         try
         {
+            SetConnectionConfigStatusKind(ConnectionConfigStatusUntested);
             ConnectionStatusMessage = "正在测试 WebDAV 连接。";
-            var result = await _webDavService.TestConnectionAsync(
-                new WebDavConnectionModel
-                {
-                    Id = ConnectionId,
-                    Name = string.IsNullOrWhiteSpace(ConnectionName) ? "WebDAV" : ConnectionName,
-                    BaseUrl = BaseUrl,
-                    Username = Username,
-                    Password = Password,
-                    IsEnabled = IsConnectionEnabled
-                });
+            var result = await _webDavService.TestConnectionAsync(BuildCurrentWebDavConnectionModel());
 
+            SetConnectionConfigStatusKind(result.IsSuccess
+                ? ConnectionConfigStatusSuccess
+                : ConnectionConfigStatusFailure);
             ConnectionStatusMessage = result.Message;
         }
         catch (Exception exception)
         {
+            SetConnectionConfigStatusKind(ConnectionConfigStatusFailure);
             ConnectionStatusMessage = $"测试连接失败：{exception.Message}";
         }
     }
@@ -828,33 +915,46 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     private async Task AddLocalScanPathFromPickerAsync()
     {
-        var selectedPath = await _scanPathPickerService.PickLocalDirectoryAsync(string.Empty);
-        if (string.IsNullOrWhiteSpace(selectedPath))
+        var selectedPaths = await _scanPathPickerService.PickLocalDirectoriesAsync(string.Empty);
+        if (selectedPaths.Count == 0)
         {
             return;
         }
 
-        var pathExists = Directory.Exists(selectedPath.Trim().Trim('"'));
-        try
+        var added = new List<string>();
+        var skipped = new List<string>();
+        foreach (var selectedPath in selectedPaths)
         {
-            var saved = await _settingsService.SaveLocalScanPathAsync(
-                new ScanPath
-                {
-                    Path = selectedPath,
-                    DisplayName = BuildDisplayNameFromLocalPath(selectedPath),
-                    IsEnabled = true,
-                    IsRecursive = true
-                });
+            var normalizedPath = NormalizeLocalInputPath(selectedPath);
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                skipped.Add("空路径：未添加");
+                continue;
+            }
 
-            await LoadLocalOverviewAsync(CancellationToken.None);
-            LocalScanPathStatusMessage = pathExists
-                ? $"本地目录配置已添加：{saved.DisplayName}"
-                : $"本地目录配置已添加：{saved.DisplayName}（路径当前不可访问）";
+            var displayName = BuildDisplayNameFromLocalPath(normalizedPath);
+            var pathExists = Directory.Exists(normalizedPath);
+            try
+            {
+                var saved = await _settingsService.SaveLocalScanPathAsync(
+                    new ScanPath
+                    {
+                        Path = normalizedPath,
+                        DisplayName = displayName,
+                        IsEnabled = true,
+                        IsRecursive = true
+                    });
+
+                added.Add(pathExists ? saved.DisplayName : $"{saved.DisplayName}（路径当前不可访问）");
+            }
+            catch (Exception exception)
+            {
+                skipped.Add($"{displayName}：{FormatLocalPathSaveFailure(exception.Message)}");
+            }
         }
-        catch (Exception exception)
-        {
-            LocalScanPathStatusMessage = exception.Message;
-        }
+
+        await LoadLocalOverviewAsync(CancellationToken.None);
+        LocalScanPathStatusMessage = FormatLocalPathBatchAddStatus(added, skipped);
     }
 
     private async Task PickLocalScanPathAsync()
@@ -1163,6 +1263,58 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         CancelScanCommand.RaiseCanExecuteChanged();
     }
 
+    private void MarkConnectionConfigUntested()
+    {
+        if (_isApplyingConnection || !HasSavedConnection)
+        {
+            return;
+        }
+
+        SetConnectionConfigStatusKind(ConnectionConfigStatusUntested);
+    }
+
+    private void OnConnectionConfigInputChanged()
+    {
+        if (_isApplyingConnection)
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(HasConnectionConfigChanges));
+        SaveConnectionCommand.RaiseCanExecuteChanged();
+        MarkConnectionConfigUntested();
+    }
+
+    private void CaptureConnectionConfigBaseline()
+    {
+        _savedConnectionName = NormalizeConnectionInput(ConnectionName);
+        _savedBaseUrl = NormalizeConnectionInput(BaseUrl);
+        _savedUsername = NormalizeConnectionInput(Username);
+        _savedPassword = Password ?? string.Empty;
+        _savedIsConnectionEnabled = IsConnectionEnabled;
+        OnPropertyChanged(nameof(HasConnectionConfigChanges));
+        SaveConnectionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void SetConnectionConfigStatusKind(string statusKind)
+    {
+        var normalizedStatusKind = statusKind switch
+        {
+            ConnectionConfigStatusSuccess => ConnectionConfigStatusSuccess,
+            ConnectionConfigStatusFailure => ConnectionConfigStatusFailure,
+            _ => ConnectionConfigStatusUntested
+        };
+
+        if (_connectionConfigStatusKind == normalizedStatusKind)
+        {
+            return;
+        }
+
+        _connectionConfigStatusKind = normalizedStatusKind;
+        OnPropertyChanged(nameof(ConnectionConfigStatusText));
+        OnPropertyChanged(nameof(ConnectionConfigStatusKind));
+    }
+
     private static DateTime ToLocalDisplayTime(DateTime value)
     {
         var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
@@ -1182,6 +1334,11 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         };
     }
 
+    private static string NormalizeConnectionInput(string? value)
+    {
+        return (value ?? string.Empty).Trim();
+    }
+
     private static string BuildDisplayNameFromVirtualPath(string path)
     {
         var fileName = WebDavPathHelper.GetFileName(path);
@@ -1199,6 +1356,70 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         {
             return "本地目录";
         }
+    }
+
+    private static string NormalizeLocalInputPath(string path)
+    {
+        return (path ?? string.Empty).Trim().Trim('"');
+    }
+
+    private static string FormatLocalPathBatchAddStatus(IReadOnlyList<string> added, IReadOnlyList<string> skipped)
+    {
+        if (added.Count == 0 && skipped.Count == 0)
+        {
+            return "没有选择本地目录。";
+        }
+
+        var parts = new List<string>();
+        if (added.Count > 0)
+        {
+            parts.Add($"已添加 {added.Count} 个本地目录：{FormatNamePreview(added)}");
+        }
+
+        if (skipped.Count > 0)
+        {
+            parts.Add($"跳过 {skipped.Count} 个：{FormatNamePreview(skipped)}");
+        }
+
+        return string.Join("；", parts);
+    }
+
+    private static string FormatNamePreview(IReadOnlyList<string> values)
+    {
+        const int previewLimit = 3;
+        var preview = values
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Take(previewLimit)
+            .ToArray();
+        if (preview.Length == 0)
+        {
+            return "--";
+        }
+
+        var suffix = values.Count > previewLimit ? $" 等 {values.Count} 项" : string.Empty;
+        return $"{string.Join("、", preview)}{suffix}";
+    }
+
+    private static string FormatLocalPathSaveFailure(string message)
+    {
+        if (message.Contains("重复", StringComparison.OrdinalIgnoreCase))
+        {
+            return "已存在相同目录";
+        }
+
+        if (message.Contains("包含关系", StringComparison.OrdinalIgnoreCase))
+        {
+            return "与已有目录存在父子包含关系";
+        }
+
+        if (message.Contains("绝对路径", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("格式无效", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("不能为空", StringComparison.OrdinalIgnoreCase))
+        {
+            return "路径格式无效";
+        }
+
+        return string.IsNullOrWhiteSpace(message) ? "未添加" : message;
     }
 
     private static string FormatElapsed(TimeSpan elapsed)
@@ -1261,12 +1482,6 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         private static readonly Regex SensitivePairRegex =
             new(@"(?i)\b(password|passwd|token|api[-_ ]?key|access[-_ ]?token|authorization)\b\s*[:=]\s*[^\s;，。]+", RegexOptions.Compiled);
 
-        private static readonly Regex WindowsPathRegex =
-            new(@"[A-Za-z]:[\\/][^\s;，。]+", RegexOptions.Compiled);
-
-        private static readonly Regex UncPathRegex =
-            new(@"\\\\[^\\/\s]+[\\/][^\s;，。]+", RegexOptions.Compiled);
-
         public ScanTaskLogViewModel(
             ScanTaskLogItem item,
             string baseUrl,
@@ -1282,9 +1497,12 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 ? isLocal ? "本地目录" : "扫描路径"
                 : item.ScanPathDisplayName;
             ScanPath = item.ScanPath;
-            TargetText = isLocal ? $"本地目录：{ScanPathDisplayName}" : $"WebDAV 路径：{ScanPathDisplayName}";
-            UsernameText = isLocal ? "Local" : "已隐藏";
+            TitleText = FormatTitlePath(ScanPath, ScanPathDisplayName, isLocal);
+            BaseUrlText = isLocal ? "本地文件系统" : FormatBaseUrl(baseUrl);
+            TargetText = isLocal ? $"本地目录：{TitleText}" : $"WebDAV 路径：{TitleText}";
+            UsernameText = isLocal ? "--" : FormatUsername(username);
             StatusText = FormatStatus(item.Status);
+            StatusKind = FormatStatusKind(item.Status);
             StartedAt = item.StartedAt;
             EndedAt = item.EndedAt;
             StartedAtText = item.StartedAt.ToString("yyyy-MM-dd HH:mm");
@@ -1296,8 +1514,9 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             IgnoredFileCount = item.IgnoredFileCount;
             ErrorCount = item.ErrorCount;
             ErrorMessage = SanitizeLogText(item.ErrorMessage);
-            ReasonSummaryText = item.ReasonSummaryText;
-            TopReasonSummaryText = item.TopReasonSummaryText;
+            ReasonSummaryText = FormatReasonSummary(item);
+            TopReasonSummaryText = FormatTopReasonSummary(item);
+            ScanResultText = BuildScanResultText(ReasonSummaryText, TopReasonSummaryText, ErrorMessage);
         }
 
         public int Id { get; }
@@ -1312,11 +1531,17 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
         public string ScanPath { get; }
 
+        public string TitleText { get; }
+
+        public string BaseUrlText { get; }
+
         public string TargetText { get; }
 
         public string UsernameText { get; }
 
         public string StatusText { get; }
+
+        public string StatusKind { get; }
 
         public DateTime StartedAt { get; }
 
@@ -1349,6 +1574,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         public bool HasReasonSummary => !string.IsNullOrWhiteSpace(ReasonSummaryText)
                                         || !string.IsNullOrWhiteSpace(TopReasonSummaryText);
 
+        public string ScanResultText { get; }
+
+        public bool HasScanResultText => !string.IsNullOrWhiteSpace(ScanResultText);
+
         private static string FormatStatus(ScanTaskStatus status)
         {
             return status switch
@@ -1363,6 +1592,138 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             };
         }
 
+        private static string FormatStatusKind(ScanTaskStatus status)
+        {
+            return status switch
+            {
+                ScanTaskStatus.Success => "success",
+                ScanTaskStatus.Failed => "failure",
+                ScanTaskStatus.PartialSuccess or ScanTaskStatus.Cancelled => "warning",
+                ScanTaskStatus.Running => "running",
+                _ => "untested"
+            };
+        }
+
+        private static string FormatTitlePath(string path, string displayName, bool isLocal)
+        {
+            var title = string.IsNullOrWhiteSpace(path) ? displayName : path;
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                title = isLocal ? "本地目录" : "WebDAV 路径";
+            }
+
+            return HideUrls(title);
+        }
+
+        private static string FormatBaseUrl(string baseUrl)
+        {
+            return string.IsNullOrWhiteSpace(baseUrl) ? "未配置" : baseUrl.Trim();
+        }
+
+        private static string FormatUsername(string username)
+        {
+            return string.IsNullOrWhiteSpace(username) ? "未填写" : username.Trim();
+        }
+
+        private static string FormatReasonSummary(ScanTaskLogItem item)
+        {
+            var summary = ScanReasonSummaryFormatter.Parse(item.ReasonSummaryJson);
+            if (summary is null || summary.Entries.Count == 0)
+            {
+                return string.IsNullOrWhiteSpace(item.ReasonSummaryText)
+                    ? string.Empty
+                    : TrimReasonLabel(item.ReasonSummaryText);
+            }
+
+            var parts = new List<string>();
+            AddReasonCategoryTotal(parts, summary, "success", "成功处理");
+            AddReasonCategoryTotal(parts, summary, "skipped", "跳过");
+            AddReasonCategoryTotal(parts, summary, "cancelled", "已取消");
+            AddReasonCategoryTotal(parts, summary, "warning", "需要注意");
+            AddReasonCategoryTotal(parts, summary, "error", "失败");
+            return parts.Count == 0 ? string.Empty : string.Join("，", parts);
+        }
+
+        private static string FormatTopReasonSummary(ScanTaskLogItem item)
+        {
+            var summary = ScanReasonSummaryFormatter.Parse(item.ReasonSummaryJson);
+            if (summary is null || summary.Entries.Count == 0)
+            {
+                return string.IsNullOrWhiteSpace(item.TopReasonSummaryText)
+                    ? string.Empty
+                    : TrimReasonLabel(item.TopReasonSummaryText);
+            }
+
+            var reasons = summary.Entries
+                .Where(x => x.Count > 0 && !string.Equals(x.Category, "success", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Label, StringComparer.CurrentCulture)
+                .Take(3)
+                .Select(x => $"{x.Label} {x.Count} 项")
+                .ToArray();
+            return reasons.Length == 0 ? string.Empty : string.Join("，", reasons);
+        }
+
+        private static void AddReasonCategoryTotal(
+            ICollection<string> parts,
+            ScanReasonSummary summary,
+            string category,
+            string label)
+        {
+            var count = summary.Entries
+                .Where(x => string.Equals(x.Category, category, StringComparison.OrdinalIgnoreCase))
+                .Sum(x => x.Count);
+            if (count > 0)
+            {
+                parts.Add($"{label} {count} 项");
+            }
+        }
+
+        private static string BuildScanResultText(string reasonSummary, string topReasonSummary, string errorMessage)
+        {
+            var parts = new[]
+                {
+                    TrimReasonLabel(reasonSummary),
+                    TrimReasonLabel(topReasonSummary)
+                }
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToArray();
+            if (parts.Length > 0)
+            {
+                return $"扫描结果：{string.Join(Environment.NewLine, parts)}";
+            }
+
+            return string.IsNullOrWhiteSpace(errorMessage)
+                ? "扫描结果：未记录额外原因。"
+                : $"扫描结果：{errorMessage}";
+        }
+
+        private static string TrimReasonLabel(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var text = value.Trim();
+            var prefixes = new[]
+            {
+                "原因摘要：",
+                "原因摘要:",
+                "主要原因：",
+                "主要原因:"
+            };
+            foreach (var prefix in prefixes)
+            {
+                if (text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return text[prefix.Length..].Trim();
+                }
+            }
+
+            return text;
+        }
+
         private static string SanitizeLogText(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -1370,17 +1731,22 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 return string.Empty;
             }
 
-            var sanitized = UrlRegex.Replace(value.Trim(), "[WebDAV 地址已隐藏]");
+            var sanitized = HideUrls(value.Trim());
             sanitized = SensitivePairRegex.Replace(
                 sanitized,
                 match => $"{match.Groups[1].Value}=[已隐藏]");
-            sanitized = WindowsPathRegex.Replace(sanitized, "[本地路径已隐藏]");
-            sanitized = UncPathRegex.Replace(sanitized, "[本地路径已隐藏]");
 
             const int maxLength = 300;
             return sanitized.Length <= maxLength
                 ? sanitized
                 : sanitized[..maxLength] + "...";
+        }
+
+        private static string HideUrls(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? string.Empty
+                : UrlRegex.Replace(value.Trim(), "[WebDAV URL 已隐藏]");
         }
     }
 }

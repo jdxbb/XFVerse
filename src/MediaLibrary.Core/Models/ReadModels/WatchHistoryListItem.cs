@@ -26,7 +26,17 @@ public sealed class WatchHistoryListItem
 
     public int? ReleaseYear { get; set; }
 
+    public DateTime? ReleaseDate { get; set; }
+
     public string PosterRemoteUrl { get; set; } = string.Empty;
+
+    public string GenresText { get; set; } = string.Empty;
+
+    public string AiTagsText { get; set; } = string.Empty;
+
+    public string EmotionTagsText { get; set; } = string.Empty;
+
+    public string SceneTagsText { get; set; } = string.Empty;
 
     public string MediaFileName { get; set; } = string.Empty;
 
@@ -44,9 +54,41 @@ public sealed class WatchHistoryListItem
 
     public bool IsMediaFileDeleted { get; set; }
 
+    public int SourceCount { get; set; }
+
+    public bool HasLocalSource { get; set; }
+
+    public bool HasWebDavSource { get; set; }
+
     public IdentificationStatus IdentificationStatus { get; set; }
 
     public double? ProgressPercent { get; set; }
 
     public bool IsEpisode => EpisodeId.HasValue;
+
+    public bool HasActiveSource => SourceCount > 0;
+
+    public string SourceSummary
+    {
+        get
+        {
+            if (IsMediaFileDeleted)
+            {
+                return "源不可用";
+            }
+
+            if (!HasActiveSource)
+            {
+                return "无播放源";
+            }
+
+            return (HasLocalSource, HasWebDavSource) switch
+            {
+                (true, true) => "本地 + 网盘",
+                (true, false) => "本地",
+                (false, true) => "网盘",
+                _ => "无播放源"
+            };
+        }
+    }
 }

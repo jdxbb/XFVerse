@@ -13,11 +13,14 @@ namespace MediaLibrary.App.ViewModels.Pages;
 public sealed class WatchHistoryViewModel : PageViewModelBase
 {
     private const int HistoryTake = 100;
+    private const int PosterMovieTagDisplayLength = 18;
+    private const string TagOverflowMarker = "..";
     private const string FilterAll = "全部";
     private const string FilterToday = "今天";
     private const string FilterThisWeek = "本周";
     private const string FilterThisMonth = "本月";
     private const string FilterSpecificDate = "指定日期";
+    private static double s_persistedScrollOffset;
     private readonly IWatchHistoryService _watchHistoryService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
@@ -31,21 +34,24 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
     private DateTime? _selectedCustomDate;
     private DateTime? _targetDateForHighlight;
     private DateTime? _activeTargetDate;
+    private double _scrollOffset;
     private string _statusMessage = "正在加载观影历史。";
 
     public WatchHistoryViewModel(
         IWatchHistoryService watchHistoryService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService)
-        : base("观影历史", "按日期回看你的观看记录。")
+        : base("观影历史", "记录你的惬意时刻")
     {
         _watchHistoryService = watchHistoryService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _dataRefreshService.DataChanged += OnDataChanged;
+        _scrollOffset = s_persistedScrollOffset;
 
         DateFilterOptions = [FilterAll, FilterToday, FilterThisWeek, FilterThisMonth, FilterSpecificDate];
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsLoading);
+        SelectDateFilterCommand = new RelayCommand(SelectDateFilter);
         OpenMovieCommand = new RelayCommand(OpenMovie);
     }
 
@@ -56,6 +62,8 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
     public IReadOnlyList<string> DateFilterOptions { get; }
 
     public AsyncRelayCommand RefreshCommand { get; }
+
+    public RelayCommand SelectDateFilterCommand { get; }
 
     public RelayCommand OpenMovieCommand { get; }
 
@@ -92,6 +100,11 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
                 }
 
                 OnPropertyChanged(nameof(IsCustomDateFilter));
+                OnPropertyChanged(nameof(IsAllDateFilterSelected));
+                OnPropertyChanged(nameof(IsTodayDateFilterSelected));
+                OnPropertyChanged(nameof(IsThisWeekDateFilterSelected));
+                OnPropertyChanged(nameof(IsThisMonthDateFilterSelected));
+                OnPropertyChanged(nameof(IsSpecificDateFilterSelected));
                 QueueLoadForFilterChange();
             }
         }
@@ -119,10 +132,33 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
 
     public bool IsCustomDateFilter => SelectedDateFilter == FilterSpecificDate;
 
+    public bool IsAllDateFilterSelected => SelectedDateFilter == FilterAll;
+
+    public bool IsTodayDateFilterSelected => SelectedDateFilter == FilterToday;
+
+    public bool IsThisWeekDateFilterSelected => SelectedDateFilter == FilterThisWeek;
+
+    public bool IsThisMonthDateFilterSelected => SelectedDateFilter == FilterThisMonth;
+
+    public bool IsSpecificDateFilterSelected => SelectedDateFilter == FilterSpecificDate;
+
     public string StatusMessage
     {
         get => _statusMessage;
         private set => SetProperty(ref _statusMessage, value);
+    }
+
+    public double ScrollOffset
+    {
+        get => _scrollOffset;
+        set
+        {
+            var normalized = Math.Max(0d, value);
+            if (SetProperty(ref _scrollOffset, normalized))
+            {
+                s_persistedScrollOffset = normalized;
+            }
+        }
     }
 
     public bool HasDayGroups => DayGroups.Count > 0;
@@ -192,6 +228,14 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         _ = LoadAsync();
     }
 
+    private void SelectDateFilter(object? parameter)
+    {
+        if (parameter is string filter && DateFilterOptions.Contains(filter))
+        {
+            SelectedDateFilter = filter;
+        }
+    }
+
     private async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         if (IsLoading)
@@ -250,11 +294,9 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
 
         ClearTargetHighlight(clearPendingDate: false);
         _activeTargetDate = targetDate;
-        targetGroup.IsTargetHighlightActive = true;
         var version = ++_targetHighlightVersion;
         TargetDateLocated?.Invoke(this, new WatchHistoryTargetDateLocatedEventArgs(targetDate));
         Log($"watch-history-target-date-applied targetDate={targetDate:yyyy-MM-dd} itemCount={itemCount}");
-        Log($"watch-history-target-highlighted targetDate={targetDate:yyyy-MM-dd}");
         _ = ClearTargetHighlightAfterDelayAsync(targetDate, version);
         return $"已定位到 {targetDate:yyyy年M月d日} · {itemCount} 条观看记录。";
     }
@@ -484,6 +526,7 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             EpisodeId = item.EpisodeId;
             TvSeasonId = item.TvSeasonId;
             Title = string.IsNullOrWhiteSpace(item.Title) ? "未知影片" : item.Title;
+            IsEpisode = item.IsEpisode;
             ReleaseYearText = item.ReleaseYear.HasValue ? item.ReleaseYear.Value.ToString() : "年份未知";
             PosterRemoteUrl = item.PosterRemoteUrl;
             WatchTimeText = item.StartedAtLocal.ToString("HH:mm");
@@ -497,6 +540,52 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             IsMediaFileDeleted = item.IsMediaFileDeleted;
             SourceStatusText = item.IsMediaFileDeleted ? "播放源不可用" : string.Empty;
             CanOpenDetail = item.MovieId > 0 || (item.EpisodeId.HasValue && item.TvSeasonId.HasValue);
+            MediaKindText = item.IsEpisode ? "电视剧" : "电影";
+            CategoryTagText = MediaKindText;
+            SourceBadgeText = item.SourceSummary;
+            ReleaseDateText = BuildReleaseDateText(item);
+            ProgressLabel = item.ProgressPercent.HasValue ? $"{item.ProgressPercent.Value:0}%" : "--";
+
+            if (item.IsEpisode)
+            {
+                PosterTagGroupOneText = FormatSingleTagLine(item.GenresText, "无电视剧标签");
+                PosterTagGroupTwoText = string.Empty;
+                PosterTagGroupThreeText = string.Empty;
+                PosterTagLine = PosterTagGroupOneText;
+                PosterTagToolTipText = PosterTagGroupOneText;
+            }
+            else
+            {
+                var typeTagSourceText = string.IsNullOrWhiteSpace(item.AiTagsText)
+                    ? item.GenresText
+                    : item.AiTagsText;
+                var posterTagGroups = BuildMovieTagGroups(
+                    typeTagSourceText,
+                    item.EmotionTagsText,
+                    item.SceneTagsText,
+                    "无影片标签",
+                    PosterMovieTagDisplayLength);
+                var fullTagGroups = BuildMovieTagGroups(
+                    typeTagSourceText,
+                    item.EmotionTagsText,
+                    item.SceneTagsText,
+                    "无影片标签",
+                    null);
+
+                PosterTagGroupOneText = posterTagGroups[0];
+                PosterTagGroupTwoText = posterTagGroups[1];
+                PosterTagGroupThreeText = posterTagGroups[2];
+                PosterTagLine = JoinVisibleGroups(PosterTagGroupOneText, PosterTagGroupTwoText, PosterTagGroupThreeText);
+                PosterTagToolTipText = JoinVisibleGroups(fullTagGroups);
+            }
+
+            PosterTagSeparatorAfterOneText = BuildSeparator(
+                PosterTagGroupOneText,
+                PosterTagGroupTwoText,
+                PosterTagGroupThreeText);
+            PosterTagSeparatorAfterTwoText = BuildSeparator(
+                PosterTagGroupTwoText,
+                PosterTagGroupThreeText);
         }
 
         public int HistoryId { get; }
@@ -509,11 +598,17 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
 
         public int MediaFileId { get; }
 
+        public bool IsEpisode { get; }
+
         public string Title { get; }
 
         public string ReleaseYearText { get; }
 
+        public string ReleaseDateText { get; }
+
         public string PosterRemoteUrl { get; }
+
+        public bool HasPoster => !string.IsNullOrWhiteSpace(PosterRemoteUrl);
 
         public string WatchTimeText { get; }
 
@@ -527,15 +622,277 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
 
         public bool HasProgressPercent { get; }
 
+        public string ProgressLabel { get; }
+
         public string MediaFileName { get; }
 
         public string SourceStatusText { get; }
+
+        public string SourceSummaryText => SourceBadgeText;
+
+        public string CategoryTagText { get; }
+
+        public string SourceBadgeText { get; }
+
+        public bool HasBatchModeHint => false;
+
+        public string BatchModeHintText => string.Empty;
+
+        public string MediaKindText { get; }
+
+        public string PosterTagGroupOneText { get; }
+
+        public string PosterTagSeparatorAfterOneText { get; }
+
+        public string PosterTagGroupTwoText { get; }
+
+        public string PosterTagSeparatorAfterTwoText { get; }
+
+        public string PosterTagGroupThreeText { get; }
+
+        public string PosterTagLine { get; }
+
+        public string PosterTagToolTipText { get; }
 
         public bool CanOpenDetail { get; }
 
         public bool IsMediaFileDeleted { get; }
 
         public bool HasSourceStatus => !string.IsNullOrWhiteSpace(SourceStatusText);
+
+        private static string BuildReleaseDateText(WatchHistoryListItem item)
+        {
+            return item.ReleaseDate.HasValue
+                ? item.ReleaseDate.Value.ToString("yyyy-MM-dd")
+                : item.ReleaseYear.HasValue
+                    ? item.ReleaseYear.Value.ToString()
+                    : "日期未知";
+        }
+
+        private static string[] BuildMovieTagGroups(
+            string typeTags,
+            string emotionTags,
+            string sceneTags,
+            string fallback,
+            int? maxDisplayLength)
+        {
+            var groups = new[]
+            {
+                ParseTags(typeTags),
+                ParseTags(emotionTags),
+                ParseTags(sceneTags)
+            };
+
+            if (groups.All(group => group.Count == 0))
+            {
+                return [fallback, string.Empty, string.Empty];
+            }
+
+            var fullGroups = groups.Select(FormatTags).ToArray();
+            if (!maxDisplayLength.HasValue || FitsDisplayLength(JoinVisibleGroups(fullGroups), maxDisplayLength.Value))
+            {
+                return fullGroups;
+            }
+
+            var selected = new[]
+            {
+                new List<string>(),
+                new List<string>(),
+                new List<string>()
+            };
+            var displayOrder = new List<int>();
+            var maxCount = groups.Max(group => group.Count);
+            for (var index = 0; index < maxCount; index++)
+            {
+                for (var groupIndex = 0; groupIndex < groups.Length; groupIndex++)
+                {
+                    if (index >= groups[groupIndex].Count)
+                    {
+                        continue;
+                    }
+
+                    var candidate = CloneSelectedGroups(selected);
+                    candidate[groupIndex].Add(groups[groupIndex][index]);
+                    var candidateOrder = displayOrder.Concat([groupIndex]).ToList();
+                    if (FitsDisplayLength(JoinVisibleGroups(candidate.Select(FormatTags).ToArray()), maxDisplayLength.Value))
+                    {
+                        selected[groupIndex].Add(groups[groupIndex][index]);
+                        displayOrder.Add(groupIndex);
+                        continue;
+                    }
+
+                    return FormatOverflowMovieTagGroups(candidate, groups, candidateOrder, maxDisplayLength.Value);
+                }
+            }
+
+            return selected.Select(FormatTags).ToArray();
+        }
+
+        private static List<string>[] CloneSelectedGroups(IEnumerable<List<string>> groups)
+        {
+            return groups.Select(group => group.ToList()).ToArray();
+        }
+
+        private static string[] FormatOverflowMovieTagGroups(
+            List<string>[] selected,
+            IReadOnlyList<string>[] originalGroups,
+            List<int> displayOrder,
+            int maxDisplayLength)
+        {
+            EnsureAtLeastOneSelectedTag(selected, originalGroups, displayOrder);
+            while (!FitsDisplayLength(JoinVisibleGroups(FormatGroupsWithOverflow(selected, originalGroups)), maxDisplayLength)
+                   && displayOrder.Count > 1)
+            {
+                var groupIndex = displayOrder[^1];
+                displayOrder.RemoveAt(displayOrder.Count - 1);
+                if (selected[groupIndex].Count == 0)
+                {
+                    continue;
+                }
+
+                selected[groupIndex].RemoveAt(selected[groupIndex].Count - 1);
+            }
+
+            var formatted = FormatGroupsWithOverflow(selected, originalGroups);
+            if (FitsDisplayLength(JoinVisibleGroups(formatted), maxDisplayLength))
+            {
+                return formatted;
+            }
+
+            return TruncateVisibleGroupsForDisplay(formatted, maxDisplayLength);
+        }
+
+        private static void EnsureAtLeastOneSelectedTag(
+            IList<string>[] selected,
+            IReadOnlyList<string>[] originalGroups,
+            ICollection<int> displayOrder)
+        {
+            if (selected.Any(group => group.Count > 0))
+            {
+                return;
+            }
+
+            for (var index = 0; index < originalGroups.Length; index++)
+            {
+                if (originalGroups[index].Count == 0)
+                {
+                    continue;
+                }
+
+                selected[index].Add(originalGroups[index][0]);
+                displayOrder.Add(index);
+                return;
+            }
+        }
+
+        private static string[] FormatGroupsWithOverflow(
+            IReadOnlyList<string>[] selected,
+            IReadOnlyList<string>[] originalGroups)
+        {
+            var formatted = new string[selected.Length];
+            for (var index = 0; index < selected.Length; index++)
+            {
+                if (selected[index].Count == 0)
+                {
+                    formatted[index] = string.Empty;
+                    continue;
+                }
+
+                var groupText = FormatTags(selected[index]);
+                formatted[index] = originalGroups[index].Count > selected[index].Count
+                    ? $"{groupText}{TagOverflowMarker}"
+                    : groupText;
+            }
+
+            return formatted;
+        }
+
+        private static string[] TruncateVisibleGroupsForDisplay(string[] groups, int maxDisplayLength)
+        {
+            var result = groups.ToArray();
+            while (!FitsDisplayLength(JoinVisibleGroups(result), maxDisplayLength))
+            {
+                var groupIndex = Enumerable.Range(0, result.Length)
+                    .Where(index => !string.IsNullOrWhiteSpace(result[index]))
+                    .LastOrDefault(-1);
+                if (groupIndex < 0)
+                {
+                    break;
+                }
+
+                var current = result[groupIndex];
+                if (CalculateDisplayLength(current) <= TagOverflowMarker.Length + 1)
+                {
+                    result[groupIndex] = string.Empty;
+                    continue;
+                }
+
+                result[groupIndex] = TruncateForDisplay(current, CalculateDisplayLength(current) - 1);
+            }
+
+            return result;
+        }
+
+        private static string FormatSingleTagLine(string? value, string fallback)
+        {
+            var tags = ParseTags(value);
+            return tags.Count == 0 ? fallback : FormatTags(tags);
+        }
+
+        private static IReadOnlyList<string> ParseTags(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return Array.Empty<string>();
+            }
+
+            return value
+                .Split(new[] { '/', '、', ',', '，', '|', ';', '；' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string FormatTags(IEnumerable<string> tags)
+        {
+            return string.Join(" / ", tags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
+        }
+
+        private static string JoinVisibleGroups(params string[] groups)
+        {
+            return string.Join(" | ", groups.Where(group => !string.IsNullOrWhiteSpace(group)));
+        }
+
+        private static string BuildSeparator(string currentGroup, params string[] followingGroups)
+        {
+            return !string.IsNullOrWhiteSpace(currentGroup) && followingGroups.Any(group => !string.IsNullOrWhiteSpace(group))
+                ? " | "
+                : string.Empty;
+        }
+
+        private static bool FitsDisplayLength(string value, int maxDisplayLength)
+        {
+            return CalculateDisplayLength(value) <= maxDisplayLength;
+        }
+
+        private static int CalculateDisplayLength(string value)
+        {
+            return value.Count(character => !char.IsWhiteSpace(character));
+        }
+
+        private static string TruncateForDisplay(string value, int maxDisplayLength)
+        {
+            if (FitsDisplayLength(value, maxDisplayLength))
+            {
+                return value;
+            }
+
+            var remaining = Math.Max(1, maxDisplayLength - TagOverflowMarker.Length);
+            var chars = value
+                .Where(character => !char.IsWhiteSpace(character))
+                .Take(remaining);
+            return $"{new string(chars.ToArray())}{TagOverflowMarker}";
+        }
     }
 
     private static string BuildProgressText(WatchHistoryListItem item)

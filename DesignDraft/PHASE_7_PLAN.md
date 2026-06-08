@@ -226,8 +226,8 @@ Scope:
 
 Substages:
 - 7.7a audit and shared UI baseline completed: added `PageTabs.xaml` shared top-tab style baseline and kept accepted Discovery / Settings local templates untouched;
-- 7.7b watch history visual alignment and date targeting;
-- 7.7c favorites visual alignment, Movie / Season cards and remove-state handling;
+- 7.7b watch history visual alignment and date targeting completed: rebuilt WatchHistoryPage as fixed date filters plus scrollable date-group poster grid, and copied Media Library poster card visuals for history items;
+- 7.7c favorites visual alignment completed: rebuilt Favorites as Movie Discovery-style top tabs plus scrollable Movie / Season poster-card grid, with item-level remove loading / failure / disabled state;
 - 7.7d watch-insights shell, Discovery-style tabs and state baseline;
 - 7.7e profile-analysis tab visual closeout;
 - 7.7f statistics upper area: range, overview and calendar;

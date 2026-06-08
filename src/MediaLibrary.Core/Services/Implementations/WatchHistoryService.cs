@@ -237,7 +237,12 @@ public sealed class WatchHistoryService : IWatchHistoryService
                     TmdbId = x.Movie!.TmdbId,
                     Title = x.Movie.Title,
                     ReleaseYear = x.Movie.ReleaseYear,
+                    ReleaseDate = x.Movie.ReleaseDate,
                     PosterRemoteUrl = x.Movie.PosterRemoteUrl ?? x.Movie.PosterLocalPath ?? string.Empty,
+                    GenresText = x.Movie.GenresText ?? string.Empty,
+                    AiTagsText = x.Movie.AiTagsText ?? string.Empty,
+                    EmotionTagsText = x.Movie.EmotionTagsText ?? string.Empty,
+                    SceneTagsText = x.Movie.SceneTagsText ?? string.Empty,
                     MediaFileName = x.MediaFile == null ? string.Empty : x.MediaFile.FileName,
                     StartedAt = x.StartedAt,
                     EndedAt = x.EndedAt,
@@ -247,6 +252,18 @@ public sealed class WatchHistoryService : IWatchHistoryService
                     RuntimeMinutes = x.Movie.RuntimeMinutes,
                     IsCompleted = x.IsCompleted,
                     IsMediaFileDeleted = x.MediaFile != null && x.MediaFile.IsDeleted,
+                    SourceCount = x.Movie.MediaFiles.Count(
+                        mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video),
+                    HasLocalSource = x.Movie.MediaFiles.Any(
+                        mediaFile => !mediaFile.IsDeleted
+                                     && mediaFile.MediaType == MediaType.Video
+                                     && mediaFile.SourceConnection != null
+                                     && mediaFile.SourceConnection.ProtocolType == ProtocolType.Local),
+                    HasWebDavSource = x.Movie.MediaFiles.Any(
+                        mediaFile => !mediaFile.IsDeleted
+                                     && mediaFile.MediaType == MediaType.Video
+                                     && mediaFile.SourceConnection != null
+                                     && mediaFile.SourceConnection.ProtocolType == ProtocolType.WebDav),
                     IdentificationStatus = x.Movie.IdentificationStatus
                 })
             .ToListAsync(cancellationToken);
@@ -288,7 +305,9 @@ public sealed class WatchHistoryService : IWatchHistoryService
                         : x.Episode.Season.AirDate.HasValue
                             ? x.Episode.Season.AirDate.Value.Year
                             : x.Episode.Season.Series.FirstAirYear,
+                    ReleaseDate = x.Episode.AirDate ?? x.Episode.Season.AirDate ?? x.Episode.Season.Series.FirstAirDate,
                     PosterRemoteUrl = x.Episode.Season.PosterRemoteUrl ?? x.Episode.Season.Series.PosterRemoteUrl ?? string.Empty,
+                    GenresText = x.Episode.Season.Series.GenresText ?? string.Empty,
                     MediaFileName = x.MediaFile == null ? string.Empty : x.MediaFile.FileName,
                     StartedAt = x.StartedAt,
                     EndedAt = x.EndedAt,
@@ -298,6 +317,18 @@ public sealed class WatchHistoryService : IWatchHistoryService
                     RuntimeMinutes = x.Episode.RuntimeMinutes,
                     IsCompleted = x.IsCompleted,
                     IsMediaFileDeleted = x.MediaFile != null && x.MediaFile.IsDeleted,
+                    SourceCount = x.Episode.MediaFiles.Count(
+                        mediaFile => !mediaFile.IsDeleted && mediaFile.MediaType == MediaType.Video),
+                    HasLocalSource = x.Episode.MediaFiles.Any(
+                        mediaFile => !mediaFile.IsDeleted
+                                     && mediaFile.MediaType == MediaType.Video
+                                     && mediaFile.SourceConnection != null
+                                     && mediaFile.SourceConnection.ProtocolType == ProtocolType.Local),
+                    HasWebDavSource = x.Episode.MediaFiles.Any(
+                        mediaFile => !mediaFile.IsDeleted
+                                     && mediaFile.MediaType == MediaType.Video
+                                     && mediaFile.SourceConnection != null
+                                     && mediaFile.SourceConnection.ProtocolType == ProtocolType.WebDav),
                     IdentificationStatus = x.Episode.Season.IdentificationStatus
                 })
             .ToListAsync(cancellationToken);
@@ -846,7 +877,12 @@ public sealed class WatchHistoryService : IWatchHistoryService
             TmdbId = row.TmdbId,
             Title = string.IsNullOrWhiteSpace(row.Title) ? row.MediaFileName : row.Title,
             ReleaseYear = row.ReleaseYear,
+            ReleaseDate = row.ReleaseDate,
             PosterRemoteUrl = row.PosterRemoteUrl,
+            GenresText = row.GenresText,
+            AiTagsText = row.AiTagsText,
+            EmotionTagsText = row.EmotionTagsText,
+            SceneTagsText = row.SceneTagsText,
             MediaFileName = row.MediaFileName,
             StartedAtLocal = ToLocalTime(row.StartedAt),
             EndedAtLocal = row.EndedAt.HasValue ? ToLocalTime(row.EndedAt.Value) : null,
@@ -855,6 +891,9 @@ public sealed class WatchHistoryService : IWatchHistoryService
             TotalDurationSeconds = totalDurationSeconds,
             IsCompleted = row.IsCompleted,
             IsMediaFileDeleted = row.IsMediaFileDeleted,
+            SourceCount = row.SourceCount,
+            HasLocalSource = row.HasLocalSource,
+            HasWebDavSource = row.HasWebDavSource,
             IdentificationStatus = row.IdentificationStatus,
             ProgressPercent = progressPercent
         };
@@ -1011,7 +1050,17 @@ public sealed class WatchHistoryService : IWatchHistoryService
 
         public int? ReleaseYear { get; init; }
 
+        public DateTime? ReleaseDate { get; init; }
+
         public string PosterRemoteUrl { get; init; } = string.Empty;
+
+        public string GenresText { get; init; } = string.Empty;
+
+        public string AiTagsText { get; init; } = string.Empty;
+
+        public string EmotionTagsText { get; init; } = string.Empty;
+
+        public string SceneTagsText { get; init; } = string.Empty;
 
         public string MediaFileName { get; init; } = string.Empty;
 
@@ -1030,6 +1079,12 @@ public sealed class WatchHistoryService : IWatchHistoryService
         public bool IsCompleted { get; init; }
 
         public bool IsMediaFileDeleted { get; init; }
+
+        public int SourceCount { get; init; }
+
+        public bool HasLocalSource { get; init; }
+
+        public bool HasWebDavSource { get; init; }
 
         public IdentificationStatus IdentificationStatus { get; init; }
     }

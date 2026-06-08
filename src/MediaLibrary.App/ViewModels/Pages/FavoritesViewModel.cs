@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
@@ -19,7 +20,9 @@ public sealed class FavoritesViewModel : PageViewModelBase
     private readonly IDataRefreshService _dataRefreshService;
     private bool _isActive;
     private bool _isLoading;
-    private string _statusMessage = "管理你喜爱和想看的影片。";
+    private int _selectedTabIndex;
+    private string _loadErrorMessage = string.Empty;
+    private string _statusMessage = "收藏你的独家喜好。";
 
     public FavoritesViewModel(
         IUserCollectionService userCollectionService,
@@ -27,7 +30,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
         IMovieManagementService movieManagementService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService)
-        : base("收藏夹", "集中查看喜爱和想看的影片。")
+        : base("收藏夹", "收藏你的独家喜好")
     {
         _userCollectionService = userCollectionService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
@@ -37,7 +40,8 @@ public sealed class FavoritesViewModel : PageViewModelBase
         _dataRefreshService.DataChanged += OnDataChanged;
 
         OpenMovieCommand = new RelayCommand(OpenMovie);
-        RemoveItemCommand = new AsyncRelayCommand(RemoveItemAsync, _ => !IsLoading);
+        SelectTabCommand = new RelayCommand(SelectTab);
+        RemoveItemCommand = new AsyncRelayCommand(RemoveItemAsync, CanRemoveItem, disableWhileExecuting: false);
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsLoading);
     }
 
@@ -46,6 +50,8 @@ public sealed class FavoritesViewModel : PageViewModelBase
     public ObservableCollection<FavoriteCollectionItemViewModel> WantToWatchMovies { get; } = [];
 
     public RelayCommand OpenMovieCommand { get; }
+
+    public RelayCommand SelectTabCommand { get; }
 
     public AsyncRelayCommand RemoveItemCommand { get; }
 
@@ -61,8 +67,37 @@ public sealed class FavoritesViewModel : PageViewModelBase
             if (SetProperty(ref _isLoading, value))
             {
                 OnPropertyChanged(nameof(IsRefreshing));
+                RaiseTabStateChanged();
                 RefreshCommand.RaiseCanExecuteChanged();
                 RemoveItemCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public int SelectedTabIndex
+    {
+        get => _selectedTabIndex;
+        set
+        {
+            if (SetProperty(ref _selectedTabIndex, value))
+            {
+                RaiseTabSelectionChanged();
+            }
+        }
+    }
+
+    public bool IsFavoriteTabSelected => SelectedTabIndex == 0;
+
+    public bool IsWantToWatchTabSelected => SelectedTabIndex == 1;
+
+    public string LoadErrorMessage
+    {
+        get => _loadErrorMessage;
+        private set
+        {
+            if (SetProperty(ref _loadErrorMessage, value))
+            {
+                RaiseTabStateChanged();
             }
         }
     }
@@ -77,13 +112,28 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
     public bool HasWantToWatchMovies => WantToWatchMovies.Count > 0;
 
+    public bool HasLoadError => !string.IsNullOrWhiteSpace(LoadErrorMessage);
+
+    public bool ShowFavoriteMovies => !IsLoading && !HasLoadError && HasFavoriteMovies;
+
+    public bool ShowWantToWatchMovies => !IsLoading && !HasLoadError && HasWantToWatchMovies;
+
+    public bool ShowFavoriteEmptyState => !IsLoading && !HasLoadError && !HasFavoriteMovies;
+
+    public bool ShowWantToWatchEmptyState => !IsLoading && !HasLoadError && !HasWantToWatchMovies;
+
     public string FavoriteCountText => $"{FavoriteMovies.Count} 部";
 
     public string WantToWatchCountText => $"{WantToWatchMovies.Count} 部";
 
+    public string FavoriteTabHeaderText => $"喜爱 {FavoriteMovies.Count}";
+
+    public string WantToWatchTabHeaderText => $"想看 {WantToWatchMovies.Count}";
+
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         _isActive = true;
+        SelectedTabIndex = 0;
         await LoadAsync(cancellationToken);
     }
 
@@ -119,6 +169,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
         IsLoading = true;
         try
         {
+            LoadErrorMessage = string.Empty;
             StatusMessage = "正在加载收藏夹。";
             var movieItems = await _userCollectionService.GetCollectionItemsAsync(cancellationToken);
             var tvItems = await _tvSeasonCollectionService.GetCollectionItemsAsync(cancellationToken);
@@ -133,7 +184,8 @@ public sealed class FavoritesViewModel : PageViewModelBase
             FavoriteMovies.Clear();
             WantToWatchMovies.Clear();
             RaiseCountsChanged();
-            StatusMessage = $"加载收藏夹失败：{exception.Message}";
+            LoadErrorMessage = $"加载收藏夹失败：{BuildSafeErrorMessage(exception)}";
+            StatusMessage = LoadErrorMessage;
         }
         finally
         {
@@ -193,6 +245,9 @@ public sealed class FavoritesViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasWantToWatchMovies));
         OnPropertyChanged(nameof(FavoriteCountText));
         OnPropertyChanged(nameof(WantToWatchCountText));
+        OnPropertyChanged(nameof(FavoriteTabHeaderText));
+        OnPropertyChanged(nameof(WantToWatchTabHeaderText));
+        RaiseTabStateChanged();
     }
 
     private string BuildStatusMessage()
@@ -203,6 +258,23 @@ public sealed class FavoritesViewModel : PageViewModelBase
             : $"喜爱 {FavoriteMovies.Count} 部 · 想看 {WantToWatchMovies.Count} 部";
     }
 
+    private void SelectTab(object? parameter)
+    {
+        SelectedTabIndex = parameter switch
+        {
+            int index => index,
+            string value when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) => index,
+            _ => SelectedTabIndex
+        };
+    }
+
+    private bool CanRemoveItem(object? parameter)
+    {
+        return !IsLoading
+               && parameter is FavoriteCollectionItemViewModel item
+               && item.CanStartRemove;
+    }
+
     private async Task RemoveItemAsync(object? parameter)
     {
         if (parameter is not FavoriteCollectionItemViewModel item)
@@ -210,6 +282,14 @@ public sealed class FavoritesViewModel : PageViewModelBase
             return;
         }
 
+        if (!CanRemoveItem(item))
+        {
+            item.MarkActionBlocked();
+            return;
+        }
+
+        item.BeginAction();
+        RemoveItemCommand.RaiseCanExecuteChanged();
         try
         {
             if (item.TabKind == FavoriteTabKind.Favorite)
@@ -226,7 +306,14 @@ public sealed class FavoritesViewModel : PageViewModelBase
         }
         catch (Exception exception)
         {
-            StatusMessage = $"{item.ActionText}失败：{exception.Message}";
+            var message = BuildSafeErrorMessage(exception);
+            item.SetActionError($"{item.ActionText}失败：{message}");
+            StatusMessage = $"{item.ActionText}失败：{message}";
+        }
+        finally
+        {
+            item.EndAction();
+            RemoveItemCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -244,8 +331,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         if (!item.MovieId.HasValue)
         {
-            StatusMessage = "无播放源影片的喜爱状态暂未接入，无法取消喜爱。";
-            return;
+            throw new InvalidOperationException(item.RemoveDisabledReason);
         }
 
         await _movieManagementService.SetFavoriteAsync(
@@ -293,6 +379,42 @@ public sealed class FavoritesViewModel : PageViewModelBase
         }
 
         _navigationStateService.RequestExternalMovieDetail(ToRecommendation(movie, keepMovieId: false));
+    }
+
+    private void RaiseTabSelectionChanged()
+    {
+        OnPropertyChanged(nameof(IsFavoriteTabSelected));
+        OnPropertyChanged(nameof(IsWantToWatchTabSelected));
+    }
+
+    private void RaiseTabStateChanged()
+    {
+        OnPropertyChanged(nameof(HasLoadError));
+        OnPropertyChanged(nameof(ShowFavoriteMovies));
+        OnPropertyChanged(nameof(ShowWantToWatchMovies));
+        OnPropertyChanged(nameof(ShowFavoriteEmptyState));
+        OnPropertyChanged(nameof(ShowWantToWatchEmptyState));
+    }
+
+    private static string BuildSafeErrorMessage(Exception exception)
+    {
+        var message = (exception.Message ?? string.Empty)
+            .Replace("\r", " ")
+            .Replace("\n", " ")
+            .Trim();
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return "未知错误。";
+        }
+
+        if (message.Contains("://", StringComparison.Ordinal)
+            || message.Contains(@":\", StringComparison.Ordinal))
+        {
+            return "错误详情包含受保护的路径或地址，已隐藏。";
+        }
+
+        return message.Length <= 120 ? message : $"{message[..120]}...";
     }
 
     private static AiRecommendationItem ToRecommendation(
@@ -345,9 +467,11 @@ public sealed class FavoritesViewModel : PageViewModelBase
         WantToWatch
     }
 
-    public sealed class FavoriteCollectionItemViewModel
+    public sealed class FavoriteCollectionItemViewModel : ViewModelBase
     {
         private readonly CollectionMovieItem _item;
+        private bool _isActionRunning;
+        private string _actionErrorMessage = string.Empty;
 
         public FavoriteCollectionItemViewModel(CollectionMovieItem item, FavoriteTabKind tabKind)
         {
@@ -372,6 +496,10 @@ public sealed class FavoritesViewModel : PageViewModelBase
         public int? ReleaseYear => _item.ReleaseYear;
 
         public DateTime? ReleaseDate => _item.ReleaseDate;
+
+        public int SeasonNumber => _item.SeasonNumber;
+
+        public int TotalEpisodeCount => _item.TotalEpisodeCount;
 
         public string PosterRemoteUrl => _item.PosterRemoteUrl;
 
@@ -427,6 +555,176 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         public string ActionText => TabKind == FavoriteTabKind.Favorite ? "取消喜爱" : "取消想看";
 
+        public string ActionButtonText => IsActionRunning ? "取消中..." : ActionText;
+
+        public bool IsActionRunning
+        {
+            get => _isActionRunning;
+            private set
+            {
+                if (SetProperty(ref _isActionRunning, value))
+                {
+                    OnPropertyChanged(nameof(CanStartRemove));
+                    OnPropertyChanged(nameof(ActionButtonText));
+                    OnPropertyChanged(nameof(ActionStatusText));
+                    OnPropertyChanged(nameof(HasActionStatus));
+                }
+            }
+        }
+
+        public string ActionErrorMessage
+        {
+            get => _actionErrorMessage;
+            private set
+            {
+                if (SetProperty(ref _actionErrorMessage, value))
+                {
+                    OnPropertyChanged(nameof(HasActionError));
+                    OnPropertyChanged(nameof(ActionStatusText));
+                    OnPropertyChanged(nameof(HasActionStatus));
+                }
+            }
+        }
+
+        public bool HasActionError => !string.IsNullOrWhiteSpace(ActionErrorMessage);
+
+        public string ActionStatusText
+        {
+            get
+            {
+                if (IsActionRunning)
+                {
+                    return $"{ActionText}中";
+                }
+
+                if (HasActionError)
+                {
+                    return ActionErrorMessage;
+                }
+
+                return CanRemove ? string.Empty : RemoveDisabledReason;
+            }
+        }
+
+        public bool HasActionStatus => !string.IsNullOrWhiteSpace(ActionStatusText);
+
         public bool CanRemove => IsTvSeason || TabKind != FavoriteTabKind.Favorite || MovieId.HasValue;
+
+        public bool CanStartRemove => CanRemove && !IsActionRunning;
+
+        public string RemoveDisabledReason => CanRemove
+            ? string.Empty
+            : "缺少稳定影片记录，暂无法取消喜爱。";
+
+        public string MediaKindText => IsTvSeason ? "电视剧" : "电影";
+
+        public string CategoryTagText => MediaKindText;
+
+        public bool HasPoster => !string.IsNullOrWhiteSpace(PosterRemoteUrl);
+
+        public string RatingBadgeText => FormatRatingText();
+
+        public string ReleaseDateText => IsTvSeason
+            ? BuildSeasonAuxiliaryText()
+            : ReleaseDate.HasValue
+                ? ReleaseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                : ReleaseYear?.ToString(CultureInfo.InvariantCulture) ?? "年份未知";
+
+        public string SourceSummaryText => IsTvSeason && !string.IsNullOrWhiteSpace(_item.SourceSummary)
+            ? _item.SourceSummary
+            : AvailabilityText;
+
+        public string PosterTagLine => BuildPosterTagLine();
+
+        public string PosterTagToolTipText => PosterTagLine;
+
+        public void BeginAction()
+        {
+            ActionErrorMessage = string.Empty;
+            IsActionRunning = true;
+        }
+
+        public void EndAction()
+        {
+            IsActionRunning = false;
+        }
+
+        public void SetActionError(string message)
+        {
+            ActionErrorMessage = message;
+        }
+
+        public void MarkActionBlocked()
+        {
+            if (!CanRemove)
+            {
+                ActionErrorMessage = RemoveDisabledReason;
+            }
+        }
+
+        private string FormatRatingText()
+        {
+            var rating = TmdbRating;
+            if (!rating.HasValue && OmdbScoreValue.HasValue)
+            {
+                var scale = OmdbScoreScale.GetValueOrDefault(10d);
+                rating = scale > 0 ? OmdbScoreValue.Value / scale * 10d : OmdbScoreValue.Value;
+            }
+
+            return rating.HasValue
+                ? rating.Value.ToString("0.0", CultureInfo.InvariantCulture)
+                : "--";
+        }
+
+        private string BuildSeasonAuxiliaryText()
+        {
+            var parts = new List<string>
+            {
+                SeasonNumber > 0 ? $"S{SeasonNumber:D2}" : "未识别季"
+            };
+
+            if (TotalEpisodeCount > 0)
+            {
+                parts.Add($"共 {TotalEpisodeCount} 集");
+            }
+
+            if (ReleaseYear.HasValue)
+            {
+                parts.Add(ReleaseYear.Value.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return string.Join(" · ", parts);
+        }
+
+        private string BuildPosterTagLine()
+        {
+            var tagText = FirstNonEmpty(
+                BuildLimitedTagText(GenresText),
+                BuildLimitedTagText(AiTagsText),
+                MediaKindText);
+
+            return JoinNonEmpty("  |  ", tagText, SourceSummaryText, WatchStateText);
+        }
+
+        private static string BuildLimitedTagText(string text)
+        {
+            var tags = text
+                .Split(['、', ',', '，', '|', '/', ';', '；'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Take(2)
+                .ToArray();
+
+            return tags.Length == 0 ? string.Empty : string.Join(" / ", tags);
+        }
+
+        private static string JoinNonEmpty(string separator, params string[] values)
+        {
+            return string.Join(separator, values.Where(x => !string.IsNullOrWhiteSpace(x)));
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
+        }
     }
 }

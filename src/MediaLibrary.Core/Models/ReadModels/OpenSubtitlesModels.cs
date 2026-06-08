@@ -1,6 +1,9 @@
 namespace MediaLibrary.Core.Models.ReadModels;
 
-public sealed record OpenSubtitlesLanguageOption(string Code, string Name);
+public sealed record OpenSubtitlesLanguageOption(string Code, string Name)
+{
+    public override string ToString() => Name;
+}
 
 public sealed class OpenSubtitlesClientOptions
 {

@@ -45,6 +45,76 @@ Suggested commit message:
 
 - `Phase 7.7a shared top tab baseline`
 
+### 7.7b - Watch History Visual Alignment And Date Targeting
+
+Completed:
+
+- Rebuilt `WatchHistoryPage.xaml` from the old page-card row list into a fixed date-filter toolbar plus scrollable date-group poster grid.
+- Replaced the date `ComboBox` with explicit `全部 / 今天 / 本周 / 本月 / 指定日期` filter buttons and kept the existing refresh command.
+- Copied the Media Library poster-card visual direction for watch-history items: 180x270 poster card, rounded clip, placeholder, cached poster image, palette shadow host, top chips, bottom gradient, title, metadata/tag line and progress bar.
+- Kept Movie / Episode history display and existing detail navigation semantics; no player history-write path or Watch Insights statistics scope was changed.
+- Added WatchHistoryViewModel presentation projections and one-way WPF bindings needed by the poster card template.
+- Recorded the 7.7b execution result in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln --no-restore` passed with 0 warnings and 0 errors.
+- Ran the desktop app and navigated to Watch History. The final run stayed open after navigation, and UI Automation found `观影历史`, all date filter buttons and `刷新`.
+- Fixed runtime XAML binding issues found during app probing: `Run.Text` and `ProgressBar.Value` needed explicit one-way binding to read-only card projection properties.
+
+Explicit non-goals:
+
+- no delete-history, search, sort, batch selection, continue-play button or player history-write change;
+- no FavoritesPage or WatchInsightsPage visual work;
+- no Core service, database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None. Changes are App-layer UI commands/projections and XAML presentation only.
+
+Non-stage page changes:
+
+- None. Shell, Movie Discovery, Media Library, Favorites, Watch Insights, Player and Core services were not edited in 7.7b.
+
+Suggested commit message:
+
+- `Phase 7.7b align watch history UI`
+
+### 7.7c - Favorites Visual Alignment And Remove State
+
+Completed:
+
+- Rebuilt `FavoritesPage.xaml` from the old visible-header `TabControl` and page-card shell into a root `Grid > TabControl` with a Movie Discovery-style manual top tab strip for `喜爱` / `想看`.
+- Used the 7.7a `PageTabs.xaml` primitives for fixed-width manual tab buttons, selected underline and divider placement while keeping Movie Discovery and Settings local accepted templates untouched.
+- Rebuilt Favorites content as a scrollable 180x270 poster-card grid for Movie / Season collection items, with poster placeholder, cached poster image, type chip, rating badge, collection chip, title, date / season auxiliary text and source / watch-state summary.
+- Added FavoritesViewModel presentation state for default `喜爱` tab selection, tab count headers, loading/error/empty states, card display fields and item-level remove action state.
+- Kept existing collection service semantics: Movie favorite removal uses movie management, Movie want-to-watch removal uses user collection service, Season favorite / want-to-watch removal uses TV season collection service.
+- Added item-level `取消中...`, failure text and real disabled reason projection. Missing stable `MovieId` for an external favorite is not faked as removable.
+- Recorded the 7.7c execution result in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\xfverse-build-7-7c\"` passed with 0 warnings and 0 errors.
+- Normal build to the default output folder was blocked by a running `MediaLibrary.App` process locking the App binary / DLL; the temp-output build confirms the code and XAML compile.
+
+Explicit non-goals:
+
+- no search, sorting, filtering, batch selection, delete-record, scan-entry or continue-play feature on Favorites;
+- no Watch Insights, watch-statistics, watch-profile, recommendation, Movie-only boundary or Core service change;
+- no database schema, migration, database update, commit or push change.
+
+Business logic changes:
+
+- None in Core services. Changes are App-layer UI state/projections and XAML presentation only.
+
+Non-stage page changes:
+
+- None. Media Library, Movie Discovery, Watch History, Watch Insights, detail pages, Player, Shell and collection services were not edited in 7.7c.
+
+Suggested commit message:
+
+- `Phase 7.7c align favorites UI`
+
 ## Phase 7.6 - Settings / Scan / Cache
 
 ### 7.6a - Shared Component Baseline
@@ -426,6 +496,52 @@ Non-stage page changes:
 Suggested commit message:
 
 - `Phase 7.6d scan path pickers`
+
+#### 7.6d Follow-up - Season Overview And Scan Config Polish
+
+Completed:
+
+- Kept the Season detail episode overview in a three-and-a-half-line modern vertical scroll area, with horizontal scrolling and text trimming explicitly disabled.
+- Tightened the ScanTasks WebDAV add-path and account cards by removing stretch rows, correcting the add-path folder glyph, and letting the save / test buttons size to their text.
+- Changed the WebDAV account status projection to untested yellow, test-passed green and test-failed red; saving the WebDAV connection now runs one existing connection test automatically.
+- Changed the local scan path list from `UniformGrid` to fixed-width `WrapPanel` rows so path boxes no longer resize when only a few paths exist.
+- Set the local folder picker to a stable default initial directory when no explicit initial path is provided, instead of inheriting the system dialog's previous folder.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\xfv-b\"` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Explicit non-goals:
+
+- no scanner recognition algorithm, media-library semantics, path-removal semantics, database schema, migration, database update, commit or push change.
+
+Suggested commit message:
+
+- `Phase 7.6d polish season overview and scan config`
+
+#### 7.6d Follow-up - Scroll And Scan Progress Polish
+
+Completed:
+
+- Delegated mouse wheel input from non-scrollable Season episode overviews back to the outer episode list; scrollable episode overviews still consume their own wheel input.
+- Replaced the WebDAV add-path folder glyph with a vector folder icon.
+- Disabled the WebDAV save button unless the current fields differ from the saved connection baseline.
+- Added a local folder picker fallback so an empty selected folder can still be returned and saved; folder contents are not validated in configuration.
+- Restored the ScanTasks progress order to progress bar / current stage / current file above the metric cards, then narrowed metric cards and increased column gaps.
+- Changed the progress track to a muted grey track and enlarged / vertically centered metric icons.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\xfv-b\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no scanner recognition algorithm, path-removal semantics, database schema, migration, database update, commit or push change.
+
+Suggested commit message:
+
+- `Phase 7.6d refine season scroll and scan progress`
 
 ### 7.6e - Scan Progress, History Logs And Safe Operations
 

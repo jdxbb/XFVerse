@@ -66,7 +66,22 @@ public partial class TvSeasonDetailPage : UserControl
     {
         if (sender is ScrollViewer scrollViewer)
         {
+            if (scrollViewer.ScrollableHeight <= 0 && IsDescendantOf(scrollViewer, EpisodeListBox))
+            {
+                var episodeListScrollViewer = FindDescendant<ScrollViewer>(EpisodeListBox);
+                if (episodeListScrollViewer is not null)
+                {
+                    ScrollViewerBySmallWheelStep(episodeListScrollViewer, e, OverviewMouseWheelScrollStep);
+                }
+
+                return;
+            }
+
             ScrollViewerBySmallWheelStep(scrollViewer, e, OverviewMouseWheelScrollStep);
+            if (scrollViewer.ScrollableHeight > 0)
+            {
+                e.Handled = true;
+            }
         }
     }
 
@@ -294,5 +309,23 @@ public partial class TvSeasonDetailPage : UserControl
         }
 
         return null;
+    }
+
+    private static bool IsDescendantOf(DependencyObject child, DependencyObject ancestor)
+    {
+        var current = child;
+        while (current is not null)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+
+            current = current is FrameworkElement frameworkElement
+                ? frameworkElement.Parent ?? VisualTreeHelper.GetParent(current)
+                : VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 }
