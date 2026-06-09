@@ -175,7 +175,7 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
             .AsNoTracking()
             .Where(x => x.TmdbId.HasValue
                 && x.TmdbId.Value > 0
-                && (x.IsInLibrary || x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
+                && (x.IsInLibrary || x.IsWatched || x.IsFavorite || x.IsWantToWatch || x.IsNotInterested)
                 && !string.IsNullOrWhiteSpace(x.Title)
                 && (!x.MovieId.HasValue
                     || dbContext.Movies.Any(movie => movie.Id == x.MovieId.Value
@@ -202,6 +202,7 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
                 OmdbScoreValue = x.OmdbScoreValue,
                 OmdbScoreScale = x.OmdbScoreScale,
                 OmdbVoteCount = x.OmdbVoteCount,
+                IsFavorite = x.IsFavorite,
                 IsWantToWatch = x.IsWantToWatch,
                 IsWatched = x.IsWatched,
                 IsNotInterested = x.IsNotInterested,
@@ -335,14 +336,16 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
             }
 
             var addsWatched = item.IsWatched && !sample.IsWatched;
+            var addsFavorite = item.IsFavorite && !sample.IsFavorite;
             var addsWantToWatch = item.IsWantToWatch && !sample.IsWantToWatch;
             var addsNotInterested = item.IsNotInterested && !sample.IsNotInterested;
 
             sample.MovieId ??= item.MovieId;
             sample.IsWatched |= item.IsWatched;
+            sample.IsFavorite |= item.IsFavorite;
             sample.IsWantToWatch |= item.IsWantToWatch;
             sample.IsNotInterested |= item.IsNotInterested;
-            if (addsWatched || addsWantToWatch || addsNotInterested)
+            if (addsWatched || addsFavorite || addsWantToWatch || addsNotInterested)
             {
                 sample.SortAtUtc = MaxUtc(sample.SortAtUtc, item.UpdatedAt);
             }
@@ -947,6 +950,8 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
         public double? OmdbScoreScale { get; set; }
 
         public int? OmdbVoteCount { get; set; }
+
+        public bool IsFavorite { get; set; }
 
         public bool IsWantToWatch { get; set; }
 

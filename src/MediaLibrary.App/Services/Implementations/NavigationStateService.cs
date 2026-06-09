@@ -12,6 +12,10 @@ public sealed class NavigationStateService : INavigationStateService
     private readonly HashSet<int> _seriesSeasonListScrollRestoreRequests = [];
     private readonly HashSet<int> _seasonEpisodeListScrollRestoreRequests = [];
     private NavigationRequest? _currentRequest;
+    private double _watchHistoryScrollOffset;
+    private int _favoritesSelectedTabIndex;
+    private double _favoritesFavoriteScrollOffset;
+    private double _favoritesWantToWatchScrollOffset;
 
     public int? SelectedMovieId { get; private set; }
 
@@ -133,6 +137,44 @@ public sealed class NavigationStateService : INavigationStateService
         return _seasonEpisodeListScrollRestoreRequests.Remove(tvSeasonId);
     }
 
+    public double GetWatchHistoryScrollOffset()
+    {
+        return _watchHistoryScrollOffset;
+    }
+
+    public void SetWatchHistoryScrollOffset(double offset)
+    {
+        _watchHistoryScrollOffset = Math.Max(0d, offset);
+    }
+
+    public int GetFavoritesSelectedTabIndex()
+    {
+        return _favoritesSelectedTabIndex;
+    }
+
+    public void SetFavoritesSelectedTabIndex(int selectedTabIndex)
+    {
+        _favoritesSelectedTabIndex = Math.Clamp(selectedTabIndex, 0, 1);
+    }
+
+    public double GetFavoritesScrollOffset(int selectedTabIndex)
+    {
+        return NormalizeFavoritesTabIndex(selectedTabIndex) == 0
+            ? _favoritesFavoriteScrollOffset
+            : _favoritesWantToWatchScrollOffset;
+    }
+
+    public void SetFavoritesScrollOffset(int selectedTabIndex, double offset)
+    {
+        if (NormalizeFavoritesTabIndex(selectedTabIndex) == 0)
+        {
+            _favoritesFavoriteScrollOffset = Math.Max(0d, offset);
+            return;
+        }
+
+        _favoritesWantToWatchScrollOffset = Math.Max(0d, offset);
+    }
+
     private void RequestDetailBack(NavigationRequest fallbackRequest)
     {
         var request = _detailBackStack.Count > 0
@@ -227,6 +269,11 @@ public sealed class NavigationStateService : INavigationStateService
         }
 
         offsets[key] = offset;
+    }
+
+    private static int NormalizeFavoritesTabIndex(int selectedTabIndex)
+    {
+        return Math.Clamp(selectedTabIndex, 0, 1);
     }
 
     private static bool AreSameRequest(NavigationRequest left, NavigationRequest right)

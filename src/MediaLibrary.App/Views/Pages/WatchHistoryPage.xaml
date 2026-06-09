@@ -193,56 +193,6 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="WatchHistoryDatePickerButtonStyle" TargetType="{x:Type Button}">
-            <Setter Property="Width" Value="34" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Button}">
-                        <Border x:Name="ButtonChrome"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="#22FFFFFF" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="#33FFFFFF" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="WatchHistoryModernCalendarStyle" TargetType="{x:Type Calendar}">
-            <Setter Property="Background" Value="{DynamicResource BrushSurfaceRaised}" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
-        </Style>
-
-        <Style x:Key="WatchHistoryModernDatePickerStyle"
-               TargetType="{x:Type DatePicker}"
-               BasedOn="{StaticResource DatePickerStyle}">
-            <Setter Property="Width" Value="168" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Padding" Value="10,0" />
-            <Setter Property="Background" Value="{DynamicResource BrushInputBackground}" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushInputBorder}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CalendarStyle" Value="{StaticResource WatchHistoryModernCalendarStyle}" />
-        </Style>
-
         <Style x:Key="LibraryMediaChipStyle" TargetType="{x:Type Border}">
             <Setter Property="Padding" Value="7,4" />
             <Setter Property="CornerRadius" Value="6" />
@@ -597,12 +547,10 @@
                             CommandParameter="指定日期"
                             Content="指定日期"
                             Style="{StaticResource WatchHistorySpecificDateFilterButtonStyle}" />
-                    <DatePicker Width="168"
-                                Margin="0,0,8,0"
-                                VerticalAlignment="Center"
-                                SelectedDate="{Binding SelectedCustomDate, Mode=TwoWay}"
-                                Style="{StaticResource WatchHistoryModernDatePickerStyle}"
-                                Visibility="{Binding IsCustomDateFilter, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <controls:SmartDatePicker Margin="0,0,8,0"
+                                              VerticalAlignment="Center"
+                                              SelectedDate="{Binding SelectedCustomDate, Mode=TwoWay}"
+                                              Visibility="{Binding IsCustomDateFilter, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </WrapPanel>
 
                 <StackPanel Grid.Column="1"
@@ -642,7 +590,7 @@
                           ScrollChanged="OnHistoryScrollChanged"
                           helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
                           HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Visible"
                           Visibility="{Binding HasDayGroups, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <ScrollViewer.Resources>
                     <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource LibraryModernScrollBarStyle}" />

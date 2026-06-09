@@ -54,5 +54,17 @@ public interface INavigationStateService
 
     bool ConsumeSeasonEpisodeListScrollRestoreRequest(int tvSeasonId);
 
+    double GetWatchHistoryScrollOffset();
+
+    void SetWatchHistoryScrollOffset(double offset);
+
     DateTime? ConsumeWatchHistoryTargetDate();
+
+    int GetFavoritesSelectedTabIndex();
+
+    void SetFavoritesSelectedTabIndex(int selectedTabIndex);
+
+    double GetFavoritesScrollOffset(int selectedTabIndex);
+
+    void SetFavoritesScrollOffset(int selectedTabIndex, double offset);
 }

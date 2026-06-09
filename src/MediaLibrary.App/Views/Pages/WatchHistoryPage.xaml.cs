@@ -66,7 +66,7 @@ public partial class WatchHistoryPage : UserControl
 
         if (e.VerticalOffset <= 0d
             && viewModel.ScrollOffset > 0d
-            && (e.ExtentHeightChange < 0d || e.ViewportHeightChange != 0d))
+            && (Math.Abs(e.ExtentHeightChange) > 0.1d || Math.Abs(e.ViewportHeightChange) > 0.1d))
         {
             return;
         }
@@ -154,7 +154,17 @@ public partial class WatchHistoryPage : UserControl
             return;
         }
 
-        viewModel.ScrollOffset = HistoryScrollViewer.VerticalOffset;
+        var currentOffset = HistoryScrollViewer.VerticalOffset;
+        if (currentOffset <= 0d
+            && viewModel.ScrollOffset > 0d
+            && (!HistoryScrollViewer.IsVisible
+                || HistoryScrollViewer.ExtentHeight <= 0d
+                || HistoryScrollViewer.ScrollableHeight <= 0d))
+        {
+            return;
+        }
+
+        viewModel.ScrollOffset = currentOffset;
     }
 
     private void QueueApplyHistoryScrollOffset()

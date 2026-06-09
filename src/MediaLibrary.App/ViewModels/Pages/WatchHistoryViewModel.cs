@@ -20,7 +20,6 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
     private const string FilterThisWeek = "本周";
     private const string FilterThisMonth = "本月";
     private const string FilterSpecificDate = "指定日期";
-    private static double s_persistedScrollOffset;
     private readonly IWatchHistoryService _watchHistoryService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
@@ -47,7 +46,7 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _dataRefreshService.DataChanged += OnDataChanged;
-        _scrollOffset = s_persistedScrollOffset;
+        _scrollOffset = _navigationStateService.GetWatchHistoryScrollOffset();
 
         DateFilterOptions = [FilterAll, FilterToday, FilterThisWeek, FilterThisMonth, FilterSpecificDate];
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsLoading);
@@ -156,7 +155,7 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             var normalized = Math.Max(0d, value);
             if (SetProperty(ref _scrollOffset, normalized))
             {
-                s_persistedScrollOffset = normalized;
+                _navigationStateService.SetWatchHistoryScrollOffset(normalized);
             }
         }
     }

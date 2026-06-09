@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using MediaLibrary.App.Services.Implementations;
@@ -20,6 +21,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private const string ConnectionConfigStatusUntested = "untested";
     private const string ConnectionConfigStatusSuccess = "success";
     private const string ConnectionConfigStatusFailure = "failure";
+    private const int LocalStatusSegmentMaxLength = 24;
+    private const int LocalStatusDisplayMaxLength = 86;
 
     private readonly IMediaScanService _mediaScanService;
     private readonly ILocalMediaScanService _localMediaScanService;
@@ -332,14 +335,30 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     public string ScanPathStatusMessage
     {
         get => _scanPathStatusMessage;
-        private set => SetProperty(ref _scanPathStatusMessage, value);
+        private set
+        {
+            if (SetProperty(ref _scanPathStatusMessage, value))
+            {
+                OnPropertyChanged(nameof(ScanPathStatusDisplayText));
+            }
+        }
     }
 
     public string LocalScanPathStatusMessage
     {
         get => _localScanPathStatusMessage;
-        private set => SetProperty(ref _localScanPathStatusMessage, value);
+        private set
+        {
+            if (SetProperty(ref _localScanPathStatusMessage, value))
+            {
+                OnPropertyChanged(nameof(LocalScanPathStatusDisplayText));
+            }
+        }
     }
+
+    public string ScanPathStatusDisplayText => FormatLocalScanPathStatusDisplay(ScanPathStatusMessage);
+
+    public string LocalScanPathStatusDisplayText => FormatLocalScanPathStatusDisplay(LocalScanPathStatusMessage);
 
     public int? EditingScanPathId
     {
@@ -747,33 +766,46 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             return;
         }
 
-        var selectedPath = await _scanPathPickerService.PickWebDavDirectoryAsync(
-            BuildCurrentWebDavConnectionModel(),
-            "/");
-        if (string.IsNullOrWhiteSpace(selectedPath))
+        var skipped = new List<string>();
+        var removedNestedCount = 0;
+        var selectedPaths = FilterNestedVirtualSelections((await _scanPathPickerService.PickWebDavDirectoriesAsync(
+                BuildCurrentWebDavConnectionModel(),
+                "/"))
+            .Select(WebDavPathHelper.NormalizeVirtualPath)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray(), skipped);
+        if (selectedPaths.Length == 0)
         {
+            ScanPathStatusMessage = FormatWebDavPathBatchAddStatus([], skipped, removedNestedCount: 0);
             return;
         }
 
-        try
+        var added = new List<string>();
+        foreach (var selectedPath in selectedPaths)
         {
-            var saved = await _settingsService.SaveScanPathAsync(
-                new ScanPath
-                {
-                    SourceConnectionId = ConnectionId.Value,
-                    Path = selectedPath,
-                    DisplayName = BuildDisplayNameFromVirtualPath(selectedPath),
-                    IsEnabled = true,
-                    IsRecursive = true
-                });
+            try
+            {
+                removedNestedCount += await DeleteNestedWebDavScanPathsAsync(selectedPath, excludedScanPathId: null);
+                var saved = await _settingsService.SaveScanPathAsync(
+                    new ScanPath
+                    {
+                        SourceConnectionId = ConnectionId.Value,
+                        Path = selectedPath,
+                        DisplayName = BuildDisplayNameFromVirtualPath(selectedPath),
+                        IsEnabled = true,
+                        IsRecursive = true
+                    });
+                added.Add(saved.DisplayName);
+            }
+            catch (Exception exception)
+            {
+                skipped.Add($"{BuildDisplayNameFromVirtualPath(selectedPath)}：{exception.Message}");
+            }
+        }
 
-            await LoadOverviewAsync(CancellationToken.None);
-            ScanPathStatusMessage = $"扫描路径已添加：{saved.DisplayName}";
-        }
-        catch (Exception exception)
-        {
-            ScanPathStatusMessage = exception.Message;
-        }
+        await LoadOverviewAsync(CancellationToken.None);
+        ScanPathStatusMessage = FormatWebDavPathBatchAddStatus(added, skipped, removedNestedCount);
     }
 
     private void BeginAddScanPath()
@@ -842,6 +874,9 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
         try
         {
+            var removedNestedCount = await DeleteNestedWebDavScanPathsAsync(
+                EditingScanPathValue,
+                EditingScanPathId);
             var saved = await _settingsService.SaveScanPathAsync(
                 new ScanPath
                 {
@@ -854,7 +889,9 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 });
 
             await LoadOverviewAsync(CancellationToken.None);
-            ScanPathStatusMessage = $"扫描路径已保存：{saved.DisplayName}";
+            ScanPathStatusMessage = AppendNestedPathRemovalStatus(
+                $"扫描路径已保存：{saved.DisplayName}",
+                removedNestedCount);
             CancelEditScanPath();
         }
         catch (Exception exception)
@@ -915,27 +952,29 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     private async Task AddLocalScanPathFromPickerAsync()
     {
-        var selectedPaths = await _scanPathPickerService.PickLocalDirectoriesAsync(string.Empty);
-        if (selectedPaths.Count == 0)
+        var skipped = new List<string>();
+        var removedNestedCount = 0;
+        var selectedPaths = FilterNestedLocalSelections((await _scanPathPickerService.PickLocalDirectoriesAsync(string.Empty))
+            .Select(NormalizeLocalInputPath)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray(), skipped);
+        if (selectedPaths.Length == 0)
         {
+            LocalScanPathStatusMessage = FormatLocalPathBatchAddStatus([], skipped, removedNestedCount: 0);
             return;
         }
 
         var added = new List<string>();
-        var skipped = new List<string>();
-        foreach (var selectedPath in selectedPaths)
+        foreach (var normalizedPath in selectedPaths)
         {
-            var normalizedPath = NormalizeLocalInputPath(selectedPath);
-            if (string.IsNullOrWhiteSpace(normalizedPath))
-            {
-                skipped.Add("空路径：未添加");
-                continue;
-            }
-
             var displayName = BuildDisplayNameFromLocalPath(normalizedPath);
             var pathExists = Directory.Exists(normalizedPath);
             try
             {
+                removedNestedCount += await DeleteNestedLocalScanPathsAsync(
+                    normalizedPath,
+                    excludedScanPathId: null);
                 var saved = await _settingsService.SaveLocalScanPathAsync(
                     new ScanPath
                     {
@@ -954,7 +993,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         }
 
         await LoadLocalOverviewAsync(CancellationToken.None);
-        LocalScanPathStatusMessage = FormatLocalPathBatchAddStatus(added, skipped);
+        LocalScanPathStatusMessage = FormatLocalPathBatchAddStatus(added, skipped, removedNestedCount);
     }
 
     private async Task PickLocalScanPathAsync()
@@ -994,6 +1033,9 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         var pathExists = Directory.Exists((EditingLocalScanPathValue ?? string.Empty).Trim().Trim('"'));
         try
         {
+            var removedNestedCount = await DeleteNestedLocalScanPathsAsync(
+                EditingLocalScanPathValue ?? string.Empty,
+                EditingLocalScanPathId);
             var saved = await _settingsService.SaveLocalScanPathAsync(
                 new ScanPath
                 {
@@ -1005,9 +1047,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 });
 
             await LoadLocalOverviewAsync(CancellationToken.None);
-            LocalScanPathStatusMessage = pathExists
+            var statusMessage = pathExists
                 ? $"本地目录配置已保存：{saved.DisplayName}"
                 : $"本地目录配置已保存：{saved.DisplayName}（路径当前不可访问）";
+            LocalScanPathStatusMessage = AppendNestedPathRemovalStatus(statusMessage, removedNestedCount);
             CancelEditLocalScanPath();
         }
         catch (Exception exception)
@@ -1363,11 +1406,175 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         return (path ?? string.Empty).Trim().Trim('"');
     }
 
-    private static string FormatLocalPathBatchAddStatus(IReadOnlyList<string> added, IReadOnlyList<string> skipped)
+    private async Task<int> DeleteNestedWebDavScanPathsAsync(string parentPath, int? excludedScanPathId)
+    {
+        if (!ConnectionId.HasValue || string.IsNullOrWhiteSpace(parentPath))
+        {
+            return 0;
+        }
+
+        var existingPaths = await _settingsService.GetScanPathsAsync(ConnectionId.Value);
+        var nestedPaths = existingPaths
+            .Where(path => path.Id != excludedScanPathId
+                           && IsVirtualChildPath(parentPath, path.Path))
+            .ToArray();
+        foreach (var nestedPath in nestedPaths)
+        {
+            await _settingsService.DeleteScanPathAsync(nestedPath.Id);
+        }
+
+        return nestedPaths.Length;
+    }
+
+    private async Task<int> DeleteNestedLocalScanPathsAsync(string parentPath, int? excludedScanPathId)
+    {
+        if (string.IsNullOrWhiteSpace(parentPath))
+        {
+            return 0;
+        }
+
+        var existingPaths = await _settingsService.GetLocalScanPathsAsync();
+        var nestedPaths = existingPaths
+            .Where(path => path.Id != excludedScanPathId
+                           && IsLocalChildPath(parentPath, path.Path))
+            .ToArray();
+        foreach (var nestedPath in nestedPaths)
+        {
+            await _settingsService.DeleteLocalScanPathAsync(nestedPath.Id);
+        }
+
+        return nestedPaths.Length;
+    }
+
+    private static string[] FilterNestedVirtualSelections(IReadOnlyList<string> selectedPaths, IList<string> skipped)
+    {
+        var result = new List<string>();
+        foreach (var selectedPath in selectedPaths)
+        {
+            var coveredBySelectedParent = selectedPaths.Any(parentPath =>
+                !string.Equals(parentPath, selectedPath, StringComparison.OrdinalIgnoreCase)
+                && IsVirtualChildPath(parentPath, selectedPath));
+            if (coveredBySelectedParent)
+            {
+                skipped.Add($"{BuildDisplayNameFromVirtualPath(selectedPath)}：已被同批选择的父路径覆盖");
+                continue;
+            }
+
+            result.Add(selectedPath);
+        }
+
+        return result.ToArray();
+    }
+
+    private static string[] FilterNestedLocalSelections(IReadOnlyList<string> selectedPaths, IList<string> skipped)
+    {
+        var result = new List<string>();
+        foreach (var selectedPath in selectedPaths)
+        {
+            var coveredBySelectedParent = selectedPaths.Any(parentPath =>
+                !string.Equals(parentPath, selectedPath, StringComparison.OrdinalIgnoreCase)
+                && IsLocalChildPath(parentPath, selectedPath));
+            if (coveredBySelectedParent)
+            {
+                skipped.Add($"{BuildDisplayNameFromLocalPath(selectedPath)}：已被同批选择的父目录覆盖");
+                continue;
+            }
+
+            result.Add(selectedPath);
+        }
+
+        return result.ToArray();
+    }
+
+    private static bool IsVirtualChildPath(string parentPath, string candidatePath)
+    {
+        var normalizedParent = WebDavPathHelper.NormalizeVirtualPath(parentPath);
+        var normalizedCandidate = WebDavPathHelper.NormalizeVirtualPath(candidatePath);
+        if (string.Equals(normalizedParent, normalizedCandidate, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (normalizedParent == "/")
+        {
+            return normalizedCandidate != "/";
+        }
+
+        return normalizedCandidate.StartsWith(
+            $"{normalizedParent.TrimEnd('/')}/",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsLocalChildPath(string parentPath, string candidatePath)
+    {
+        var normalizedParent = NormalizeLocalComparablePath(parentPath);
+        var normalizedCandidate = NormalizeLocalComparablePath(candidatePath);
+        if (string.IsNullOrWhiteSpace(normalizedParent)
+            || string.IsNullOrWhiteSpace(normalizedCandidate)
+            || string.Equals(normalizedParent, normalizedCandidate, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return normalizedCandidate.StartsWith(
+            $"{normalizedParent}{Path.DirectorySeparatorChar}",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeLocalComparablePath(string path)
+    {
+        var normalizedPath = NormalizeLocalInputPath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            normalizedPath = Path.GetFullPath(normalizedPath);
+        }
+        catch
+        {
+            // Keep the user's normalized input if the path is currently not parseable.
+        }
+
+        return normalizedPath
+            .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
+            .TrimEnd(Path.DirectorySeparatorChar);
+    }
+
+    private static string FormatWebDavPathBatchAddStatus(
+        IReadOnlyList<string> added,
+        IReadOnlyList<string> skipped,
+        int removedNestedCount)
     {
         if (added.Count == 0 && skipped.Count == 0)
         {
-            return "没有选择本地目录。";
+            return AppendNestedPathRemovalStatus("没有选择 WebDAV 目录。", removedNestedCount);
+        }
+
+        var parts = new List<string>();
+        if (added.Count > 0)
+        {
+            parts.Add($"已添加 {added.Count} 个 WebDAV 路径：{FormatNamePreview(added)}");
+        }
+
+        if (skipped.Count > 0)
+        {
+            parts.Add($"跳过 {skipped.Count} 个：{FormatNamePreview(skipped)}");
+        }
+
+        return AppendNestedPathRemovalStatus(string.Join("；", parts), removedNestedCount);
+    }
+
+    private static string FormatLocalPathBatchAddStatus(
+        IReadOnlyList<string> added,
+        IReadOnlyList<string> skipped,
+        int removedNestedCount)
+    {
+        if (added.Count == 0 && skipped.Count == 0)
+        {
+            return AppendNestedPathRemovalStatus("没有选择本地目录。", removedNestedCount);
         }
 
         var parts = new List<string>();
@@ -1381,7 +1588,106 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             parts.Add($"跳过 {skipped.Count} 个：{FormatNamePreview(skipped)}");
         }
 
-        return string.Join("；", parts);
+        return AppendNestedPathRemovalStatus(string.Join("；", parts), removedNestedCount);
+    }
+
+    private static string AppendNestedPathRemovalStatus(string message, int removedNestedCount)
+    {
+        if (removedNestedCount <= 0)
+        {
+            return message;
+        }
+
+        return $"{message}；已自动移除 {removedNestedCount} 个已有子路径，原因：新添加的父路径已覆盖它们。";
+    }
+
+    private static string FormatLocalScanPathStatusDisplay(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return string.Empty;
+        }
+
+        var compactMessage = TruncateDelimitedStatusSegments(message.Trim(), LocalStatusSegmentMaxLength);
+        return TruncateMiddle(compactMessage, LocalStatusDisplayMaxLength);
+    }
+
+    private static string TruncateDelimitedStatusSegments(string message, int maxSegmentLength)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return message;
+        }
+
+        var builder = new StringBuilder(message.Length);
+        var segmentStart = 0;
+        for (var i = 0; i < message.Length; i++)
+        {
+            if (!IsLocalStatusDelimiter(message[i]))
+            {
+                continue;
+            }
+
+            AppendTruncatedStatusSegment(builder, message.AsSpan(segmentStart, i - segmentStart), maxSegmentLength);
+            builder.Append(message[i]);
+            segmentStart = i + 1;
+        }
+
+        AppendTruncatedStatusSegment(builder, message.AsSpan(segmentStart), maxSegmentLength);
+        return builder.ToString();
+    }
+
+    private static bool IsLocalStatusDelimiter(char value)
+    {
+        return value is ':' or '：' or '、' or ',' or '，' or ';' or '；';
+    }
+
+    private static void AppendTruncatedStatusSegment(StringBuilder builder, ReadOnlySpan<char> segment, int maxSegmentLength)
+    {
+        if (segment.Length == 0)
+        {
+            return;
+        }
+
+        var leadingWhitespaceLength = 0;
+        while (leadingWhitespaceLength < segment.Length && char.IsWhiteSpace(segment[leadingWhitespaceLength]))
+        {
+            leadingWhitespaceLength++;
+        }
+
+        var trailingWhitespaceLength = 0;
+        while (trailingWhitespaceLength < segment.Length - leadingWhitespaceLength
+               && char.IsWhiteSpace(segment[segment.Length - trailingWhitespaceLength - 1]))
+        {
+            trailingWhitespaceLength++;
+        }
+
+        if (leadingWhitespaceLength > 0)
+        {
+            builder.Append(segment[..leadingWhitespaceLength]);
+        }
+
+        var content = segment.Slice(
+            leadingWhitespaceLength,
+            segment.Length - leadingWhitespaceLength - trailingWhitespaceLength);
+        builder.Append(TruncateMiddle(content.ToString(), maxSegmentLength));
+
+        if (trailingWhitespaceLength > 0)
+        {
+            builder.Append(segment[^trailingWhitespaceLength..]);
+        }
+    }
+
+    private static string TruncateMiddle(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        var headLength = Math.Max(8, (maxLength - 3) / 2);
+        var tailLength = Math.Max(8, maxLength - 3 - headLength);
+        return $"{value[..headLength]}...{value[^tailLength..]}";
     }
 
     private static string FormatNamePreview(IReadOnlyList<string> values)

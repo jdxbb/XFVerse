@@ -73,9 +73,47 @@ public sealed class UserCollectionService : IUserCollectionService
                 })
             .ToListAsync(cancellationToken);
 
+        var favoriteItems = await dbContext.UserMovieCollectionItems
+            .AsNoTracking()
+            .Where(x => x.IsFavorite && !x.IsNotInterested)
+            .Select(
+                x => new CollectionMovieItem
+                {
+                    MovieId = x.MovieId,
+                    TmdbId = x.TmdbId,
+                    Title = x.Title,
+                    OriginalTitle = x.OriginalTitle,
+                    ReleaseYear = x.ReleaseYear,
+                    ReleaseDate = x.ReleaseDate,
+                    PosterRemoteUrl = x.PosterRemoteUrl,
+                    Overview = x.Overview,
+                    GenresText = x.GenresText,
+                    AiTagsText = x.GenresText,
+                    EmotionTagsText = InferEmotionTags(x.Overview),
+                    SceneTagsText = "\u72ec\u81ea\u89c2\u770b",
+                    Country = x.Country,
+                    Language = x.Language,
+                    RuntimeMinutes = x.RuntimeMinutes,
+                    ImdbId = x.ImdbId,
+                    TmdbRating = x.TmdbRating,
+                    TmdbVoteCount = x.TmdbVoteCount,
+                    OmdbScoreValue = x.OmdbScoreValue,
+                    OmdbScoreScale = x.OmdbScoreScale,
+                    OmdbVoteCount = x.OmdbVoteCount,
+                    OmdbSourceUrl = x.OmdbSourceUrl,
+                    OmdbLastUpdatedAt = x.OmdbLastUpdatedAt,
+                    IsLiked = true,
+                    IsWantToWatch = x.IsWantToWatch,
+                    IsWatched = x.IsWatched,
+                    IsNotInterested = x.IsNotInterested,
+                    IsInLibrary = x.IsInLibrary,
+                    UpdatedAt = x.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+
         var wantItems = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
-            .Where(x => x.IsWantToWatch && !x.IsNotInterested)
+            .Where(x => x.IsWantToWatch && !x.IsFavorite && !x.IsNotInterested)
             .Select(
                 x => new CollectionMovieItem
                 {
@@ -111,11 +149,17 @@ public sealed class UserCollectionService : IUserCollectionService
                 })
             .ToListAsync(cancellationToken);
 
+        await HydrateCollectionItemRatingsFromMoviesAsync(
+            dbContext,
+            favoriteItems.Concat(wantItems),
+            cancellationToken);
+
         NormalizeCollectionTags(likedMovies);
+        NormalizeCollectionTags(favoriteItems);
         NormalizeCollectionTags(wantItems);
 
         var merged = new Dictionary<string, CollectionMovieItem>(StringComparer.OrdinalIgnoreCase);
-        foreach (var item in likedMovies.Concat(wantItems))
+        foreach (var item in likedMovies.Concat(favoriteItems).Concat(wantItems))
         {
             var key = BuildKey(item.MovieId, item.TmdbId, item.Title, item.ReleaseYear);
             if (merged.TryGetValue(key, out var existing))
@@ -146,6 +190,96 @@ public sealed class UserCollectionService : IUserCollectionService
             .OrderByDescending(x => x.UpdatedAt)
             .ThenBy(x => x.Title)
             .ToList();
+    }
+
+    private static async Task HydrateCollectionItemRatingsFromMoviesAsync(
+        AppDbContext dbContext,
+        IEnumerable<CollectionMovieItem> items,
+        CancellationToken cancellationToken)
+    {
+        var collectionItems = items
+            .Where(x => !x.IsTvSeason && (x.MovieId.HasValue || x.TmdbId.HasValue))
+            .ToArray();
+        if (collectionItems.Length == 0)
+        {
+            return;
+        }
+
+        var movieIds = collectionItems
+            .Select(x => x.MovieId)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToArray();
+        var tmdbIds = collectionItems
+            .Select(x => x.TmdbId)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToArray();
+
+        var ratings = await dbContext.Movies
+            .AsNoTracking()
+            .Where(x => movieIds.Contains(x.Id) || (x.TmdbId.HasValue && tmdbIds.Contains(x.TmdbId.Value)))
+            .Select(
+                x => new CollectionMovieRatingSnapshot
+                {
+                    MovieId = x.Id,
+                    TmdbId = x.TmdbId,
+                    TmdbRating = x.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    TmdbVoteCount = x.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbScoreValue = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    OmdbScoreScale = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreScale)
+                        .FirstOrDefault(),
+                    OmdbVoteCount = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbSourceUrl = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.SourceUrl ?? string.Empty)
+                        .FirstOrDefault() ?? string.Empty,
+                    OmdbLastUpdatedAt = x.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.LastUpdatedAt ?? rating.CreatedAt)
+                        .FirstOrDefault()
+                })
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in collectionItems)
+        {
+            var rating = item.MovieId.HasValue
+                ? ratings.FirstOrDefault(x => x.MovieId == item.MovieId.Value)
+                : null;
+            rating ??= item.TmdbId.HasValue
+                ? ratings.FirstOrDefault(x => x.TmdbId == item.TmdbId.Value)
+                : null;
+            if (rating is null)
+            {
+                continue;
+            }
+
+            item.TmdbRating ??= rating.TmdbRating;
+            item.TmdbVoteCount ??= rating.TmdbVoteCount;
+            item.OmdbScoreValue ??= rating.OmdbScoreValue;
+            item.OmdbScoreScale ??= rating.OmdbScoreScale;
+            item.OmdbVoteCount ??= rating.OmdbVoteCount;
+            item.OmdbLastUpdatedAt ??= rating.OmdbLastUpdatedAt;
+            item.OmdbSourceUrl = string.IsNullOrWhiteSpace(item.OmdbSourceUrl)
+                ? rating.OmdbSourceUrl
+                : item.OmdbSourceUrl;
+        }
     }
 
     public async Task AddWantToWatchAsync(
@@ -367,6 +501,7 @@ public sealed class UserCollectionService : IUserCollectionService
 
         var now = DateTime.UtcNow;
         var oldEntityWatched = entity?.IsWatched ?? false;
+        var oldEntityFavorite = entity?.IsFavorite ?? false;
         var oldEntityWantToWatch = entity?.IsWantToWatch ?? false;
 
         if (entity is null)
@@ -387,6 +522,10 @@ public sealed class UserCollectionService : IUserCollectionService
         {
             entity.IsWantToWatch = false;
         }
+        else
+        {
+            entity.IsFavorite = false;
+        }
 
         RestoreAutoVisibilityForPositiveState(entity, isWatched);
         entity.UpdatedAt = now;
@@ -399,6 +538,17 @@ public sealed class UserCollectionService : IUserCollectionService
             UserMovieStateChangeHistoryRecorder.StateWatched,
             oldEntityWatched,
             entity.IsWatched,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldEntityFavorite,
+            entity.IsFavorite,
             changeSource,
             now);
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
@@ -459,6 +609,213 @@ public sealed class UserCollectionService : IUserCollectionService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task SetFavoriteAsync(
+        AiRecommendationItem recommendation,
+        bool isFavorite,
+        CancellationToken cancellationToken = default,
+        string changeSource = "Manual")
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
+        var movie = await FindMovieForRecommendationAsync(dbContext, recommendation, cancellationToken);
+        if (entity is null && movie is null && !isFavorite)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (movie is not null)
+        {
+            var oldMovieWatched = movie.IsWatched;
+            var oldMovieFavorite = movie.IsFavorite;
+            if (isFavorite && !movie.IsWatched && (entity?.IsWatched == true || recommendation.IsWatched))
+            {
+                movie.IsWatched = true;
+            }
+
+            if (isFavorite && !movie.IsWatched)
+            {
+                throw new InvalidOperationException("\u53ea\u6709\u5df2\u770b\u5f71\u7247\u53ef\u4ee5\u6807\u8bb0\u559c\u7231\u3002");
+            }
+
+            movie.IsFavorite = isFavorite;
+            movie.UpdatedAt = now;
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                movie.TmdbId,
+                movie.Id,
+                collectionItemId: null,
+                movie.Title,
+                UserMovieStateChangeHistoryRecorder.StateWatched,
+                oldMovieWatched,
+                movie.IsWatched,
+                changeSource,
+                now);
+            UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                dbContext,
+                movie.TmdbId,
+                movie.Id,
+                collectionItemId: null,
+                movie.Title,
+                UserMovieStateChangeHistoryRecorder.StateFavorite,
+                oldMovieFavorite,
+                movie.IsFavorite,
+                changeSource,
+                now);
+
+            if (entity is not null)
+            {
+                var oldEntityWatched = entity.IsWatched;
+                var oldEntityFavorite = entity.IsFavorite;
+                var oldEntityWantToWatch = entity.IsWantToWatch;
+                var oldEntityNotInterested = entity.IsNotInterested;
+                ApplyMovieSnapshot(entity, movie);
+                entity.IsWatched = movie.IsWatched;
+                entity.IsFavorite = isFavorite;
+                if (isFavorite)
+                {
+                    entity.IsWantToWatch = false;
+                    entity.IsNotInterested = false;
+                }
+
+                RestoreAutoVisibilityForPositiveState(entity, isFavorite);
+                entity.UpdatedAt = now;
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    entity.TmdbId,
+                    movie.Id,
+                    entity.Id == 0 ? null : entity.Id,
+                    entity.Title,
+                    UserMovieStateChangeHistoryRecorder.StateWatched,
+                    oldEntityWatched,
+                    entity.IsWatched,
+                    changeSource,
+                    now);
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    entity.TmdbId,
+                    movie.Id,
+                    entity.Id == 0 ? null : entity.Id,
+                    entity.Title,
+                    UserMovieStateChangeHistoryRecorder.StateFavorite,
+                    oldEntityFavorite,
+                    entity.IsFavorite,
+                    changeSource,
+                    now);
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    entity.TmdbId,
+                    movie.Id,
+                    entity.Id == 0 ? null : entity.Id,
+                    entity.Title,
+                    UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+                    oldEntityWantToWatch,
+                    entity.IsWantToWatch,
+                    changeSource,
+                    now);
+                UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+                    dbContext,
+                    entity.TmdbId,
+                    movie.Id,
+                    entity.Id == 0 ? null : entity.Id,
+                    entity.Title,
+                    UserMovieStateChangeHistoryRecorder.StateNotInterested,
+                    oldEntityNotInterested,
+                    entity.IsNotInterested,
+                    changeSource,
+                    now);
+                CleanupCollectionEntityIfEmpty(dbContext, entity);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        if (entity is null)
+        {
+            entity = new UserMovieCollectionItem
+            {
+                CreatedAt = now,
+                IsWantToWatch = false,
+                IsWatched = false,
+                IsFavorite = false,
+                IsNotInterested = false
+            };
+            dbContext.UserMovieCollectionItems.Add(entity);
+        }
+
+        var oldFavorite = entity.IsFavorite;
+        var oldWatched = entity.IsWatched;
+        var oldWantToWatch = entity.IsWantToWatch;
+        var oldNotInterested = entity.IsNotInterested;
+        ApplyRecommendationSnapshot(entity, recommendation);
+        if (isFavorite && !entity.IsWatched && recommendation.IsWatched)
+        {
+            entity.IsWatched = true;
+        }
+
+        if (isFavorite && !entity.IsWatched)
+        {
+            throw new InvalidOperationException("\u53ea\u6709\u5df2\u770b\u5f71\u7247\u53ef\u4ee5\u6807\u8bb0\u559c\u7231\u3002");
+        }
+
+        entity.IsFavorite = isFavorite;
+        if (isFavorite)
+        {
+            entity.IsWantToWatch = false;
+            entity.IsNotInterested = false;
+        }
+
+        RestoreAutoVisibilityForPositiveState(entity, isFavorite);
+        entity.UpdatedAt = now;
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWatched,
+            oldWatched,
+            entity.IsWatched,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldFavorite,
+            entity.IsFavorite,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateWantToWatch,
+            oldWantToWatch,
+            entity.IsWantToWatch,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateNotInterested,
+            oldNotInterested,
+            entity.IsNotInterested,
+            changeSource,
+            now);
+        CleanupCollectionEntityIfEmpty(dbContext, entity);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task SetNotInterestedAsync(
         AiRecommendationItem recommendation,
         bool isNotInterested,
@@ -476,6 +833,7 @@ public sealed class UserCollectionService : IUserCollectionService
         var now = DateTime.UtcNow;
         var oldNotInterested = entity?.IsNotInterested ?? false;
         var oldWantToWatch = entity?.IsWantToWatch ?? false;
+        var oldFavorite = entity?.IsFavorite ?? false;
 
         if (entity is null)
         {
@@ -518,6 +876,7 @@ public sealed class UserCollectionService : IUserCollectionService
         if (isNotInterested)
         {
             entity.IsWantToWatch = false;
+            entity.IsFavorite = false;
         }
 
         RestoreAutoVisibilityForPositiveState(entity, isNotInterested);
@@ -531,6 +890,17 @@ public sealed class UserCollectionService : IUserCollectionService
             UserMovieStateChangeHistoryRecorder.StateNotInterested,
             oldNotInterested,
             entity.IsNotInterested,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldFavorite,
+            entity.IsFavorite,
             changeSource,
             now);
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
@@ -570,6 +940,7 @@ public sealed class UserCollectionService : IUserCollectionService
         var now = DateTime.UtcNow;
         var oldNotInterested = entity?.IsNotInterested ?? false;
         var oldWantToWatch = entity?.IsWantToWatch ?? false;
+        var oldFavorite = entity?.IsFavorite ?? false;
         var oldMovieFavorite = movie.IsFavorite;
 
         if (entity is null)
@@ -587,6 +958,7 @@ public sealed class UserCollectionService : IUserCollectionService
         if (isNotInterested)
         {
             entity.IsWantToWatch = false;
+            entity.IsFavorite = false;
             movie.IsFavorite = false;
             movie.UpdatedAt = now;
         }
@@ -602,6 +974,17 @@ public sealed class UserCollectionService : IUserCollectionService
             UserMovieStateChangeHistoryRecorder.StateNotInterested,
             oldNotInterested,
             entity.IsNotInterested,
+            changeSource,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            movie.Id,
+            entity.Id == 0 ? null : entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldFavorite,
+            entity.IsFavorite,
             changeSource,
             now);
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
@@ -650,6 +1033,7 @@ public sealed class UserCollectionService : IUserCollectionService
             ApplyRecommendationSnapshot(entity, recommendation);
             entity.IsWatched = recommendation.IsWatched;
             entity.IsWantToWatch = recommendation.IsWantToWatch;
+            entity.IsFavorite = recommendation.IsFavorite;
             entity.IsNotInterested = recommendation.IsNotInterested;
         }
 
@@ -716,6 +1100,7 @@ public sealed class UserCollectionService : IUserCollectionService
                 CreatedAt = now,
                 IsWantToWatch = false,
                 IsWatched = false,
+                IsFavorite = false,
                 IsNotInterested = false
             };
             dbContext.UserMovieCollectionItems.Add(entity);
@@ -735,9 +1120,11 @@ public sealed class UserCollectionService : IUserCollectionService
                               || movie?.IsWatched == true
                               || movie?.UserRating.HasValue == true
                               || entity.IsWatched
+                              || entity.IsFavorite
                               || entity.IsWantToWatch
                               || entity.IsNotInterested
                               || recommendation.IsWatched
+                              || recommendation.IsFavorite
                               || recommendation.IsWantToWatch
                               || recommendation.IsNotInterested;
         entity.LibraryVisibilityState = ResolveRestoredVisibilityState(hasActiveSource, hasCurrentState);
@@ -793,9 +1180,11 @@ public sealed class UserCollectionService : IUserCollectionService
         var now = DateTime.UtcNow;
         var oldWantToWatch = entity.IsWantToWatch;
         var oldWatched = entity.IsWatched;
+        var oldFavorite = entity.IsFavorite;
         var oldNotInterested = entity.IsNotInterested;
         entity.IsWantToWatch = false;
         entity.IsWatched = false;
+        entity.IsFavorite = false;
         entity.IsNotInterested = false;
         entity.UpdatedAt = now;
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
@@ -818,6 +1207,17 @@ public sealed class UserCollectionService : IUserCollectionService
             UserMovieStateChangeHistoryRecorder.StateWatched,
             oldWatched,
             entity.IsWatched,
+            UserMovieStateChangeHistoryRecorder.SourceCollection,
+            now);
+        UserMovieStateChangeHistoryRecorder.RecordIfChanged(
+            dbContext,
+            entity.TmdbId,
+            entity.MovieId,
+            entity.Id,
+            entity.Title,
+            UserMovieStateChangeHistoryRecorder.StateFavorite,
+            oldFavorite,
+            entity.IsFavorite,
             UserMovieStateChangeHistoryRecorder.SourceCollection,
             now);
         UserMovieStateChangeHistoryRecorder.RecordIfChanged(
@@ -1026,6 +1426,7 @@ public sealed class UserCollectionService : IUserCollectionService
     private static void CleanupCollectionEntityIfEmpty(AppDbContext dbContext, UserMovieCollectionItem entity)
     {
         if (!entity.IsWatched
+            && !entity.IsFavorite
             && !entity.IsWantToWatch
             && !entity.IsNotInterested
             && entity.LibraryVisibilityState == LibraryVisibilityState.Auto)
@@ -1122,5 +1523,26 @@ public sealed class UserCollectionService : IUserCollectionService
         }
 
         return $"title:{title.Trim().ToLowerInvariant()}:{year?.ToString() ?? string.Empty}";
+    }
+
+    private sealed class CollectionMovieRatingSnapshot
+    {
+        public int MovieId { get; init; }
+
+        public int? TmdbId { get; init; }
+
+        public double? TmdbRating { get; init; }
+
+        public int? TmdbVoteCount { get; init; }
+
+        public double? OmdbScoreValue { get; init; }
+
+        public double? OmdbScoreScale { get; init; }
+
+        public int? OmdbVoteCount { get; init; }
+
+        public string OmdbSourceUrl { get; init; } = string.Empty;
+
+        public DateTime? OmdbLastUpdatedAt { get; init; }
     }
 }

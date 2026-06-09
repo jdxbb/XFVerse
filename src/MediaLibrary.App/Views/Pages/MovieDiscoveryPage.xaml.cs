@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using MediaLibrary.App.Helpers;
 using MediaLibrary.App.ViewModels.Main;
 using MediaLibrary.App.ViewModels.Pages;
+using MediaLibrary.Core.Diagnostics;
 
 namespace MediaLibrary.App.Views.Pages;
 
@@ -284,6 +285,32 @@ public partial class MovieDiscoveryPage : UserControl
         }
 
         e.Handled = true;
+    }
+
+    private void RankingNextPageButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MovieDiscoveryViewModel viewModel)
+        {
+            return;
+        }
+
+        var buttonEnabled = sender is Button button && button.IsEnabled;
+        AiPerfDiagnostics.WriteEvent(
+            "event=ranking-next-ui-pointer "
+            + $"mediaType={(viewModel.IsTvRankingSelected ? "tv" : "movie")} "
+            + $"buttonEnabled={buttonEnabled} "
+            + $"commandCanExecute={viewModel.GoNextRankingPageCommand.CanExecute(null)} "
+            + $"activeCanNext={viewModel.CanGoNextActiveRankingPage} "
+            + $"movieCanNext={viewModel.CanGoNextRankingPage} "
+            + $"tvCanNext={viewModel.CanGoNextTvRankingPage} "
+            + $"moviePage={viewModel.RankingPageIndex} "
+            + $"movieTotalPages={viewModel.RankingTotalDisplayPages} "
+            + $"tvPage={viewModel.TvRankingPageIndex} "
+            + $"tvTotalPages={viewModel.TvRankingTotalDisplayPages} "
+            + $"movieLoading={viewModel.IsRankingLoading} "
+            + $"tvLoading={viewModel.IsTvRankingLoading} "
+            + $"tvNavigating={viewModel.IsTvSeriesNavigating} "
+            + $"menuOpen={_openContextMenu?.IsOpen == true}");
     }
 
     private bool CanOpenRankingTabMenu()

@@ -25,13 +25,9 @@ internal static class DiscoveryRatingPresenter
                 (Score: tmdbScore!.Value, Votes: Math.Min(Math.Max(tmdbVotes ?? 0, 0), VoteWeightCap)),
                 (Score: omdbRating!.ScoreValue, Votes: Math.Min(Math.Max(omdbRating.VoteCount ?? 0, 0), VoteWeightCap))
             };
-            var totalVotes = ratings.Sum(rating => rating.Votes);
-            var weightedScore = totalVotes > 0
-                ? ratings.Sum(rating => rating.Score * rating.Votes) / totalVotes
-                : ratings.Average(rating => rating.Score);
-            if (IsValidScore(weightedScore))
+            if (TryBuildDisplayScore(ratings, out var displayScore))
             {
-                return new DiscoveryRatingPresentation(weightedScore, FormatRatingText(weightedScore));
+                return new DiscoveryRatingPresentation(displayScore, FormatRatingText(displayScore));
             }
         }
 
@@ -75,6 +71,32 @@ internal static class DiscoveryRatingPresenter
     public static bool IsHighDisplayRating(double? score)
     {
         return IsValidScore(score) && RoundRatingForDisplay(score!.Value) >= 8d;
+    }
+
+    private static bool TryBuildDisplayScore(
+        IReadOnlyList<(double Score, int Votes)> ratings,
+        out double score)
+    {
+        var validRatings = ratings
+            .Where(rating => IsValidScore(rating.Score))
+            .ToArray();
+        if (validRatings.Length == 0)
+        {
+            score = 0d;
+            return false;
+        }
+
+        if (validRatings.Length == 1)
+        {
+            score = validRatings[0].Score;
+            return true;
+        }
+
+        var totalVotes = validRatings.Sum(rating => rating.Votes);
+        score = totalVotes > 0
+            ? validRatings.Sum(rating => rating.Score * rating.Votes) / totalVotes
+            : validRatings.Average(rating => rating.Score);
+        return IsValidScore(score);
     }
 
     private static string FormatRatingText(double score)

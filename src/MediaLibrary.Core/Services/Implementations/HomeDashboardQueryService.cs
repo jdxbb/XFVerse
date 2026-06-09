@@ -310,9 +310,46 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
                 })
             .ToListAsync(cancellationToken);
 
+        var externalFavoriteItems = await dbContext.UserMovieCollectionItems
+            .AsNoTracking()
+            .Where(x => x.IsFavorite && !x.IsNotInterested)
+            .OrderByDescending(x => x.UpdatedAt)
+            .Take(6)
+            .Select(
+                x => new CollectionMovieItem
+                {
+                    MovieId = x.MovieId,
+                    TmdbId = x.TmdbId,
+                    Title = x.Title,
+                    OriginalTitle = x.OriginalTitle,
+                    ReleaseYear = x.ReleaseYear,
+                    ReleaseDate = x.ReleaseDate,
+                    PosterRemoteUrl = x.PosterRemoteUrl,
+                    Overview = x.Overview,
+                    GenresText = x.GenresText,
+                    AiTagsText = x.GenresText,
+                    Country = x.Country,
+                    Language = x.Language,
+                    RuntimeMinutes = x.RuntimeMinutes,
+                    ImdbId = x.ImdbId,
+                    TmdbRating = x.TmdbRating,
+                    TmdbVoteCount = x.TmdbVoteCount,
+                    OmdbScoreValue = x.OmdbScoreValue,
+                    OmdbScoreScale = x.OmdbScoreScale,
+                    OmdbVoteCount = x.OmdbVoteCount,
+                    OmdbSourceUrl = x.OmdbSourceUrl,
+                    OmdbLastUpdatedAt = x.OmdbLastUpdatedAt,
+                    IsLiked = true,
+                    IsWantToWatch = x.IsWantToWatch,
+                    IsWatched = x.IsWatched,
+                    IsInLibrary = x.IsInLibrary,
+                    UpdatedAt = x.UpdatedAt
+                })
+            .ToListAsync(cancellationToken);
+
         var wantItems = await dbContext.UserMovieCollectionItems
             .AsNoTracking()
-            .Where(x => x.IsWantToWatch && !x.IsWatched)
+            .Where(x => x.IsWantToWatch && !x.IsFavorite && !x.IsWatched)
             .OrderByDescending(x => x.UpdatedAt)
             .Take(6)
             .Select(
@@ -349,7 +386,11 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
 
         return new HomeDashboardModel
         {
-            FavoriteCollectionItems = favoriteItems,
+            FavoriteCollectionItems = favoriteItems
+                .Concat(externalFavoriteItems)
+                .OrderByDescending(x => x.UpdatedAt)
+                .Take(6)
+                .ToList(),
             WantToWatchItems = wantItems
         };
     }

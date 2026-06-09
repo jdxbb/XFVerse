@@ -9,4 +9,6 @@ public interface IScanPathPickerService
     Task<IReadOnlyList<string>> PickLocalDirectoriesAsync(string? initialPath = null);
 
     Task<string?> PickWebDavDirectoryAsync(WebDavConnectionModel connection, string? initialPath = null);
+
+    Task<IReadOnlyList<string>> PickWebDavDirectoriesAsync(WebDavConnectionModel connection, string? initialPath = null);
 }

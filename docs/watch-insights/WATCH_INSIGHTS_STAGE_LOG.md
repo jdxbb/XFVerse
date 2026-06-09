@@ -275,6 +275,19 @@ Validation:
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
 
+## External Movie Favorite Signal Follow-up
+
+Completed:
+- Watch Statistics and Watch Profile input now include `UserMovieCollectionItem.IsFavorite` so no-source external favorites are counted as favorite signals.
+- Favorite tag comparison and profile samples now merge external favorite collection rows with local `Movie.IsFavorite` rows by TMDB identity.
+
+Boundaries kept:
+- No profile prompt structure or recommendation generation policy was changed.
+- No database update, commit, or push was run.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:BaseOutputPath=<temp-build-output>` passed with 0 warnings and 0 errors after migration generation.
+
 ## WI-8.2 Persona Poster Asset Replacement And Color Frame Mapping
 
 Status:

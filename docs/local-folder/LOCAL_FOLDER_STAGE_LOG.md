@@ -518,3 +518,120 @@
 ### Suggested Commit Message
 
 - `feat: add local folder media source support`
+
+## Scan Task UI Follow-up
+
+### Modified Files
+
+- `src/MediaLibrary.App/Services/Implementations/ScanPathPickerService.cs`
+- `src/MediaLibrary.App/ViewModels/Pages/ScanTasksViewModel.cs`
+- `src/MediaLibrary.App/Views/Pages/ScanTasksPage.xaml`
+- `docs/local-folder/LOCAL_FOLDER_STAGE_LOG.md`
+
+### Added Files
+
+- None.
+
+### Deleted Files
+
+- None.
+
+### Added Migration
+
+- None.
+
+### Completed
+
+- Kept Local folder overlap protection: a selected folder is still skipped when it has a parent/child containment relationship with an existing Local scan path.
+- Moved the Local configuration status text into the card header, immediately to the left of the path picker button.
+- Made skipped Local folder additions show a compact reason such as duplicate path, containment relationship, or invalid path format.
+- Combined `FolderNames` and `FolderName` from the Windows folder picker so a valid returned selection is not lost.
+- Changed the Local path list to two equal responsive columns with a vertical divider between the left and right path boxes.
+- Reduced scan metric card width, changed the scanned icon to a centered check mark, and moved the third metric column left to leave more room before scan action buttons.
+
+### Not Done In This Stage
+
+- No change to Local folder overlap scanning semantics.
+- No WebDAV picker behavior changes.
+- No database schema change.
+- No migration.
+
+### Build Result
+
+- `dotnet build MediaLibrary.sln`: passed with 0 warnings and 0 errors.
+
+### Manual Acceptance Matrix
+
+- Open the scan tasks page.
+- In Local configuration, confirm the status text appears left of `选择路径`.
+- Select a new Local folder and confirm the list refreshes.
+- Select an already configured Local folder and confirm the status reports a duplicate reason.
+- Select a child or parent folder of an existing Local folder and confirm the status reports a containment reason.
+- Confirm the skipped containment folder is not added to the list.
+- Confirm long Local path names truncate with tooltip rather than stretching the row.
+- Confirm Local paths render as two equal-width columns.
+- Confirm the vertical divider appears between the two Local path columns.
+- Collapse the navigation bar and confirm both Local path columns expand equally.
+- Confirm the scan progress `已扫描` metric uses a vertically centered check icon.
+- Confirm scan metric cards are narrower and leave a larger gap before the scan action buttons on wider layouts.
+
+### Known Issues
+
+- Blocker: None.
+- Deferred: WebDAV path picker had no concrete follow-up item in this pass.
+- Noise: Full visual QA still needs in-app confirmation on the user's real display scale.
+
+## Scan Task UI Follow-up 2
+
+### Completed
+
+- Local path add status now keeps the full reason in tooltip while showing a shortened display value for very long directory names.
+- The containment-skip semantic remains explicit in the status message; long private path names are truncated only for the visible header text.
+- WebDAV configuration card now has a vertical divider between the two equal-width path/config boxes.
+- Local path cards stay top-aligned inside the two-column list to avoid large vertical gaps when only a few paths are configured.
+- Scan progress metric icons now share the same centered vector-icon structure, and the gap before the right-side scan buttons was increased.
+- WebDAV path picker gained compact dialog styling, icon-only parent/forward/refresh controls, shorter directory rows, and two evenly distributed action buttons.
+
+### Not Done
+
+- No Local folder overlap scanning semantic was changed.
+- No database schema, migration, database update, commit, or push was added.
+
+### Verification
+
+- `dotnet build MediaLibrary.sln`: passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`: no output.
+
+### Known Issues
+
+- Blocker: None.
+- Deferred: Manual visual QA is still needed on the real scan page for sidebar collapsed/expanded widths.
+- Noise: Full private Local/WebDAV paths are not recorded in documentation.
+
+## Scan Task Picker And Progress Alignment Follow-up
+
+### Completed
+
+- Local configuration status display now truncates both long status segments and the whole visible header value; the full reason remains available through the tooltip.
+- WebDAV path picker now uses a single preference-style glass panel on a transparent borderless window, avoiding the previous double rounded-border look.
+- WebDAV picker close action uses the Segoe MDL2 close glyph instead of a text fallback.
+- WebDAV directory loading now shows a centered spinner and loading text inside the directory content area.
+- WebDAV picker forward navigation now keeps a stack so consecutive parent navigation can be undone with consecutive forward clicks until the user switches into a selected directory.
+- WebDAV directory list height was reduced, uses a modern auto-reveal scrollbar, and supports mouse-wheel scrolling while the pointer is over the list.
+- WebDAV picker footer actions now use auto-width buttons distributed across two equal columns.
+- Scan progress actions now sit between equal flexible gaps after the fixed metric-card cluster, so the gap from the third metric card to the buttons matches the gap from the buttons to the progress card right edge across sidebar states.
+
+### Not Done
+
+- No scan recognition, overlap, deletion, or media-library semantics were changed.
+- No database schema, migration, database update, commit, or push was added.
+
+### Verification
+
+- `dotnet build MediaLibrary.sln -p:BaseOutputPath=<temp-build-output>` passed with 0 warnings and 0 errors.
+
+### Known Issues
+
+- Blocker: None.
+- Deferred: Manual visual QA is still needed in the real WPF window for exact sidebar collapsed/expanded spacing and WebDAV row density.
+- Noise: Existing adjacent scan-task and UI follow-up changes remain in the working tree.

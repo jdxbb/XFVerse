@@ -2402,7 +2402,7 @@ public sealed class RecommendationService : IRecommendationService
     {
         return await dbContext.UserMovieCollectionItems
             .AsNoTracking()
-            .Where(x => x.IsInLibrary || x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
+            .Where(x => x.IsInLibrary || x.IsWatched || x.IsFavorite || x.IsWantToWatch || x.IsNotInterested)
             .Select(
                 x => new UserMovieState
                 {
@@ -2421,10 +2421,12 @@ public sealed class RecommendationService : IRecommendationService
                     ImdbId = x.ImdbId,
                     TmdbRating = x.TmdbRating,
                     TmdbVoteCount = x.TmdbVoteCount,
+                    IsFavorite = x.IsFavorite,
                     IsWantToWatch = x.IsWantToWatch,
                     IsWatched = x.IsWatched,
                     IsNotInterested = x.IsNotInterested,
                     IsInLibrary = x.IsInLibrary,
+                    LibraryVisibilityState = x.LibraryVisibilityState,
                     UpdatedAt = x.UpdatedAt
                 })
             .ToListAsync(cancellationToken);
@@ -2435,7 +2437,7 @@ public sealed class RecommendationService : IRecommendationService
         IReadOnlyList<UserMovieState> userStates)
     {
         return libraryMovies.Any(x => IsReliableLibraryMovieIdentity(x) && (x.IsWatched || x.IsFavorite))
-               || userStates.Any(x => IsReliableUserMovieStateIdentity(x) && (x.IsWantToWatch || x.IsWatched));
+               || userStates.Any(x => IsReliableUserMovieStateIdentity(x) && (x.IsWantToWatch || x.IsWatched || x.IsFavorite));
     }
 
     private static bool IsReliableLibraryMovieIdentity(LibraryRecommendationMovie movie)
@@ -2452,7 +2454,7 @@ public sealed class RecommendationService : IRecommendationService
 
     private static bool HasMeaningfulUserMovieState(UserMovieState state)
     {
-        return state.IsInLibrary || state.IsWatched || state.IsWantToWatch || state.IsNotInterested;
+        return state.IsInLibrary || state.IsWatched || state.IsFavorite || state.IsWantToWatch || state.IsNotInterested;
     }
 
     private static void ApplyUserCollectionFlags(
@@ -2473,7 +2475,10 @@ public sealed class RecommendationService : IRecommendationService
                 {
                     item.IsWantToWatch = false;
                     item.IsWatched = false;
+                    item.IsFavorite = false;
                     item.IsNotInterested = false;
+                    item.IsVisibleInLibrary = false;
+                    item.LibraryVisibilityState = LibraryVisibilityState.Auto;
                 }
 
                 item.WatchStateText = item.IsWatched ? "已看" : "未看";
@@ -2482,17 +2487,32 @@ public sealed class RecommendationService : IRecommendationService
 
             item.IsWantToWatch = state.IsWantToWatch && !state.IsWatched;
             item.IsNotInterested = state.IsNotInterested;
-            if (state.IsInLibrary)
-            {
-                item.IsVisibleInLibrary = true;
-                item.LibraryVisibilityState = LibraryVisibilityState.Visible;
-            }
+            item.IsFavorite = state.IsFavorite;
+            var hasCurrentState = state.IsWatched || state.IsFavorite || state.IsWantToWatch || state.IsNotInterested;
+            item.IsVisibleInLibrary = ResolveIsVisibleInLibrary(
+                state.IsInLibrary,
+                state.LibraryVisibilityState,
+                hasCurrentState);
+            item.LibraryVisibilityState = state.LibraryVisibilityState;
 
             item.IsWatched = item.IsInLibrary
                 ? item.IsWatched || state.IsWatched
                 : state.IsWatched;
             item.WatchStateText = item.IsWatched ? "已看" : "未看";
         }
+    }
+
+    private static bool ResolveIsVisibleInLibrary(
+        bool hasActiveSource,
+        LibraryVisibilityState visibilityState,
+        bool hasCurrentState)
+    {
+        return visibilityState switch
+        {
+            LibraryVisibilityState.Hidden => false,
+            LibraryVisibilityState.Visible => true,
+            _ => hasActiveSource || hasCurrentState
+        };
     }
 
     private async Task<List<AiRecommendationItem>> PrepareRecommendationReturnItemsAsync(
@@ -5313,6 +5333,8 @@ public sealed class RecommendationService : IRecommendationService
 
         public int? TmdbVoteCount { get; set; }
 
+        public bool IsFavorite { get; set; }
+
         public bool IsWantToWatch { get; set; }
 
         public bool IsWatched { get; set; }
@@ -5320,6 +5342,8 @@ public sealed class RecommendationService : IRecommendationService
         public bool IsNotInterested { get; set; }
 
         public bool IsInLibrary { get; set; }
+
+        public LibraryVisibilityState LibraryVisibilityState { get; set; } = LibraryVisibilityState.Auto;
 
         public DateTime UpdatedAt { get; set; }
     }
@@ -5440,6 +5464,7 @@ public sealed class RecommendationService : IRecommendationService
                 TmdbVoteCount = state.TmdbVoteCount,
                 IsInLibrary = false,
                 IsWatched = state.IsWatched,
+                IsFavorite = state.IsFavorite,
                 IsWantToWatch = state.IsWantToWatch,
                 IsNotInterested = state.IsNotInterested,
                 UpdatedAt = state.UpdatedAt

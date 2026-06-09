@@ -29,13 +29,28 @@ public sealed class ScanPathPickerService : IScanPathPickerService
 
     public Task<string?> PickWebDavDirectoryAsync(WebDavConnectionModel connection, string? initialPath = null)
     {
-        var dialog = new WebDavPathPickerWindow(_webDavService, connection, initialPath)
+        var dialog = CreateWebDavPathPickerWindow(connection, initialPath, allowMultiple: false);
+
+        return Task.FromResult(dialog.ShowDialog() == true ? dialog.SelectedPath : null);
+    }
+
+    public Task<IReadOnlyList<string>> PickWebDavDirectoriesAsync(WebDavConnectionModel connection, string? initialPath = null)
+    {
+        var dialog = CreateWebDavPathPickerWindow(connection, initialPath, allowMultiple: true);
+
+        return Task.FromResult<IReadOnlyList<string>>(dialog.ShowDialog() == true ? dialog.SelectedPaths : []);
+    }
+
+    private WebDavPathPickerWindow CreateWebDavPathPickerWindow(
+        WebDavConnectionModel connection,
+        string? initialPath,
+        bool allowMultiple)
+    {
+        return new WebDavPathPickerWindow(_webDavService, connection, initialPath, allowMultiple)
         {
             Owner = ResolveOwner(),
             ShowActivated = true
         };
-
-        return Task.FromResult(dialog.ShowDialog() == true ? dialog.SelectedPath : null);
     }
 
     private static IReadOnlyList<string> PickLocalDirectoriesCore(string? initialPath, bool allowMultiple)
@@ -65,13 +80,13 @@ public sealed class ScanPathPickerService : IScanPathPickerService
         }
 
         var selectedFolders = dialog.FolderNames
+            .Concat(new[] { dialog.FolderName })
             .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return selectedFolders.Length > 0
-            ? selectedFolders
-            : string.IsNullOrWhiteSpace(dialog.FolderName) ? [] : [dialog.FolderName];
+        return selectedFolders;
     }
 
     private static string? NormalizeExistingDirectory(string? path)
@@ -96,6 +111,7 @@ public sealed class ScanPathPickerService : IScanPathPickerService
     {
         var candidates = new[]
         {
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         };

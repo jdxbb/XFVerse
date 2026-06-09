@@ -14,6 +14,8 @@ public interface IUserCollectionService
 
     Task SetWatchedAsync(AiRecommendationItem recommendation, bool isWatched, CancellationToken cancellationToken = default, string changeSource = "Manual");
 
+    Task SetFavoriteAsync(AiRecommendationItem recommendation, bool isFavorite, CancellationToken cancellationToken = default, string changeSource = "Manual");
+
     Task SetNotInterestedAsync(AiRecommendationItem recommendation, bool isNotInterested, CancellationToken cancellationToken = default, string changeSource = "Manual");
 
     Task SetNotInterestedAsync(int movieId, bool isNotInterested, CancellationToken cancellationToken = default, string changeSource = "Manual");

@@ -3,50 +3,219 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
         Title="选择 WebDAV 路径"
-        Width="640"
-        Height="560"
-        MinWidth="560"
-        MinHeight="480"
+        Width="700"
+        Height="480"
+        MinWidth="620"
+        MinHeight="440"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
+        ResizeMode="NoResize"
         ShowInTaskbar="False"
         ShowActivated="True"
-        Background="{DynamicResource BrushDialogBackground}"
+        AllowsTransparency="True"
+        Background="Transparent"
         Style="{StaticResource DialogWindowStyle}"
         Loaded="Window_Loaded">
-    <Border Style="{StaticResource DialogSurfaceStyle}">
+    <Window.Resources>
+        <Style x:Key="WebDavPathPickerDialogPanelStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <Style x:Key="WebDavPathPickerCloseButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinWidth" Value="38" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="WebDavPathPickerIconButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SmallIconButtonStyle}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style x:Key="WebDavPathPickerSelectionDotButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinWidth" Value="24" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Grid Background="{TemplateBinding Background}">
+                            <Ellipse x:Name="SelectionDot"
+                                     Width="14"
+                                     Height="14"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource BrushAccent}"
+                                     StrokeThickness="1.6" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}, Path=IsSelected}"
+                                         Value="True">
+                                <Setter Property="Fill"
+                                        TargetName="SelectionDot"
+                                        Value="{DynamicResource BrushAccent}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WebDavPathPickerDirectoryItemStyle" TargetType="{x:Type ListBoxItem}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="DirectoryItem_PreviewMouseLeftButtonDown" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <Border x:Name="ItemChrome"
+                                Padding="8"
+                                Background="{DynamicResource BrushSurfaceAlt}"
+                                BorderBrush="{DynamicResource BrushBorder}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource RadiusCompactCard}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource BrushSurfaceRaised}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WebDavPathPickerModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border Width="5"
+                                Background="{DynamicResource BrushForegroundMuted}"
+                                CornerRadius="2.5"
+                                Opacity="0.58" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WebDavPathPickerModernScrollRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WebDavPathPickerModernScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="5" />
+            <Setter Property="MinWidth" Value="5" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Width="{TemplateBinding Width}" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Style="{StaticResource WebDavPathPickerModernScrollRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource WebDavPathPickerModernScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Style="{StaticResource WebDavPathPickerModernScrollRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="IsMouseCaptureWithin" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(helpers:ScrollBarAutoRevealBehavior.IsRevealed)}"
+                             Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Border Style="{StaticResource WebDavPathPickerDialogPanelStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="8" />
+                <RowDefinition Height="260" />
+                <RowDefinition Height="12" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid MouseLeftButtonDown="Header_MouseLeftButtonDown">
+            <Grid MinHeight="34"
+                  MouseLeftButtonDown="Header_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="选择 WebDAV 扫描路径"
-                               Style="{StaticResource DialogTitleStyle}" />
-                    <TextBlock Margin="0,8,0,0"
-                               Text="只浏览远端目录层级，选择后仅填入路径编辑框，不会自动保存。"
-                               Style="{StaticResource DialogBodyStyle}" />
-                </StackPanel>
-
+                <TextBlock VerticalAlignment="Center"
+                           Text="选择 WebDAV 扫描路径"
+                           Style="{StaticResource DialogTitleStyle}" />
                 <Button Grid.Column="1"
-                        Content="×"
                         Click="CancelButton_Click"
-                        Style="{StaticResource DialogCloseButtonStyle}"
-                        ToolTip="关闭" />
+                        Style="{StaticResource WebDavPathPickerCloseButtonStyle}"
+                        ToolTip="关闭">
+                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                               FontSize="12"
+                               Text="&#xE711;" />
+                </Button>
             </Grid>
 
-            <Border Grid.Row="1"
-                    Margin="0,20,0,12"
-                    Padding="14"
+            <Border Grid.Row="2"
+                    Padding="9"
                     Style="{StaticResource CompactCardStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -56,111 +225,175 @@
                     <StackPanel MinWidth="0">
                         <TextBlock Text="当前目录"
                                    Style="{StaticResource BodyMutedTextStyle}" />
-                        <TextBlock Margin="0,6,0,0"
+                        <TextBlock Margin="0,3,0,0"
                                    helpers:TrimmedTextToolTipBehavior.FullText="{Binding CurrentPath}"
                                    Style="{StaticResource LongFieldTextBlockStyle}"
-                                   Text="{Binding CurrentPath}" />
+                                   Text="{Binding CurrentPath}"
+                                   TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <StackPanel Grid.Column="1"
-                                Margin="16,0,0,0"
+                                Margin="12,0,0,0"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
-                        <Button Content="上一级"
+                        <Button Content="&#xE72B;"
                                 Click="ParentButton_Click"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                        <Button Margin="10,0,0,0"
-                                Content="刷新"
+                                IsEnabled="{Binding CanGoParent}"
+                                Style="{StaticResource WebDavPathPickerIconButtonStyle}"
+                                ToolTip="上一级" />
+                        <Button Margin="6,0,0,0"
+                                Content="&#xE72A;"
+                                Click="ForwardButton_Click"
+                                IsEnabled="{Binding CanGoForward}"
+                                Style="{StaticResource WebDavPathPickerIconButtonStyle}"
+                                ToolTip="返回之前目录" />
+                        <Button Margin="6,0,0,0"
                                 Click="RefreshButton_Click"
-                                Style="{StaticResource SecondaryButtonStyle}" />
+                                IsEnabled="{Binding IsNotBusy}"
+                                Style="{StaticResource WebDavPathPickerIconButtonStyle}"
+                                ToolTip="刷新">
+                            <TextBlock Text="&#xE72C;"
+                                       RenderTransformOrigin="0.5,0.5">
+                                <TextBlock.RenderTransform>
+                                    <RotateTransform Angle="0" />
+                                </TextBlock.RenderTransform>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="WebDavPathPickerRefreshSpinner">
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                             From="0"
+                                                                             To="360"
+                                                                             Duration="0:0:0.8" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="WebDavPathPickerRefreshSpinner" />
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="4">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-
-                <TextBlock Text="{Binding StatusText}"
-                           TextWrapping="Wrap"
+                <TextBlock helpers:TrimmedTextToolTipBehavior.FullText="{Binding StatusText}"
+                           Text="{Binding StatusText}"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
                            Style="{StaticResource BodyMutedTextStyle}" />
+                <ListBox x:Name="DirectoryList"
+                         Grid.Row="2"
+                         ItemsSource="{Binding DirectoryItems}"
+                         SelectionMode="{Binding DirectorySelectionMode}"
+                         SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                         ItemContainerStyle="{StaticResource WebDavPathPickerDirectoryItemStyle}"
+                         Background="{x:Null}"
+                         BorderThickness="0"
+                         ScrollViewer.CanContentScroll="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
+                         PreviewMouseWheel="DirectoryList_PreviewMouseWheel"
+                         SelectionChanged="DirectoryList_SelectionChanged"
+                         MouseDoubleClick="DirectoryList_MouseDoubleClick">
+                    <ListBox.Resources>
+                        <Style TargetType="{x:Type ScrollBar}"
+                               BasedOn="{StaticResource WebDavPathPickerModernScrollBarStyle}" />
+                    </ListBox.Resources>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid MinHeight="42">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Style="{StaticResource WebDavPathPickerSelectionDotButtonStyle}"
+                                        PreviewMouseLeftButtonDown="SelectionDotButton_PreviewMouseLeftButtonDown"
+                                        ToolTip="选择或取消选择目录" />
+                                <TextBlock Grid.Column="2"
+                                           Width="34"
+                                           VerticalAlignment="Center"
+                                           Text="目录"
+                                           TextAlignment="Center"
+                                           Style="{StaticResource BodyMutedTextStyle}" />
+                                <StackPanel Grid.Column="4"
+                                            MinWidth="0"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Height="20"
+                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding Name}"
+                                               Style="{StaticResource LongFieldTextBlockStyle}"
+                                               Text="{Binding Name}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Height="20"
+                                               Margin="0,2,0,0"
+                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding Path}"
+                                               Style="{StaticResource BodyMutedTextStyle}"
+                                               Text="{Binding Path}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
-                <Border Grid.Row="1"
-                        Margin="0,12,0,0"
-                        Padding="12"
-                        Style="{StaticResource CompactCardStyle}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto"
-                                      helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
-                            <ListBox x:Name="DirectoryList"
-                                     ItemsSource="{Binding DirectoryItems}"
-                                     SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
-                                     Background="{x:Null}"
-                                     BorderThickness="0"
-                                     MouseDoubleClick="DirectoryList_MouseDoubleClick">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Margin="0,0,0,8"
-                                                Padding="12"
-                                                CornerRadius="{StaticResource RadiusCompactCard}"
-                                                Background="{DynamicResource BrushSurfaceAlt}"
-                                                BorderBrush="{DynamicResource BrushBorder}"
-                                                BorderThickness="1">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="12" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="目录"
-                                                           Style="{StaticResource BodyMutedTextStyle}" />
-                                                <StackPanel Grid.Column="2"
-                                                            MinWidth="0">
-                                                    <TextBlock helpers:TrimmedTextToolTipBehavior.FullText="{Binding Name}"
-                                                               Style="{StaticResource LongFieldTextBlockStyle}"
-                                                               Text="{Binding Name}" />
-                                                    <TextBlock Margin="0,4,0,0"
-                                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding Path}"
-                                                               Style="{StaticResource LongFieldTextBlockStyle}"
-                                                               Text="{Binding Path}" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </ScrollViewer>
-
-                        <TextBlock Grid.Row="1"
-                                   Margin="0,10,0,0"
-                                   Text="双击目录进入；也可以直接选择当前目录。"
-                                   Style="{StaticResource BodyMutedTextStyle}" />
-                    </Grid>
+                <Border Grid.RowSpan="3"
+                        Background="{DynamicResource BrushGlassSurface}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Control Width="32"
+                                 Height="32"
+                                 HorizontalAlignment="Center"
+                                 Template="{StaticResource LoadingSpinnerTemplate}" />
+                        <TextBlock Margin="0,12,0,0"
+                                   HorizontalAlignment="Center"
+                                   Text="{Binding StatusText}"
+                                   Style="{StaticResource InlineLoadingStyle}" />
+                    </StackPanel>
                 </Border>
             </Grid>
 
-            <StackPanel Grid.Row="3"
-                        Style="{StaticResource DialogButtonRowStyle}">
-                <Button Content="取消"
-                        Click="CancelButton_Click"
-                        IsCancel="True"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-                <Button Margin="10,0,0,0"
+            <Grid Grid.Row="6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button HorizontalAlignment="Center"
                         Content="进入选中目录"
                         Click="EnterSelectedButton_Click"
+                        IsEnabled="{Binding CanEnterSelected}"
                         Style="{StaticResource SecondaryButtonStyle}" />
-                <Button Margin="10,0,0,0"
-                        Content="选择当前目录"
+                <Button Grid.Column="1"
+                        HorizontalAlignment="Center"
+                        Content="选择路径"
                         Click="SelectCurrentButton_Click"
                         Style="{StaticResource PrimaryButtonStyle}" />
-            </StackPanel>
+            </Grid>
         </Grid>
     </Border>
 </Window>

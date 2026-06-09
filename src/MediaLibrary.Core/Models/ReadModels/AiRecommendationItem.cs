@@ -7,6 +7,7 @@ namespace MediaLibrary.Core.Models.ReadModels;
 public sealed class AiRecommendationItem : INotifyPropertyChanged
 {
     private bool _isWatched;
+    private bool _isFavorite;
     private bool _isWantToWatch;
     private bool _isNotInterested;
     private string _watchStateText = "未看";
@@ -87,6 +88,12 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
                 OnPropertyChanged(nameof(WantToWatchButtonText));
             }
         }
+    }
+
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        set => SetField(ref _isFavorite, value);
     }
 
     public bool IsNotInterested
@@ -293,6 +300,12 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
         {
             score = 0d;
             return false;
+        }
+
+        if (ratings.Count == 1)
+        {
+            score = ratings[0].Score;
+            return true;
         }
 
         var totalVotes = ratings.Sum(x => x.Votes);

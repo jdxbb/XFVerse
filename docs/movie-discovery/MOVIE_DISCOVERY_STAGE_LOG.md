@@ -1,5 +1,36 @@
 # 影片发现阶段日志
 
+## 2026-06-08 - Discovery / Detail state and poster action follow-up
+
+Goal:
+
+- Align Discovery Movie poster want-action visuals with the requested star-only treatment.
+- Keep external Movie detail media-library action state consistent after watched / want-to-watch / not-interested changes, including AI recommendations.
+
+Completed:
+
+- Discovery Movie poster cards now use a transparent star icon button in the existing top-right slot; the list-layout text action remains unchanged.
+- Movie detail not-interested action now uses an exclamation mark icon before marking and an undo arrow icon after marking.
+- External Movie detail now refreshes watched / want-to-watch / not-interested and media-library visibility through the same Discovery status resolver used by search and ranking.
+- AI recommendation state merge now carries `LibraryVisibilityState` and resolves `IsVisibleInLibrary` with the same visible / hidden / auto semantics as Discovery.
+- Media-library Movie source summary now displays dual local and WebDAV sources as `本地/网盘`.
+
+Not done:
+
+- No recommendation prompt, candidate ordering, scan rule, playback source, database schema, migration, database update, commit or push was changed.
+- No TV recommendation or Watch Insights scope was added.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` remained empty.
+
+Known Issues:
+
+- Blocker: None found.
+- Deferred: Runtime WPF visual acceptance is still needed for the exact star size / perceived alignment on real displays.
+- Noise: Existing non-media-library source summaries in other read models still use their previous `本地 + 网盘` wording.
+
 ## 2026-06-06 - 7.4e / Discovery 回归收口
 
 完成内容：
@@ -1726,3 +1757,106 @@ Non-stage page changes:
 Validation:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+## Poster Action And Movie Detail State Follow-up
+
+Completed:
+
+- Movie-search poster want action changed from a text/chip button to a backgroundless vector star icon.
+- Empty star uses a translucent frosted-white treatment; selected star uses a gold gradient and remains aligned to the poster action's previous right edge.
+- Movie detail no longer refreshes library-entry state through the external-recommendation path after toggling want/not-interested, preventing the UI from immediately resetting.
+- External movie detail can use a stable resolved `MovieId` for favorite toggling after the movie is marked watched.
+- Movie detail preserves library visibility when cancelling a marker on a movie that was already in the library; auto-removal is limited to state added by the current detail session.
+- Mixed Local/WebDAV source display remains unified as `本地/网盘`.
+
+Not done:
+
+- No recommendation ranking, TMDB request shape, scan logic, schema migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual UI acceptance is still needed for AI recommendation detail re-entry after toggling collection state.
+- Noise: Existing working-tree changes from adjacent UI follow-ups are present.
+
+## Discovery Poster, Retry, And External Favorite Follow-up
+
+Completed:
+
+- Movie-search and Favorites poster action icons now use single-layer Segoe MDL2 glyphs instead of stacked vector Path shadow/highlight layers, removing the duplicate-icon artifact and reducing the visual size.
+- Movie-search poster star action keeps the right-edge action position while using a 30px transparent hit target and a 20px star glyph.
+- Favorites poster favorite/want actions now use the same transparent single-glyph treatment for heart/star actions.
+- Discovery search and ranking overlays now expose retry commands on load failure and keep failures in the centered overlay instead of only the summary/status text.
+- Clearing search filters now resets the search method to the active media title search (`movie title` or `TV title`) and reloads when the previous method was person search.
+- External no-source movie details can persist favorite state after being marked watched. The state is stored on `UserMovieCollectionItem.IsFavorite`, reused by Discovery status resolution, Favorites, Home preview, Watch Insights, Watch Profile input and AI recommendation user-state hydration.
+- Added EF migration `AddUserMovieCollectionFavorite` for `UserMovieCollectionItems.IsFavorite` plus its index.
+
+Not done:
+
+- No database update, commit, or push was run.
+- No TMDB request shape, ranking sort semantics, scanner, media-file creation, playback-source creation, or recommendation ranking prompt was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:BaseOutputPath=<temp-build-output>` passed with 0 warnings and 0 errors after migration generation.
+- EF migration generation passed.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual UI acceptance is still needed for real hover/size perception of the poster icons and for retry behavior under real TMDB/WebDAV network failures.
+- Noise: Existing unrelated working-tree changes are still present.
+
+## 2026-06-09 - Ranking First-entry Pager And Poster Theme Icon Follow-up
+
+Completed:
+
+- Movie-search poster selected want-to-watch star now uses the app theme accent brush instead of the fixed gold gradient.
+- Ranking pager command gating was narrowed to loading / TV navigation only; the visible movie / TV pager buttons still use their concrete `CanGoNext*` / `CanGoPrevious*` bindings and the handler still guards invalid page moves.
+- Ranking page index and total-page changes now also notify active next-page state, reducing stale command state after the first ranking activation.
+- Kept the existing behavior where clicking the Ranking tab from another Discovery tab opens the ranking preset menu.
+
+Not done:
+
+- No TMDB request shape, ranking source order, ranking display sizing, scan logic, database update, commit, or push was changed.
+- No new migration was added by this follow-up.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None found in this follow-up.
+- Deferred: Manual WPF acceptance is still needed for first-entry ranking next-page behavior against the user's live TMDB/cache state.
+- Noise: Existing unrelated working-tree and migration changes remain present.
+
+## 2026-06-10 - Paging Failure Toast And Favorites Season Rating Follow-up
+
+Completed:
+
+- Movie search, TV search, movie ranking, and TV ranking page-load failures now show a small transient toast near the upper screen area for about 1.5 seconds after rollback.
+- The toast uses page-local ViewModel state and does not intercept mouse input while visible.
+- Favorites poster rating text now turns gold when the displayed rating rounds to 8.0 or above, matching the Discovery rating threshold.
+- Favorites TV season cards no longer mix season TMDB rating with series IMDb rating; season cards only hydrate and display the season TMDB score directly.
+- TV season cards show the rating placeholder until the season rating hydration returns a valid season score.
+
+Not done:
+
+- No TMDB request shape, ranking sort semantics, scanner behavior, database update, new migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` reported no whitespace errors; only existing CRLF conversion warnings were printed.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for the toast position/duration and for season-rating values against live TMDB season data.
+- Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.

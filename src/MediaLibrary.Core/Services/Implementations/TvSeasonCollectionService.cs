@@ -1058,7 +1058,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
     {
         return (hasLocal, hasWebDav) switch
         {
-            (true, true) => "本地 + 网盘",
+            (true, true) => "本地/网盘",
             (true, false) => "本地",
             (false, true) => "网盘",
             _ => "暂无播放源"

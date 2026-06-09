@@ -26,6 +26,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private readonly INavigationStateService _navigationStateService;
     private readonly IPlayerWindowService _playerWindowService;
     private readonly IMovieDetailQueryService _movieDetailQueryService;
+    private readonly IDiscoveryMovieStatusResolver _discoveryMovieStatusResolver;
     private readonly ITmdbService _tmdbService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly ISingleSourceCorrectionService _singleSourceCorrectionService;
@@ -109,6 +110,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private bool _isNotInterested;
     private bool _isVisibleInLibrary;
     private bool _isAddingToLibrary;
+    private bool _autoVisibleInLibraryFromCurrentDetailState;
     private bool _hasCorrectionPreview;
     private bool _isCorrectionBusy;
     private bool _isRestoringCorrectionStatus;
@@ -121,6 +123,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         INavigationStateService navigationStateService,
         IPlayerWindowService playerWindowService,
         IMovieDetailQueryService movieDetailQueryService,
+        IDiscoveryMovieStatusResolver discoveryMovieStatusResolver,
         ITmdbService tmdbService,
         IMovieIdentificationService movieIdentificationService,
         ISingleSourceCorrectionService singleSourceCorrectionService,
@@ -135,6 +138,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _navigationStateService = navigationStateService;
         _playerWindowService = playerWindowService;
         _movieDetailQueryService = movieDetailQueryService;
+        _discoveryMovieStatusResolver = discoveryMovieStatusResolver;
         _tmdbService = tmdbService;
         _movieIdentificationService = movieIdentificationService;
         _singleSourceCorrectionService = singleSourceCorrectionService;
@@ -384,7 +388,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         ? IsFavorite ? "\uEB52" : "\uEB51"
         : IsWantToWatch ? "\uE735" : "\uE734";
 
-    public string NotInterestedButtonIcon => "\uE814";
+    public string NotInterestedButtonIcon => IsNotInterested ? "\uE7A7" : "!";
 
     public string ManualSearchQuery { get => _manualSearchQuery; set => SetProperty(ref _manualSearchQuery, value); }
 
@@ -705,6 +709,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isNotInterested, value))
             {
                 NotInterestedButtonText = value ? "取消不想看" : "不想看";
+                OnPropertyChanged(nameof(NotInterestedButtonIcon));
             }
         }
     }
@@ -794,8 +799,19 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public bool CanTogglePreference => ShowPreferenceAction
                                        && (IsWatched
-                                           ? IsLibraryMovie && _movieId.HasValue
+                                           ? CanToggleFavoriteForCurrentMovie
                                            : CanToggleWantToWatch);
+
+    private int? CurrentFavoriteMovieId =>
+        IsLibraryMovie
+            ? _movieId
+            : _externalRecommendation?.MovieId is > 0
+                ? _externalRecommendation.MovieId
+                : null;
+
+    private bool CanToggleFavoriteForCurrentMovie =>
+        CurrentFavoriteMovieId.HasValue
+        || (!IsLibraryMovie && _externalRecommendation is not null);
 
     public bool CanToggleNotInterested => ShowNotInterestedAction;
 
@@ -870,6 +886,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             }
 
             var isNewMovie = _movieId != detail.MovieId;
+            var wasExternalDetail = _externalRecommendation is not null;
             _movieId = detail.MovieId;
             _tmdbId = detail.TmdbId;
             _externalRecommendation = null;
@@ -881,6 +898,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             IsNotInterested = detail.IsNotInterested;
             IsVisibleInLibrary = detail.IsVisibleInLibrary;
             CurrentLibraryVisibilityState = detail.LibraryVisibilityState;
+            if (isNewMovie || wasExternalDetail)
+            {
+                ResetDetailAutoLibraryVisibilityTracking();
+            }
             RefreshWantToWatchCommandState();
             RefreshNotInterestedCommandState();
             RefreshWatchedCommandState();
@@ -1284,6 +1305,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     {
         ApplyCachedExternalTags(recommendation);
         var shouldAutoClassify = NeedsExternalAutoClassification(recommendation);
+        var shouldResetLibraryVisibilityTracking = !ReferenceEquals(_externalRecommendation, recommendation) || IsLibraryMovie;
 
         _movieId = null;
         _tmdbId = recommendation.TmdbId;
@@ -1293,6 +1315,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         IsNoSourceDetail = true;
         IsVisibleInLibrary = recommendation.IsVisibleInLibrary;
         CurrentLibraryVisibilityState = recommendation.LibraryVisibilityState;
+        if (shouldResetLibraryVisibilityTracking)
+        {
+            ResetDetailAutoLibraryVisibilityTracking();
+        }
         SelectedDetailTabIndex = 0;
         _correctionMediaFileId = null;
         _selectedCorrectionSource = null;
@@ -1381,7 +1407,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         NotifySourceStateChanged();
         SearchCandidates.Clear();
         OnPropertyChanged(nameof(HasSearchCandidates));
-        await RefreshExternalWantToWatchStateAsync(cancellationToken);
+        await RefreshExternalCollectionStateAsync(cancellationToken);
         RefreshWantToWatchCommandState();
         RefreshNotInterestedCommandState();
         RefreshWatchedCommandState();
@@ -1586,7 +1612,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
-        if (!IsLibraryMovie || _movieId is null)
+        var favoriteMovieId = CurrentFavoriteMovieId;
+        if (!favoriteMovieId.HasValue && _externalRecommendation is null)
         {
             StatusMessage = "当前无播放源影片暂不支持在此详情页标记喜爱。";
             return;
@@ -1611,8 +1638,27 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             }
 
             await Dispatcher.Yield(DispatcherPriority.Background);
-            await PersistStateInBackgroundAsync(
-                () => _movieManagementService.SetFavoriteAsync(_movieId.Value, targetFavorite));
+            if (favoriteMovieId.HasValue)
+            {
+                await PersistStateInBackgroundAsync(
+                    () => _movieManagementService.SetFavoriteAsync(favoriteMovieId.Value, targetFavorite));
+            }
+            else
+            {
+                _externalRecommendation!.IsFavorite = targetFavorite;
+                _externalRecommendation.IsWatched = IsWatched;
+                _externalRecommendation.IsNotInterested = IsNotInterested;
+                await PersistStateInBackgroundAsync(
+                    () => _userCollectionService.SetFavoriteAsync(
+                        _externalRecommendation,
+                        targetFavorite,
+                        changeSource: "MovieDetail"));
+            }
+
+            if (_externalRecommendation is not null)
+            {
+                await RefreshExternalCollectionStateAsync(CancellationToken.None);
+            }
             StatusMessage = IsFavorite ? "已标记为喜爱。" : "已取消喜爱。";
             QueueStateRefresh(collectionChanged: true, recommendationChanged: true);
         }
@@ -1620,6 +1666,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         {
             IsFavorite = previousFavorite;
             IsNotInterested = previousNotInterested;
+            if (_externalRecommendation is not null)
+            {
+                _externalRecommendation.IsFavorite = previousFavorite;
+                _externalRecommendation.IsNotInterested = previousNotInterested;
+            }
             StatusMessage = $"喜爱状态更新失败：{DescribeException(exception)}";
         }
         finally
@@ -1667,6 +1718,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 _dataRefreshService.NotifyLibraryChanged();
                 _dataRefreshService.NotifyCollectionChanged();
                 await LoadMovieAsync(_movieId.Value, CancellationToken.None);
+                ResetDetailAutoLibraryVisibilityTracking();
                 StatusMessage = IsVisibleInLibrary ? "已加入媒体库。" : "已移出媒体库。";
                 return;
             }
@@ -1700,6 +1752,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 : IsVisibleInLibrary ? LibraryVisibilityState.Visible : LibraryVisibilityState.Hidden;
             _externalRecommendation.IsVisibleInLibrary = IsVisibleInLibrary;
             _externalRecommendation.LibraryVisibilityState = CurrentLibraryVisibilityState;
+            ResetDetailAutoLibraryVisibilityTracking();
             AvailabilityText = "暂无播放源";
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
@@ -1744,6 +1797,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         var previousFavorite = IsFavorite;
         var previousWantToWatch = IsWantToWatch;
         var targetWatched = !previousWatched;
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         SetTogglingWatched(true);
         try
         {
@@ -1760,6 +1814,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             await Dispatcher.Yield(DispatcherPriority.Background);
             await PersistStateInBackgroundAsync(
                 () => _movieManagementService.SetWatchedAsync(_movieId.Value, targetWatched));
+            await RestoreLibraryVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                targetWatched,
+                CancellationToken.None);
+            TrackDetailStateLibraryVisibility(wasVisibleBeforeToggle, targetWatched);
             StatusMessage = IsWatched ? "已标记为已看。" : "已标记为未看。";
             QueueStateRefresh(metadataChanged: true, collectionChanged: true, recommendationChanged: true);
         }
@@ -1785,8 +1844,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
 
         var previousWatched = IsWatched;
+        var previousFavorite = IsFavorite;
         var previousWantToWatch = IsWantToWatch;
         var targetWatched = !previousWatched;
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         SetTogglingWatched(true);
         try
         {
@@ -1797,18 +1858,31 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 IsWantToWatch = false;
                 _externalRecommendation.IsWantToWatch = false;
             }
+            else
+            {
+                IsFavorite = false;
+                _externalRecommendation.IsFavorite = false;
+            }
 
             await Dispatcher.Yield(DispatcherPriority.Background);
             await PersistStateInBackgroundAsync(
                 () => _userCollectionService.SetWatchedAsync(_externalRecommendation, targetWatched));
+            await RestoreLibraryVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                targetWatched,
+                CancellationToken.None);
+            await RefreshExternalCollectionStateAsync(CancellationToken.None);
+            TrackDetailStateLibraryVisibility(wasVisibleBeforeToggle, targetWatched);
             StatusMessage = targetWatched ? "已标记为已看。" : "已标记为未看。";
             QueueStateRefresh(collectionChanged: true, recommendationChanged: true);
         }
         catch (Exception exception)
         {
             IsWatched = previousWatched;
+            IsFavorite = previousFavorite;
             IsWantToWatch = previousWantToWatch;
             _externalRecommendation.IsWatched = previousWatched;
+            _externalRecommendation.IsFavorite = previousFavorite;
             _externalRecommendation.IsWantToWatch = previousWantToWatch;
             StatusMessage = $"观看状态更新失败：{DescribeException(exception)}";
         }
@@ -1840,10 +1914,12 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
         var previousState = IsWantToWatch;
         var previousNotInterested = IsNotInterested;
+        var targetWantToWatch = !previousState;
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         SetTogglingWantToWatch(true);
         try
         {
-            IsWantToWatch = !previousState;
+            IsWantToWatch = targetWantToWatch;
             await Dispatcher.Yield(DispatcherPriority.Background);
             if (IsLibraryMovie)
             {
@@ -1874,6 +1950,15 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 }
             }
 
+            await RestoreLibraryVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                targetWantToWatch,
+                CancellationToken.None);
+            if (_externalRecommendation is not null)
+            {
+                await RefreshExternalCollectionStateAsync(CancellationToken.None);
+            }
+            TrackDetailStateLibraryVisibility(wasVisibleBeforeToggle, targetWantToWatch);
             StatusMessage = IsWantToWatch ? "已加入想看。" : "已取消想看。";
             QueueStateRefresh(collectionChanged: true, recommendationChanged: true);
         }
@@ -1918,6 +2003,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         var previousWantToWatch = IsWantToWatch;
         var previousFavorite = IsFavorite;
         var targetNotInterested = !previousNotInterested;
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         SetTogglingNotInterested(true);
         try
         {
@@ -1946,6 +2032,15 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 recommendation.IsNotInterested = targetNotInterested;
             }
 
+            await RestoreLibraryVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                targetNotInterested,
+                CancellationToken.None);
+            if (_externalRecommendation is not null)
+            {
+                await RefreshExternalCollectionStateAsync(CancellationToken.None);
+            }
+            TrackDetailStateLibraryVisibility(wasVisibleBeforeToggle, targetNotInterested);
             StatusMessage = targetNotInterested ? "已标记为不想看。" : "已取消不想看。";
             QueueStateRefresh(collectionChanged: true, forceRecommendationChanged: true);
         }
@@ -1968,29 +2063,166 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         }
     }
 
-    private async Task RefreshExternalWantToWatchStateAsync(CancellationToken cancellationToken)
+    private async Task RefreshExternalCollectionStateAsync(CancellationToken cancellationToken)
     {
         if (_externalRecommendation is null)
         {
             IsWantToWatch = false;
             IsWatched = false;
             IsNotInterested = false;
+            IsVisibleInLibrary = false;
+            CurrentLibraryVisibilityState = LibraryVisibilityState.Auto;
             return;
         }
 
-        var collectionItems = await _userCollectionService.GetCollectionItemsAsync(cancellationToken);
-        var isNotInterested = await _userCollectionService.IsNotInterestedAsync(_externalRecommendation, cancellationToken);
-        var collectionItem = collectionItems.FirstOrDefault(x => IsSameRecommendation(x, _externalRecommendation));
-        var isWatched = collectionItem is null ? _externalRecommendation.IsWatched : collectionItem.IsWatched;
-        var isWantToWatch = collectionItem is null
-            ? _externalRecommendation.IsWantToWatch && !isWatched && !isNotInterested
-            : collectionItem.IsWantToWatch && !isWatched;
+        try
+        {
+            if (_externalRecommendation.TmdbId is int tmdbId && tmdbId > 0)
+            {
+                var statuses = await _discoveryMovieStatusResolver.ResolveAsync(new[] { tmdbId }, cancellationToken);
+                if (statuses.TryGetValue(tmdbId, out var status))
+                {
+                    ApplyExternalMovieStatus(status);
+                    return;
+                }
+            }
+
+            var collectionItems = await _userCollectionService.GetCollectionItemsAsync(cancellationToken);
+            var isNotInterested = await _userCollectionService.IsNotInterestedAsync(_externalRecommendation, cancellationToken);
+            var collectionItem = collectionItems.FirstOrDefault(x => IsSameRecommendation(x, _externalRecommendation));
+            var isWatched = collectionItem is null ? _externalRecommendation.IsWatched : collectionItem.IsWatched;
+            IsFavorite = collectionItem?.IsLiked == true;
+            var isWantToWatch = collectionItem is null
+                ? _externalRecommendation.IsWantToWatch && !isWatched && !isNotInterested
+                : collectionItem.IsWantToWatch && !isWatched;
+            var hasCurrentState = isWatched || isWantToWatch || isNotInterested;
+            ApplyExternalCollectionState(
+                isWatched,
+                isWantToWatch,
+                isNotInterested,
+                ResolveIsVisibleInLibrary(
+                    _externalRecommendation.IsInLibrary,
+                    _externalRecommendation.LibraryVisibilityState,
+                    hasCurrentState),
+                _externalRecommendation.LibraryVisibilityState,
+                _externalRecommendation.IsInLibrary);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            var hasCurrentState = _externalRecommendation.IsWatched
+                                  || _externalRecommendation.IsWantToWatch
+                                  || _externalRecommendation.IsNotInterested;
+            ApplyExternalCollectionState(
+                _externalRecommendation.IsWatched,
+                _externalRecommendation.IsWantToWatch && !_externalRecommendation.IsWatched,
+                _externalRecommendation.IsNotInterested,
+                ResolveIsVisibleInLibrary(
+                    _externalRecommendation.IsInLibrary,
+                    _externalRecommendation.LibraryVisibilityState,
+                    hasCurrentState),
+                _externalRecommendation.LibraryVisibilityState,
+                _externalRecommendation.IsInLibrary);
+        }
+    }
+
+    private void ApplyExternalMovieStatus(DiscoveryMovieStatus status)
+    {
+        if (status.MovieId is > 0)
+        {
+            _externalRecommendation!.MovieId = status.MovieId.Value;
+        }
+
+        IsFavorite = status.IsFavorite;
+        ApplyExternalCollectionState(
+            status.IsWatched,
+            status.IsWantToWatch && !status.IsWatched,
+            status.IsNotInterested,
+            status.IsVisibleInLibrary,
+            status.LibraryVisibilityState,
+            status.IsInLibrary);
+    }
+
+    private void ApplyExternalCollectionState(
+        bool isWatched,
+        bool isWantToWatch,
+        bool isNotInterested,
+        bool isVisibleInLibrary,
+        LibraryVisibilityState libraryVisibilityState,
+        bool isInLibrary)
+    {
         IsWatched = isWatched;
-        IsWantToWatch = isWantToWatch;
+        IsWantToWatch = isWantToWatch && !isWatched && !isNotInterested;
         IsNotInterested = isNotInterested;
-        _externalRecommendation.IsWatched = isWatched;
+        IsVisibleInLibrary = isVisibleInLibrary;
+        CurrentLibraryVisibilityState = libraryVisibilityState;
+        _externalRecommendation!.IsWatched = IsWatched;
+        _externalRecommendation.IsFavorite = IsFavorite;
         _externalRecommendation.IsWantToWatch = IsWantToWatch;
         _externalRecommendation.IsNotInterested = IsNotInterested;
+        _externalRecommendation.IsVisibleInLibrary = IsVisibleInLibrary;
+        _externalRecommendation.LibraryVisibilityState = CurrentLibraryVisibilityState;
+        _externalRecommendation.IsInLibrary = isInLibrary;
+    }
+
+    private static bool ResolveIsVisibleInLibrary(
+        bool hasActiveSource,
+        LibraryVisibilityState visibilityState,
+        bool hasCurrentState)
+    {
+        return visibilityState switch
+        {
+            LibraryVisibilityState.Hidden => false,
+            LibraryVisibilityState.Visible => true,
+            _ => hasActiveSource || hasCurrentState
+        };
+    }
+
+    private void ResetDetailAutoLibraryVisibilityTracking()
+    {
+        _autoVisibleInLibraryFromCurrentDetailState = false;
+    }
+
+    private void TrackDetailStateLibraryVisibility(bool wasVisibleBeforeToggle, bool targetState)
+    {
+        if (targetState && !wasVisibleBeforeToggle && IsVisibleInLibrary)
+        {
+            _autoVisibleInLibraryFromCurrentDetailState = true;
+            return;
+        }
+
+        if (!targetState && _autoVisibleInLibraryFromCurrentDetailState && !IsVisibleInLibrary)
+        {
+            _autoVisibleInLibraryFromCurrentDetailState = false;
+        }
+    }
+
+    private async Task RestoreLibraryVisibilityIfNeededAfterStateRemovalAsync(
+        bool wasVisibleBeforeToggle,
+        bool targetState,
+        CancellationToken cancellationToken)
+    {
+        if (targetState || !wasVisibleBeforeToggle || _autoVisibleInLibraryFromCurrentDetailState)
+        {
+            return;
+        }
+
+        if (IsLibraryMovie && _movieId is { } movieId)
+        {
+            await _movieManagementService.RestoreToLibraryAsync(movieId, cancellationToken);
+            return;
+        }
+
+        if (_externalRecommendation is not null)
+        {
+            await _userCollectionService.RestoreToLibraryAsync(
+                _externalRecommendation,
+                cancellationToken,
+                "MovieDetailStateCancelPreserveLibrary");
+        }
     }
 
     private void SetTogglingWantToWatch(bool value)

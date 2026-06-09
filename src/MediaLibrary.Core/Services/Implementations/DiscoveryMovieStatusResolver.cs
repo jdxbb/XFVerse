@@ -109,6 +109,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                     x.OmdbLastUpdatedAt,
                     x.IsWantToWatch,
                     x.IsWatched,
+                    x.IsFavorite,
                     x.IsNotInterested,
                     x.IsInLibrary,
                     x.LibraryVisibilityState,
@@ -168,7 +169,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
             var collection = group.OrderByDescending(x => x.UpdatedAt).First();
             if (!result.TryGetValue(group.Key, out var status))
             {
-                var hasState = group.Any(x => x.IsWatched || x.IsWantToWatch || x.IsNotInterested);
+                var hasState = group.Any(x => x.IsWatched || x.IsFavorite || x.IsWantToWatch || x.IsNotInterested);
                 status = new DiscoveryMovieStatus
                 {
                     TmdbId = group.Key,
@@ -198,6 +199,7 @@ public sealed class DiscoveryMovieStatusResolver : IDiscoveryMovieStatusResolver
                 result[group.Key] = status;
             }
 
+            status.IsFavorite |= group.Any(x => x.IsFavorite);
             status.IsWantToWatch = group.Any(x => x.IsWantToWatch);
             status.IsWatched |= group.Any(x => x.IsWatched);
             status.IsNotInterested = group.Any(x => x.IsNotInterested);

@@ -67,6 +67,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private bool _isSeasonWatched;
     private bool _isSeasonUnwatched;
     private bool _isVisibleInLibrary;
+    private bool _autoVisibleInLibraryFromCurrentDetailState;
     private bool _isEpisodeMetadataLoading;
     private bool _isOpeningEpisodePlayer;
     private bool _isDetailLoading;
@@ -623,6 +624,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             if (SetProperty(ref _isNotInterested, value))
             {
                 OnPropertyChanged(nameof(NotInterestedButtonText));
+                OnPropertyChanged(nameof(NotInterestedButtonIcon));
             }
         }
     }
@@ -668,7 +670,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         ? IsFavorite ? "\uEB52" : "\uEB51"
         : IsWantToWatch ? "\uE735" : "\uE734";
 
-    public string NotInterestedButtonIcon => "\uE814";
+    public string NotInterestedButtonIcon => IsNotInterested ? "\uE7A7" : "!";
 
     public string NotInterestedButtonText => IsNotInterested ? "取消不想看" : "不想看";
 
@@ -758,6 +760,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 return;
             }
 
+            var isNewSeason = _seasonId != model.SeasonId;
             _seasonId = model.SeasonId;
             _episodeListScrollOffset = _navigationStateService.GetSeasonEpisodeListScrollOffset(model.SeasonId);
             OnPropertyChanged(nameof(EpisodeListScrollOffset));
@@ -797,6 +800,10 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             IsSeasonUnwatched = model.IsSeasonUnwatched;
             IsVisibleInLibrary = model.IsVisibleInLibrary;
             CurrentLibraryVisibilityState = model.LibraryVisibilityState;
+            if (isNewSeason)
+            {
+                ResetSeasonAutoLibraryVisibilityTracking();
+            }
             var selectedEpisodeId = _navigationStateService.SelectedTvEpisodeId;
             Episodes.Clear();
             foreach (var episode in model.Episodes)
@@ -886,6 +893,41 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(AddSeasonToLibraryButtonText));
         OnPropertyChanged(nameof(AddSeasonToLibraryButtonIcon));
         AddSeasonToLibraryCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ResetSeasonAutoLibraryVisibilityTracking()
+    {
+        _autoVisibleInLibraryFromCurrentDetailState = false;
+    }
+
+    private void TrackSeasonStateLibraryVisibility(bool wasVisibleBeforeToggle, bool targetState)
+    {
+        if (targetState && !wasVisibleBeforeToggle && IsVisibleInLibrary)
+        {
+            _autoVisibleInLibraryFromCurrentDetailState = true;
+            return;
+        }
+
+        if (!targetState && _autoVisibleInLibraryFromCurrentDetailState && !IsVisibleInLibrary)
+        {
+            _autoVisibleInLibraryFromCurrentDetailState = false;
+        }
+    }
+
+    private async Task RestoreSeasonVisibilityIfNeededAfterStateRemovalAsync(
+        bool wasVisibleBeforeToggle,
+        bool targetState,
+        CancellationToken cancellationToken)
+    {
+        if (targetState
+            || !wasVisibleBeforeToggle
+            || _autoVisibleInLibraryFromCurrentDetailState
+            || !_seasonId.HasValue)
+        {
+            return;
+        }
+
+        await _tvSeasonCollectionService.RestoreSeasonToLibraryAsync(_seasonId.Value, cancellationToken);
     }
 
     private void ResetEpisodeListScrollOffset(int seasonId)
@@ -1787,11 +1829,18 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             return;
         }
 
+        var targetFavorite = !IsFavorite;
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         try
         {
-            await _tvSeasonCollectionService.SetFavoriteAsync(_seasonId.Value, !IsFavorite, changeSource: "Manual");
+            await _tvSeasonCollectionService.SetFavoriteAsync(_seasonId.Value, targetFavorite, changeSource: "Manual");
+            await RestoreSeasonVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                targetFavorite,
+                CancellationToken.None);
             _dataRefreshService.NotifyCollectionChanged();
             await ActivateAsync();
+            TrackSeasonStateLibraryVisibility(wasVisibleBeforeToggle, targetFavorite);
         }
         catch (Exception exception)
         {
@@ -1811,11 +1860,18 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             return;
         }
 
+        var targetWantToWatch = !IsWantToWatch;
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         try
         {
-            await _tvSeasonCollectionService.SetWantToWatchAsync(_seasonId.Value, !IsWantToWatch, changeSource: "Manual");
+            await _tvSeasonCollectionService.SetWantToWatchAsync(_seasonId.Value, targetWantToWatch, changeSource: "Manual");
+            await RestoreSeasonVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                targetWantToWatch,
+                CancellationToken.None);
             _dataRefreshService.NotifyCollectionChanged();
             await ActivateAsync();
+            TrackSeasonStateLibraryVisibility(wasVisibleBeforeToggle, targetWantToWatch);
         }
         catch (Exception exception)
         {
@@ -1830,11 +1886,18 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             return;
         }
 
+        var targetNotInterested = !IsNotInterested;
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         try
         {
-            await _tvSeasonCollectionService.SetNotInterestedAsync(_seasonId.Value, !IsNotInterested, changeSource: "Manual");
+            await _tvSeasonCollectionService.SetNotInterestedAsync(_seasonId.Value, targetNotInterested, changeSource: "Manual");
+            await RestoreSeasonVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                targetNotInterested,
+                CancellationToken.None);
             _dataRefreshService.NotifyCollectionChanged();
             await ActivateAsync();
+            TrackSeasonStateLibraryVisibility(wasVisibleBeforeToggle, targetNotInterested);
         }
         catch (Exception exception)
         {
@@ -1849,6 +1912,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             return;
         }
 
+        var wasVisibleBeforeToggle = IsVisibleInLibrary;
         try
         {
             foreach (var episode in Episodes)
@@ -1860,8 +1924,14 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             await Task.Yield();
             await Task.Run(
                 () => _tvSeasonCollectionService.SetWatchedAsync(_seasonId.Value, isWatched, changeSource: "Manual"));
+            await RestoreSeasonVisibilityIfNeededAfterStateRemovalAsync(
+                wasVisibleBeforeToggle,
+                isWatched,
+                CancellationToken.None);
             _dataRefreshService.NotifyPlaybackChanged();
             _dataRefreshService.NotifyCollectionChanged();
+            await ActivateAsync();
+            TrackSeasonStateLibraryVisibility(wasVisibleBeforeToggle, isWatched);
             StatusMessage = isWatched ? "已标记整季为已看。" : "已标记整季为未看。";
         }
         catch (Exception exception)
@@ -1895,6 +1965,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             _dataRefreshService.NotifyLibraryChanged();
             _dataRefreshService.NotifyCollectionChanged();
             await ActivateAsync();
+            ResetSeasonAutoLibraryVisibilityTracking();
             StatusMessage = IsVisibleInLibrary ? "已加入媒体库。" : "已移出媒体库。";
         }
         catch (Exception exception)
@@ -1913,6 +1984,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
         try
         {
+            var episodeNumberText = episode.EpisodeNumberText;
             episode.IsWatched = isWatched;
             RefreshEpisodeAggregateState();
             await Task.Yield();
@@ -1920,7 +1992,8 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                 () => _tvSeasonCollectionService.SetEpisodeWatchedAsync(episode.EpisodeId, isWatched, changeSource: "Manual"));
             _dataRefreshService.NotifyPlaybackChanged();
             _dataRefreshService.NotifyCollectionChanged();
-            StatusMessage = $"{episode.EpisodeNumberText} 已标记为{(isWatched ? "已看" : "未看")}。";
+            await ActivateAsync();
+            StatusMessage = $"{episodeNumberText} 已标记为{(isWatched ? "已看" : "未看")}。";
         }
         catch (Exception exception)
         {

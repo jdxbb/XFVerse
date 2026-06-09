@@ -15,6 +15,8 @@
         <SolidColorBrush x:Key="DiscoveryLibraryRatingGoldBrush" Color="#F5C84B" />
         <SolidColorBrush x:Key="DiscoveryWantAddBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="DiscoveryWantRemoveBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="DiscoveryWantEmptyStarFillBrush" Color="#4DFFFFFF" />
+        <SolidColorBrush x:Key="DiscoveryWantEmptyStarStrokeBrush" Color="#E6FFFFFF" />
 
         <Style x:Key="DiscoveryLibraryMediaChipStyle" TargetType="Border">
             <Setter Property="Height" Value="20" />
@@ -125,6 +127,54 @@
                     <Setter Property="Opacity" Value="1" />
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DiscoverySearchWantIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#F8FAFC" />
+            <Setter Property="Opacity" Value="0.96" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTip" Value="{Binding WantToWatchButtonText}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <TextBlock x:Name="WantIcon"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       Text="&#xE734;" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
+                                <Setter TargetName="WantIcon" Property="Text" Value="&#xE735;" />
+                                <Setter TargetName="WantIcon" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                            </DataTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.42" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="DiscoveryRankingWantChipButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscoverySearchWantChipButtonStyle}">
@@ -2306,6 +2356,20 @@
                                                    TextAlignment="Center"
                                                    TextWrapping="Wrap"
                                                    Style="{StaticResource BodyMutedTextStyle}" />
+                                        <Button Margin="0,12,0,0"
+                                                Content="重试"
+                                                Command="{Binding RetrySearchCommand}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShowActiveSearchRetry}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
                                     </StackPanel>
 
                                     <Grid>
@@ -2492,11 +2556,10 @@
                                                                 </Border>
                                                                 <Button HorizontalAlignment="Right"
                                                                         VerticalAlignment="Top"
-                                                                        Margin="8"
-                                                                        Content="{Binding WantToWatchButtonText}"
+                                                                        Margin="0,3,8,0"
                                                                         Command="{Binding DataContext.ToggleSearchWantToWatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                         CommandParameter="{Binding}"
-                                                                        Style="{StaticResource DiscoverySearchWantChipButtonStyle}" />
+                                                                        Style="{StaticResource DiscoverySearchWantIconButtonStyle}" />
                                                                 <Grid HorizontalAlignment="Stretch"
                                                                       VerticalAlignment="Bottom"
                                                                       Margin="8,0,8,10">
@@ -3252,6 +3315,20 @@
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
                                                Style="{StaticResource BodyMutedTextStyle}" />
+                                    <Button Margin="0,12,0,0"
+                                            Content="重试"
+                                            Command="{Binding RetryRankingCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowActiveRankingRetry}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                 </StackPanel>
 
                                 <ScrollViewer x:Name="RankingMovieScrollViewer"
@@ -3464,6 +3541,7 @@
                                                    Style="{StaticResource BodyTextStyle}" />
                                         <Button Command="{Binding GoNextRankingPageCommand}"
                                                 IsEnabled="{Binding CanGoNextRankingPage}"
+                                                PreviewMouseLeftButtonDown="RankingNextPageButton_PreviewMouseLeftButtonDown"
                                                 Style="{StaticResource DiscoveryPagerIconButtonStyle}"
                                                 ToolTip="下一页">
                                             <Viewbox Width="16" Height="16">
@@ -3681,6 +3759,7 @@
                                                    Style="{StaticResource BodyTextStyle}" />
                                         <Button Command="{Binding GoNextRankingPageCommand}"
                                                 IsEnabled="{Binding CanGoNextTvRankingPage}"
+                                                PreviewMouseLeftButtonDown="RankingNextPageButton_PreviewMouseLeftButtonDown"
                                                 Style="{StaticResource DiscoveryPagerIconButtonStyle}"
                                                 ToolTip="下一页">
                                             <Viewbox Width="16" Height="16">
@@ -3706,5 +3785,45 @@
                                     Content="{Binding AiRecommendationViewModel}" />
                 </TabItem>
         </TabControl>
+        <Grid Panel.ZIndex="50"
+              IsHitTestVisible="False">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="3*" />
+                <RowDefinition Height="7*" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0"
+                    MinHeight="34"
+                    MaxWidth="360"
+                    Margin="0,0,0,18"
+                    Padding="14,8"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Bottom"
+                    Background="#F0202938"
+                    BorderBrush="#33FFFFFF"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Opacity="0.98"
+                    SnapsToDevicePixels="True">
+                <Border.Style>
+                    <Style TargetType="{x:Type Border}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsTransientPageMessageVisible}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock MaxWidth="324"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource BrushForegroundPrimary}"
+                           Text="{Binding TransientPageMessageText}"
+                           TextAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

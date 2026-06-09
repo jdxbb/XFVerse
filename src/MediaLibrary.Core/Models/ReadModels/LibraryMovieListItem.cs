@@ -131,7 +131,7 @@ public sealed class LibraryMovieListItem
 
             return (HasLocalSource, HasWebDavSource) switch
             {
-                (true, true) => "本地 + 网盘",
+                (true, true) => "本地/网盘",
                 (true, false) => "本地",
                 (false, true) => "网盘",
                 _ => "无播放源"

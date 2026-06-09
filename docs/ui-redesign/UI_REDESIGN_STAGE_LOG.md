@@ -645,3 +645,315 @@ Known Issues：
 - `dotnet build MediaLibrary.sln`：通过，0 warning / 0 error。
 - `git diff --check`：无空白错误，仅有既有 CRLF 转换提示。
 - `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+## 观影历史与收藏夹 UI Follow-up
+
+### 阶段目标
+
+- 收口观影历史海报网格、日期控件、滚动恢复和收藏夹海报布局。
+
+### 完成内容
+
+- 观影历史海报卡片统一使用固定 `EqualSpacingWrapPanel` 间距，不再随导航栏展开/收起切换 `ItemWidth`，避免不同时间筛选下首列位置轻微偏移。
+- 观影历史和收藏夹海报卡片左右间距统一增大。
+- 观影历史原生 `DatePicker` 替换为本地适配的 SmartDate 风格控件：保留 `Control + Popup + UniformGrid` 日历结构，颜色和状态使用 XFVerse 动态资源。
+- 修正观影历史内容重建时 `ScrollChanged` 把已保存滚动偏移覆盖为 `0` 的问题；切换导航页再回来应继续恢复滚动位置。
+- 混合来源显示文案统一从 `本地 + 网盘` 改为 `本地/网盘`。
+- 收藏夹 Tab 栏使用与观影发现一致的顶部偏移和内容区 Padding。
+- 收藏夹海报区改为观影历史同款等间距布局，并将卡片内部替换为影片搜索海报结构。
+- 喜爱 tab 的右上角操作改为无背景纯心形图标：已喜爱显示实心渐变爱心；想看 tab 继续使用无背景实心星形取消想看入口。
+- 新增 SmartDate 第三方说明文件，记录 MIT 来源和本地适配范围。
+
+### 明确未做事项
+
+- 未引入外部二进制依赖或 NuGet 包。
+- 未修改收藏夹、想看、喜爱、观看历史的业务语义。
+- 未新增 migration、database update、commit 或 push。
+
+### 验证结果
+
+- `dotnet build MediaLibrary.sln`：因正在运行的桌面应用锁定默认 Debug 输出 DLL，默认输出路径 build 失败于文件复制阶段。
+- `dotnet build MediaLibrary.sln -p:BaseOutputPath=<temp-build-output>`：通过，0 warning / 0 error。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`：无输出。
+
+### Known Issues
+
+- Blocker：无。
+- Deferred：需要在真实窗口尺寸下人工确认收藏夹海报 hover、右上角按钮和空状态。
+- Noise：SmartDate 控件是本地适配版本，不是直接引用上游项目程序集。
+
+## Watch History / Favorites / Scan Dialog Polish Follow-up
+
+### Completed
+
+- Movie-search poster want action now uses backgroundless vector star icons. Empty state uses a translucent frosted white star; selected state uses a metallic gold gradient while keeping the previous right-edge alignment.
+- Favorites poster actions now use backgroundless vector heart/star icons copied into the movie-search-style poster surface.
+- Watch history and favorites poster grids use stable spacing and visible vertical scrollbars to avoid horizontal drift when changing time filters or item count.
+- Watch history scroll offset is persisted through navigation state, with an unload/layout guard that avoids overwriting a saved non-zero offset with a transient zero.
+- Movie and Season detail not-interested actions now render vector exclamation / undo-arrow icons instead of font glyph strings.
+- WebDAV path picker was restyled as a compact dialog with icon-only parent/forward/refresh controls, two-line directory rows, no subtitle, no bottom hint, and two evenly distributed action buttons.
+- Scan progress metric icons now all use the same `Border + Viewbox + Path` structure as the checked scanned icon.
+
+### Not Done
+
+- No database schema, migration, database update, commit, or push was added.
+- Runtime visual QA on the user's real display scale is still manual.
+
+### Verification
+
+- `dotnet build MediaLibrary.sln`: passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations`: no output.
+
+### Known Issues
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for collapsed/expanded sidebar spacing and WebDAV picker row density.
+- Noise: Existing line-ending normalization warnings may still appear in Git output.
+
+## Discovery And Favorites Poster Icon Cleanup
+
+Completed:
+
+- Replaced the Search and Favorites poster action Path stacks with single Segoe MDL2 glyph icons.
+- Removed the extra shadow/highlight layers that made star and heart actions look like overlapping icons.
+- Kept poster action buttons backgroundless and right-aligned, with reduced 30px hit targets and 20px glyphs.
+- Added centered retry buttons to Discovery search/ranking error overlays using the shared secondary button style.
+
+Not done:
+
+- No broader theme, typography, card layout, or navigation redesign was changed.
+- No database update, commit, or push was run.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:BaseOutputPath=<temp-build-output>` passed with 0 warnings and 0 errors after migration generation.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for icon perceived size on the user's display scale.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Scan Task Picker Polish Follow-up
+
+Completed:
+
+- Updated the WebDAV path picker to match the preference dialog's single glass-panel treatment instead of nesting a rounded dialog surface inside another rounded shell.
+- Replaced the close action with an explicit Segoe MDL2 close glyph.
+- Added a directory-content loading overlay with centered spinner and text.
+- Reduced the directory list height, applied a modern auto-reveal scrollbar, and routed mouse-wheel scrolling over the list.
+- Changed footer actions to auto-width buttons distributed across equal columns.
+- Adjusted scan progress action-button placement so its left and right gaps stay equal around the button group as the page width changes.
+
+Not done:
+
+- No broader scan page redesign, theme overhaul, database update, commit, or push was run.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:BaseOutputPath=<temp-build-output>` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed in the real WPF window for the exact perceived spacing.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Poster Theme Icon Follow-up
+
+Completed:
+
+- Movie-search poster selected star now uses the active theme accent brush instead of a fixed gold treatment.
+- Favorites poster selected heart and selected want-to-watch star now use the active theme accent brush instead of fixed red / gold treatments.
+- The icons remain single Segoe MDL2 glyphs with transparent 30px hit targets.
+
+Not done:
+
+- No broader theme palette, layout, media-library semantics, database update, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for icon contrast on both light and dark themes.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Scan Task Configuration Layout Follow-up
+
+Completed:
+
+- Removed the framed card treatment from the local-configuration empty state text.
+- Reworked the WebDAV path-add area into a title row with the path picker button, a one-line status row, and a four-row path list.
+- Matched WebDAV path status truncation and tooltip behavior to the local-configuration status display.
+- Reduced WebDAV path picker vertical density, including the current-directory card, directory list height, row spacing, and wheel-scroll step.
+- Fixed WebDAV path picker confirmation so selecting a child directory returns that selected directory instead of the current parent directory.
+- Increased scan progress metric card spacing only when the navigation sidebar is collapsed.
+
+Not done:
+
+- No scanning semantics, delete semantics, database update, migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for real WebDAV directory density, tooltip timing, and collapsed-sidebar card spacing.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Watch History And Favorites Poster Layout Rework
+
+Completed:
+
+- Watch history poster card layout now follows the media-library poster grid width rules: 194px item width by default, 201px when the navigation sidebar is expanded, 180px content width, and 288px item height.
+- Watch history poster card margin now matches the media-library poster card spacing.
+- Favorites poster lists now use the movie-search/media-library style `ListBox` plus `VirtualizingWrapPanel` instead of the previous `ScrollViewer` plus `ItemsControl` layout.
+- Favorites poster list item sizing now follows the same collapsed/expanded sidebar width rules as media-library and movie-search posters.
+- Favorites poster cards keep the movie-search poster visual structure, with the top-right icon action mapped to favorite removal on the favorite tab and want-to-watch removal on the want tab.
+- Favorites selected tab is now stored through navigation state and is no longer reset to the favorite tab on page activation.
+
+Not done:
+
+- No collection semantics, media-library deletion semantics, database update, migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for exact poster spacing at the user's desktop scale and for favorite-tab persistence through the full navigation flow.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Scan Task WebDAV And Favorites Persistence Follow-up
+
+Completed:
+
+- Increased the WebDAV path picker dialog height by roughly one third and widened it slightly.
+- Changed WebDAV directory list wheel scrolling to pixel-based scrolling with a smaller step so wheel movement is less jumpy.
+- When adding or saving a WebDAV parent path, existing child paths are automatically removed and the status text reports the removed count and reason.
+- Applied the same parent-path cleanup and removal-count status to local scan path add/save flows, including same-batch local child selection filtering.
+- Matched the WebDAV account configuration card height to the add-path card and distributed the added space across the three input rows.
+- Favorites now persists each tab's poster-list scroll offset through tab switches, detail navigation, and page reactivation.
+- Favorites rating text now uses the same weighted TMDB/OMDb display rule as movie search, and collection list loading hydrates missing rating snapshots from the current movie records.
+
+Not done:
+
+- No database update, new migration, commit, push, scan matching rule, or media file deletion behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed in the real WPF window for the WebDAV dialog dimensions, wheel feel, and favorites scroll restoration timing.
+- Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.
+
+## Scan Task Multi-select And Rating Edge-case Follow-up
+
+Completed:
+
+- Fixed the WebDAV add-path card to a stable maximum height so the card no longer changes height as path count changes.
+- Removed the rounded empty-state frame from the WebDAV add-path empty text.
+- Kept the WebDAV account card at the same fixed height as the add-path card and redistributed the extra vertical space across the three input rows.
+- Added multi-select support to the WebDAV path picker for add-path flow while keeping edit-path selection single-value.
+- Added a hollow selection dot to every WebDAV directory row; selected rows fill the dot with the active theme accent.
+- WebDAV batch add now filters same-batch child paths covered by a selected parent path and still reports skipped/removed counts.
+- Favorites now hydrates TV season poster ratings after load using the same season TMDB plus series IMDb sources used by the media-library list.
+- Poster rating rules now explicitly display a single available rating even without votes, and average TMDB/IMDb when both ratings have no vote counts.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, or media file deletion behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for the fixed WebDAV card height, selection-dot contrast, and multi-select interaction feel.
+- Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.
+
+## Scan Task Path Picker And Discovery Paging Retry Follow-up
+
+Completed:
+
+- WebDAV directory rows now only toggle selected state when the hollow selection dot is clicked; double-clicking the row body still enters the directory.
+- Local folder picking now falls back to the Windows desktop path before user profile and documents when no initial path is available.
+- Moved the WebDAV account card action row upward to avoid clipping in the fixed-height card.
+- Movie search, TV search, movie ranking, and TV ranking page loading now use internal retry with rollback to the previous page state after repeated failures.
+- Paging failure handling restores previous rows, page index, totals, and status text instead of leaving the screen stuck in a loading message.
+
+Not done:
+
+- No visible retry button was added to the UI; retry is an internal paging safeguard.
+- No database update, new migration, commit, push, scanner matching rule, or media file deletion behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for WebDAV dot-only selection, desktop default picker behavior, account-card row spacing, and transient network retry timing.
+- Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.
+
+## Scan Account Layout And Ranking Pager Diagnostics Follow-up
+
+Completed:
+
+- Moved the WebDAV account connection status text from the bottom action row to the row directly under the account title, matching the add-path card status row alignment.
+- Changed the WebDAV account card bottom action row to two evenly distributed columns while keeping each button width content-sized.
+- Aligned ranking previous/next command availability with the actual active ranking pager state, instead of only checking whether ranking loading is idle.
+- Added ranking next-page diagnostics at the UI pointer layer and ViewModel command layer to distinguish missed UI events, disabled command state, and ViewModel rejection.
+- Added TV ranking diagnostics for display-page load, source fetch, status resolution, stale requests, cancellation, and failures to match the movie ranking logging coverage.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, or media file deletion behavior was changed.
+- No new visible ranking retry control was added.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for account-card row spacing and for reproducing the first-ranking-next-click issue with the added diagnostics.
+- Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.
+
+## Ranking Paging Cancellation And Timeout Follow-up
+
+Completed:
+
+- Diagnosed the first ranking next-page no-op from the ranking diagnostics: the UI click and command were both reached, but the source fetch was immediately canceled because paging reused an already canceled ranking cancellation token.
+- Movie search, TV search, movie ranking, and TV ranking paging now recreate canceled page-load cancellation token sources before starting a new page request.
+- Interactive page loading now applies a short per-attempt timeout before retrying, so disconnected-network paging does not wait for the full lower-level TMDB timeout cycle.
+- Paging failure rollback messages now include a clear "loading failed, please retry later" prompt, with timeout failures displayed as request timeouts.
+- Confirmed favorites posters use the shared poster cache image pipeline, which already retries remote poster downloads with bounded per-attempt timeouts and cooldowns.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media file deletion behavior, or visible retry button was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for the new paging timeout duration and failure text under disconnected-network conditions.
+- Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.

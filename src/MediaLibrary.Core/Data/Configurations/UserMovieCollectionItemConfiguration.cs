@@ -52,6 +52,7 @@ public sealed class UserMovieCollectionItemConfiguration : IEntityTypeConfigurat
 
         builder.HasIndex(x => x.MovieId);
         builder.HasIndex(x => x.TmdbId);
+        builder.HasIndex(x => x.IsFavorite);
         builder.HasIndex(x => x.IsWantToWatch);
         builder.HasIndex(x => x.IsNotInterested);
         builder.HasIndex(x => x.UpdatedAt);

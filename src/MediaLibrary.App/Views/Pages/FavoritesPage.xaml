@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.FavoritesPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True">
@@ -14,6 +15,8 @@
         <SolidColorBrush x:Key="FavoriteMediaCardAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="FavoriteMediaCardAccentTextBrush" Color="#111827" />
         <SolidColorBrush x:Key="FavoriteTagDividerBrush" Color="#7DD3FC" />
+        <SolidColorBrush x:Key="FavoriteRatingGoldBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="FavoriteIconOutlineBrush" Color="#F8FAFC" />
 
         <Style x:Key="FavoriteModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
             <Setter Property="Template">
@@ -87,6 +90,40 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="FavoritePosterResultListBoxStyle" TargetType="{x:Type ListBox}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
+            <Setter Property="helpers:ScrollBarAutoRevealBehavior.IsEnabled" Value="True" />
+        </Style>
+
+        <Style x:Key="FavoritePosterResultListBoxItemStyle" TargetType="{x:Type ListBoxItem}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          ClipToBounds="False"
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="FavoriteManualFavoriteTabButtonStyle"
                TargetType="{x:Type Button}"
                BasedOn="{StaticResource PageTopManualTabButtonStyle}">
@@ -112,20 +149,27 @@
         <Style x:Key="FavoritesHiddenHeaderTabControlStyle" TargetType="{x:Type TabControl}">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0" />
+            <Setter Property="Padding" Value="0,16,0,0" />
+            <Setter Property="Margin" Value="0,-8,0,0" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type TabControl}">
                         <Grid KeyboardNavigation.TabNavigation="Local">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="40" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <Grid Grid.Row="0">
-                                <Border Style="{StaticResource PageTopTabDividerStyle}" />
-                                <StackPanel HorizontalAlignment="Left"
+                            <Grid Grid.Row="0"
+                                  ClipToBounds="False"
+                                  SnapsToDevicePixels="True">
+                                <Border Height="2"
+                                        VerticalAlignment="Bottom"
+                                        Background="{DynamicResource BrushDivider}" />
+                                <StackPanel Panel.ZIndex="2"
+                                            HorizontalAlignment="Left"
                                             VerticalAlignment="Bottom"
+                                            ClipToBounds="False"
                                             Orientation="Horizontal">
                                     <Button Content="{Binding DataContext.FavoriteTabHeaderText, RelativeSource={RelativeSource TemplatedParent}}"
                                             Command="{Binding DataContext.SelectTabCommand, RelativeSource={RelativeSource TemplatedParent}}"
@@ -137,6 +181,7 @@
                                             Style="{StaticResource FavoriteManualWantTabButtonStyle}" />
                                 </StackPanel>
                                 <TabPanel x:Name="HeaderPanel"
+                                          Panel.ZIndex="0"
                                           Height="0"
                                           HorizontalAlignment="Left"
                                           IsHitTestVisible="False"
@@ -147,7 +192,7 @@
 
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Grid.Row="1"
-                                              Margin="0,22,0,0"
+                                              Margin="{TemplateBinding Padding}"
                                               ContentSource="SelectedContent" />
                         </Grid>
                     </ControlTemplate>
@@ -216,15 +261,18 @@
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="LineHeight" Value="16" />
             <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsHighRating}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource FavoriteRatingGoldBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="FavoriteMediaTitleTextStyle" TargetType="{x:Type TextBlock}">
             <Setter Property="Foreground" Value="{StaticResource FavoriteMediaCardTextBrush}" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="LineHeight" Value="18" />
-            <Setter Property="MaxHeight" Value="36" />
-            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
@@ -265,136 +313,260 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="FavoritePosterStateIconButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTip" Value="{Binding ActionText}" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <Setter Property="Opacity" Value="0.96" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="Transparent">
+                            <TextBlock x:Name="StateIcon"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20"
+                                       Foreground="{StaticResource FavoriteIconOutlineBrush}"
+                                       Text="&#xEB51;" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsFavoriteTab}" Value="True">
+                                <Setter TargetName="StateIcon" Property="Text" Value="&#xEB52;" />
+                                <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsWantToWatchTab}" Value="True">
+                                <Setter TargetName="StateIcon" Property="Text" Value="&#xE735;" />
+                                <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.46" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate x:Key="FavoriteMediaCardTemplate">
-            <StackPanel Width="180"
-                        Margin="0,0,22,28">
-                <Button Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding}"
-                        Style="{StaticResource FavoritePosterOpenButtonStyle}">
-                    <Grid Width="180"
-                          Height="270"
-                          ClipToBounds="False">
-                        <Grid.Resources>
-                            <RectangleGeometry x:Key="FavoritePosterClipGeometry"
-                                               Rect="0,0,180,270"
-                                               RadiusX="12"
-                                               RadiusY="12" />
-                        </Grid.Resources>
-
-                        <Border Margin="0,8,0,0"
-                                Background="#26000000"
-                                CornerRadius="12"
-                                Opacity="0.45" />
-
-                        <Grid Clip="{StaticResource FavoritePosterClipGeometry}">
-                            <Border Background="{StaticResource FavoriteMediaCardSurfaceBrush}" />
-                            <Control IsHitTestVisible="False"
-                                     Template="{StaticResource PosterPlaceholderTemplate}" />
-                            <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="320"
-                                   helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   SnapsToDevicePixels="True"
-                                   Stretch="UniformToFill">
-                                <Image.Style>
-                                    <Style TargetType="{x:Type Image}">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding HasPoster}" Value="False">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Image.Style>
-                            </Image>
-
-                            <Grid>
-                                <Grid.Background>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#00000000" Offset="0" />
-                                        <GradientStop Color="#0A111827" Offset="0.42" />
-                                        <GradientStop Color="#78111824" Offset="0.78" />
-                                        <GradientStop Color="#B8111824" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Grid.Background>
-                            </Grid>
-                            <Border Height="86"
-                                    VerticalAlignment="Top"
-                                    IsHitTestVisible="False">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#38FFFFFF" Offset="0" />
-                                        <GradientStop Color="#20FFFFFF" Offset="0.22" />
-                                        <GradientStop Color="#08FFFFFF" Offset="0.62" />
-                                        <GradientStop Color="#00FFFFFF" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                            </Border>
-
-                            <Border HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Margin="8"
-                                    MaxWidth="82"
-                                    Style="{StaticResource FavoriteMediaChipStyle}">
-                                <TextBlock Text="{Binding CategoryTagText}"
-                                           Style="{StaticResource FavoriteMediaChipTextStyle}" />
-                            </Border>
-                            <Border HorizontalAlignment="Right"
-                                    VerticalAlignment="Top"
-                                    Margin="8"
-                                    Style="{StaticResource FavoriteRatingBadgeStyle}">
-                                <TextBlock Text="{Binding RatingBadgeText}"
-                                           Style="{StaticResource FavoriteRatingTextStyle}" />
-                            </Border>
-                            <Border HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Margin="8,38,8,0"
-                                    MaxWidth="110"
-                                    Style="{StaticResource FavoriteMediaChipStyle}">
-                                <TextBlock Text="{Binding CollectionTypeText}"
-                                           Style="{StaticResource FavoriteMediaChipTextStyle}" />
-                            </Border>
-
-                            <StackPanel VerticalAlignment="Bottom"
-                                        Margin="10">
-                                <TextBlock Text="{Binding Title}"
-                                           Style="{StaticResource FavoriteMediaTitleTextStyle}"
-                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}" />
-                                <TextBlock Margin="0,3,0,0"
-                                           Text="{Binding ReleaseDateText}"
-                                           Style="{StaticResource FavoriteMediaMutedTextStyle}"
-                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding ReleaseDateText}" />
-                                <Border Margin="0,5,0,0"
-                                        Style="{StaticResource FavoriteTagLineContainerStyle}"
-                                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
-                                        helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}">
-                                    <TextBlock Text="{Binding PosterTagLine}"
-                                               Style="{StaticResource FavoriteMediaMutedTextStyle}" />
-                                </Border>
-                            </StackPanel>
-
-                            <Border BorderBrush="#14FFFFFF"
-                                    BorderThickness="1"
-                                    CornerRadius="12"
-                                    IsHitTestVisible="False" />
-                            <Border Margin="1"
-                                    BorderBrush="#0A000000"
-                                    BorderThickness="1"
-                                    CornerRadius="11"
-                                    IsHitTestVisible="False" />
-                        </Grid>
+            <Grid Width="180"
+                  Height="270"
+                  ClipToBounds="False"
+                  Cursor="Hand"
+                  Margin="0,3,14,15"
+                  RenderTransformOrigin="0.5,0.5"
+                  SnapsToDevicePixels="True"
+                  ToolTip="{Binding ActionStatusText}"
+                  UseLayoutRounding="True">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="RenderTransform">
+                            <Setter.Value>
+                                <TranslateTransform />
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform Y="-2" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.InputBindings>
+                    <MouseBinding MouseAction="LeftClick"
+                                  Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  CommandParameter="{Binding}" />
+                </Grid.InputBindings>
+                <Border x:Name="FavoriteMoviePosterCardClipMask"
+                        Background="White"
+                        CornerRadius="12"
+                        IsHitTestVisible="False" />
+                <Canvas ClipToBounds="False"
+                        IsHitTestVisible="False">
+                    <Image x:Name="FavoriteMoviePosterPaletteShadowHost"
+                           Width="348"
+                           Height="438"
+                           Canvas.Left="-84"
+                           Canvas.Top="-84"
+                           helpers:PosterCachedShadowBehavior.BlurRadius="28"
+                           helpers:PosterCachedShadowBehavior.CardHeight="270"
+                           helpers:PosterCachedShadowBehavior.CardWidth="180"
+                           helpers:PosterCachedShadowBehavior.CornerRadius="12"
+                           helpers:PosterCachedShadowBehavior.Direction="270"
+                           helpers:PosterCachedShadowBehavior.InnerMargin="0,3,0,0"
+                           helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.42"
+                           helpers:PosterCachedShadowBehavior.Padding="84"
+                           helpers:PosterCachedShadowBehavior.QuantizeColor="True"
+                           helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
+                           helpers:PosterCachedShadowBehavior.ShadowDepth="7"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           SnapsToDevicePixels="True"
+                           Stretch="Fill" />
+                    <Image Width="348"
+                           Height="438"
+                           Canvas.Left="-84"
+                           Canvas.Top="-84"
+                           helpers:PosterCachedShadowBehavior.BlurRadius="14"
+                           helpers:PosterCachedShadowBehavior.CardHeight="270"
+                           helpers:PosterCachedShadowBehavior.CardWidth="180"
+                           helpers:PosterCachedShadowBehavior.CornerRadius="12"
+                           helpers:PosterCachedShadowBehavior.Direction="270"
+                           helpers:PosterCachedShadowBehavior.IsEnabled="True"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.28"
+                           helpers:PosterCachedShadowBehavior.Padding="84"
+                           helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
+                           helpers:PosterCachedShadowBehavior.ShadowDepth="3"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           SnapsToDevicePixels="True"
+                           Stretch="Fill" />
+                </Canvas>
+                <Grid>
+                    <Grid.OpacityMask>
+                        <VisualBrush Visual="{Binding ElementName=FavoriteMoviePosterCardClipMask}" />
+                    </Grid.OpacityMask>
+                    <Border Background="{StaticResource FavoriteMediaCardSurfaceBrush}" />
+                    <Control IsHitTestVisible="False"
+                             Template="{StaticResource PosterPlaceholderTemplate}" />
+                    <Image helpers:PosterCacheImageBehavior.DecodePixelWidth="320"
+                           helpers:PosterCacheImageBehavior.Source="{Binding PosterRemoteUrl}"
+                           helpers:PosterPaletteShadowBehavior.TargetElement="{Binding ElementName=FavoriteMoviePosterPaletteShadowHost}"
+                           helpers:PosterPaletteShadowBehavior.TargetName="FavoriteMoviePosterPaletteShadowHost"
+                           SnapsToDevicePixels="True"
+                           Stretch="UniformToFill">
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasPoster}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                    <Grid IsHitTestVisible="False">
+                        <Grid.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#00000000" Offset="0" />
+                                <GradientStop Color="#0A111827" Offset="0.42" />
+                                <GradientStop Color="#78111824" Offset="0.78" />
+                                <GradientStop Color="#B8111824" Offset="1" />
+                            </LinearGradientBrush>
+                        </Grid.Background>
                     </Grid>
-                </Button>
-
-                <Button Content="{Binding ActionButtonText}"
-                        Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding}"
-                        IsEnabled="{Binding CanStartRemove}"
-                        Style="{StaticResource FavoriteCardActionButtonStyle}"
-                        ToolTip="{Binding ActionStatusText}" />
-                <TextBlock Text="{Binding ActionStatusText}"
-                           Style="{StaticResource FavoriteActionStatusTextStyle}"
-                           Visibility="{Binding HasActionStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            </StackPanel>
+                    <Border Height="86"
+                            VerticalAlignment="Top"
+                            IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#38FFFFFF" Offset="0" />
+                                <GradientStop Color="#20FFFFFF" Offset="0.22" />
+                                <GradientStop Color="#08FFFFFF" Offset="0.62" />
+                                <GradientStop Color="#00FFFFFF" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <Border HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Margin="8"
+                            MaxWidth="88"
+                            Style="{StaticResource FavoriteMediaChipStyle}">
+                        <TextBlock Text="{Binding CategoryTagText}"
+                                   Style="{StaticResource FavoriteMediaChipTextStyle}" />
+                    </Border>
+                    <Button HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,3,8,0"
+                            Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            IsEnabled="{Binding CanStartRemove}"
+                            Style="{StaticResource FavoritePosterStateIconButtonStyle}" />
+                    <Grid HorizontalAlignment="Stretch"
+                          VerticalAlignment="Bottom"
+                          Margin="8,0,8,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   HorizontalAlignment="Left"
+                                   MaxWidth="102"
+                                   Text="{Binding Title}"
+                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding Title}"
+                                   Style="{StaticResource FavoriteMediaTitleTextStyle}" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="0"
+                                   HorizontalAlignment="Left"
+                                   Margin="0,3,0,0"
+                                   MaxWidth="102"
+                                   Text="{Binding ReleaseDateText}"
+                                   Style="{StaticResource FavoriteMediaMutedTextStyle}" />
+                        <Border Grid.RowSpan="2"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource FavoriteRatingBadgeStyle}">
+                            <TextBlock Text="{Binding RatingBadgeText}"
+                                       Style="{StaticResource FavoriteRatingTextStyle}" />
+                        </Border>
+                        <Border Grid.Row="2"
+                                Grid.ColumnSpan="3"
+                                Margin="0,5,0,0"
+                                helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
+                                helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
+                                Style="{StaticResource FavoriteTagLineContainerStyle}">
+                            <TextBlock Style="{StaticResource FavoriteMediaMutedTextStyle}">
+                                <Run Text="{Binding PosterTagGroupOneText, Mode=OneWay}" />
+                                <Run Text="{Binding PosterTagSeparatorAfterOneText, Mode=OneWay}"
+                                     Foreground="{StaticResource FavoriteTagDividerBrush}" />
+                                <Run Text="{Binding PosterTagGroupTwoText, Mode=OneWay}" />
+                                <Run Text="{Binding PosterTagSeparatorAfterTwoText, Mode=OneWay}"
+                                     Foreground="{StaticResource FavoriteTagDividerBrush}" />
+                                <Run Text="{Binding PosterTagGroupThreeText, Mode=OneWay}" />
+                            </TextBlock>
+                        </Border>
+                    </Grid>
+                </Grid>
+                <Border BorderBrush="#14FFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        IsHitTestVisible="False" />
+                <Border Margin="1"
+                        BorderBrush="#0A000000"
+                        BorderThickness="1"
+                        CornerRadius="11"
+                        IsHitTestVisible="False" />
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="FavoriteLoadingStateTemplate">
@@ -484,23 +656,38 @@
                     <ContentControl Content="{Binding}"
                                     ContentTemplate="{StaticResource FavoriteEmptyStateTemplate}"
                                     Visibility="{Binding ShowFavoriteEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <ScrollViewer Padding="0,0,8,0"
-                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto"
-                                  Visibility="{Binding ShowFavoriteMovies, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ScrollViewer.Resources>
+                    <ListBox x:Name="FavoritePosterListBox"
+                             ItemsSource="{Binding FavoriteMovies}"
+                             ItemTemplate="{StaticResource FavoriteMediaCardTemplate}"
+                             Loaded="FavoritesListBox_Loaded"
+                             ScrollViewer.ScrollChanged="FavoritesListBox_ScrollChanged"
+                             Style="{StaticResource FavoritePosterResultListBoxStyle}"
+                             ItemContainerStyle="{StaticResource FavoritePosterResultListBoxItemStyle}"
+                             Visibility="{Binding ShowFavoriteMovies, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ListBox.Resources>
                             <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource FavoriteModernScrollBarStyle}" />
-                        </ScrollViewer.Resources>
-                        <ItemsControl ItemsSource="{Binding FavoriteMovies}"
-                                      ItemTemplate="{StaticResource FavoriteMediaCardTemplate}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
-                    </ScrollViewer>
+                        </ListBox.Resources>
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <controls:VirtualizingWrapPanel>
+                                    <controls:VirtualizingWrapPanel.Style>
+                                        <Style TargetType="{x:Type controls:VirtualizingWrapPanel}">
+                                            <Setter Property="ItemWidth" Value="194" />
+                                            <Setter Property="ItemContentWidth" Value="180" />
+                                            <Setter Property="ItemHeight" Value="288" />
+                                            <Setter Property="OverscanRows" Value="1" />
+                                            <Setter Property="ViewportPadding" Value="0,10,0,30" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                    <Setter Property="ItemWidth" Value="201" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </controls:VirtualizingWrapPanel.Style>
+                                </controls:VirtualizingWrapPanel>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                    </ListBox>
                 </Grid>
             </TabItem>
 
@@ -515,23 +702,38 @@
                     <ContentControl Content="{Binding}"
                                     ContentTemplate="{StaticResource WantToWatchEmptyStateTemplate}"
                                     Visibility="{Binding ShowWantToWatchEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <ScrollViewer Padding="0,0,8,0"
-                                  helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto"
-                                  Visibility="{Binding ShowWantToWatchMovies, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ScrollViewer.Resources>
+                    <ListBox x:Name="WantToWatchPosterListBox"
+                             ItemsSource="{Binding WantToWatchMovies}"
+                             ItemTemplate="{StaticResource FavoriteMediaCardTemplate}"
+                             Loaded="FavoritesListBox_Loaded"
+                             ScrollViewer.ScrollChanged="FavoritesListBox_ScrollChanged"
+                             Style="{StaticResource FavoritePosterResultListBoxStyle}"
+                             ItemContainerStyle="{StaticResource FavoritePosterResultListBoxItemStyle}"
+                             Visibility="{Binding ShowWantToWatchMovies, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ListBox.Resources>
                             <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource FavoriteModernScrollBarStyle}" />
-                        </ScrollViewer.Resources>
-                        <ItemsControl ItemsSource="{Binding WantToWatchMovies}"
-                                      ItemTemplate="{StaticResource FavoriteMediaCardTemplate}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
-                    </ScrollViewer>
+                        </ListBox.Resources>
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <controls:VirtualizingWrapPanel>
+                                    <controls:VirtualizingWrapPanel.Style>
+                                        <Style TargetType="{x:Type controls:VirtualizingWrapPanel}">
+                                            <Setter Property="ItemWidth" Value="194" />
+                                            <Setter Property="ItemContentWidth" Value="180" />
+                                            <Setter Property="ItemHeight" Value="288" />
+                                            <Setter Property="OverscanRows" Value="1" />
+                                            <Setter Property="ViewportPadding" Value="0,10,0,30" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                    <Setter Property="ItemWidth" Value="201" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </controls:VirtualizingWrapPanel.Style>
+                                </controls:VirtualizingWrapPanel>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                    </ListBox>
                 </Grid>
             </TabItem>
         </TabControl>

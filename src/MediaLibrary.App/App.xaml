@@ -15,6 +15,7 @@
                 <ResourceDictionary Source="Resources/Styles/Cards.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Buttons.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Inputs.xaml" />
+                <ResourceDictionary Source="Resources/Styles/SmartDatePicker.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Navigation.xaml" />
                 <ResourceDictionary Source="Resources/Styles/PageTabs.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Glass.xaml" />

@@ -50,6 +50,8 @@ public sealed class UserMovieCollectionItem
 
     public bool IsWatched { get; set; }
 
+    public bool IsFavorite { get; set; }
+
     public bool IsNotInterested { get; set; }
 
     public bool IsInLibrary { get; set; }

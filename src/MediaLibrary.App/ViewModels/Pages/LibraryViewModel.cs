@@ -1458,6 +1458,11 @@ public sealed class LibraryViewModel : PageViewModelBase
             return null;
         }
 
+        if (normalizedRatings.Count == 1)
+        {
+            return normalizedRatings[0].Rating;
+        }
+
         var totalVotes = normalizedRatings.Sum(x => x.Votes);
         return totalVotes > 0
             ? normalizedRatings.Sum(x => x.Rating * x.Votes) / totalVotes

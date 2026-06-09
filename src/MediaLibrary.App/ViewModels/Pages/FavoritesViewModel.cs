@@ -13,20 +13,25 @@ namespace MediaLibrary.App.ViewModels.Pages;
 public sealed class FavoritesViewModel : PageViewModelBase
 {
     private const string CollectionChangeSource = "Collection";
+    private const int RatingVoteWeightCap = 100_000;
     private readonly IUserCollectionService _userCollectionService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
+    private readonly ITvDetailQueryService _tvDetailQueryService;
     private readonly IMovieManagementService _movieManagementService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
     private bool _isActive;
     private bool _isLoading;
     private int _selectedTabIndex;
+    private double _favoriteScrollOffset;
+    private double _wantToWatchScrollOffset;
     private string _loadErrorMessage = string.Empty;
     private string _statusMessage = "收藏你的独家喜好。";
 
     public FavoritesViewModel(
         IUserCollectionService userCollectionService,
         ITvSeasonCollectionService tvSeasonCollectionService,
+        ITvDetailQueryService tvDetailQueryService,
         IMovieManagementService movieManagementService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService)
@@ -34,9 +39,13 @@ public sealed class FavoritesViewModel : PageViewModelBase
     {
         _userCollectionService = userCollectionService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
+        _tvDetailQueryService = tvDetailQueryService;
         _movieManagementService = movieManagementService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
+        _selectedTabIndex = NormalizeSelectedTabIndex(_navigationStateService.GetFavoritesSelectedTabIndex());
+        _favoriteScrollOffset = _navigationStateService.GetFavoritesScrollOffset(0);
+        _wantToWatchScrollOffset = _navigationStateService.GetFavoritesScrollOffset(1);
         _dataRefreshService.DataChanged += OnDataChanged;
 
         OpenMovieCommand = new RelayCommand(OpenMovie);
@@ -79,8 +88,10 @@ public sealed class FavoritesViewModel : PageViewModelBase
         get => _selectedTabIndex;
         set
         {
-            if (SetProperty(ref _selectedTabIndex, value))
+            var normalized = NormalizeSelectedTabIndex(value);
+            if (SetProperty(ref _selectedTabIndex, normalized))
             {
+                _navigationStateService.SetFavoritesSelectedTabIndex(normalized);
                 RaiseTabSelectionChanged();
             }
         }
@@ -89,6 +100,32 @@ public sealed class FavoritesViewModel : PageViewModelBase
     public bool IsFavoriteTabSelected => SelectedTabIndex == 0;
 
     public bool IsWantToWatchTabSelected => SelectedTabIndex == 1;
+
+    public double FavoriteScrollOffset
+    {
+        get => _favoriteScrollOffset;
+        set
+        {
+            var normalized = Math.Max(0d, value);
+            if (SetProperty(ref _favoriteScrollOffset, normalized))
+            {
+                _navigationStateService.SetFavoritesScrollOffset(0, normalized);
+            }
+        }
+    }
+
+    public double WantToWatchScrollOffset
+    {
+        get => _wantToWatchScrollOffset;
+        set
+        {
+            var normalized = Math.Max(0d, value);
+            if (SetProperty(ref _wantToWatchScrollOffset, normalized))
+            {
+                _navigationStateService.SetFavoritesScrollOffset(1, normalized);
+            }
+        }
+    }
 
     public string LoadErrorMessage
     {
@@ -133,7 +170,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         _isActive = true;
-        SelectedTabIndex = 0;
+        SelectedTabIndex = _navigationStateService.GetFavoritesSelectedTabIndex();
         await LoadAsync(cancellationToken);
     }
 
@@ -178,6 +215,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
             ReplaceItems(WantToWatchMovies, BuildTabItems(items.Where(x => x.IsWantToWatch), FavoriteTabKind.WantToWatch));
             RaiseCountsChanged();
             StatusMessage = BuildStatusMessage();
+            _ = HydrateTvSeasonRatingsAsync(FavoriteMovies.Concat(WantToWatchMovies).ToArray(), cancellationToken);
         }
         catch (Exception exception)
         {
@@ -268,6 +306,88 @@ public sealed class FavoritesViewModel : PageViewModelBase
         };
     }
 
+    private static int NormalizeSelectedTabIndex(int selectedTabIndex)
+    {
+        return Math.Clamp(selectedTabIndex, 0, 1);
+    }
+
+    private async Task HydrateTvSeasonRatingsAsync(
+        IReadOnlyList<FavoriteCollectionItemViewModel> items,
+        CancellationToken cancellationToken)
+    {
+        foreach (var item in items.Where(x => x.IsTvSeason && x.TvSeasonId is > 0))
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            try
+            {
+                var seasonRating = await _tvDetailQueryService.GetSeasonTmdbRatingAsync(item.TvSeasonId!.Value, cancellationToken);
+                if (TryNormalizeRatingScore(seasonRating, out var score))
+                {
+                    await Application.Current.Dispatcher.InvokeAsync(() => item.ApplyRatingOverride(score));
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch
+            {
+                // Rating hydration is a best-effort UI refresh; the card can keep its current placeholder.
+            }
+        }
+    }
+
+    private static bool TryBuildRatingScore(IEnumerable<MovieRatingItem> ratings, out double score)
+    {
+        var normalizedRatings = ratings
+            .Where(IsValidRating)
+            .Select(
+                rating => new
+                {
+                    Score = Math.Clamp(rating.ScoreValue / rating.ScoreScale * 10d, 0d, 10d),
+                    Votes = Math.Min(Math.Max(rating.VoteCount ?? 0, 0), RatingVoteWeightCap)
+                })
+            .ToArray();
+        if (normalizedRatings.Length == 0)
+        {
+            score = 0d;
+            return false;
+        }
+
+        if (normalizedRatings.Length == 1)
+        {
+            score = normalizedRatings[0].Score;
+            return true;
+        }
+
+        var totalVotes = normalizedRatings.Sum(x => x.Votes);
+        score = totalVotes > 0
+            ? normalizedRatings.Sum(x => x.Score * x.Votes) / totalVotes
+            : normalizedRatings.Average(x => x.Score);
+        return true;
+    }
+
+    private static bool TryNormalizeRatingScore(MovieRatingItem? rating, out double score)
+    {
+        if (rating is not { ScoreValue: > 0d, ScoreScale: > 0d } validRating)
+        {
+            score = 0d;
+            return false;
+        }
+
+        score = Math.Clamp(validRating.ScoreValue / validRating.ScoreScale * 10d, 0d, 10d);
+        return true;
+    }
+
+    private static bool IsValidRating(MovieRatingItem? rating)
+    {
+        return rating is { ScoreValue: > 0d, ScoreScale: > 0d };
+    }
+
     private bool CanRemoveItem(object? parameter)
     {
         return !IsLoading
@@ -329,15 +449,20 @@ public sealed class FavoritesViewModel : PageViewModelBase
             return;
         }
 
-        if (!item.MovieId.HasValue)
+        if (item.MovieId.HasValue)
         {
-            throw new InvalidOperationException(item.RemoveDisabledReason);
+            await _movieManagementService.SetFavoriteAsync(
+                item.MovieId.Value,
+                isFavorite: false,
+                changeSource: CollectionChangeSource);
         }
-
-        await _movieManagementService.SetFavoriteAsync(
-            item.MovieId.Value,
-            isFavorite: false,
-            changeSource: CollectionChangeSource);
+        else
+        {
+            await _userCollectionService.SetFavoriteAsync(
+                ToRecommendation(item, keepMovieId: false),
+                isFavorite: false,
+                changeSource: CollectionChangeSource);
+        }
         StatusMessage = $"已取消喜爱：{item.Title}";
     }
 
@@ -453,6 +578,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
             SceneTagsText = movie.SceneTagsText,
             IsInLibrary = movie.IsInLibrary,
             IsWatched = movie.IsWatched,
+            IsFavorite = movie.IsLiked,
             IsWantToWatch = movie.IsWantToWatch,
             IsNotInterested = movie.IsNotInterested,
             ScopeText = movie.TabKind == FavoriteTabKind.WantToWatch ? "想看影片" : "喜爱影片",
@@ -471,6 +597,7 @@ public sealed class FavoritesViewModel : PageViewModelBase
     {
         private readonly CollectionMovieItem _item;
         private bool _isActionRunning;
+        private double? _ratingOverrideValue;
         private string _actionErrorMessage = string.Empty;
 
         public FavoriteCollectionItemViewModel(CollectionMovieItem item, FavoriteTabKind tabKind)
@@ -486,6 +613,8 @@ public sealed class FavoritesViewModel : PageViewModelBase
         public bool IsTvSeason => _item.IsTvSeason;
 
         public int? TvSeasonId => _item.TvSeasonId;
+
+        public int? TvSeriesId => _item.TvSeriesId;
 
         public int? TmdbId => _item.TmdbId;
 
@@ -546,6 +675,10 @@ public sealed class FavoritesViewModel : PageViewModelBase
         public bool IsInLibrary => _item.IsInLibrary;
 
         public string CollectionTypeText => TabKind == FavoriteTabKind.Favorite ? "喜爱" : "想看";
+
+        public bool IsFavoriteTab => TabKind == FavoriteTabKind.Favorite;
+
+        public bool IsWantToWatchTab => TabKind == FavoriteTabKind.WantToWatch;
 
         public string AvailabilityText => _item.AvailabilityText;
 
@@ -608,7 +741,11 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         public bool HasActionStatus => !string.IsNullOrWhiteSpace(ActionStatusText);
 
-        public bool CanRemove => IsTvSeason || TabKind != FavoriteTabKind.Favorite || MovieId.HasValue;
+        public bool CanRemove => IsTvSeason
+                                 || TabKind != FavoriteTabKind.Favorite
+                                 || MovieId.HasValue
+                                 || TmdbId.HasValue
+                                 || !string.IsNullOrWhiteSpace(Title);
 
         public bool CanStartRemove => CanRemove && !IsActionRunning;
 
@@ -622,7 +759,12 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         public bool HasPoster => !string.IsNullOrWhiteSpace(PosterRemoteUrl);
 
-        public string RatingBadgeText => FormatRatingText();
+        public string RatingBadgeText => TryGetDisplayRatingScore(out var score)
+            ? FormatRatingValue(score)
+            : "--";
+
+        public bool IsHighRating => TryGetDisplayRatingScore(out var score)
+                                    && DiscoveryRatingPresenter.IsHighDisplayRating(score);
 
         public string ReleaseDateText => IsTvSeason
             ? BuildSeasonAuxiliaryText()
@@ -637,6 +779,21 @@ public sealed class FavoritesViewModel : PageViewModelBase
         public string PosterTagLine => BuildPosterTagLine();
 
         public string PosterTagToolTipText => PosterTagLine;
+
+        public string PosterTagGroupOneText => BuildPosterTagGroupOneText();
+
+        public string PosterTagSeparatorAfterOneText => BuildPosterTagSeparator(
+            PosterTagGroupOneText,
+            PosterTagGroupTwoText,
+            PosterTagGroupThreeText);
+
+        public string PosterTagGroupTwoText => SourceSummaryText;
+
+        public string PosterTagSeparatorAfterTwoText => BuildPosterTagSeparator(
+            PosterTagGroupTwoText,
+            PosterTagGroupThreeText);
+
+        public string PosterTagGroupThreeText => WatchStateText;
 
         public void BeginAction()
         {
@@ -662,18 +819,62 @@ public sealed class FavoritesViewModel : PageViewModelBase
             }
         }
 
-        private string FormatRatingText()
+        public void ApplyRatingOverride(double score)
         {
-            var rating = TmdbRating;
-            if (!rating.HasValue && OmdbScoreValue.HasValue)
+            var normalizedScore = Math.Clamp(score, 0d, 10d);
+            if (_ratingOverrideValue.HasValue
+                && Math.Abs(_ratingOverrideValue.Value - normalizedScore) < 0.01d)
             {
-                var scale = OmdbScoreScale.GetValueOrDefault(10d);
-                rating = scale > 0 ? OmdbScoreValue.Value / scale * 10d : OmdbScoreValue.Value;
+                return;
             }
 
-            return rating.HasValue
-                ? rating.Value.ToString("0.0", CultureInfo.InvariantCulture)
-                : "--";
+            _ratingOverrideValue = normalizedScore;
+            OnPropertyChanged(nameof(RatingBadgeText));
+            OnPropertyChanged(nameof(IsHighRating));
+        }
+
+        private bool TryGetDisplayRatingScore(out double score)
+        {
+            if (_ratingOverrideValue.HasValue)
+            {
+                score = _ratingOverrideValue.Value;
+                return true;
+            }
+
+            if (IsTvSeason)
+            {
+                score = 0d;
+                return false;
+            }
+
+            return TryBuildRatingScore(
+                new[]
+                {
+                    TmdbRating.HasValue
+                        ? new MovieRatingItem
+                        {
+                            SourceName = "TMDB",
+                            ScoreValue = TmdbRating.Value,
+                            ScoreScale = 10d,
+                            VoteCount = TmdbVoteCount
+                        }
+                        : null,
+                    OmdbScoreValue.HasValue
+                        ? new MovieRatingItem
+                        {
+                            SourceName = "IMDb",
+                            ScoreValue = OmdbScoreValue.Value,
+                            ScoreScale = OmdbScoreScale is > 0 ? OmdbScoreScale.Value : 10d,
+                            VoteCount = OmdbVoteCount
+                        }
+                        : null
+                }.Where(rating => rating is not null).Select(rating => rating!),
+                out score);
+        }
+
+        private static string FormatRatingValue(double score)
+        {
+            return Math.Round(score, 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture);
         }
 
         private string BuildSeasonAuxiliaryText()
@@ -698,12 +899,22 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         private string BuildPosterTagLine()
         {
-            var tagText = FirstNonEmpty(
+            return JoinNonEmpty(" | ", PosterTagGroupOneText, PosterTagGroupTwoText, PosterTagGroupThreeText);
+        }
+
+        private string BuildPosterTagGroupOneText()
+        {
+            return FirstNonEmpty(
                 BuildLimitedTagText(GenresText),
                 BuildLimitedTagText(AiTagsText),
                 MediaKindText);
+        }
 
-            return JoinNonEmpty("  |  ", tagText, SourceSummaryText, WatchStateText);
+        private static string BuildPosterTagSeparator(string currentGroup, params string[] followingGroups)
+        {
+            return !string.IsNullOrWhiteSpace(currentGroup) && followingGroups.Any(group => !string.IsNullOrWhiteSpace(group))
+                ? " | "
+                : string.Empty;
         }
 
         private static string BuildLimitedTagText(string text)

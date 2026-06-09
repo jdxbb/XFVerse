@@ -467,7 +467,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .AsNoTracking()
             .Where(x => x.TmdbId.HasValue
                 && x.TmdbId.Value > 0
-                && (x.IsInLibrary || x.IsWatched || x.IsWantToWatch || x.IsNotInterested)
+                && (x.IsInLibrary || x.IsWatched || x.IsFavorite || x.IsWantToWatch || x.IsNotInterested)
                 && !string.IsNullOrWhiteSpace(x.Title)
                 && (!x.MovieId.HasValue
                     || dbContext.Movies.Any(movie => movie.Id == x.MovieId.Value
@@ -490,6 +490,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 OmdbScoreValue = x.OmdbScoreValue,
                 OmdbScoreScale = x.OmdbScoreScale,
                 OmdbVoteCount = x.OmdbVoteCount,
+                IsFavorite = x.IsFavorite,
                 IsWantToWatch = x.IsWantToWatch,
                 IsWatched = x.IsWatched,
                 IsNotInterested = x.IsNotInterested,
@@ -524,6 +525,9 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 .Where(x => x.IsFavorite)
                 .Select(x => BuildTmdbKey(x.TmdbId))
                 .ToHashSet(StringComparer.Ordinal);
+            favoriteKeys.UnionWith(collectionItems
+                .Where(x => x.IsFavorite)
+                .Select(x => BuildTmdbKey(x.TmdbId)));
 
             var wantToWatchKeys = collectionItems
                 .Where(x => x.IsWantToWatch)
@@ -558,6 +562,9 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         var favoriteActiveStates = movies
             .Where(x => x.IsFavorite)
             .Select(x => new ActiveStateStatsRow(BuildTmdbKey(x.TmdbId), x.CreatedAt))
+            .Concat(collectionItems
+                .Where(x => x.IsFavorite)
+                .Select(x => new ActiveStateStatsRow(BuildTmdbKey(x.TmdbId), x.CreatedAt)))
             .ToList();
         var wantToWatchActiveStates = collectionItems
             .Where(x => x.IsWantToWatch)
@@ -1035,6 +1042,13 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         foreach (var movie in identifiedMovies.Where(x => x.IsFavorite))
         {
             foreach (var tag in GetTypeTags(movie))
+            {
+                AddWeightedTag(likedAccumulator, tag, 0);
+            }
+        }
+        foreach (var item in collectionItems.Where(x => x.IsFavorite))
+        {
+            foreach (var tag in SplitTags(item.GenresText))
             {
                 AddWeightedTag(likedAccumulator, tag, 0);
             }
@@ -1605,6 +1619,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         public double? OmdbScoreScale { get; set; }
 
         public int? OmdbVoteCount { get; set; }
+
+        public bool IsFavorite { get; set; }
 
         public bool IsWantToWatch { get; set; }
 

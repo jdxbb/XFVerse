@@ -1,5 +1,33 @@
 # TV Support Stage Log
 
+## Season Detail Action State Follow-up - 2026-06-08
+
+Goal:
+
+- Keep Season detail media-library action state consistent after watched-state changes.
+- Align Season detail not-interested action icon language with Movie detail.
+
+Completed:
+
+- Season detail not-interested action now uses an exclamation mark icon before marking and an undo arrow icon after marking.
+- Season-level watched / unwatched success paths now reload the detail model before reporting success, so the add / remove media-library button reflects the latest visibility state.
+- Episode-level watched / unwatched success paths now reload the Season detail model and preserve the clicked episode label in the success message.
+
+Not done:
+
+- No TV scan rule, Season / Episode metadata shape, playback source, schema migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` remained empty.
+
+Known Issues:
+
+- Blocker: None found.
+- Deferred: Runtime WPF visual acceptance is still needed for the exact button icon rendering and detail reload timing.
+- Noise: The reload is intentionally scoped to successful watched-state changes; collection-state actions already reload the detail model.
+
 ## TV Metadata Enrichment Follow-up - Persisted Production Metadata
 
 Completed:
@@ -4085,3 +4113,28 @@ Verification:
 
 - `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
 - Current migrations diff remained empty.
+
+### Phase 4 Season Detail State Follow-up
+
+Completed:
+
+- Season detail not-interested action now uses vector exclamation / undo-arrow icons instead of font glyph strings.
+- Season detail preserves library visibility when cancelling watched, want-to-watch, favorite, or not-interested state on a Season that was already visible in the library.
+- Auto-removal is limited to Season visibility that came from a state marker added during the current detail session.
+- Manual add/remove Season library actions reset the current detail auto-visibility tracker.
+- Mixed Local/WebDAV Season source display remains unified as `本地/网盘`.
+
+Not done:
+
+- No TV identification rule, correction transaction boundary, schema migration, database update, commit, or push was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual runtime acceptance is still needed for Season detail state toggles opened from every entry route.
+- Noise: This follow-up only changes visibility preservation around user state toggles; it does not change delete-record semantics.

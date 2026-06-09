@@ -168,6 +168,37 @@
                            Text="{Binding}" />
             </StackPanel>
         </DataTemplate>
+
+        <DataTemplate x:Key="MovieDetailNotInterestedActionButtonTemplate">
+            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                <Grid Width="16"
+                      Height="16"
+                      VerticalAlignment="Center">
+                    <Path x:Name="NotInterestedIcon"
+                          Data="M11,3 H13 L12.65,14 H11.35 Z M11,17 H13 V20 H11 Z"
+                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          Stretch="Uniform" />
+                    <Path x:Name="CancelNotInterestedIcon"
+                          Data="M7.2,7.4 H4.3 V4.5 M4.55,7.35 C6.35,4.85 9.05,3.5 12,3.5 C16.7,3.5 20.5,7.3 20.5,12 C20.5,16.7 16.7,20.5 12,20.5 C9.45,20.5 7.15,19.38 5.6,17.6"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          StrokeStartLineCap="Round"
+                          StrokeThickness="2.1"
+                          Stretch="Uniform"
+                          Visibility="Collapsed" />
+                </Grid>
+                <TextBlock Margin="12,0,0,0"
+                           VerticalAlignment="Center"
+                           Text="{Binding}" />
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                    <Setter TargetName="NotInterestedIcon" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="CancelNotInterestedIcon" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid>
@@ -636,9 +667,9 @@
                 <Button Grid.Column="6"
                         Command="{Binding ToggleNotInterestedCommand}"
                         Content="{Binding NotInterestedButtonText}"
-                        ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
+                        ContentTemplate="{StaticResource MovieDetailNotInterestedActionButtonTemplate}"
                         IsEnabled="{Binding CanToggleNotInterested}"
-                        Tag="{Binding NotInterestedButtonIcon}">
+                        Tag="{Binding IsNotInterested}">
                     <Button.Style>
                         <Style BasedOn="{StaticResource GlassSecondaryButtonStyle}" TargetType="Button">
                             <Setter Property="Visibility" Value="Visible" />
