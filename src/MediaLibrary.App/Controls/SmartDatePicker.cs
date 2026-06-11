@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace MediaLibrary.App.Controls;
 
@@ -11,6 +13,9 @@ public sealed class SmartDatePicker : Control
     private readonly RelayActionCommand _previousMonthCommand;
     private readonly RelayActionCommand _nextMonthCommand;
     private readonly RelayActionCommand _selectDateCommand;
+    private Popup? _popup;
+    private ToggleButton? _switchButton;
+    private Window? _outsideClickWindow;
 
     static SmartDatePicker()
     {
@@ -29,6 +34,7 @@ public sealed class SmartDatePicker : Control
         RefreshCalendarDays();
         UpdateDisplayText();
         UpdateCurrentMonthText();
+        Unloaded += (_, _) => DetachOutsideClickHandler();
     }
 
     public static readonly DependencyProperty SelectedDateProperty =
@@ -110,6 +116,28 @@ public sealed class SmartDatePicker : Control
 
     public ICommand SelectDateCommand => _selectDateCommand;
 
+    public override void OnApplyTemplate()
+    {
+        if (_switchButton is not null)
+        {
+            _switchButton.RemoveHandler(
+                UIElement.PreviewMouseLeftButtonDownEvent,
+                new MouseButtonEventHandler(SwitchButton_PreviewMouseLeftButtonDown));
+        }
+
+        base.OnApplyTemplate();
+
+        _switchButton = GetTemplateChild("PART_Switch") as ToggleButton;
+        _popup = GetTemplateChild("PART_Popup") as Popup;
+        if (_switchButton is not null)
+        {
+            _switchButton.AddHandler(
+                UIElement.PreviewMouseLeftButtonDownEvent,
+                new MouseButtonEventHandler(SwitchButton_PreviewMouseLeftButtonDown),
+                true);
+        }
+    }
+
     private static void OnSelectedDateChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs e)
     {
         var picker = (SmartDatePicker)dependencyObject;
@@ -133,7 +161,17 @@ public sealed class SmartDatePicker : Control
     private static void OnIsDropDownOpenChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs e)
     {
         var picker = (SmartDatePicker)dependencyObject;
-        if ((bool)e.NewValue && picker.SelectedDate.HasValue)
+        var isOpen = e.NewValue is bool newValue && newValue;
+        if (isOpen)
+        {
+            picker.AttachOutsideClickHandler();
+        }
+        else
+        {
+            picker.DetachOutsideClickHandler();
+        }
+
+        if (isOpen && picker.SelectedDate.HasValue)
         {
             var selected = picker.SelectedDate.Value;
             picker.SetCurrentValue(CurrentMonthProperty, new DateTime(selected.Year, selected.Month, 1));
@@ -154,6 +192,73 @@ public sealed class SmartDatePicker : Control
 
         SetCurrentValue(SelectedDateProperty, date.Date);
         SetCurrentValue(IsDropDownOpenProperty, false);
+    }
+
+    private void SwitchButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        SetCurrentValue(IsDropDownOpenProperty, !IsDropDownOpen);
+        e.Handled = true;
+    }
+
+    private void AttachOutsideClickHandler()
+    {
+        var window = Window.GetWindow(this);
+        if (ReferenceEquals(_outsideClickWindow, window))
+        {
+            return;
+        }
+
+        DetachOutsideClickHandler();
+        _outsideClickWindow = window;
+        if (_outsideClickWindow is not null)
+        {
+            _outsideClickWindow.PreviewMouseDown += OutsideClickWindow_PreviewMouseDown;
+        }
+    }
+
+    private void DetachOutsideClickHandler()
+    {
+        if (_outsideClickWindow is not null)
+        {
+            _outsideClickWindow.PreviewMouseDown -= OutsideClickWindow_PreviewMouseDown;
+            _outsideClickWindow = null;
+        }
+    }
+
+    private void OutsideClickWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!IsDropDownOpen || IsSourceWithinPicker(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        SetCurrentValue(IsDropDownOpenProperty, false);
+    }
+
+    private bool IsSourceWithinPicker(DependencyObject? source)
+    {
+        var popupChild = _popup?.Child;
+        for (var current = source; current is not null; current = GetDependencyParent(current))
+        {
+            if (ReferenceEquals(current, this)
+                || ReferenceEquals(current, _switchButton)
+                || ReferenceEquals(current, popupChild))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetDependencyParent(DependencyObject current)
+    {
+        if (current is Visual || current is System.Windows.Media.Media3D.Visual3D)
+        {
+            return VisualTreeHelper.GetParent(current);
+        }
+
+        return LogicalTreeHelper.GetParent(current);
     }
 
     private void RefreshCalendarDays()

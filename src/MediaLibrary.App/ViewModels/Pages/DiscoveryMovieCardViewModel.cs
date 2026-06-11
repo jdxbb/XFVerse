@@ -212,7 +212,7 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public bool CanToggleWantToWatch => !IsWatched;
 
-    public string WantToWatchButtonText => IsWatched ? "已看" : IsWantToWatch ? "取消想看" : "+ 想看";
+    public string WantToWatchButtonText => IsWatched ? "已看，无法标记想看" : IsWantToWatch ? "取消想看" : "+ 想看";
 
     public string FullTagLine => JoinVisibleGroups(BuildTagGroups(null));
 

@@ -3,8 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
-        <SolidColorBrush x:Key="HomePosterCardBackgroundBrush" Color="#121821" />
-        <SolidColorBrush x:Key="HomePosterCardSurfaceBrush" Color="#202938" />
+        <SolidColorBrush x:Key="HomePosterCardBackgroundBrush" Color="{DynamicResource ColorCard}" />
+        <SolidColorBrush x:Key="HomePosterCardSurfaceBrush" Color="{DynamicResource ColorSurfaceAlt}" />
+        <SolidColorBrush x:Key="HomePosterBadgeBrush" Color="#E2E8F0" />
+        <SolidColorBrush x:Key="HomePosterBadgeTextBrush" Color="#111827" />
 
         <Style x:Key="HomeTwoLineTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -109,9 +111,9 @@
             <Setter Property="Height" Value="24" />
             <Setter Property="Padding" Value="8,2" />
             <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="{StaticResource HomePosterBadgeBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
 
@@ -120,10 +122,10 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="FontSize" Value="13.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Foreground" Value="{StaticResource HomePosterBadgeTextBrush}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
-                    <Setter Property="Foreground" Value="#F5C84B" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushWarning}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -379,14 +381,15 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Margin="-32,-24,-32,0">
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="MainContentColumn" Width="*" MinWidth="660" />
             <ColumnDefinition Width="24" />
             <ColumnDefinition x:Name="AiPanelColumn" Width="360" />
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.ColumnSpan="3">
+        <Grid Grid.ColumnSpan="3"
+              Margin="32,24,32,0">
             <Grid.Style>
                 <Style TargetType="Grid">
                     <Setter Property="Visibility" Value="Visible" />
@@ -428,6 +431,7 @@
 
                     <ItemsControl Grid.Row="2"
                                   Margin="0,0,-12,0"
+                                  ClipToBounds="False"
                                   ItemsSource="{Binding LibraryStatusOverview}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -1178,6 +1182,7 @@
         </Grid>
 
         <Border Grid.ColumnSpan="3"
+                Margin="32,24,32,0"
                 Panel.ZIndex="220"
                 Background="Transparent">
             <Border.Style>

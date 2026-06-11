@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Plan
 
-Last updated: 2026-06-07
+Last updated: 2026-06-10
 
 ## Purpose
 
@@ -231,8 +231,11 @@ Substages:
 - 7.7d watch-insights shell completed: rebuilt WatchInsights as Movie Discovery-style top tabs plus independent profile/statistics scroll surfaces, with module-state baseline and UI status sanitization;
 - 7.7e profile-analysis tab visual closeout completed: rebuilt the profile tab around summary, DNA, persona, quadrant and watch-vs-like modules using App-layer display projections only;
 - 7.7f statistics upper area completed: rebuilt range switching, overview cards, monthly metrics and calendar heatmap using App-layer display projections only;
-- 7.7g statistics lower area: preference graph, rankings, rhythm and taste combination map;
-- 7.7h regression, docs and closeout.
+- 7.7g statistics lower area completed: rebuilt preference graph, tag rankings, viewing rhythm and taste combination map using App-layer display projections only; follow-ups aligned Watch Insights tabs / surfaces, moved Profile Analysis refresh into the Tab action area, and tightened the taste-summary card / quote typography;
+- 7.7 preliminary palette alignment completed: shared Light / Dark dictionaries and fixed dark player resources now follow the `DesignDraft/DESIGN.md` gray-pink / neutral-first palette direction; follow-up feedback reduced large-surface gray-pink usage and restored poster-card chips, rating backgrounds, overlay text and progress-track backgrounds to their previous readable treatment; this is not the full 7.8 visual regression;
+- 7.7 visual feedback follow-up completed: fixed SmartDatePicker click-to-close behavior with code-owned popup state and outside-click closing, added and thickened fine white outlines to solid poster-corner icons, replaced detail rating stars with proportional five-star rendering and theme-aware strokes, kept watched Movie Discovery search results showing an empty want star with a semantic transient no-op prompt, wired the Settings About row to the official site, and added a dark-theme sidebar right-edge divider;
+- 7.7 Watch Insights profile follow-up completed: restored Home-aligned profile card shadows, added profile-refresh spinner / combined status-time label, normalized taste summaries into readable quoted paragraphs, and densified the 2x3 keyword area without increasing keyword count;
+- 7.7h regression, docs and closeout remains next.
 
 Not in scope:
 - moving TV into Movie-only recommendation / persona insight semantics;

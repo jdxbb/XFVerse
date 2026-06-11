@@ -3,6 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
+        <Style x:Key="ScanLogCardShellStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+
         <Storyboard x:Key="ScanLogStatusLightStoryboard"
                     AutoReverse="True"
                     RepeatBehavior="Forever">
@@ -67,12 +73,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Margin="0,0,0,10"
-            Padding="12"
-            CornerRadius="6"
-            Background="{DynamicResource BrushSurfaceAlt}"
-            BorderBrush="{DynamicResource BrushBorder}"
-            BorderThickness="1">
+    <Border Style="{StaticResource ScanLogCardShellStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />

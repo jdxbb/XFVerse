@@ -1,5 +1,61 @@
 # 影片发现阶段日志
 
+## 2026-06-11 - Discovery Search And Ranking Shadow Safe Area Follow-up
+
+Goal:
+
+- Prevent top/right shadow clipping on Movie Discovery search and ranking cards without changing tab behavior, search/ranking commands, paging, filters, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Confirmed the search toolbar card, search result card and ranking card are page-edge `GlassPageCardStyle` surfaces with top/right shadow clipping risk.
+- Added symmetric shadow-safe expansion around the Search tab content and Ranking tab content, while compensating card bodies back to the original content column so alignment does not drift.
+
+Not done:
+
+- No search/ranking logic, tab selection, menu behavior, paging, list/poster templates, database schema, migration, database update, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gCrossPageShadowSafe\"` passed with 0 warnings and 0 errors.
+
+## 2026-06-11 - Poster Corner Action Tooltip Follow-up
+
+Goal:
+
+- Remove hover text from poster-corner want/favorite action buttons without changing click behavior, card navigation, toast feedback, search/ranking logic, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Removed the Movie Discovery search poster top-right want-action tooltip, including the watched-movie disabled hint tooltip.
+- Removed the Favorites poster top-right collection-state action tooltip and the card-level action-status tooltip that made the same hover text appear over the poster.
+
+Not done:
+
+- No card command, invalid watched-movie toast, collection state service, search/ranking behavior, database schema, migration, database update, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gTooltipInsightShadow\"` passed with 0 warnings and 0 errors.
+
+## 2026-06-11 - Transient Toast Opacity Follow-up
+
+Goal:
+
+- Improve the readability of Movie Discovery transient page messages without changing toast behavior, command semantics, paging, search, recommendations, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Increased semantic transient toast background opacity from `0.76` to `0.88` for info, warning, error and success variants.
+
+Not done:
+
+- No toast duration, position, trigger condition, paging/search logic, recommendation logic, database schema, migration, database update, commit, or push change.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gToastShadowViewport\"` passed with 0 warnings and 0 errors.
+
 ## 2026-06-08 - Discovery / Detail state and poster action follow-up
 
 Goal:

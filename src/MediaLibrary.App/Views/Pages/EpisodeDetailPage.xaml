@@ -276,7 +276,7 @@
                                 </Grid>
                             </StackPanel>
 
-                            <Border Grid.Row="2" Width="294" Padding="8" HorizontalAlignment="Center" Background="{DynamicResource BrushGlassSurfaceAlt}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12">
+                            <Border Grid.Row="2" Width="294" Padding="8" HorizontalAlignment="Center" CornerRadius="12" Style="{StaticResource GlassPageCardStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="88" />
@@ -298,7 +298,14 @@
                                             <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource BrushForegroundMuted}" Text="/" />
                                             <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource BrushForegroundMuted}" Text="10" />
                                         </StackPanel>
-                                        <TextBlock HorizontalAlignment="Center" Margin="0,2,0,0" FontSize="18" Foreground="{DynamicResource BrushAccent}" Text="{Binding EpisodeTmdbRating.ScoreValue, Converter={StaticResource RatingStarsConverter}}" />
+                                        <controls:RatingStarsBar HorizontalAlignment="Center"
+                                                                 Margin="0,3,0,0"
+                                                                 Fill="{DynamicResource BrushRatingStarFill}"
+                                                                 ScoreValue="{Binding EpisodeTmdbRating.ScoreValue}"
+                                                                 StarSize="16"
+                                                                 StarSpacing="1.5"
+                                                                 Stroke="{DynamicResource BrushRatingStarStroke}"
+                                                                 StrokeThickness="0.65" />
                                     </StackPanel>
                                     <Border Grid.Column="3" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
                                     <StackPanel Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center">

@@ -1,6 +1,6 @@
 # Phase 7 Known Issues
 
-Last updated: 2026-06-08
+Last updated: 2026-06-10
 
 This file tracks current blockers, deferred work, risks, noise and user-confirmed non-issues for Phase 7. It should be updated at every Phase 7 substage closeout.
 
@@ -73,15 +73,18 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 - 7.7d rebuilt the Watch Insights shell as Movie Discovery-style top tabs with independent profile/statistics scroll surfaces and module-state baseline.
 - 7.7e rebuilt the Watch Insights profile-analysis tab around summary, DNA, persona, quadrant and watch-vs-like modules using App-layer display projections only.
 - 7.7f rebuilt the Watch Insights statistics upper area around range switching, overview cards, monthly metrics and calendar heatmap using App-layer display projections only.
-- Watch-insights statistics lower visual consistency remains later 7.7g work after the 7.7d shell baseline.
+- 7.7g rebuilt the Watch Insights statistics lower area around preference graph, tag rankings, viewing rhythm and taste combination map using App-layer display projections only.
+- 7.7 follow-up completed preliminary global palette alignment against `DesignDraft/DESIGN.md`: shared Light / Dark dictionaries and fixed dark player resources now use the gray-pink / neutral-first direction, while poster-card chips, rating backgrounds, overlay text and progress-track backgrounds were restored to their previous readable treatment after user feedback. This is not the full 7.8 regression.
+- 7.7g visual follow-ups now include code-owned Watch History date-picker click-to-close behavior with outside-click closing, watched Movie Discovery search cards retaining an empty want star with a semantic transient no-op prompt, proportional detail rating stars for Movie / Series / Season / Episode rating cards with theme-aware strokes, and a Settings About row official-site link.
+- 7.7g Watch Insights profile follow-up restored profile-card shadows, added profile-refresh spinner / combined status-time label, normalized one-paragraph taste summaries into two readable paragraphs when possible, and densified the 2x3 keyword panel without increasing keyword count.
 - External Movie favorites without a stable `MovieId` still have no model-level cancel path. 7.7c shows a real disabled reason instead of pretending the action is available; adding a persistent external favorite identifier is deferred to a separate data-model stage.
 - Watch-insights and recommendation Movie-only boundaries must be preserved.
 - Movie Discovery and Settings still keep their accepted page-local tab templates. Retargeting accepted pages to `PageTabs.xaml` is deferred unless a later global polish stage explicitly owns the cross-page regression.
 
 ### 7.8 Global Visual Polish
 
-- Local Light / Dark / card polish is deferred to 7.8 or later targeted stages.
-- Global button, spacing, color, menu, dialog, card and empty-state polish remains deferred.
+- Full Light / Dark / card polish remains a 7.8 or later targeted stage. 7.7 only performed a preliminary palette replacement for shared resources and obvious temporary page-local brushes.
+- Global button, spacing, menu, dialog, card density, empty-state and screenshot-based polish remains deferred.
 - Home, Library and current detail pages now use the shared layered liquid-glass ResourceDictionary baseline for rounded content cards, background-bearing buttons and primary selected states. Light and Dark themes use differentiated translucent levels, edge highlights and cached diffuse detail backgrounds; extending the same baseline to later rebuilt pages, navigation items, popups, dialogs, tags and equivalent components remains deferred to their page phases and the 7.8 consistency audit.
 - The shared liquid-glass baseline must preserve readability and clear interaction states. Avoid page-local hardcoded variants, excessive transparency, high-saturation glow and decorative effects that reduce scanability.
 - Final large-list scroll and performance review belongs to 7.8 unless a blocker appears earlier.
@@ -119,8 +122,8 @@ This file tracks current blockers, deferred work, risks, noise and user-confirme
 
 - LF / CRLF warnings from Git may appear in diff checks; record them only as formatting noise when `git diff --check` has no actual errors.
 - Cumulative upstream diff may include 7.0, 7.1 or older authorized changes.
-- Local button, color, spacing and card details are not all final until 7.8.
-- The current shared liquid-glass colors are a restrained implementation baseline, not the final global palette. Final cross-page color tuning remains owned by 7.8.
+- Local button, spacing and card details are not all final until 7.8.
+- The current shared palette now follows the `DesignDraft/DESIGN.md` gray-pink / neutral-first direction, but final cross-page color balancing and screenshot QA remain 7.8 work.
 - Old visual drafts may show controls, copy or layouts that were superseded by user decisions.
 - The accepted Movie detail page is the stable TV-detail comparison baseline. Repeating unchanged Movie screenshots is unnecessary noise unless a visual blocker or explicit verification request requires a fresh capture.
 - Existing persistent TMDB TV detail cache rows use the previous schema key. New crew-capable requests use `v3`; old rows remain normal cache-cleanup noise.

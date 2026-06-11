@@ -1,6 +1,6 @@
 # Phase 7 UI Rebuild Stage Log
 
-Last updated: 2026-06-08
+Last updated: 2026-06-10
 
 This is the living Phase 7 handoff log. Keep entries concise and stage-oriented. Do not turn this into a full code diff.
 
@@ -219,6 +219,197 @@ Non-stage page changes:
 Suggested commit message:
 
 - `Phase 7.7f polish watch statistics overview`
+
+### 7.7g - Watch Insights Statistics Lower Area
+
+Completed:
+
+- Rebuilt the Watch Statistics lower area into the sketch-aligned preference graph, tag ranking, viewing rhythm and taste combination modules.
+- Replaced the old preference bubble wrap layout with a scalable fixed-canvas bubble graph using real type / emotion distribution data, resource-driven colors and a legend.
+- Rebuilt tag rankings as three Top3 cards for type, emotion and scene tags, keeping rank, label, count and relative-progress bindings from the existing statistics snapshot.
+- Reframed viewing rhythm as a time-bucket bar chart plus weekday/weekend comparison and duration distribution panels.
+- Rebuilt the taste-combination map as a scalable node/link canvas plus Top10 combination list; graph nodes and links still come from real snapshot data, with the existing Top10 fallback when graph data is sparse.
+- Added App-layer display-only projections for bubble positions, rhythm summary text, dominant duration text, node labels and graph sizing.
+- Recorded the 7.7g execution result in `docs/ui-redesign/PHASE_7_7_HISTORY_FAVORITES_INSIGHTS_PLAN.md`.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild77g\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no watch-statistics service semantics, tag aggregation, AI classification, scan recognition, cache fingerprint, profile, recommendation, player, collection service, Core business rule, Movie-only boundary, database schema, migration, database update, commit or push change.
+- no 7.7 full regression closeout or 7.8 global Light / Dark polish.
+
+Business logic changes:
+
+- None in Core services. Changes are App-layer statistics display projections and XAML visual layout only.
+
+Non-stage page changes:
+
+- None. Movie Discovery, Favorites, Watch History, Settings, Media Library, detail pages, Player and Shell were not edited in 7.7g.
+
+Suggested commit message:
+
+- `Phase 7.7g polish watch statistics charts`
+
+#### 7.7g Follow-up - Watch Insights Tab Alignment And Modern Surfaces
+
+Completed:
+
+- Matched the Watch Insights top Tab strip placement to Movie Discovery's accepted `TabControl` coordinates: negative top offset, top content padding, divider / underline alignment and selected-content margin source.
+- Replaced Watch Insights main module card surfaces with `GlassPageCardStyle`.
+- Retargeted Watch Insights inner panels to the shared glass inline-panel baseline.
+- Changed the local Watch Insights scrollbar to the same resource-driven 6px modern scrollbar direction used by Discovery and Settings.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuildInsightsPolish\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no Watch Insights service semantics, profile generation, recommendation, Core business rule, Movie-only boundary, database schema, migration, database update, commit or push change.
+
+#### 7.7g Follow-up - Watch Insights Profile Summary Layout
+
+Completed:
+
+- Removed the Profile Analysis top module-state card so the first visible card is the taste-summary card.
+- Moved `刷新画像` into the taste-summary card header right action area with compact status and last-refresh text.
+- Removed the three lower-left summary chips for status, refresh time and sample count.
+- Fixed the taste-summary card height and aligned the summary panel bottom with the right keyword panel.
+- Reduced the keyword panel height and changed core keywords to a two-row, three-column `UniformGrid`.
+- Replaced keyword pill chips with low-radius rounded-rectangle keyword labels.
+
+Validation:
+
+- Initial build retry hit temporary build output disk-space exhaustion; after cleaning Codex temp build outputs, `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuildWatchInsightsProfileLayoutFinal\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no Watch Insights service semantics, profile generation, recommendation, Core business rule, Movie-only boundary, database schema, migration, database update, commit or push change.
+
+#### 7.7g Follow-up - Watch Insights Profile Refresh And Quote Summary
+
+Completed:
+
+- Moved `刷新画像` from the taste-summary card to the top Tab divider action area.
+- The refresh action is visible only on the `画像分析` Tab and appears as a transparent MDL2 refresh icon button with `刷新画像` tooltip.
+- Moved the last profile refresh time label to the left of the refresh icon.
+- Explicitly restored arrow cursor behavior for the Profile and Statistics content surfaces.
+- Switched large Watch Insights module cards to a page-local no-rectangular-shadow card style with larger bottom spacing.
+- Added top / bottom scroll-content padding to protect card edges from clipping.
+- Removed the cached/status pill from the taste-summary card.
+- Tightened the taste-summary subtitle-to-content gap.
+- Reworked the taste-summary text area as a quote-style layout with muted opening and closing quote marks.
+- Empty summary content now shows centered empty-state text in the same content area without an extra border or background.
+- App-layer summary formatting now preserves AI-returned natural paragraphs and only prepends two full-width spaces to each paragraph.
+- Updated the profile summary prompt so future AI output asks for two natural paragraphs separated by a newline.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuildWatchInsightsRefreshTabLayout\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no statistics service semantics, recommendation, player, scan, collection, Movie-only boundary, database schema, migration, database update, commit or push change.
+
+#### 7.7g Follow-up - Preliminary Global Palette Alignment
+
+Completed:
+
+- Replaced the temporary beige / orange Light palette and teal Dark palette with the gray-pink, soft-pink accent and neutral-first direction from `DesignDraft/DESIGN.md`.
+- Retuned shared glass gradients, selected states, focus, hover / pressed, empty, warning, success, danger and info resources while keeping the existing resource keys stable.
+- Retuned the fixed dark player resource dictionary so player progress, focus ring, menu / popup surfaces and status colors no longer use the old teal temporary scheme.
+- Repointed obvious page-local poster-card and collection-state brushes in Home, Library, Movie Discovery, Recommendations, Favorites and Watch History to the new shared palette, then toned this back where the result felt too pink.
+- Restored poster-card top chips, rating-badge backgrounds, poster overlay text and poster-card progress tracks to the previous blue-gray / white-on-poster treatment after user feedback that these should not use the pink palette.
+- Kept pink primarily for primary actions, selected states and limited accents.
+- Lightened the dark theme away from dirty gray-pink mass surfaces by moving navigation, cards and glass surfaces toward cleaner neutral charcoal / warm-gray values.
+- Repointed the shared progress bar fill to `BrushInfo`, but restored the progress track background to the previous light gray.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuildGlobalPalette77\"` passed with 0 warnings and 0 errors.
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuildPaletteLessPink77\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- This is still Phase 7.7 preliminary palette alignment, not Phase 7.8.
+- no full 7.8 cross-page visual regression, screenshot QA, menu / dialog / detail-page polish, performance audit, business semantics, Movie-only boundary, database schema, migration, database update, commit or push change.
+
+#### 7.7g Follow-up - Visual Details And Date Picker Feedback
+
+Completed:
+
+- Updated `SmartDatePicker` so clicking its switch while the dropdown is already open closes the dropdown instead of closing and immediately reopening through popup outside-click handling.
+- Added a very fine white outline effect to solid poster-corner favorite / want icons in Favorites.
+- Added the same very fine white outline effect to solid poster-corner want stars in Movie Discovery while leaving unselected empty stars unchanged.
+- Added a very fine white outline effect to all five rating stars in Movie / Season / Episode detail rating cards, including empty stars.
+- Added a 1px semi-transparent white right-edge border for the sidebar in Dark theme; Light theme keeps the same edge resource transparent.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77VisualFixes\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no date filtering business-rule change, collection-state semantics change, rating calculation change, detail-page data change, database schema, migration, database update, commit or push change.
+
+#### 7.7g Follow-up - Search Want Star, Fractional Rating Stars And Official Site Link
+
+Completed:
+
+- Hardened `SmartDatePicker` click-to-close behavior for the popup-close-before-toggle-click order by suppressing the next switch-open when the open popup is closed by clicking the switch.
+- Kept the Movie Discovery poster-card want star visible for watched movies; watched movies now show an empty star, ignore the want-state mutation and display the same transient page message channel used by page-load failures.
+- Slightly thickened the fine white outline effect on solid poster-corner favorite / want icons in Favorites and Movie Discovery.
+- Added `RatingStarsBar` for proportional five-star rendering and switched Movie, Series, Season and Episode detail rating cards to it, including the Series overview IMDb / TMDB cards.
+- Changed the Settings About row to open `https://xfverse.fun` with the default browser.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gLatest\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- This is still a Phase 7.7g follow-up, not Phase 7.8.
+- no database schema, migration, database update, recommendation / Watch Insights business semantics, scoring-source data, commit or push change.
+
+#### 7.7g Follow-up - Date Picker Ownership And Semantic Toast Styling
+
+Completed:
+
+- Reworked `SmartDatePicker` ownership so the switch click is the single source of open / close state: the popup no longer auto-closes through `StaysOpen=False`, and the switch no longer two-way writes `IsDropDownOpen`.
+- Added owner-window outside-click closing for `SmartDatePicker`, keeping clicks inside the picker and popup content open.
+- Thickened solid poster-corner favorite / want icon outlines slightly beyond the previous follow-up.
+- Moved rating-star stroke color behind a theme resource: Light uses the sidebar background color, Dark keeps the white stroke.
+- Added semantic transient page-message styling in Movie Discovery for Info / Warning / Error / Success, using translucent status backgrounds, matching borders / foregrounds and a higher placement.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gDatePickerToast\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no global toast service extraction, database schema, migration, database update, commit or push change.
+
+#### 7.7g Follow-up - Profile Card Shadow, Refresh State And Summary Readability
+
+Completed:
+
+- Restored the Watch Insights profile module-card shadow by letting profile cards inherit the Home-aligned `GlassPageCardStyle` shadow again, and increased module spacing / scroll safety padding.
+- Added a loading spin animation to the profile refresh glyph while a new profile is being generated.
+- Replaced the top-right profile timestamp label with a combined refresh-status label that carries loading, generation time, cache / failure and insufficient-data states.
+- Removed the separate status title below the taste summary area so status text is not duplicated under the first profile card.
+- Added local summary normalization fallback in `WatchProfileService`: preserve AI paragraphs when present; split one long paragraph near sentence punctuation into two paragraphs; keep UI paragraph indentation and quote presentation.
+- Kept the keyword count capped at 6, while adding a subtle 2x3 slot grid behind keyword chips to reduce empty visual space without inventing extra keywords.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gWatchInsightsProfilePolish\"` passed with 0 warnings and 0 errors.
+
+Explicit non-goals:
+
+- no profile input-scope, Movie-only boundary, recommendation logic, database schema, migration, database update, commit or push change.
 
 ## Phase 7.6 - Settings / Scan / Cache
 

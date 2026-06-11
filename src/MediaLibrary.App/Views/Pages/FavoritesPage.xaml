@@ -8,14 +8,14 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
-        <SolidColorBrush x:Key="FavoriteMediaCardBackgroundBrush" Color="#121821" />
-        <SolidColorBrush x:Key="FavoriteMediaCardSurfaceBrush" Color="#202938" />
+        <SolidColorBrush x:Key="FavoriteMediaCardBackgroundBrush" Color="{DynamicResource ColorCard}" />
+        <SolidColorBrush x:Key="FavoriteMediaCardSurfaceBrush" Color="{DynamicResource ColorSurfaceAlt}" />
         <SolidColorBrush x:Key="FavoriteMediaCardTextBrush" Color="#F8FAFC" />
         <SolidColorBrush x:Key="FavoriteMediaCardMutedTextBrush" Color="#D8DEE9" />
         <SolidColorBrush x:Key="FavoriteMediaCardAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="FavoriteMediaCardAccentTextBrush" Color="#111827" />
         <SolidColorBrush x:Key="FavoriteTagDividerBrush" Color="#7DD3FC" />
-        <SolidColorBrush x:Key="FavoriteRatingGoldBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="FavoriteRatingGoldBrush" Color="{DynamicResource ColorWarning}" />
         <SolidColorBrush x:Key="FavoriteIconOutlineBrush" Color="#F8FAFC" />
 
         <Style x:Key="FavoriteModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
@@ -327,29 +327,50 @@
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="ToolTip" Value="{Binding ActionText}" />
-            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
             <Setter Property="Opacity" Value="0.96" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
                         <Border Background="Transparent">
-                            <TextBlock x:Name="StateIcon"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="20"
-                                       Foreground="{StaticResource FavoriteIconOutlineBrush}"
-                                       Text="&#xEB51;" />
+                            <Grid>
+                                <TextBlock x:Name="StateIconStroke"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="20"
+                                           Foreground="{StaticResource FavoriteIconOutlineBrush}"
+                                           IsHitTestVisible="False"
+                                           Opacity="0"
+                                           Text="{Binding Text, ElementName=StateIcon}">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect BlurRadius="2.2"
+                                                          Color="#FFFFFFFF"
+                                                          Direction="0"
+                                                          Opacity="1"
+                                                          ShadowDepth="0" />
+                                    </TextBlock.Effect>
+                                </TextBlock>
+                                <TextBlock x:Name="StateIcon"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="20"
+                                           Foreground="{StaticResource FavoriteIconOutlineBrush}"
+                                           Text="&#xEB51;" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsFavoriteTab}" Value="True">
                                 <Setter TargetName="StateIcon" Property="Text" Value="&#xEB52;" />
-                                <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
+                                <Setter TargetName="StateIconStroke" Property="Text" Value="&#xEB52;" />
+                                <Setter TargetName="StateIconStroke" Property="Opacity" Value="1" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsWantToWatchTab}" Value="True">
                                 <Setter TargetName="StateIcon" Property="Text" Value="&#xE735;" />
-                                <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
+                                <Setter TargetName="StateIconStroke" Property="Text" Value="&#xE735;" />
+                                <Setter TargetName="StateIconStroke" Property="Opacity" Value="1" />
                             </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Opacity" Value="1" />
@@ -375,7 +396,6 @@
                   Margin="0,3,14,15"
                   RenderTransformOrigin="0.5,0.5"
                   SnapsToDevicePixels="True"
-                  ToolTip="{Binding ActionStatusText}"
                   UseLayoutRounding="True">
                 <Grid.Style>
                     <Style TargetType="Grid">

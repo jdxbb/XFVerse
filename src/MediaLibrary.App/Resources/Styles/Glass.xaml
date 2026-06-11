@@ -3,7 +3,7 @@
     <Style x:Key="GlassPageCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowGlassCard}" />
+        <Setter Property="Effect" Value="{DynamicResource ShadowLargeCard}" />
     </Style>
 
     <Style x:Key="GlassCompactCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
@@ -15,22 +15,25 @@
     <Style x:Key="GlassInlinePanelStyle" TargetType="Border" BasedOn="{StaticResource InlinePanelStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+        <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
     </Style>
 
     <Style x:Key="GlassHomeMetricCardStyle" TargetType="Border" BasedOn="{StaticResource HomeMetricCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+        <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
     </Style>
 
     <Style x:Key="GlassHomeAiPanelStyle" TargetType="Border" BasedOn="{StaticResource HomeAiPanelStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowGlassCard}" />
+        <Setter Property="Effect" Value="{DynamicResource ShadowLargeCard}" />
     </Style>
 
     <Style x:Key="GlassHomeAiCardStyle" TargetType="Border" BasedOn="{StaticResource HomeAiCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+        <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
     </Style>
 
     <Style x:Key="GlassPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">

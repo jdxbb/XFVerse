@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -46,6 +47,7 @@ public sealed class SettingsViewModel : PageViewModelBase
     private const string ApiConfigStatusSuccess = "success";
     private const string ApiConfigStatusUntested = "untested";
     private const string ApiConfigStatusFailure = "failure";
+    private const string OfficialWebsiteUrl = "https://xfverse.fun";
     private int? _connectionId;
     private int? _applicationSettingId;
     private string _connectionName = string.Empty;
@@ -196,6 +198,7 @@ public sealed class SettingsViewModel : PageViewModelBase
         ClearSubtitleCacheCommand = new AsyncRelayCommand(ClearSubtitleCacheAsync, () => IsSubtitleCacheClearAvailable);
         RefreshSoftwareCacheCommand = new AsyncRelayCommand(RefreshSoftwareCacheAsync);
         ToggleAboutDetailsCommand = new RelayCommand(ToggleAboutDetails);
+        OpenOfficialWebsiteCommand = new RelayCommand(OpenOfficialWebsite);
         SelectSettingsTabCommand = new RelayCommand(SelectSettingsTab);
         SelectThemeModeCommand = new AsyncRelayCommand(SelectThemeModeAsync);
         SelectCloseWindowBehaviorCommand = new AsyncRelayCommand(SelectCloseWindowBehaviorAsync);
@@ -256,6 +259,8 @@ public sealed class SettingsViewModel : PageViewModelBase
     public AsyncRelayCommand RefreshSoftwareCacheCommand { get; }
 
     public RelayCommand ToggleAboutDetailsCommand { get; }
+
+    public RelayCommand OpenOfficialWebsiteCommand { get; }
 
     public RelayCommand SelectSettingsTabCommand { get; }
 
@@ -2294,6 +2299,22 @@ public sealed class SettingsViewModel : PageViewModelBase
     private void ToggleAboutDetails()
     {
         AboutStatusMessage = "本地桌面影音库；媒体源文件仍保留在本地目录或 WebDAV 远端。";
+    }
+
+    private void OpenOfficialWebsite()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(OfficialWebsiteUrl)
+            {
+                UseShellExecute = true
+            });
+            AboutStatusMessage = "正在打开 XFVerse 官网。";
+        }
+        catch (Exception exception)
+        {
+            AboutStatusMessage = $"打开官网失败：{exception.Message}";
+        }
     }
 
     private void SelectSettingsTab(object? parameter)

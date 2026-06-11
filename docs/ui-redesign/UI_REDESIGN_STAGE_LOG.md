@@ -1,5 +1,70 @@
 # UI 初级重构阶段日志
 
+## 2026-06-11 - Scan Tasks Shadow-safe Layout Correction
+
+Goal:
+- Fix the remaining Scan Tasks clipping and dark-theme large-card glow issues without changing scan semantics.
+
+Completed:
+- Removed the WebDAV configuration vertical divider.
+- Changed the Scan Tasks root safe area from the previous edge-compensation layout to a more conservative shadow-safe grid with equal visible left/right inset and larger actual glow gutters.
+- Relaxed the left/right column minimum widths so the scan-record card is less likely to hit the right clipping edge.
+- Strengthened dark-theme `ShadowLargeCard` again using a larger centered white glow.
+
+Not done:
+- No scan behavior, WebDAV/local path semantics, Settings/API behavior, database schema, migration, database update, commit, or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gScanSafeGlowFix\"` passed with 0 warnings and 0 errors.
+
+## 2026-06-11 - Scan Tasks Inline Panels And Dark Glow Boost
+
+Goal:
+- Align Scan Tasks inner cards with Watch Insights inline glass panels and make dark-theme large-card glow visibly stronger.
+
+Completed:
+- Rebased Scan Tasks inner cards, metric cards and empty-state cards on `GlassInlinePanelStyle`.
+- Rebased `ScanLogCard` on the same inline glass panel family so scan records match the large card internals.
+- Strengthened dark-theme `ShadowLargeCard` with more blur and opacity, centered as an outer glow. Compact cards and poster shadows were left on their existing resources.
+
+Not done:
+- No scan behavior, WebDAV/local path semantics, Settings/API behavior, database schema, migration, database update, commit, or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gScanInlineGlowBoost\"` passed with 0 warnings and 0 errors.
+
+## 2026-06-11 - Settings API Card Polish And Dark Large-card Glow
+
+Goal:
+- Fix the Settings page regressions from the cross-page card pass and refine dark-theme large-card elevation without changing poster-card shadows.
+
+Completed:
+- Restored the General Settings behavior card left/right compensation so it matches the cache settings card width.
+- Reworked the API configuration card inner form panel to reuse the Watch Insights inline glass panel family.
+- Routed large card styles through the theme-specific `ShadowLargeCard` resource. Dark theme now uses a weak white glow for large cards, while compact cards and poster shadows keep their existing resources.
+
+Not done:
+- No Settings/API service behavior, cache behavior, scan behavior, database schema, migration, database update, commit, or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gSettingsApiGlow\"` passed with 0 warnings and 0 errors.
+
+## 2026-06-11 - Cross-page Card Shadow Safe Area Follow-up
+
+Goal:
+- Audit and fix page-edge card shadow clipping risks across Home, Library, Watch History, Settings and Scan Tasks, while keeping this as a Phase 7.7g visual follow-up rather than a new stage.
+
+Completed:
+- Confirmed Home top/right cards, Library top/main cards, Watch History filter card, Settings content cards and Scan Tasks outer cards could sit against a page or scroll-viewport boundary without enough effect drawing space.
+- Applied symmetric shadow-safe expansion and inner compensation so card bodies keep original content-column alignment while shadows can render outside normal card bounds.
+- Rebased Settings general/API card surfaces and Scan Tasks outer cards onto `GlassPageCardStyle`.
+
+Not done:
+- No Settings or Scan service behavior, scan path semantics, cache behavior, database schema, migration, database update, commit, or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gCrossPageShadowSafe\"` passed with 0 warnings and 0 errors.
+
 ## UI-0
 
 - 只读审计已完成。

@@ -3,7 +3,7 @@
     <Style x:Key="ProgressBarStyle" TargetType="ProgressBar">
         <Setter Property="Height" Value="8" />
         <Setter Property="Background" Value="#E5E7EB" />
-        <Setter Property="Foreground" Value="#67C7F2" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushInfo}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Template">
@@ -27,6 +27,7 @@
 
     <Style x:Key="ThinProgressBarStyle" TargetType="ProgressBar" BasedOn="{StaticResource ProgressBarStyle}">
         <Setter Property="Height" Value="4" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushWatchProgressFill}" />
     </Style>
 
     <Style x:Key="SliderStyle" TargetType="Slider">

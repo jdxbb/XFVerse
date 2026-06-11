@@ -17,15 +17,34 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private const string StatisticsTabKey = "statistics";
     private const int ProfileTabIndex = 0;
     private const int StatisticsTabIndex = 1;
-    private const int TasteGraphNodeLimit = 6;
-    private const int TasteGraphLinkLimit = 12;
-    private const double TasteGraphNodeWidth = 138d;
-    private const double TasteGraphNodeHeight = 36d;
-    private const double TasteGraphTypeX = 20d;
-    private const double TasteGraphEmotionX = 250d;
-    private const double TasteGraphSceneX = 480d;
-    private const double TasteGraphFirstNodeY = 52d;
-    private const double TasteGraphNodeSpacingY = 44d;
+    private const int TasteGraphNodeLimit = 4;
+    private const int TasteGraphLinkLimit = 14;
+    private const double TasteGraphNodeWidth = 108d;
+    private const double TasteGraphNodeHeight = 78d;
+    private const double TasteGraphTypeX = 46d;
+    private const double TasteGraphEmotionX = 276d;
+    private const double TasteGraphSceneX = 506d;
+    private const double TasteGraphFirstNodeY = 74d;
+    private const double TasteGraphNodeSpacingY = 88d;
+    private const double PreferenceBubbleCanvasWidth = 760d;
+    private const double PreferenceBubbleCanvasHeight = 520d;
+    private static readonly (double X, double Y)[] PreferenceBubbleSlots =
+    [
+        (116d, 100d),
+        (300d, 78d),
+        (522d, 102d),
+        (654d, 176d),
+        (178d, 232d),
+        (392d, 238d),
+        (582d, 306d),
+        (108d, 364d),
+        (306d, 392d),
+        (504d, 426d),
+        (656d, 402d),
+        (430d, 152d),
+        (244d, 318d),
+        (620d, 66d)
+    ];
     private const string PersonaPosterDefaultGender = "female";
     private const string PersonaPosterFallbackKey = "genre_explorer";
     private const string PersonaFrameDefaultColor = "gold";
@@ -290,6 +309,9 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 NextCalendarMonthCommand.RaiseCanExecuteChanged();
                 ReturnToCurrentCalendarMonthCommand.RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(RefreshButtonText));
+                OnPropertyChanged(nameof(IsRefreshing));
+                OnPropertyChanged(nameof(IsStatisticsRefreshAnimating));
+                OnPropertyChanged(nameof(StatisticsRefreshStatusText));
                 OnPropertyChanged(nameof(StatisticsModuleState));
                 OnPropertyChanged(nameof(ShowStatisticsModuleState));
             }
@@ -297,6 +319,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     }
 
     public string RefreshButtonText => IsLoadingStatistics ? "刷新中..." : "刷新统计";
+
+    public bool IsStatisticsRefreshAnimating => IsLoadingStatistics;
 
     public bool IsLoadingProfile
     {
@@ -309,6 +333,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ProfileRefreshButtonText));
                 OnPropertyChanged(nameof(CanRefreshProfile));
                 OnPropertyChanged(nameof(IsRefreshing));
+                OnPropertyChanged(nameof(IsProfileRefreshAnimating));
+                OnPropertyChanged(nameof(ProfileRefreshStatusText));
                 OnPropertyChanged(nameof(ProfileModuleState));
                 OnPropertyChanged(nameof(ShowProfileModuleState));
             }
@@ -316,6 +342,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     }
 
     public string ProfileRefreshButtonText => IsLoadingProfile ? "生成中..." : "刷新画像";
+
+    public bool IsProfileRefreshAnimating => IsLoadingProfile;
 
     public bool CanRefreshProfile => !IsLoadingProfile && !IsProfileInsufficient;
 
@@ -327,6 +355,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             if (SetProperty(ref _statisticsErrorMessage, value))
             {
                 OnPropertyChanged(nameof(HasStatisticsError));
+                OnPropertyChanged(nameof(StatisticsRefreshStatusText));
                 OnPropertyChanged(nameof(StatisticsModuleState));
                 OnPropertyChanged(nameof(ShowStatisticsModuleState));
             }
@@ -344,6 +373,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(HasProfileError));
                 OnPropertyChanged(nameof(ShowProfileEmptyState));
+                OnPropertyChanged(nameof(ProfileRefreshStatusText));
                 OnPropertyChanged(nameof(ProfileModuleState));
                 OnPropertyChanged(nameof(ShowProfileModuleState));
             }
@@ -362,6 +392,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(IsProfileInsufficient));
                 OnPropertyChanged(nameof(ShowProfileEmptyState));
                 OnPropertyChanged(nameof(CanRefreshProfile));
+                OnPropertyChanged(nameof(ProfileRefreshStatusText));
                 OnPropertyChanged(nameof(ProfileModuleState));
                 OnPropertyChanged(nameof(ShowProfileModuleState));
                 RefreshProfileCommand.RaiseCanExecuteChanged();
@@ -374,7 +405,13 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public string ProfileStatusText
     {
         get => _profileStatusText;
-        private set => SetProperty(ref _profileStatusText, value);
+        private set
+        {
+            if (SetProperty(ref _profileStatusText, value))
+            {
+                OnPropertyChanged(nameof(ProfileRefreshStatusText));
+            }
+        }
     }
 
     public string CalendarNoticeMessage
@@ -394,19 +431,101 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public WatchStatisticsSnapshot Statistics
     {
         get => _statistics;
-        private set => SetProperty(ref _statistics, value);
+        private set
+        {
+            if (SetProperty(ref _statistics, value))
+            {
+                OnPropertyChanged(nameof(HasAnyStatisticsData));
+                OnPropertyChanged(nameof(StatisticsRefreshStatusText));
+            }
+        }
     }
 
     public string LastStatisticsRefreshedAtText
     {
         get => _lastStatisticsRefreshedAtText;
-        private set => SetProperty(ref _lastStatisticsRefreshedAtText, value);
+        private set
+        {
+            if (SetProperty(ref _lastStatisticsRefreshedAtText, value))
+            {
+                OnPropertyChanged(nameof(StatisticsRefreshStatusText));
+            }
+        }
     }
 
     public string LastProfileRefreshedAtText
     {
         get => _lastProfileRefreshedAtText;
-        private set => SetProperty(ref _lastProfileRefreshedAtText, value);
+        private set
+        {
+            if (SetProperty(ref _lastProfileRefreshedAtText, value))
+            {
+                OnPropertyChanged(nameof(ProfileRefreshStatusText));
+            }
+        }
+    }
+
+    public string ProfileRefreshStatusText
+    {
+        get
+        {
+            if (IsLoadingProfile)
+            {
+                return "正在生成新的画像...";
+            }
+
+            if (IsProfileInsufficient)
+            {
+                return string.IsNullOrWhiteSpace(ProfileInsufficientReason)
+                    ? "画像数据不足"
+                    : "画像数据不足，继续观看后再生成";
+            }
+
+            if (HasProfileError && !HasProfile)
+            {
+                return "画像生成失败，请稍后重试";
+            }
+
+            var status = string.IsNullOrWhiteSpace(ProfileStatusText) ? "画像状态" : ProfileStatusText;
+            if (string.IsNullOrWhiteSpace(LastProfileRefreshedAtText)
+                || string.Equals(LastProfileRefreshedAtText, "尚未生成", StringComparison.Ordinal))
+            {
+                return status;
+            }
+
+            return $"{status} · {LastProfileRefreshedAtText}";
+        }
+    }
+
+    public string StatisticsRefreshStatusText
+    {
+        get
+        {
+            if (IsLoadingStatistics)
+            {
+                return "正在刷新统计...";
+            }
+
+            if (HasStatisticsError)
+            {
+                return HasAnyStatisticsData
+                    ? $"统计刷新失败 · {LastStatisticsRefreshedAtText}"
+                    : "统计加载失败，请稍后重试";
+            }
+
+            if (!HasAnyStatisticsData)
+            {
+                return "暂无统计数据";
+            }
+
+            if (string.IsNullOrWhiteSpace(LastStatisticsRefreshedAtText)
+                || string.Equals(LastStatisticsRefreshedAtText, "尚未加载", StringComparison.Ordinal))
+            {
+                return "统计已更新";
+            }
+
+            return $"统计已更新 · {LastStatisticsRefreshedAtText}";
+        }
     }
 
     public WatchProfileSnapshot? Profile
@@ -525,6 +644,14 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public string DurationDistributionTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "长期常看片长" : "本月常看片长";
 
     public string TasteCombinationTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "累计口味组合" : "本月口味组合";
+
+    public string PeakViewingTimeText { get; private set; } = "暂无常看时间段";
+
+    public string DominantDurationText { get; private set; } = "常看片长暂无数据";
+
+    public string PreferenceBubbleLegendText { get; private set; } = "气泡大小代表标签出现次数，颜色区分类型与情绪标签。";
+
+    public string TasteGraphLegendText { get; private set; } = "连线越粗代表组合共现越频繁，节点代表参与组合的标签。";
 
     public string TotalWatchTimeText { get; private set; } = "0分钟";
 
@@ -926,7 +1053,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ? "尚未生成"
             : $"上次生成 {snapshot.Meta.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}";
 
-        ProfileSummaryText = snapshot.Summary.Text;
+        ProfileSummaryText = FormatProfileSummaryText(snapshot.Summary.Text);
         ProfilePersonaType = string.IsNullOrWhiteSpace(snapshot.Persona.Type) ? "--" : snapshot.Persona.Type;
         ProfilePersonaTitle = string.IsNullOrWhiteSpace(snapshot.Persona.Title) ? ProfilePersonaType : snapshot.Persona.Title;
         ProfilePersonaDescription = snapshot.Persona.Description;
@@ -1167,6 +1294,30 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         }
     }
 
+    private static string FormatProfileSummaryText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var normalized = text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        var paragraphs = normalized
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(FormatIndentedParagraph)
+            .Where(x => !string.IsNullOrWhiteSpace(x));
+
+        return string.Join(Environment.NewLine, paragraphs);
+    }
+
+    private static string FormatIndentedParagraph(string paragraph)
+    {
+        var trimmed = paragraph.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? string.Empty : "　　" + trimmed.TrimStart('　');
+    }
+
     private static void ReplaceMessages(ICollection<WarningMessageItem> target, IEnumerable<string> source)
     {
         target.Clear();
@@ -1396,18 +1547,30 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private void BuildPreferenceBubbles(WatchStatisticsSnapshot snapshot)
     {
         PreferenceBubbles.Clear();
-        var items = snapshot.EmotionDistribution
-            .Take(8)
-            .Select(x => new BubbleTagItem(x.Label, "情绪", x.Count, CalculateBubbleSize(x.Count)))
-            .Concat(snapshot.SceneDistribution
-                .Take(8)
-                .Select(x => new BubbleTagItem(x.Label, "场景", x.Count, CalculateBubbleSize(x.Count))))
+        var rawItems = snapshot.TypeDistribution
+            .Take(7)
+            .Select(x => (x.Label, Kind: "类型", x.Count))
+            .Concat(snapshot.EmotionDistribution
+                .Take(7)
+                .Select(x => (x.Label, Kind: "情绪", x.Count)))
             .OrderByDescending(x => x.Count)
-            .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase);
+            .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase)
+            .Take(PreferenceBubbleSlots.Length)
+            .ToList();
+        var maxCount = rawItems.Count == 0 ? 0 : rawItems.Max(x => x.Count);
 
-        foreach (var item in items)
+        for (var index = 0; index < rawItems.Count; index++)
         {
-            PreferenceBubbles.Add(item);
+            var item = rawItems[index];
+            var size = CalculateBubbleSize(item.Count, maxCount);
+            var slot = PreferenceBubbleSlots[index];
+            PreferenceBubbles.Add(new BubbleTagItem(
+                item.Label,
+                item.Kind,
+                item.Count,
+                size,
+                CalculateBubbleCoordinate(slot.X, size, PreferenceBubbleCanvasWidth),
+                CalculateBubbleCoordinate(slot.Y, size, PreferenceBubbleCanvasHeight)));
         }
     }
 
@@ -1434,6 +1597,15 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 CalculateProgress(bucket.WatchSeconds, maxWatchSeconds)));
         }
 
+        var peakBucket = snapshot.ViewingTimeDistribution
+            .Where(x => x.WatchSeconds > 0)
+            .OrderByDescending(x => x.WatchSeconds)
+            .ThenBy(x => x.StartHour)
+            .FirstOrDefault();
+        PeakViewingTimeText = peakBucket is null
+            ? "暂无常看时间段"
+            : $"你最常在 {peakBucket.Label} 观影";
+
         WeekPartItems.Clear();
         WeekPartItems.Add(new(
             "周内",
@@ -1457,6 +1629,18 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 FormatPercent(item.Percent),
                 item.Percent * 100d));
         }
+
+        var dominantDuration = snapshot.DurationDistribution
+            .Where(x => x.Count > 0)
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.MinMinutes)
+            .FirstOrDefault();
+        DominantDurationText = dominantDuration is null
+            ? "常看片长暂无数据"
+            : $"最多：{FormatDurationBucketName(dominantDuration.Label)}";
+
+        OnPropertyChanged(nameof(PeakViewingTimeText));
+        OnPropertyChanged(nameof(DominantDurationText));
     }
 
     private static List<TasteCombinationNode> SelectTasteNodes(
@@ -1780,9 +1964,19 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         return Math.Clamp(value / max * 100d, 3d, 100d);
     }
 
-    private static double CalculateBubbleSize(int count)
+    private static double CalculateBubbleSize(int count, int maxCount)
     {
-        return Math.Clamp(56d + count * 8d, 60d, 118d);
+        if (count <= 0 || maxCount <= 0)
+        {
+            return 72d;
+        }
+
+        return Math.Clamp(76d + count / (double)maxCount * 72d, 82d, 148d);
+    }
+
+    private static double CalculateBubbleCoordinate(double centerCoordinate, double size, double canvasLength)
+    {
+        return Math.Clamp(centerCoordinate - size / 2d, 16d, Math.Max(16d, canvasLength - size - 16d));
     }
 
     private static string FormatDurationBucketName(string label)
@@ -1808,6 +2002,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasRhythmData));
         OnPropertyChanged(nameof(HasTasteCombinationData));
         OnPropertyChanged(nameof(HasWatchLikeData));
+        OnPropertyChanged(nameof(StatisticsRefreshStatusText));
         OnPropertyChanged(nameof(StatisticsModuleState));
         OnPropertyChanged(nameof(ShowStatisticsModuleState));
     }
@@ -1848,6 +2043,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasProfileError));
         OnPropertyChanged(nameof(ProfileStatusText));
         OnPropertyChanged(nameof(LastProfileRefreshedAtText));
+        OnPropertyChanged(nameof(ProfileRefreshStatusText));
         OnPropertyChanged(nameof(ProfileSummaryText));
         OnPropertyChanged(nameof(ProfileHeroTitle));
         OnPropertyChanged(nameof(ProfileHeroSubtitle));
@@ -2034,9 +2230,18 @@ public sealed record CalendarDayCell(
     }
 }
 
-public sealed record BubbleTagItem(string Label, string Kind, int Count, double Size)
+public sealed record BubbleTagItem(string Label, string Kind, int Count, double Size, double X, double Y)
 {
     public string CountText => $"{Count}次";
+
+    public string KindIcon => Kind switch
+    {
+        "类型" => "类",
+        "情绪" => "情",
+        _ => "签"
+    };
+
+    public double LabelMaxWidth => Math.Max(44d, Size - 18d);
 }
 
 public sealed record RankingGroup(string Title, IReadOnlyList<RankedTagItem> Items)
@@ -2070,6 +2275,8 @@ public sealed record ProfileListItem(int Rank, string Label, double ProgressValu
 public sealed record TimeBucketItem(string Label, string WatchText, int WatchCount, double ProgressValue)
 {
     public string CountText => $"{WatchCount}次";
+
+    public double BarHeight => Math.Clamp(ProgressValue / 100d * 164d, ProgressValue > 0 ? 12d : 4d, 164d);
 }
 
 public sealed record WeekPartItem(
@@ -2102,6 +2309,22 @@ public sealed record TasteGraphNodeItem(
     public double CenterY => Y + Height / 2d;
 
     public string CountText => $"{Count}次";
+
+    public string KindText => Kind switch
+    {
+        "type" => "类型",
+        "emotion" => "情绪",
+        "scene" => "场景",
+        _ => "标签"
+    };
+
+    public string KindIcon => Kind switch
+    {
+        "type" => "类",
+        "emotion" => "情",
+        "scene" => "景",
+        _ => "签"
+    };
 }
 
 public sealed record TasteGraphLinkItem(

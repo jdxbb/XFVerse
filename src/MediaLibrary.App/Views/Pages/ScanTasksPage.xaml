@@ -87,16 +87,13 @@
 
         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource ScanModernScrollBarStyle}" />
 
-        <Style x:Key="ScanOuterCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
+        <Style x:Key="ScanOuterCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
             <Setter Property="Padding" Value="18" />
         </Style>
 
-        <Style x:Key="ScanInnerCardStyle" TargetType="Border">
-            <Setter Property="Padding" Value="14" />
-            <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />
-            <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="1" />
+        <Style x:Key="ScanInnerCardStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="CornerRadius" Value="12" />
         </Style>
 
         <Style x:Key="ScanSmallSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
@@ -133,8 +130,9 @@
             <Setter Property="FontSize" Value="12" />
         </Style>
 
-        <Style x:Key="ScanEmptyStateStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+        <Style x:Key="ScanEmptyStateStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
             <Setter Property="Padding" Value="14" />
+            <Setter Property="CornerRadius" Value="12" />
             <Setter Property="MinHeight" Value="86" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -193,11 +191,12 @@
             <Setter Property="ToolTip" Value="移除路径" />
         </Style>
 
-        <Style x:Key="ScanMetricCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+        <Style x:Key="ScanMetricCardStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
             <Setter Property="Width" Value="150" />
             <Setter Property="MinHeight" Value="58" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="Padding" Value="10" />
+            <Setter Property="CornerRadius" Value="12" />
         </Style>
 
         <Style x:Key="ScanMetricStartCardStyle" TargetType="Border" BasedOn="{StaticResource ScanMetricCardStyle}">
@@ -312,14 +311,28 @@
     </UserControl.Resources>
 
     <ScrollViewer x:Name="RootScrollViewer"
+                  Margin="-28,-28,-28,0"
+                  ClipToBounds="False"
                   PreviewMouseWheel="RootScrollViewer_PreviewMouseWheel"
                   Style="{StaticResource ScanPageScrollViewerStyle}">
-        <Grid MinWidth="1080">
-            <Grid>
+        <Grid Width="{Binding ActualWidth, ElementName=RootScrollViewer}"
+              ClipToBounds="False">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="50" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="58" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="46" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="46" />
+            </Grid.ColumnDefinitions>
+        <Grid Grid.Row="1" Grid.Column="1" MinWidth="1020" ClipToBounds="False">
+            <Grid ClipToBounds="False">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="7*" MinWidth="700" />
-                    <ColumnDefinition Width="24" />
-                    <ColumnDefinition Width="3*" MinWidth="330" />
+                    <ColumnDefinition Width="7*" MinWidth="670" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="3*" MinWidth="320" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel x:Name="LeftColumn">
@@ -339,12 +352,6 @@
                                     <ColumnDefinition Width="16" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="1"
-                                        Width="1"
-                                        Margin="0,2,0,2"
-                                        HorizontalAlignment="Center"
-                                        Background="{DynamicResource BrushBorder}" />
 
                                 <Border Grid.Column="0"
                                         Height="280"
@@ -930,6 +937,7 @@
                     </Grid>
                 </Border>
             </Grid>
+        </Grid>
         </Grid>
     </ScrollViewer>
 </UserControl>

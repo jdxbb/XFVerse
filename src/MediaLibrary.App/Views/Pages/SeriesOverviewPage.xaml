@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.SeriesOverviewPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
         <helpers:RatingStarsConverter x:Key="RatingStarsConverter" />
@@ -261,10 +262,8 @@
                                 <DataTemplate>
                                     <Border Margin="8,0"
                                             Padding="10"
-                                            Background="{DynamicResource BrushGlassSurfaceAlt}"
-                                            BorderBrush="{DynamicResource BrushBorder}"
-                                            BorderThickness="1"
-                                            CornerRadius="12">
+                                            CornerRadius="12"
+                                            Style="{StaticResource GlassInlinePanelStyle}">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />
@@ -297,11 +296,14 @@
                                                         <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource BrushForegroundMuted}" Text="/" />
                                                         <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource BrushForegroundMuted}" Text="10" />
                                                     </StackPanel>
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               Margin="0,2,0,0"
-                                                               FontSize="18"
-                                                               Foreground="{DynamicResource BrushAccent}"
-                                                               Text="{Binding ScoreValue, Converter={StaticResource RatingStarsConverter}}" />
+                                                    <controls:RatingStarsBar HorizontalAlignment="Center"
+                                                                             Margin="0,3,0,0"
+                                                                             Fill="{DynamicResource BrushRatingStarFill}"
+                                                                             ScoreValue="{Binding ScoreValue}"
+                                                                             StarSize="16"
+                                                                             StarSpacing="1.5"
+                                                                             Stroke="{DynamicResource BrushRatingStarStroke}"
+                                                                             StrokeThickness="0.65" />
                                                 </StackPanel>
                                                 <Border Grid.Column="1" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
                                                 <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">

@@ -4,6 +4,11 @@
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              x:Name="Root">
     <UserControl.Resources>
+        <Style x:Key="ApiConfigInnerPanelStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+
         <Storyboard x:Key="ApiStatusLightStoryboard"
                     AutoReverse="True"
                     RepeatBehavior="Forever">
@@ -14,7 +19,7 @@
         </Storyboard>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource CompactCardStyle}">
+    <Border Style="{StaticResource GlassPageCardStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -105,11 +110,7 @@
 
             <Border Grid.Row="1"
                     Margin="0,18,0,0"
-                    Padding="16,14"
-                    CornerRadius="{StaticResource RadiusCompactCard}"
-                    Background="{DynamicResource BrushSurfaceAlt}"
-                    BorderBrush="{DynamicResource BrushBorder}"
-                    BorderThickness="1">
+                    Style="{StaticResource ApiConfigInnerPanelStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />

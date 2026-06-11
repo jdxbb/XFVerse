@@ -390,10 +390,8 @@
                                     <DataTemplate>
                                         <Border Margin="8,0"
                                                 Padding="10"
-                                                Background="{DynamicResource BrushGlassSurfaceAlt}"
-                                                BorderBrush="{DynamicResource BrushBorder}"
-                                                BorderThickness="1"
-                                                CornerRadius="12">
+                                                CornerRadius="12"
+                                                Style="{StaticResource GlassInlinePanelStyle}">
                                             <Grid>
                                                 <Grid.RowDefinitions>
                                                     <RowDefinition Height="Auto" />
@@ -442,11 +440,14 @@
                                                                        Foreground="{DynamicResource BrushForegroundMuted}"
                                                                        Text="10" />
                                                         </StackPanel>
-                                                        <TextBlock HorizontalAlignment="Center"
-                                                                   Margin="0,2,0,0"
-                                                                   FontSize="18"
-                                                                   Foreground="{DynamicResource BrushAccent}"
-                                                                   Text="{Binding ScoreValue, Converter={StaticResource RatingStarsConverter}}" />
+                                                        <controls:RatingStarsBar HorizontalAlignment="Center"
+                                                                                 Margin="0,3,0,0"
+                                                                                 Fill="{DynamicResource BrushRatingStarFill}"
+                                                                                 ScoreValue="{Binding ScoreValue}"
+                                                                                 StarSize="16"
+                                                                                 StarSpacing="1.5"
+                                                                                 Stroke="{DynamicResource BrushRatingStarStroke}"
+                                                                                 StrokeThickness="0.65" />
                                                     </StackPanel>
                                                     <Border Grid.Column="1"
                                                             Width="3"

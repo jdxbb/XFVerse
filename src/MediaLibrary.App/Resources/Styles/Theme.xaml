@@ -23,12 +23,14 @@
     <Style x:Key="HeroCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowGlassCard}" />
+        <Setter Property="Effect" Value="{DynamicResource ShadowLargeCard}" />
         <Setter Property="Padding" Value="{StaticResource HeroCardPadding}" />
     </Style>
 
     <Style x:Key="SidebarBorderStyle" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource BrushSidebar}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushSidebarRightBorder}" />
+        <Setter Property="BorderThickness" Value="0,0,1,0" />
         <Setter Property="Padding" Value="0" />
     </Style>
 

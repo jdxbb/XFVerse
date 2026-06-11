@@ -5,18 +5,22 @@
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              xmlns:viewModels="clr-namespace:MediaLibrary.App.ViewModels.Pages">
     <UserControl.Resources>
-        <SolidColorBrush x:Key="DiscoveryLibraryMediaCardBackgroundBrush" Color="#121821" />
-        <SolidColorBrush x:Key="DiscoveryLibraryMediaCardSurfaceBrush" Color="#202938" />
+        <SolidColorBrush x:Key="DiscoveryLibraryMediaCardBackgroundBrush" Color="{DynamicResource ColorCard}" />
+        <SolidColorBrush x:Key="DiscoveryLibraryMediaCardSurfaceBrush" Color="{DynamicResource ColorSurfaceAlt}" />
         <SolidColorBrush x:Key="DiscoveryLibraryMediaCardTextBrush" Color="#F8FAFC" />
         <SolidColorBrush x:Key="DiscoveryLibraryMediaCardMutedTextBrush" Color="#D8DEE9" />
         <SolidColorBrush x:Key="DiscoveryLibraryMediaCardAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="DiscoveryLibraryMediaCardAccentTextBrush" Color="#111827" />
         <SolidColorBrush x:Key="DiscoveryLibraryTagDividerBrush" Color="#7DD3FC" />
-        <SolidColorBrush x:Key="DiscoveryLibraryRatingGoldBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="DiscoveryLibraryRatingGoldBrush" Color="{DynamicResource ColorWarning}" />
         <SolidColorBrush x:Key="DiscoveryWantAddBrush" Color="#E2E8F0" />
-        <SolidColorBrush x:Key="DiscoveryWantRemoveBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="DiscoveryWantRemoveBrush" Color="{DynamicResource ColorAccent}" />
         <SolidColorBrush x:Key="DiscoveryWantEmptyStarFillBrush" Color="#4DFFFFFF" />
         <SolidColorBrush x:Key="DiscoveryWantEmptyStarStrokeBrush" Color="#E6FFFFFF" />
+        <SolidColorBrush x:Key="DiscoveryToastInfoBackgroundBrush" Color="{DynamicResource ColorInfoBackground}" Opacity="0.88" />
+        <SolidColorBrush x:Key="DiscoveryToastWarningBackgroundBrush" Color="{DynamicResource ColorWarningBackground}" Opacity="0.88" />
+        <SolidColorBrush x:Key="DiscoveryToastErrorBackgroundBrush" Color="{DynamicResource ColorErrorBackground}" Opacity="0.88" />
+        <SolidColorBrush x:Key="DiscoveryToastSuccessBackgroundBrush" Color="{DynamicResource ColorSuccessBackground}" Opacity="0.88" />
 
         <Style x:Key="DiscoveryLibraryMediaChipStyle" TargetType="Border">
             <Setter Property="Height" Value="20" />
@@ -79,7 +83,7 @@
             <Setter Property="Foreground" Value="{StaticResource DiscoveryLibraryMediaCardAccentTextBrush}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
-                    <Setter Property="Foreground" Value="#F5C84B" />
+                    <Setter Property="Foreground" Value="{StaticResource DiscoveryLibraryRatingGoldBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -121,7 +125,7 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
                     <Setter Property="Background" Value="{StaticResource DiscoveryWantRemoveBrush}" />
-                    <Setter Property="Foreground" Value="#111827" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
                 </DataTrigger>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Opacity" Value="1" />
@@ -140,33 +144,54 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="#F8FAFC" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushTooltipForeground}" />
             <Setter Property="Opacity" Value="0.96" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="ToolTip" Value="{Binding WantToWatchButtonText}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="Transparent">
-                            <TextBlock x:Name="WantIcon"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="20"
-                                       Foreground="{TemplateBinding Foreground}"
-                                       Text="&#xE734;" />
+                            <Grid>
+                                <TextBlock x:Name="WantIconStroke"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="20"
+                                           Foreground="{StaticResource DiscoveryWantEmptyStarStrokeBrush}"
+                                           IsHitTestVisible="False"
+                                           Opacity="0"
+                                           Text="&#xE735;">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect BlurRadius="2.2"
+                                                          Color="#FFFFFFFF"
+                                                          Direction="0"
+                                                          Opacity="1"
+                                                          ShadowDepth="0" />
+                                    </TextBlock.Effect>
+                                </TextBlock>
+                                <TextBlock x:Name="WantIcon"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="20"
+                                           Foreground="{TemplateBinding Foreground}"
+                                           Text="&#xE734;" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Opacity" Value="1" />
                             </Trigger>
-                            <DataTrigger Binding="{Binding CanToggleWantToWatch}" Value="False">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
                             <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
                                 <Setter TargetName="WantIcon" Property="Text" Value="&#xE735;" />
-                                <Setter TargetName="WantIcon" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                <Setter TargetName="WantIcon" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
+                                <Setter TargetName="WantIconStroke" Property="Opacity" Value="1" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsWatched}" Value="True">
+                                <Setter TargetName="WantIcon" Property="Text" Value="&#xE734;" />
+                                <Setter TargetName="WantIcon" Property="Foreground" Value="{DynamicResource BrushTooltipForeground}" />
+                                <Setter TargetName="WantIconStroke" Property="Opacity" Value="0" />
                             </DataTrigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.42" />
@@ -628,6 +653,7 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
@@ -655,6 +681,13 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushGlassButtonHover}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="DiscoveryPosterLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscoveryLayoutSegmentButtonStyle}">
@@ -678,11 +711,11 @@
         </Style>
 
         <Style x:Key="DiscoveryLayoutSegmentHostStyle" TargetType="Border">
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassButton}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="CornerRadius" Value="5" />
         </Style>
 
         <Style x:Key="DiscoverySearchClearButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
@@ -845,7 +878,7 @@
         </Style>
 
         <Style x:Key="DiscoveryTabItemStyle" TargetType="TabItem">
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="Foreground" Value="{StaticResource DiscoveryLibraryMediaCardAccentTextBrush}" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="MinWidth" Value="104" />
@@ -1004,7 +1037,7 @@
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
-                    <Setter Property="Foreground" Value="#F5C84B" />
+                    <Setter Property="Foreground" Value="{StaticResource DiscoveryLibraryRatingGoldBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -1774,14 +1807,15 @@
         <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
                     Style="{StaticResource DiscoveryTabControlStyle}">
                 <TabItem Header="影片搜索" Style="{StaticResource DiscoveryTabItemStyle}">
-                    <Grid>
+                    <Grid Margin="-32,-24,-32,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="18" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Border Padding="14"
+                        <Border Margin="32,24,32,0"
+                                Padding="14"
                                 Cursor="Arrow"
                                 Style="{StaticResource GlassPageCardStyle}">
                         <Grid>
@@ -2274,6 +2308,7 @@
                         </Border>
 
                         <Border Grid.Row="2"
+                                Margin="32,0,32,0"
                                 Cursor="Arrow"
                                 Style="{StaticResource GlassPageCardStyle}">
                             <Grid>
@@ -3272,8 +3307,9 @@
                     </Grid>
                 </TabItem>
                 <TabItem Header="姒滃崟" Style="{StaticResource DiscoveryTabItemStyle}">
-                    <Grid>
-                        <Border Cursor="Arrow"
+                    <Grid Margin="-32,-24,-32,0">
+                        <Border Margin="32,24,32,0"
+                                Cursor="Arrow"
                                 Style="{StaticResource GlassPageCardStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -3788,41 +3824,75 @@
         <Grid Panel.ZIndex="50"
               IsHitTestVisible="False">
             <Grid.RowDefinitions>
-                <RowDefinition Height="3*" />
-                <RowDefinition Height="7*" />
+                <RowDefinition Height="2*" />
+                <RowDefinition Height="8*" />
             </Grid.RowDefinitions>
             <Border Grid.Row="0"
                     MinHeight="34"
-                    MaxWidth="360"
-                    Margin="0,0,0,18"
-                    Padding="14,8"
+                    MaxWidth="420"
+                    Margin="0,0,0,12"
+                    Padding="16,9"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Bottom"
-                    Background="#F0202938"
-                    BorderBrush="#33FFFFFF"
                     BorderThickness="1"
-                    CornerRadius="8"
-                    Opacity="0.98"
+                    CornerRadius="12"
                     SnapsToDevicePixels="True">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="22"
+                                      Color="#000000"
+                                      Direction="270"
+                                      Opacity="0.20"
+                                      ShadowDepth="8" />
+                </Border.Effect>
                 <Border.Style>
                     <Style TargetType="{x:Type Border}">
                         <Setter Property="Visibility" Value="Collapsed" />
+                        <Setter Property="Background" Value="{StaticResource DiscoveryToastInfoBackgroundBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource BrushInfoBorder}" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsTransientPageMessageVisible}" Value="True">
                                 <Setter Property="Visibility" Value="Visible" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding TransientPageMessageKind}" Value="Warning">
+                                <Setter Property="Background" Value="{StaticResource DiscoveryToastWarningBackgroundBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BrushWarningBorder}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding TransientPageMessageKind}" Value="Error">
+                                <Setter Property="Background" Value="{StaticResource DiscoveryToastErrorBackgroundBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BrushErrorBorder}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding TransientPageMessageKind}" Value="Success">
+                                <Setter Property="Background" Value="{StaticResource DiscoveryToastSuccessBackgroundBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BrushSuccessBorder}" />
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <TextBlock MaxWidth="324"
+                <TextBlock MaxWidth="380"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            FontSize="13"
                            FontWeight="SemiBold"
-                           Foreground="{DynamicResource BrushForegroundPrimary}"
                            Text="{Binding TransientPageMessageText}"
                            TextAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
+                           TextTrimming="CharacterEllipsis">
+                    <TextBlock.Style>
+                        <Style TargetType="{x:Type TextBlock}">
+                            <Setter Property="Foreground" Value="{DynamicResource BrushInfoForeground}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding TransientPageMessageKind}" Value="Warning">
+                                    <Setter Property="Foreground" Value="{DynamicResource BrushWarningForeground}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding TransientPageMessageKind}" Value="Error">
+                                    <Setter Property="Foreground" Value="{DynamicResource BrushErrorForeground}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding TransientPageMessageKind}" Value="Success">
+                                    <Setter Property="Foreground" Value="{DynamicResource BrushSuccessForeground}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Border>
         </Grid>
     </Grid>

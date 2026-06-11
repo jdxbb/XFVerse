@@ -5,17 +5,18 @@
              xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
-        <SolidColorBrush x:Key="LibraryMediaCardBackgroundBrush" Color="#121821" />
-        <SolidColorBrush x:Key="LibraryMediaCardSurfaceBrush" Color="#202938" />
+        <SolidColorBrush x:Key="LibraryMediaCardBackgroundBrush" Color="{DynamicResource ColorCard}" />
+        <SolidColorBrush x:Key="LibraryListMediaCardBackgroundBrush" Color="{DynamicResource ColorSidebar}" />
+        <SolidColorBrush x:Key="LibraryMediaCardSurfaceBrush" Color="{DynamicResource ColorSurfaceAlt}" />
         <SolidColorBrush x:Key="LibraryMediaCardTextBrush" Color="#F8FAFC" />
         <SolidColorBrush x:Key="LibraryMediaCardMutedTextBrush" Color="#D8DEE9" />
         <SolidColorBrush x:Key="LibraryMediaCardAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="LibraryMediaCardAccentTextBrush" Color="#111827" />
-        <SolidColorBrush x:Key="LibraryMediaCardDividerBrush" Color="#E5E7EB" />
-        <SolidColorBrush x:Key="LibraryMediaProgressFillBrush" Color="#67C7F2" />
+        <SolidColorBrush x:Key="LibraryMediaCardDividerBrush" Color="{DynamicResource ColorDivider}" />
+        <SolidColorBrush x:Key="LibraryMediaProgressFillBrush" Color="{DynamicResource ColorWatchProgressFill}" />
         <SolidColorBrush x:Key="LibraryMediaProgressTrackBrush" Color="#E5E7EB" />
         <SolidColorBrush x:Key="LibraryTagDividerBrush" Color="#7DD3FC" />
-        <SolidColorBrush x:Key="LibraryRatingGoldBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="LibraryRatingGoldBrush" Color="{DynamicResource ColorWarning}" />
 
         <Style x:Key="LibraryMediaProgressBarStyle" TargetType="ProgressBar">
             <Setter Property="Height" Value="4" />
@@ -531,6 +532,7 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundSecondary}" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Focusable" Value="False" />
@@ -560,6 +562,13 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BrushGlassButtonHover}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="LibraryPosterLayoutSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource LibraryLayoutSegmentButtonStyle}">
@@ -580,6 +589,14 @@
                     <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LibraryLayoutSegmentHostStyle" TargetType="Border">
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Background" Value="{DynamicResource BrushGlassButton}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
         </Style>
 
         <Style x:Key="SelectionDotButtonStyle" TargetType="Button">
@@ -885,14 +902,18 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Background="Transparent" PreviewMouseDown="OnRootPreviewMouseDown">
+    <Grid Margin="-32,-24,-32,0"
+          Background="Transparent"
+          PreviewMouseDown="OnRootPreviewMouseDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="18" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Padding="14" Style="{StaticResource GlassPageCardStyle}">
+        <Border Margin="32,24,32,0"
+                Padding="14"
+                Style="{StaticResource GlassPageCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -1205,7 +1226,7 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="2" Margin="32,0,32,0">
             <Border Style="{StaticResource GlassPageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -1221,11 +1242,7 @@
                                     Command="{Binding OpenRemovedLibraryCommand}"
                                     Style="{StaticResource LibraryToolbarButtonStyle}" />
                             <Border Margin="8,0,0,0"
-                                    Padding="0"
-                                    Background="{DynamicResource BrushGlassSurfaceAlt}"
-                                    BorderBrush="{DynamicResource BrushBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="3">
+                                    Style="{StaticResource LibraryLayoutSegmentHostStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <Button Content="海报"
                                             Command="{Binding SwitchToPosterViewCommand}"
@@ -1627,7 +1644,7 @@
                                 <Border MinHeight="74"
                                         Margin="0,0,18,0"
                                         Padding="7"
-                                        Background="{StaticResource LibraryMediaCardBackgroundBrush}"
+                                        Background="{StaticResource LibraryListMediaCardBackgroundBrush}"
                                         BorderBrush="{DynamicResource BrushBorder}"
                                         BorderThickness="1"
                                         CornerRadius="14">

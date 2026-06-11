@@ -70,6 +70,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const int PageLoadRetryDelayMilliseconds = 350;
     private const int PageLoadAttemptTimeoutSeconds = 5;
     private const int PageLoadFailureToastMilliseconds = 1500;
+    private const string TransientPageMessageKindInfo = "Info";
+    private const string TransientPageMessageKindWarning = "Warning";
+    private const string TransientPageMessageKindError = "Error";
 
     private static readonly IReadOnlyList<string> MovieSearchTypeOptions =
     [
@@ -317,6 +320,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private bool _isTvSeriesNavigating;
     private bool _openAiRecommendationsOnNextActivation;
     private string _transientPageMessageText = string.Empty;
+    private string _transientPageMessageKind = TransientPageMessageKindInfo;
     private bool _isTransientPageMessageVisible;
     private int _transientPageMessageVersion;
 
@@ -449,6 +453,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         get => _transientPageMessageText;
         private set => SetProperty(ref _transientPageMessageText, value);
+    }
+
+    public string TransientPageMessageKind
+    {
+        get => _transientPageMessageKind;
+        private set => SetProperty(ref _transientPageMessageKind, value);
     }
 
     public bool IsTransientPageMessageVisible
@@ -3743,7 +3753,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         if (item.IsWatched)
         {
-            setStatusMessage("已看影片不需要加入想看。");
+            const string watchedWantBlockedMessage = "该电影已经看过，无法标记想看。";
+            setStatusMessage(watchedWantBlockedMessage);
+            ShowTransientPageMessage(watchedWantBlockedMessage, TransientPageMessageKindWarning);
             return;
         }
 
@@ -5281,12 +5293,13 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private void ShowPageLoadFailureToast(int displayPage)
     {
-        ShowTransientPageMessage($"第 {displayPage} 页加载失败，请稍后重试。");
+        ShowTransientPageMessage($"第 {displayPage} 页加载失败，请稍后重试。", TransientPageMessageKindError);
     }
 
-    private void ShowTransientPageMessage(string message)
+    private void ShowTransientPageMessage(string message, string kind = TransientPageMessageKindInfo)
     {
         var version = ++_transientPageMessageVersion;
+        TransientPageMessageKind = kind;
         TransientPageMessageText = message;
         IsTransientPageMessageVisible = true;
         _ = HideTransientPageMessageAfterDelayAsync(version);

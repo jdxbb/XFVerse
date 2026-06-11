@@ -99,7 +99,7 @@
                     <Grid x:Name="PART_Root"
                           SnapsToDevicePixels="True">
                         <ToggleButton x:Name="PART_Switch"
-                                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
                                       Height="{TemplateBinding Height}"
                                       Background="{TemplateBinding Background}"
                                       BorderBrush="{TemplateBinding BorderBrush}"
@@ -161,7 +161,7 @@
                                IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                                Placement="Bottom"
                                PlacementTarget="{Binding ElementName=PART_Root}"
-                               StaysOpen="False"
+                               StaysOpen="True"
                                VerticalOffset="6">
                             <Border Width="286"
                                     Padding="12"

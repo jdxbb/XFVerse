@@ -1,94 +1,102 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Color x:Key="ColorBackground">#F4F1EA</Color>
-    <Color x:Key="ColorBackgroundAccent">#E7DDD0</Color>
-    <Color x:Key="ColorSidebar">#171D25</Color>
-    <Color x:Key="ColorTopBar">#FFFBF5</Color>
-    <Color x:Key="ColorSurface">#FFFBF5</Color>
-    <Color x:Key="ColorSurfaceAlt">#F2EADF</Color>
+    <Color x:Key="ColorBackground">#FAFAFC</Color>
+    <Color x:Key="ColorBackgroundAccent">#F2F4F7</Color>
+    <Color x:Key="ColorSidebar">#2F333A</Color>
+    <Color x:Key="ColorSidebarRightBorder">#00FFFFFF</Color>
+    <Color x:Key="ColorRatingStarStroke">#AEB6C2</Color>
+    <Color x:Key="ColorRatingStarFill">#E8AFC0</Color>
+    <Color x:Key="ColorWatchProgressFill">#7CCBFF</Color>
+    <Color x:Key="ColorTopBar">#FFFFFF</Color>
+    <Color x:Key="ColorSurface">#FFFFFF</Color>
+    <Color x:Key="ColorSurfaceAlt">#F5F6F9</Color>
     <Color x:Key="ColorSurfaceRaised">#FFFFFF</Color>
     <Color x:Key="ColorSurfaceElevated">#FFFFFF</Color>
-    <Color x:Key="ColorCard">#FFFBF5</Color>
+    <Color x:Key="ColorCard">#FFFFFF</Color>
     <Color x:Key="ColorCompactCard">#FFFFFF</Color>
-    <Color x:Key="ColorBorder">#DDD0C2</Color>
-    <Color x:Key="ColorDivider">#E7DCCF</Color>
-    <Color x:Key="ColorAccent">#D86638</Color>
-    <Color x:Key="ColorAccentHover">#C85D34</Color>
-    <Color x:Key="ColorAccentPressed">#A94727</Color>
-    <Color x:Key="ColorAccentSoft">#F5CBB8</Color>
-    <Color x:Key="ColorSuccess">#2E8A57</Color>
-    <Color x:Key="ColorSuccessHover">#25784B</Color>
-    <Color x:Key="ColorSuccessPressed">#1E603D</Color>
-    <Color x:Key="ColorWarning">#C68021</Color>
-    <Color x:Key="ColorWarningHover">#B37219</Color>
-    <Color x:Key="ColorWarningPressed">#965E15</Color>
-    <Color x:Key="ColorDanger">#B54B4B</Color>
-    <Color x:Key="ColorDangerHover">#A23D3D</Color>
-    <Color x:Key="ColorDangerPressed">#873030</Color>
-    <Color x:Key="ColorInfo">#2E6F9E</Color>
-    <Color x:Key="ColorInfoHover">#275F88</Color>
-    <Color x:Key="ColorInfoPressed">#214F71</Color>
-    <Color x:Key="ColorForegroundPrimary">#1D2026</Color>
-    <Color x:Key="ColorForegroundSecondary">#4D5562</Color>
-    <Color x:Key="ColorForegroundMuted">#7C8796</Color>
-    <Color x:Key="ColorTextPrimary">#1D2026</Color>
-    <Color x:Key="ColorTextSecondary">#4D5562</Color>
-    <Color x:Key="ColorTextMuted">#7C8796</Color>
-    <Color x:Key="ColorTextDisabled">#9C948A</Color>
+    <Color x:Key="ColorBorder">#E5E7EB</Color>
+    <Color x:Key="ColorDivider">#EEF0F3</Color>
+    <Color x:Key="ColorAccent">#C07A91</Color>
+    <Color x:Key="ColorAccentHover">#B36A84</Color>
+    <Color x:Key="ColorAccentPressed">#98576E</Color>
+    <Color x:Key="ColorAccentSoft">#F7E2EA</Color>
+    <Color x:Key="ColorSuccess">#5C9872</Color>
+    <Color x:Key="ColorSuccessHover">#4D8763</Color>
+    <Color x:Key="ColorSuccessPressed">#3E6D50</Color>
+    <Color x:Key="ColorWarning">#C18A4B</Color>
+    <Color x:Key="ColorWarningHover">#AD7A40</Color>
+    <Color x:Key="ColorWarningPressed">#916633</Color>
+    <Color x:Key="ColorDanger">#C26A70</Color>
+    <Color x:Key="ColorDangerHover">#AF5B62</Color>
+    <Color x:Key="ColorDangerPressed">#934A51</Color>
+    <Color x:Key="ColorInfo">#6B89AD</Color>
+    <Color x:Key="ColorInfoHover">#5D7A9D</Color>
+    <Color x:Key="ColorInfoPressed">#4D6584</Color>
+    <Color x:Key="ColorForegroundPrimary">#26282D</Color>
+    <Color x:Key="ColorForegroundSecondary">#5B616B</Color>
+    <Color x:Key="ColorForegroundMuted">#8B929D</Color>
+    <Color x:Key="ColorTextPrimary">#26282D</Color>
+    <Color x:Key="ColorTextSecondary">#5B616B</Color>
+    <Color x:Key="ColorTextMuted">#8B929D</Color>
+    <Color x:Key="ColorTextDisabled">#B0A7AE</Color>
     <Color x:Key="ColorOnAccent">#FFFFFF</Color>
-    <Color x:Key="ColorSidebarForeground">#F7EFE5</Color>
-    <Color x:Key="ColorSidebarMuted">#AEB6C2</Color>
-    <Color x:Key="ColorDisabledBackground">#ECE3D8</Color>
-    <Color x:Key="ColorDisabledBorder">#D8CABC</Color>
-    <Color x:Key="ColorDisabledForeground">#9C948A</Color>
-    <Color x:Key="ColorOverlay">#CC0B0E13</Color>
-    <Color x:Key="ColorScrim">#990B0E13</Color>
-    <Color x:Key="ColorFocusRing">#80D86638</Color>
-    <Color x:Key="ColorSelection">#2ED86638</Color>
-    <Color x:Key="ColorHoverBackground">#F2EADF</Color>
-    <Color x:Key="ColorPressedBackground">#E7DDD0</Color>
+    <Color x:Key="ColorSidebarForeground">#F8FAFC</Color>
+    <Color x:Key="ColorSidebarMuted">#B8C1CC</Color>
+    <Color x:Key="ColorDisabledBackground">#F1F3F6</Color>
+    <Color x:Key="ColorDisabledBorder">#E1E4E8</Color>
+    <Color x:Key="ColorDisabledForeground">#B0A7AE</Color>
+    <Color x:Key="ColorOverlay">#B31C1F24</Color>
+    <Color x:Key="ColorScrim">#801C1F24</Color>
+    <Color x:Key="ColorFocusRing">#73C07A91</Color>
+    <Color x:Key="ColorSelection">#28C07A91</Color>
+    <Color x:Key="ColorHoverBackground">#F5F6F9</Color>
+    <Color x:Key="ColorPressedBackground">#ECEFF3</Color>
     <Color x:Key="ColorInputBackground">#FFFFFF</Color>
-    <Color x:Key="ColorInputBorder">#D8CABC</Color>
-    <Color x:Key="ColorInputFocusBorder">#D86638</Color>
+    <Color x:Key="ColorInputBorder">#E1E4E8</Color>
+    <Color x:Key="ColorInputFocusBorder">#C07A91</Color>
     <Color x:Key="ColorPopupBackground">#FFFFFF</Color>
-    <Color x:Key="ColorTooltipBackground">#1D2026</Color>
+    <Color x:Key="ColorTooltipBackground">#2F333A</Color>
     <Color x:Key="ColorTooltipForeground">#FFFFFF</Color>
-    <Color x:Key="ColorDialogBackground">#FFFBF5</Color>
+    <Color x:Key="ColorDialogBackground">#FFFFFF</Color>
     <Color x:Key="ColorMenuBackground">#FFFFFF</Color>
 
-    <Color x:Key="ColorLoadingForeground">#D86638</Color>
-    <Color x:Key="ColorEmptyForeground">#7C8796</Color>
-    <Color x:Key="ColorErrorForeground">#A23D3D</Color>
-    <Color x:Key="ColorErrorBackground">#FFF0F0</Color>
-    <Color x:Key="ColorErrorBorder">#E2A3A3</Color>
-    <Color x:Key="ColorWarningForeground">#9F641A</Color>
-    <Color x:Key="ColorWarningBackground">#FFF6E6</Color>
-    <Color x:Key="ColorWarningBorder">#E9C681</Color>
-    <Color x:Key="ColorSuccessForeground">#246E46</Color>
-    <Color x:Key="ColorSuccessBackground">#EAF7EF</Color>
-    <Color x:Key="ColorSuccessBorder">#8DCFA9</Color>
-    <Color x:Key="ColorInfoForeground">#275F88</Color>
-    <Color x:Key="ColorInfoBackground">#EAF3FA</Color>
-    <Color x:Key="ColorInfoBorder">#8BB7D9</Color>
-    <Color x:Key="ColorConfigMissingForeground">#9F641A</Color>
-    <Color x:Key="ColorConfigMissingBackground">#FFF6E6</Color>
-    <Color x:Key="ColorConfigMissingBorder">#E9C681</Color>
-    <Color x:Key="ColorNoSourceForeground">#6F5B3A</Color>
-    <Color x:Key="ColorNoSourceBackground">#F6EFE4</Color>
-    <Color x:Key="ColorNoSourceBorder">#D9C397</Color>
-    <Color x:Key="ColorDataInsufficientForeground">#6B6475</Color>
-    <Color x:Key="ColorDataInsufficientBackground">#F2F0F6</Color>
-    <Color x:Key="ColorDataInsufficientBorder">#CEC8DA</Color>
-    <Color x:Key="ColorCacheProtectedForeground">#356676</Color>
-    <Color x:Key="ColorCacheProtectedBackground">#EAF5F7</Color>
-    <Color x:Key="ColorCacheProtectedBorder">#9FC8D0</Color>
-    <Color x:Key="ColorScanRunningForeground">#275F88</Color>
-    <Color x:Key="ColorScanRunningBackground">#EAF3FA</Color>
-    <Color x:Key="ColorScanRunningBorder">#8BB7D9</Color>
+    <Color x:Key="ColorLoadingForeground">#C07A91</Color>
+    <Color x:Key="ColorEmptyForeground">#918790</Color>
+    <Color x:Key="ColorErrorForeground">#AF5B62</Color>
+    <Color x:Key="ColorErrorBackground">#FFF2F4</Color>
+    <Color x:Key="ColorErrorBorder">#E6BCC2</Color>
+    <Color x:Key="ColorWarningForeground">#916633</Color>
+    <Color x:Key="ColorWarningBackground">#FFF8ED</Color>
+    <Color x:Key="ColorWarningBorder">#E8CFA7</Color>
+    <Color x:Key="ColorSuccessForeground">#497A5B</Color>
+    <Color x:Key="ColorSuccessBackground">#EFF8F3</Color>
+    <Color x:Key="ColorSuccessBorder">#B2D5BF</Color>
+    <Color x:Key="ColorInfoForeground">#5D7A9D</Color>
+    <Color x:Key="ColorInfoBackground">#F0F5FB</Color>
+    <Color x:Key="ColorInfoBorder">#BAC9DD</Color>
+    <Color x:Key="ColorConfigMissingForeground">#916633</Color>
+    <Color x:Key="ColorConfigMissingBackground">#FFF8ED</Color>
+    <Color x:Key="ColorConfigMissingBorder">#E8CFA7</Color>
+    <Color x:Key="ColorNoSourceForeground">#74675F</Color>
+    <Color x:Key="ColorNoSourceBackground">#F7F2EE</Color>
+    <Color x:Key="ColorNoSourceBorder">#DDCBC0</Color>
+    <Color x:Key="ColorDataInsufficientForeground">#746A78</Color>
+    <Color x:Key="ColorDataInsufficientBackground">#F6F1F7</Color>
+    <Color x:Key="ColorDataInsufficientBorder">#D8CCDE</Color>
+    <Color x:Key="ColorCacheProtectedForeground">#5A7F89</Color>
+    <Color x:Key="ColorCacheProtectedBackground">#F0F8F8</Color>
+    <Color x:Key="ColorCacheProtectedBorder">#B9D0D4</Color>
+    <Color x:Key="ColorScanRunningForeground">#5D7A9D</Color>
+    <Color x:Key="ColorScanRunningBackground">#F0F5FB</Color>
+    <Color x:Key="ColorScanRunningBorder">#BAC9DD</Color>
 
     <SolidColorBrush x:Key="BrushBackground" Color="{StaticResource ColorBackground}" />
     <SolidColorBrush x:Key="BrushBackgroundAccent" Color="{StaticResource ColorBackgroundAccent}" />
     <SolidColorBrush x:Key="BrushSidebar" Color="{StaticResource ColorSidebar}" />
+    <SolidColorBrush x:Key="BrushSidebarRightBorder" Color="{StaticResource ColorSidebarRightBorder}" />
+    <SolidColorBrush x:Key="BrushRatingStarStroke" Color="{StaticResource ColorRatingStarStroke}" />
+    <SolidColorBrush x:Key="BrushRatingStarFill" Color="{StaticResource ColorRatingStarFill}" />
+    <SolidColorBrush x:Key="BrushWatchProgressFill" Color="{StaticResource ColorWatchProgressFill}" />
     <SolidColorBrush x:Key="BrushTopBar" Color="{StaticResource ColorTopBar}" />
     <SolidColorBrush x:Key="BrushSurface" Color="{StaticResource ColorSurface}" />
     <SolidColorBrush x:Key="BrushSurfaceAlt" Color="{StaticResource ColorSurfaceAlt}" />
@@ -173,50 +181,63 @@
     <SolidColorBrush x:Key="BrushScanRunningBorder" Color="{StaticResource ColorScanRunningBorder}" />
 
     <LinearGradientBrush x:Key="BrushHeroGradient" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#FFF7EA" Offset="0" />
-        <GradientStop Color="#F3D2BF" Offset="0.55" />
-        <GradientStop Color="#E5EAF2" Offset="1" />
+        <GradientStop Color="#FFFFFF" Offset="0" />
+        <GradientStop Color="#F8EAF0" Offset="0.55" />
+        <GradientStop Color="#F0F5FA" Offset="1" />
     </LinearGradientBrush>
 
     <LinearGradientBrush x:Key="BrushGlassSurface" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#F5FFFFFF" Offset="0" />
-        <GradientStop Color="#E5F9FDFF" Offset="0.22" />
-        <GradientStop Color="#D8FFF8F1" Offset="0.62" />
-        <GradientStop Color="#C8E4EDF3" Offset="1" />
+        <GradientStop Color="#FAFFFFFF" Offset="0" />
+        <GradientStop Color="#F2FFFFFF" Offset="0.22" />
+        <GradientStop Color="#E8F8F4F7" Offset="0.62" />
+        <GradientStop Color="#DAF0F5FA" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassSurfaceAlt" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#ECFFFFFF" Offset="0" />
-        <GradientStop Color="#D8F7FBFD" Offset="0.2" />
-        <GradientStop Color="#C8F2EAE2" Offset="0.62" />
-        <GradientStop Color="#B8D9E5EC" Offset="1" />
+        <GradientStop Color="#F2FFFFFF" Offset="0" />
+        <GradientStop Color="#E8FFFFFF" Offset="0.2" />
+        <GradientStop Color="#DAF5F0F4" Offset="0.62" />
+        <GradientStop Color="#CBE8EEF5" Offset="1" />
     </LinearGradientBrush>
-    <SolidColorBrush x:Key="BrushGlassBorder" Color="#E8FFFFFF" />
+    <SolidColorBrush x:Key="BrushGlassBorder" Color="#BFC7CED8" />
     <LinearGradientBrush x:Key="BrushGlassButton" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#E8FFFFFF" Offset="0" />
-        <GradientStop Color="#CBEAF0F4" Offset="1" />
+        <GradientStop Color="#F0FFFFFF" Offset="0" />
+        <GradientStop Color="#DFF3F4F7" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassButtonHover" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#FFFFFFFF" Offset="0" />
-        <GradientStop Color="#E6DDECF2" Offset="1" />
+        <GradientStop Color="#EFF6F1F5" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassButtonPressed" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#DED8E8ED" Offset="0" />
-        <GradientStop Color="#C7C5D9E2" Offset="1" />
+        <GradientStop Color="#E8ECEEF2" Offset="0" />
+        <GradientStop Color="#D6D9DEE6" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassAccent" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#F05A7A88" Offset="0" />
-        <GradientStop Color="#E64A6675" Offset="1" />
+        <GradientStop Color="#F0C07A91" Offset="0" />
+        <GradientStop Color="#E6AA647F" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassAccentHover" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#F5688996" Offset="0" />
-        <GradientStop Color="#EB547685" Offset="1" />
+        <GradientStop Color="#F7CA8AA0" Offset="0" />
+        <GradientStop Color="#EBB5748D" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassAccentPressed" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#F04B6976" Offset="0" />
-        <GradientStop Color="#E53E5B69" Offset="1" />
+        <GradientStop Color="#F0A8647D" Offset="0" />
+        <GradientStop Color="#E491536D" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassSelected" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#8BC5DBE2" Offset="0" />
-        <GradientStop Color="#6EA8C5CF" Offset="1" />
+        <GradientStop Color="#8BECC8D5" Offset="0" />
+        <GradientStop Color="#6EDDB3C4" Offset="1" />
     </LinearGradientBrush>
+    <DropShadowEffect x:Key="ShadowLargeCard"
+                      BlurRadius="24"
+                      Direction="270"
+                      Opacity="0.18"
+                      ShadowDepth="5"
+                      Color="#000000" />
+    <DropShadowEffect x:Key="ShadowInlineCard"
+                      BlurRadius="16"
+                      Direction="270"
+                      Opacity="0.16"
+                      ShadowDepth="3"
+                      RenderingBias="Quality"
+                      Color="#000000" />
 </ResourceDictionary>

@@ -4,7 +4,7 @@
              xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
-        <Style x:Key="SettingsDraftSectionCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+        <Style x:Key="SettingsDraftSectionCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
             <Setter Property="Padding" Value="10" />
             <Setter Property="Cursor" Value="Arrow" />
         </Style>
@@ -578,7 +578,7 @@
                             Style="{StaticResource SettingsDiscoveryTabControlStyle}"
                             ItemContainerStyle="{StaticResource SettingsDiscoveryTabItemStyle}">
                     <TabItem Header="通用">
-                        <Grid Margin="0,12,0,0" ClipToBounds="False" Cursor="Arrow">
+                        <Grid Margin="-32,-12,-32,0" ClipToBounds="False" Cursor="Arrow">
                             <Grid.Style>
                                 <Style TargetType="Grid">
                                     <Setter Property="Visibility" Value="Hidden" />
@@ -596,7 +596,9 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <Border Grid.Row="0" Style="{StaticResource SettingsDraftSectionCardStyle}">
+                            <Border Grid.Row="0"
+                                    Margin="32,24,32,0"
+                                    Style="{StaticResource SettingsDraftSectionCardStyle}">
                                 <StackPanel>
                                     <TextBlock Text="缓存设置"
                                                Style="{StaticResource SettingsSectionHeadingTextStyle}" />
@@ -727,7 +729,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Row="1" Margin="0,36,0,0" Style="{StaticResource SettingsDraftSectionCardStyle}">
+                            <Border Grid.Row="1" Margin="32,36,32,0" Style="{StaticResource SettingsDraftSectionCardStyle}">
                                 <StackPanel>
                                     <TextBlock Text="行为设置"
                                                Style="{StaticResource SettingsSectionHeadingTextStyle}" />
@@ -872,8 +874,8 @@
                                 </StackPanel>
                             </Border>
                             <Button Grid.Row="3"
-                                    Margin="6,0,6,0"
-                                    Command="{Binding ToggleAboutDetailsCommand}"
+                                    Margin="38,0,38,0"
+                                    Command="{Binding OpenOfficialWebsiteCommand}"
                                     Style="{StaticResource SettingsAboutRowButtonStyle}"
                                     ToolTip="{Binding AboutStatusMessage}">
                                 <Button.RenderTransform>
@@ -980,6 +982,7 @@
 
                     <TabItem Header="API 配置">
                         <ScrollViewer x:Name="ApiConfigScrollViewer"
+                                      Margin="-32,-24,-32,0"
                                       Cursor="Arrow"
                                       HorizontalScrollBarVisibility="Disabled"
                                       VerticalScrollBarVisibility="Auto"
@@ -988,7 +991,18 @@
                             <ScrollViewer.Resources>
                                 <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SettingsModernScrollBarStyle}" />
                             </ScrollViewer.Resources>
-                            <StackPanel Margin="0,18,0,0">
+                            <Grid Width="{Binding ActualWidth, ElementName=ApiConfigScrollViewer}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="42" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="42" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="32" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="32" />
+                                </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Row="1" Grid.Column="1">
                             <controls:ApiConfigCard Title="TMDB 配置"
                                                     Description="TMDB 用于影片识别和元数据。认证信息只保存在本地数据库。"
                                                     StatusText="{Binding TmdbConfigStatusText}"
@@ -1227,6 +1241,7 @@
                                 </controls:ApiConfigCard.ActionsContent>
                             </controls:ApiConfigCard>
                             </StackPanel>
+                            </Grid>
                         </ScrollViewer>
                     </TabItem>
                 </TabControl>

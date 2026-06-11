@@ -4,12 +4,14 @@
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              Cursor="Arrow">
     <UserControl.Resources>
-        <SolidColorBrush x:Key="RecommendationPosterSurfaceBrush" Color="#202938" />
+        <SolidColorBrush x:Key="RecommendationPosterSurfaceBrush" Color="{DynamicResource ColorSurfaceAlt}" />
         <SolidColorBrush x:Key="RecommendationPosterTextBrush" Color="#F8FAFC" />
         <SolidColorBrush x:Key="RecommendationPosterMutedTextBrush" Color="#D8DEE9" />
         <SolidColorBrush x:Key="RecommendationPosterAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="RecommendationPosterAccentTextBrush" Color="#111827" />
-        <SolidColorBrush x:Key="RecommendationPosterActiveBrush" Color="#F5C84B" />
+        <SolidColorBrush x:Key="RecommendationPosterActiveBrush" Color="{DynamicResource ColorAccent}" />
+        <SolidColorBrush x:Key="RecommendationPosterRatingHighlightBrush" Color="{DynamicResource ColorWarning}" />
+        <SolidColorBrush x:Key="RecommendationPosterNotInterestedBrush" Color="{DynamicResource ColorDanger}" />
         <SolidColorBrush x:Key="RecommendationTagDividerBrush" Color="#7DD3FC" />
 
         <Style x:Key="RecommendationFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource GlassSmallButtonStyle}">
@@ -332,7 +334,7 @@
             <Setter Property="Foreground" Value="{StaticResource RecommendationPosterAccentTextBrush}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource RecommendationPosterActiveBrush}" />
+                    <Setter Property="Foreground" Value="{StaticResource RecommendationPosterRatingHighlightBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -383,7 +385,7 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
                     <Setter Property="Background" Value="{StaticResource RecommendationPosterActiveBrush}" />
-                    <Setter Property="Foreground" Value="#111827" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -391,8 +393,8 @@
         <Style x:Key="RecommendationPosterNotInterestedButtonStyle" TargetType="Button" BasedOn="{StaticResource RecommendationPosterActionButtonBaseStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsNotInterested}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource RecommendationPosterActiveBrush}" />
-                    <Setter Property="Foreground" Value="#111827" />
+                    <Setter Property="Background" Value="{StaticResource RecommendationPosterNotInterestedBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource BrushOnAccent}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>

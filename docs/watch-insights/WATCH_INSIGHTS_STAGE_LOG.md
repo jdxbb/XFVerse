@@ -1,5 +1,182 @@
 # Watch Insights Stage Log
 
+## Phase 7.7g Follow-up - Shadow Safe Grid Correction
+
+Goal: correct the repeated Watch Insights Profile/Statistics module-card shadow clipping by fixing the clipping root cause instead of shrinking card width, while keeping Profile and Statistics service semantics unchanged.
+
+Completed:
+
+- Identified the remaining root cause as the card body still sitting on the effective content edge after the previous negative-margin/padding compensation. The card effect could still bleed into the clipped edge, and padding-only tuning made the card width feel smaller.
+- Replaced the Profile and Statistics tab content padding with an explicit shadow-safe grid: a real top/left gutter for module-card effects, a right-side expanded scroll viewport to preserve the module content width, and no negative content margin.
+- Applied the same structure to Profile Analysis and Watch Statistics so both tabs use the same shadow-safe layout model.
+- Corrected the safe grid from one-sided right expansion to symmetric left/right viewport expansion, so module-card bodies align with the original content column while shadows still have space to render on both sides.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gInsightShadowSymmetric\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No statistics/profile service semantics, AI/profile generation, recommendation, scan, collection, TV/Movie boundary, database schema, migration, database update, commit, or push change.
+
+## Phase 7.7g Follow-up - Color And Profile State Cleanup
+
+Goal: address follow-up feedback for TV season list divider length, Library list-view card background, poster state icon color, rating-star stroke, watch-progress fill, and remaining Profile Analysis status text without changing service semantics, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Kept the TV season target-episode row highlight expanded, but moved the `Episode` list top divider into a normal-width overlay so the line no longer extends into the page background.
+- Changed only the Library list-view item background to use the navigation background color; poster cards and other page cards keep their existing backgrounds.
+- Reused `BrushRatingStarFill` for solid poster want/favorite icons, making the selected star/heart lighter while preserving the white outline treatment.
+- Lightened the light-theme rating-star stroke to a muted gray; dark-theme rating-star stroke remains unchanged.
+- Added a fixed light-blue watch-progress fill resource and applied it to Library/History media progress bars and the Home continue-watching thin progress bar.
+- Removed the remaining Profile Analysis status/warning text between `观影口味总结` and `观影 DNA`, including the keyword explanatory empty text.
+- Increased Watch Insights Profile/Statistics scroll padding on the top and sides so module card shadows have a larger safe drawing area.
+- Set the taste-summary scroll surface to physical scrolling for smoother pixel-level scroll behavior.
+- Slightly increased the core-keyword slot and chip height after the previous over-tightening pass.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gColorStateCleanup\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No statistics/profile service semantics, AI/profile generation, recommendation, scan, collection, TV/Movie boundary, database schema, migration, database update, commit, or push change.
+
+## Phase 7.7g Follow-up - Episode Highlight And Tab Refresh Alignment
+
+Goal: address follow-up feedback for TV season target-episode highlighting, Library layout toggle parity, Watch Insights shadow safe area, taste-summary overflow, keyword slot height, and Statistics refresh placement without changing service semantics, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Expanded the TV season episode list horizontally across the card padding and compensated row content padding so the target-episode highlight can cover the full row instead of stopping at the inner list edge.
+- Aligned the Library layout switcher with the Movie Discovery search layout switcher by using the same glass segment host, themed hover state, secondary foreground, and selected accent treatment.
+- Corrected the Watch Insights Profile and Statistics shadow safe area by removing the negative content margin that pushed cards back into the clipped viewport.
+- Changed the taste-summary text area to a modern auto-revealed scroll surface using the Watch Insights scrollbar style, so long summaries can scroll instead of truncating.
+- Reduced core-keyword slot and chip height with fixed centered rows, keeping the 2x3 layout while making the outer frames less dominant.
+- Moved the Statistics refresh action and combined status/time text into the same Tab-divider action layout used by Profile refresh; the Statistics card header now only keeps the range switch.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gEpisodeLibraryStats\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No statistics/profile service semantics, AI/profile generation, recommendation, scan, collection, TV/Movie boundary, database schema, migration, database update, commit, or push change.
+
+## Phase 7.7g Follow-up - Theme Layering And Statistics Top Cleanup
+
+Goal: address the latest visual feedback for rating stars, Movie Discovery layout toggle theming, Watch Insights card layering, profile summary spacing, keyword density, and Statistics top content without changing statistics/profile services, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Added a theme-level `BrushRatingStarFill` so light-theme detail rating stars use a lighter brighter fill while dark theme keeps the existing accent tone.
+- Strengthened the light-theme `BrushGlassBorder` to make nested glass cards easier to distinguish on Home, Watch Insights, and other shared glass-card surfaces.
+- Changed the Movie Discovery search layout toggle host and hover state to use theme glass resources instead of a fixed temporary light card color.
+- Increased Watch Insights Profile and Statistics scroll safe padding while offsetting content margins so top/side shadows can render without moving the cards.
+- Removed the profile empty-state card between `观影口味总结` and `观影 DNA`; status remains in the Tab action label and the taste-summary empty state.
+- Removed the Statistics top module-state and warning-chip blocks so `洞察总览` is the first visible Statistics card.
+- Removed the extra blank line between profile summary natural paragraphs while keeping two full-width leading spaces per paragraph.
+- Reduced the visual weight and spacing of the core-keyword slot frames.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gThemeLayering\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No service semantics, AI/profile generation, recommendation, scan, collection, Movie-only boundary, database schema, migration, database update, commit, or push change.
+
+## Phase 7.7g Follow-up - Profile Tab Refresh And Quote Summary Pass
+
+Goal: adjust the Profile Analysis refresh placement, cursor behavior, card spacing and taste-summary readability based on user feedback without changing statistics, recommendation, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Moved `刷新画像` out of the taste-summary card and into the top Tab divider action area.
+- The profile refresh action now appears only when `画像分析` is selected.
+- Replaced the text refresh button with a transparent MDL2 refresh icon button whose tooltip is `刷新画像`.
+- Placed `LastProfileRefreshedAtText` to the left of the refresh icon.
+- Explicitly restored arrow cursor behavior for the Profile and Statistics content surfaces; interactive controls keep their own hand cursor.
+- Replaced large Watch Insights module cards with a page-local card style that removes the rectangular glass shadow effect and adds larger bottom spacing.
+- Added top and bottom scroll-content padding to reduce card edge clipping.
+- Removed the cached-status pill from the taste-summary card.
+- Tightened the taste-summary header gap so summary and keyword content starts directly under the subtitle.
+- Changed the taste-summary body to a quote-style text treatment with large muted opening and closing quote marks.
+- Empty summary content now shows centered empty-state text inside the same content area without an extra border or background.
+- Profile summary display formatting preserves AI-returned natural paragraphs and only adds two full-width spaces at each paragraph start.
+- Updated the profile summary prompt to ask future AI output for two natural paragraphs separated by a newline.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuildWatchInsightsRefreshTabLayout\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No statistics service口径, recommendation, player, scan, collection, Movie-only boundary, database schema, migration, database update, commit, or push change.
+
+## Phase 7.7g Follow-up - Profile Summary Layout Pass
+
+Goal: adjust the Profile Analysis first card based on user feedback without changing profile generation, statistics, recommendation, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Removed the top profile module-state card from the Profile Analysis Tab so the first visible card is `观影口味总结`.
+- Moved `刷新画像` into the `观影口味总结` card header right action area, next to compact status and last-refresh text.
+- Removed the three lower-left summary chips from the taste-summary area.
+- Fixed the taste-summary card height and aligned the summary panel bottom with the right keyword panel.
+- Reduced the keyword panel height and changed core keywords to a two-row, three-column `UniformGrid`.
+- Replaced keyword chip pills with low-radius rounded rectangles.
+
+Validation:
+
+- First build retry failed because the temporary build output volume was full; after removing Codex temp build outputs, `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuildWatchInsightsProfileLayoutFinal\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No profile service口径, AI generation, recommendation, player, scan, collection, Core business rule, database schema, migration, database update, commit, or push change.
+
+## Phase 7.7g Follow-up - Tab Alignment And Modern Surface Pass
+
+Goal: align the Watch Insights top Tab strip with Movie Discovery and modernize Watch Insights component surfaces without changing statistics/profile services, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Matched the Watch Insights `TabControl` template positioning to Movie Discovery's top-tab coordinates: same negative top offset, same content top padding, hidden native header host, divider placement and selected-content margin source.
+- Switched Watch Insights main module cards from the older page-card surface to the shared glass page-card surface used by modernized Home / Library / Discovery / detail pages.
+- Switched inner insight panels to the shared glass inline-panel baseline, so profile, overview, calendar, chart and ranking components use the same modern translucent surface family.
+- Replaced the Watch Insights local white scrollbar thumb colors with the same resource-driven 6px modern scrollbar treatment used by Discovery / Settings.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuildInsightsPolish\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No service口径, AI/profile generation, recommendation, player, scan, collection, Core business rule, database schema, migration, database update, commit, or push change.
+
+## Phase 7.7g Statistics Lower-Area Visual Closeout
+
+Goal: close the Watch Statistics lower area against the Phase 7.7 UI redesign scope without changing statistics service semantics, profile generation, recommendation input, Movie-only boundaries, database schema, migration, database update, commit, or push.
+
+Completed:
+
+- Rebuilt the lower statistics modules around `偏好图谱`, `标签排行月榜`, `观影节奏`, and `口味组合地图`.
+- Changed the preference graph to a scalable bubble canvas using real type / emotion distribution data, with bubble size based on tag counts and legend colors from existing theme resources.
+- Changed tag rankings to three Top3 cards for type, emotion and scene tags, keeping real count / progress bindings.
+- Changed viewing rhythm to a time-bucket bar chart plus weekday/weekend and duration distribution panels.
+- Changed taste combination to a scalable node/link canvas plus Top10 list, using real combination nodes / links or the existing Top10 fallback when graph data is sparse.
+- Added App-layer display projections for bubble placement, rhythm summary, dominant duration text, graph node presentation and stable chart sizing.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir="$env:TEMP\XFVerseCodexBuild77g\"` passed with 0 warnings and 0 errors.
+
+Not done:
+
+- No statistics service口径 change, profile prompt/model/cache change, recommendation change, TV Watch Insights, mixed Movie + TV profile, database schema change, migration, database update, commit, or push.
+- No full 7.7 regression closeout or global 7.8 visual polish.
+
 ## Phase 7.7f Statistics Upper-Area Visual Closeout
 
 Goal: close the Watch Statistics upper area against the Phase 7.7 UI redesign scope without changing statistics service semantics, profile generation, recommendation input, Movie-only boundaries, database schema, migration, database update, commit, or push.

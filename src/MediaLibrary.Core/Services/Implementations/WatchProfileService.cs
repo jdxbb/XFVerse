@@ -903,7 +903,7 @@ public sealed class WatchProfileService : IWatchProfileService
             Log($"watch-profile-text-dedup-applied field=summary.keywords before={originalKeywordCount} after={profile.Summary.Keywords.Count}");
         }
 
-        profile.Summary.Text = NormalizeProfileSentence(profile.Summary.Text, maxLength: 560);
+        profile.Summary.Text = NormalizeProfileSummaryText(profile.Summary.Text, maxLength: 560);
         profile.Persona.Description = NormalizeProfileSentence(profile.Persona.Description);
         profile.WatchVsLike.Conclusion = NormalizeProfileSentence(profile.WatchVsLike.Conclusion, maxLength: 180);
     }
@@ -970,6 +970,91 @@ public sealed class WatchProfileService : IWatchProfileService
         return semanticRoots.Any(root =>
             left.Contains(root, StringComparison.OrdinalIgnoreCase)
             && right.Contains(root, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeProfileSummaryText(string text, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var normalized = text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        var paragraphs = normalized
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(NormalizeProfileSummaryParagraph)
+            .Where(paragraph => !string.IsNullOrWhiteSpace(paragraph))
+            .ToList();
+
+        if (paragraphs.Count == 1)
+        {
+            paragraphs = SplitProfileSummaryParagraph(paragraphs[0]);
+        }
+
+        if (paragraphs.Count > 2)
+        {
+            paragraphs = [paragraphs[0], string.Join(" ", paragraphs.Skip(1))];
+        }
+
+        var result = string.Join("\n\n", paragraphs);
+        return result.Length <= maxLength ? result : result[..maxLength].TrimEnd() + "…";
+    }
+
+    private static string NormalizeProfileSummaryParagraph(string paragraph)
+    {
+        return string.Join(
+            " ",
+            paragraph.Split(['\t'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static List<string> SplitProfileSummaryParagraph(string paragraph)
+    {
+        var trimmed = paragraph.Trim();
+        if (trimmed.Length < 120)
+        {
+            return [trimmed];
+        }
+
+        var splitIndex = FindProfileSummarySplitIndex(trimmed);
+        if (splitIndex <= 0 || splitIndex >= trimmed.Length - 1)
+        {
+            return [trimmed];
+        }
+
+        return
+        [
+            trimmed[..(splitIndex + 1)].Trim(),
+            trimmed[(splitIndex + 1)..].Trim()
+        ];
+    }
+
+    private static int FindProfileSummarySplitIndex(string paragraph)
+    {
+        const string sentenceTerminators = "。！？!?；;";
+        var midpoint = paragraph.Length / 2;
+        var leftBound = Math.Max(40, paragraph.Length / 3);
+        var rightBound = Math.Min(paragraph.Length - 30, paragraph.Length * 2 / 3);
+        var bestIndex = -1;
+        var bestDistance = int.MaxValue;
+
+        for (var index = 0; index < paragraph.Length; index++)
+        {
+            if (index < leftBound || index > rightBound || sentenceTerminators.IndexOf(paragraph[index]) < 0)
+            {
+                continue;
+            }
+
+            var distance = Math.Abs(index - midpoint);
+            if (distance < bestDistance)
+            {
+                bestIndex = index;
+                bestDistance = distance;
+            }
+        }
+
+        return bestIndex;
     }
 
     private static string NormalizeProfileSentence(string text, int maxLength = 240)
@@ -1417,12 +1502,13 @@ public sealed class WatchProfileService : IWatchProfileService
         {"summary":{"text":"","keywords":[]}}
 
         要求：
-        1. summary.text 写 3-5 句自然中文，整体约 160-260 字；要综合观看、喜爱、想看、不想看和近期观看投入，不要只复述标签。
+        1. summary.text 写成 2 个自然段，段落之间用换行分隔，整体约 160-260 字；要综合观看、喜爱、想看、不想看和近期观看投入，不要只复述标签。
         2. 拒绝模板化：不要固定使用“你偏向 A，但也 B”“总体来看”“一方面/另一方面”等套话；句式要像真实分析，不要每句都用同一种结构。
         3. 可以指出主线口味、稳定偏好、探索边界、情绪需求或审美取向，但每个判断都必须能从输入数据得到支持。
         4. 如果证据显示口味集中，就明确写集中；如果证据显示分散，再写多元，不要为了显得复杂而强行制造矛盾。
         5. summary.keywords 最多 6 个，可基于画像总结生成，不要求必须来自影片标签。
         6. 关键词应覆盖题材、情绪、观看方式、审美倾向、探索倾向等不同维度，不要语义高度重复。
+        7. summary.text 不要使用项目符号、编号、Markdown 或小标题。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
