@@ -24,7 +24,7 @@ public partial class ScanTasksPage : UserControl
         var nestedScrollViewer = FindAncestor<ScrollViewer>(source);
         if (nestedScrollViewer is not null
             && !ReferenceEquals(nestedScrollViewer, rootScrollViewer)
-            && CanScrollVertically(nestedScrollViewer, e.Delta))
+            && HasVerticalScrollableContent(nestedScrollViewer))
         {
             return;
         }
@@ -35,13 +35,22 @@ public partial class ScanTasksPage : UserControl
 
     private void NestedScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (sender is not ScrollViewer scrollViewer || !CanScrollVertically(scrollViewer, e.Delta))
+        if (sender is not ScrollViewer scrollViewer || !HasVerticalScrollableContent(scrollViewer))
         {
             return;
         }
 
-        ScrollByWheel(scrollViewer, e.Delta);
+        if (CanScrollVertically(scrollViewer, e.Delta))
+        {
+            ScrollByWheel(scrollViewer, e.Delta);
+        }
+
         e.Handled = true;
+    }
+
+    private static bool HasVerticalScrollableContent(ScrollViewer scrollViewer)
+    {
+        return scrollViewer.ScrollableHeight > double.Epsilon;
     }
 
     private static bool CanScrollVertically(ScrollViewer scrollViewer, int wheelDelta)

@@ -1,5 +1,289 @@
 # UI 初级重构阶段日志
 
+## 2026-06-12 - Discovery External Ai Tag Diagnostics And Cache Follow-up
+
+Goal:
+- Diagnose why Movie Discovery search and ranking cards sometimes do not replace type / emotion / scene tags after external no-source detail AI classification.
+- Persist external no-source movie AI tags so app restart does not force the same search/ranking movie to regenerate tags.
+
+Completed:
+- Added `event=ai-tag-classification` diagnostics for local detail, scan and external no-source movie tag classification paths.
+- The diagnostic records response length, raw AI-returned type / emotion / scene arrays, vocabulary-filtered arrays, fallback type tags, final applied tags and sanitized error text; it does not log full titles, paths, URLs or prompt content.
+- Added persistent external movie AI tag cache backed by app data JSON, with `external-ai-tag-cache-load/save/hit/set` diagnostics.
+- Search/ranking cards now apply the persistent cache on activation through the existing external tag snapshot path, so no-source external tags can survive app restart.
+- Added `event=discovery-card-external-tags-apply` diagnostics to show incoming cached type tags, previous card tags, final card tags and whether the card actually changed.
+- Kept the tag fallback rules: type tags fall back to TMDB/source type tags or `-`; emotion and scene tags fall back to `-`; over-limit tags are trimmed by the vocabulary filter and under-limit tags are not filled locally.
+
+Not done:
+- No recommendation algorithm change, scan matching rule change, movie-detail tag tooltip change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Use the new diagnostics on a real AI response to confirm whether misses are caused by AI returning out-of-vocabulary type tags, cache lookup misses, or card application being skipped.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Discovery Ai Type Override Follow-up
+
+Goal:
+- Ensure AI-generated type tags replace old discovery movie type tags instead of only updating emotion and scene tags.
+
+Completed:
+- Split discovery movie card AI type tags into an explicit `AiTagsText` state instead of relying only on the older `DisplayTags` / genre text.
+- Updated the visible type-tag group to prefer `AiTagsText` and only fall back to `DisplayTags` when AI type tags are absent.
+- Prevented TMDB detail snapshots from resetting `DisplayTags` back to old genre text when AI type tags already exist.
+- Kept local detail/status snapshots authoritative, while external no-source AI snapshots no longer clear existing AI type tags when they lack type tags.
+
+Not done:
+- No recommendation algorithm change, scan behavior change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Running WPF visual QA is still recommended to confirm search/ranking cards visibly replace the first tag group after AI classification.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Discovery Ai Type Tag Snapshot Follow-up
+
+Goal:
+- Ensure Movie Discovery search and ranking cards receive AI-generated type tags together with emotion and scene tags after detail-page classification.
+
+Completed:
+- Rechecked the discovery card tag pipeline: the first visible tag group is driven by `DisplayTags`, and AI type tags enter it through `AiTagsText`.
+- Kept local movie refresh reading all three fields from local detail/status snapshots.
+- Changed external AI tag cache application to run for every cached search/ranking card before local detail override, so type / emotion / scene tags from no-source external detail classification are applied as one snapshot and cannot be skipped by transient local-status state.
+
+Not done:
+- No dynamic shadow rollback, movie-detail tag tooltip change, recommendation algorithm change, scan behavior change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Running WPF visual QA is still recommended for the exact search/ranking return-from-detail refresh behavior on real AI responses.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Discovery Star Refresh And Static Glow Follow-up
+
+Goal:
+- Fix Movie Discovery search poster star outline color, make search/ranking tag refresh robust after returning from detail, and strengthen static dark-theme glow/shadow effects.
+
+Completed:
+- Changed the Movie Discovery search poster want-to-watch star outline to the same white outline tone used by Favorites, including watched/empty star states.
+- Confirmed Movie Detail local movie AI classification is awaited inside the detail loading flow and calls `NotifyMetadataChanged` after tags are written; external no-source detail classification writes to `ExternalMovieTagCache` and also notifies metadata changes.
+- Made Movie Discovery request a cached movie-card refresh every time the page activates, not only when a data-change event was received while inactive.
+- Kept the metadata/collection/library `DataChanged` listener and made the refresh dispatcher-safe for notifications coming from background threads.
+- Applied external cached AI tags back to cached search/ranking cards when the card has no local movie record, so no-source external detail tags can refresh after returning.
+- Strengthened the static token-level page/card shadow resources while keeping them as static resources, not dynamic resources.
+
+Not done:
+- No dynamic shadow rollback, movie-detail tag tooltip change, recommendation algorithm change, scan behavior change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `rg -n "StaticResource Shadow(LargeCard|InlineCard|ScoreBadge|ScanProgressIndicator)|DynamicResource Shadow(LargeCard|InlineCard|ScoreBadge|ScanProgressIndicator)" src/MediaLibrary.App -S` returned no remaining old static/dynamic page-card shadow effect references.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Running WPF visual QA is still recommended for exact star contrast on bright posters and the perceived static glow strength in both themes.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Favorite And Discovery Tag Refresh Follow-up
+
+Goal:
+- Fix Favorites poster tag data source, Movie Discovery ranking tag refresh after returning from detail, and static shadow visibility in dark theme without reverting to dynamic shadow resources.
+
+Completed:
+- Hydrated Favorites collection movie items from the matching local `Movies` record for `GenresText`, `AiTagsText`, `EmotionTagsText` and `SceneTagsText`, so favorite/want cards no longer display placeholder collection tags when the corresponding movie has real tags.
+- Kept Favorites movie poster tag display aligned with Media Library's round-robin type / emotion / scene strategy, and made TV-season favorites use a single tag line like Media Library non-movie cards.
+- Added local movie tag fields to discovery status resolution and stopped discovery movie cards from clearing emotion/scene tags when local status is applied.
+- Added Movie Discovery `DataChanged` handling for cached search and ranking movie cards; metadata/collection/library changes now re-resolve local status and reload local movie detail tags when returning from the detail page.
+- Kept page/card shadows static and repointed static shadow usages to fixed token-level resources so dark theme retains visible glow/shadow without dynamic resource reload cost.
+
+Not done:
+- No dynamic shadow rollback, movie-detail tag tooltip change, recommendation algorithm change, scan behavior change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `rg -n "StaticResource Shadow(LargeCard|InlineCard|ScoreBadge|ScanProgressIndicator)|DynamicResource Shadow(LargeCard|InlineCard|ScoreBadge|ScanProgressIndicator)" src/MediaLibrary.App -S` returned no remaining old static/dynamic page-card shadow effect references.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Running WPF visual QA is still recommended for exact dark-theme shadow strength and the return-from-detail tag refresh path on real local data.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Favorites Tags And Static Shadow Follow-up
+
+Goal:
+- Fix favorite-card tag rotation, grouped tag tooltips and page-card shadow resource overhead without changing media-library semantics.
+
+Completed:
+- Updated Favorites poster tags to use the same round-robin type / emotion / scene selection strategy as Media Library, so short poster lines give each tag category a chance to appear before overflow.
+- Added grouped three-line tooltip text for type / emotion / scene tags in Favorites, Media Library, Movie Discovery, Watch History, Home AI recommendation tags, recommendation cards and Watch Insights taste-combination chips.
+- Preserved the trimmed-only tooltip rule for those grouped tag tooltips through `OnlyWhenVisibleTextTruncated`, so the grouped tooltip only appears when the visible tag text is explicitly overflowed or visually ellipsized.
+- Kept Movie Detail tag chips without added tooltip behavior per product feedback.
+- Changed fixed page/card/component shadow effects from dynamic shadow resources to static shadow resources while retaining theme-specific light and dark shadow resource values.
+
+Not done:
+- No movie-detail tag tooltip change, recommendation algorithm change, media-library semantics change, scan behavior change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `rg -n 'DynamicResource Shadow' src/MediaLibrary.App -S` returned no remaining dynamic shadow effect usages.
+- Verified by search that Movie Detail tag chip bindings did not receive the grouped tag tooltip behavior.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Visual QA in the running WPF app is still recommended for exact tooltip trigger behavior on visually ellipsized tag text and perceived dark-theme scroll smoothness.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Tag Color Rollback And Summary Wheel Follow-up
+
+Goal:
+- Address the latest narrow UI feedback for movie-detail tag colors, watch-profile summary wheel handling and dark-theme season target highlight tone without changing business behavior.
+
+Completed:
+- Restored the movie-detail tag row labels to the original muted label color and changed tag chip text back to the same `BodyTextStyle` color family used by movie information values.
+- Kept `IsUnidentifiedMovie` as a read-only UI state and used it to move only unrecognized movie tag rows down by 1px.
+- Updated watch-profile summary wheel handling so it forwards the wheel to the outer page when the summary content does not truly need internal scrolling.
+- Shifted the dark-theme season target episode highlight back to a brighter non-black rose tone with a softer pink border.
+
+Not done:
+- No navigation behavior, scan behavior, media-library semantics, database schema, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Visual QA in the running WPF app is still recommended for exact tag contrast, summary wheel pass-through and dark-theme target highlight tone.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Rating Divider, Tooltip And Season Highlight Follow-up
+
+Goal:
+- Address the reported detail-page rating divider, movie tag spacing, shell title, tooltip shadow, watch-insight status and season target highlight issues without changing business behavior.
+
+Completed:
+- Added theme-specific `BrushRatingCardDivider` and unified movie, series, season and episode detail rating-card vertical dividers through `RatingCardDividerStyle`.
+- Tightened movie-detail tag card padding, chip margins and title-to-first-row spacing; tag rows now use equal vertical regions so unrecognized movie tag rows distribute more evenly.
+- Moved the expanded shell brand text another 1px left.
+- Removed the tooltip drop shadow that produced a square dark corner outside the rounded tooltip border.
+- Made Watch Insights profile/statistics refresh status text fixed-width, right-aligned and non-ellipsized with a fixed gap before the refresh button.
+- Replaced season-detail target episode highlighting with theme-specific soft background and border colors for both light and dark themes.
+
+Not done:
+- No ViewModel behavior, navigation behavior, scan behavior, database schema, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Visual QA in the running WPF app is still recommended for exact divider contrast, tag row distribution and target episode highlight tone in both themes.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Episode, Scan Log And Tooltip Correction Follow-up
+
+Goal:
+- Correct the latest UI polish feedback for episode detail alignment, scan-log card spacing, tooltips, tag outlines and paragraph line-height rollback without changing business behavior.
+
+Completed:
+- Kept the episode-detail information area in its reduced-gap position while aligning the episode poster left edge with the playback-source card left edge.
+- Added trimmed-only tooltips to episode single-info fields through the existing trimmed-text tooltip behavior.
+- Centered recent scan-log cards horizontally inside the scan-record card, made them slightly wider than the previous asymmetric layout and preserved shadow drawing room.
+- Added a theme-specific movie-detail tag border resource so dark theme tag chips use a thin white outline while light theme keeps the standard border color.
+- Moved the expanded shell brand text another 1px left.
+- Reverted the previous global large-paragraph line-height increase while keeping the watch-profile summary scroll containment behavior.
+- Adjusted tooltip theme colors so light theme uses a light tooltip surface, and tightened tooltip vertical padding/line layout for more even top and bottom spacing.
+
+Not done:
+- No service behavior, scan behavior, media-library semantics, database schema, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Visual QA in the running WPF app is still recommended for exact poster/source-card alignment, scan-log glow clipping and tooltip top/bottom optical spacing.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Home, Filter Menu And Tooltip Polish Follow-up
+
+Goal:
+- Address the reported home layout, selected filter menu, paragraph rhythm and tooltip polish issues without changing business behavior.
+
+Completed:
+- Added selected-state color feedback to media-library and movie-discovery dropdown menus by marking the currently active menu item as checked after each popup opens.
+- Aligned Home card header spacing for library preview, continue watching and recently added, and added poster-style lift feedback to the four library-preview metric cards.
+- Nudged the expanded shell brand text left by 1px.
+- Increased body and long-summary line height for large paragraphs.
+- Reworked the global tooltip surface for theme-aware border/glow, faster 0.2s hover delay and wrapped string content when long text exceeds the tooltip width.
+
+Not done:
+- No ViewModel behavior beyond exposing the active movie-search sort label, no service behavior, database schema, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Visual QA in the running WPF app is still recommended for exact header alignment, lift distance and tooltip wrapping width on different DPI settings.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Detail, Scan, Search And Insights UI Follow-up
+
+Goal:
+- Address the reported UI polish issues in episode detail, scan tasks, movie search, watch insights and movie detail tags without changing business behavior.
+
+Completed:
+- Moved the episode detail hero information area left by reducing the poster-side reserved width; the right-side single-episode information card and rightmost correction button stay anchored while the action-button gaps remain equal.
+- Added explicit scan-record card glow and extra list gutter so each scan-record card has drawing room for its shadow.
+- Updated WebDAV path, local path and scan-record nested wheel handling so an overflowed inner list absorbs wheel events while hovered, including at the top or bottom edge.
+- Aligned movie-search list item background with the media-library list color resource.
+- Added the same overflow-only wheel containment to the watch-profile summary text.
+- Added glow to movie-detail tag chips and vertically centered tag rows against their labels.
+
+Not done:
+- No ViewModel, service, database schema, migration, database update, scan semantics, media-library state semantics, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Visual QA in the running WPF app is still recommended for exact spacing and glow strength on different window sizes.
+- Noise: Existing unrelated working-tree changes remain present in this branch.
+
+## 2026-06-12 - Scoped Popup, Poster Badge And Scan Tasks Follow-up
+
+Goal:
+- Finish the user-reported Phase 7.7g visual fixes without widening the scope to unrelated buttons, popups or business behavior.
+
+Completed:
+- Confirmed WebDAV configuration has no standalone vertical divider and kept the local configuration divider unchanged.
+- Adjusted the Scan Tasks shadow-safe gutter and column minimum widths so scan-record cards keep symmetric visible spacing and have more glow drawing room.
+- Strengthened dark-theme large-card glow with a half-step rollback from the strongest setting, and made dark glass large-card surfaces more opaque to reduce the black rectangular underlay feel.
+- Thickened only the poster top-right filled want/favorite outline in Movie Discovery and Favorites.
+- Kept the removed-library popup, custom preference popup and correction-dialog masks transparent; disabled clipping on the custom preference panel to avoid rectangular shadow residue.
+- Updated correction dialogs with a glass large-card shell, shadow-safe content gutter, unclipped inline content card and shadowed correction source dropdowns.
+
+Not done:
+- No scan behavior, WebDAV/local path semantics, correction service behavior, recommendation behavior, database schema, migration, database update, commit, or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gPopupCorrections\"` passed with 0 warnings and 0 errors; temporary build output was removed after success.
+
 ## 2026-06-11 - Scan Tasks Shadow-safe Layout Correction
 
 Goal:
@@ -1022,3 +1306,223 @@ Known Issues:
 - Blocker: None.
 - Deferred: Manual visual acceptance is still needed for the new paging timeout duration and failure text under disconnected-network conditions.
 - Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.
+
+## Bottom Edge And Scroll-Driven Corner Follow-up
+
+Completed:
+
+- Removed the fixed bottom viewport edge on watch history, watch insights, favorites, scan tasks, and API configuration by extending each affected scroll root to the page bottom instead of stopping at the shell content margin.
+- Added reusable `ScrollDrivenBottomCornerBehavior` as a WPF attached behavior for large content cards.
+- Applied the scroll-driven bottom-corner behavior to movie discovery search results, movie discovery rankings, and the media library content body.
+- Split correction dialog combo box styling so correction-target dropdowns stay flat while playback-source dropdowns keep the elevated shadow.
+- Removed the always-visible media library batch toolbar cancel button; the running AI identification cancel action remains on the batch-selection toggle while the operation is cancellable.
+- Added theme-specific selected-dot brushes so selected batch dots are light in light theme and dark in dark theme.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No full runtime screenshot sweep was performed in this pass; visual acceptance is still manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff was checked and remained empty.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for the bottom-edge removal and scroll-driven corner transition on real long lists.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Pointer Cursors And Tooltip Follow-up
+
+Completed:
+
+- Added hand cursors to shell navigation items, the sidebar collapse button, and the account menu button.
+- Narrowed ranking detail navigation so only posters and primary titles open movie or TV details; ranking date, director, cast, and overview text no longer trigger detail navigation.
+- Removed the broad hand cursor from favorites poster cards while keeping the existing card click behavior.
+- Added hand cursors to media-library poster cards and list rows to match their existing open or batch-select click behavior.
+- Expanded the about row hover background to the full row width, aligned its hover color with the accent theme brush, and removed its tooltip.
+- Removed tooltips from movie discovery search and ranking pager buttons, removed the movie search input tooltip, and changed the home AI status tooltip to only appear on visually trimmed status lines.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No runtime screenshot sweep was performed in this pass; cursor and hover acceptance remains manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Targeted `rg` checks confirmed the removed pager/search/about/home status tooltips no longer exist at the requested call sites.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for pointer cursors, ranking click targets, and about-row hover width in both themes.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Dropdown Poster Progress And Scroll Clipping Follow-up
+
+Completed:
+
+- Removed elevated popup shadows from media-library filter menus, AI recommendation filter menus, and correction-target combo dropdown popups to match the flat movie-search dropdown visual.
+- Kept the correction-dialog playback-source combo elevation behavior unchanged.
+- Aligned favorites poster bottom metadata with the movie-search poster tag grouping: genre/display tags, emotion tags, and scene tags now drive the three visible poster tag groups.
+- Added TV season air date propagation into collection favorites items so favorite season cards can show a season date when movie-search-style fields do not exist.
+- Aligned favorites poster rating badge placement with the movie-search rating badge by right-aligning the badge inside the poster overlay.
+- Added theme-aware stroke and glow to ranking score badges.
+- Added theme-aware track stroke plus animated indicator stroke/glow to the scan-task top scan progress bar only; realtime progress bars were not changed.
+- Increased scan progress animation speed and cached the animated indicator to reduce the low-frame-rate feel while scanning.
+- Fixed scan-task and API configuration scroll roots so scrolled cards are clipped below the title or tab area instead of drawing through it.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No runtime screenshot sweep was performed in this pass; dropdown, poster, glow, and clipping acceptance remains manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Targeted `rg` checks confirmed the removed popup shadow bindings and old favorites tag helper references are absent at the requested call sites.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for dropdown corners, favorites poster metadata, scan progress smoothness, and scroll clipping in both light and dark themes.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Home Continue Watching Spacing Follow-up
+
+Completed:
+
+- Reduced the visible gap between the home "Continue Watching" title row and poster top from 3 to 2 layout pixels, using `x = 1`.
+- Reduced the home "Continue Watching" row height by `y = 12` and moved that height to the "Recently Added" row so the lower section grows upward while its bottom edge stays fixed.
+- Re-anchored the "Continue Watching" right-side navigation button to the poster content row with a fixed top offset so it remains vertically centered against the 237px posters after the row-height adjustment.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No runtime screenshot sweep was performed in this pass; home-page spacing acceptance remains manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for the home "Continue Watching" and "Recently Added" spacing on the target window sizes.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## User Profile Dialog Refresh Follow-up
+
+Completed:
+
+- Reworked the user profile dialog as a transparent rounded dialog surface so the old rectangular outside background no longer appears.
+- Added shadow-safe inner profile cards with inline glow/shadow and enough outer drawing room to avoid clipping.
+- Replaced the placeholder `XF` mark with the same vector logo geometry used by the app shell.
+- Enlarged and right-aligned the close button, matching the header title vertical center and the inner-card right edge.
+- Split the body into an avatar card and a basic-information card; removed the local-profile badges and promoted the user name to the dialog title size.
+- Replaced the text edit/save button with a pure icon edit button that switches to a pure check icon while editing.
+- Removed the bottom status banner plus cancel/done buttons, making the dialog shorter and content-driven.
+- Added local persistent user-profile storage for name, account, phone, email, gender, age, signature, and avatar path through a JSON-backed app profile service; no database schema was changed.
+- Wired the main shell account area to the same user-profile service so saved profile name/avatar data is reflected outside the dialog.
+- Swapped email and signature positions, tightened input heights, constrained signature editing to the two-line display budget, and added avatar remove/add editing with desktop-start file picker and center circular crop.
+- Added bottom-centered transient profile toasts aligned with the movie-search toast pattern: green for saved/no-change success, yellow for local warnings, red for save failures.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, login backend, cloud account, or sync behavior was changed.
+- No runtime screenshot sweep was performed in this pass; profile dialog visual acceptance remains manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Targeted `rg` checks confirmed the old profile draft class, bottom button row, cancel/done handlers, and bottom status banner are absent from the profile dialog.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for profile dialog shadows, avatar editing, toast placement, and exact compact dialog height in both themes.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Scroll Corner And Shell UI Follow-up
+
+Completed:
+
+- Updated the scroll-driven bottom-corner behavior to refresh synchronously on load, avoiding the visible full-corner to square-corner transition when entering media-library, movie-search, and ranking surfaces.
+- Added bottom breathing room to the media-library, movie-search, and ranking content cards so restored bottom corners are not clipped at the page edge when scrolled to the end.
+- Brightened the dark-theme media-library batch-selection selected dot.
+- Simplified the shell avatar popup toggle path so clicking the avatar button again closes the popup, and removed the popup shadow that produced dark corner artifacts.
+- Limited the favorites poster hand cursor and open command to the poster visual layer instead of the outer item surface.
+- Constrained the settings about row to the content column so its hover highlight and top divider no longer extend toward the sidebar.
+- Increased the visible text area inside movie-search and media-library search boxes without increasing the input height.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No runtime screenshot sweep was performed in this pass; visual acceptance remains manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff was checked and remained empty.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for the scroll-corner bottom state, dark-theme selection dot contrast, avatar popup corners/toggle, favorites cursor hit area, settings about row clipping, and search input descenders in both themes.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## AI Tag Refresh And Fallback Follow-up
+
+Completed:
+
+- Changed movie AI tag prompts to request 2 to 4 tags per type, emotion, and scene category while still accepting fewer without local supplementation.
+- Centralized AI tag result handling so extra tags are trimmed, missing emotion/scene results become `-`, and missing type results fall back to TMDB/source type tags before `-`.
+- Removed the old local overview-based emotion/scene backfill from movie classification and recommendation candidate tag handling.
+- Moved detail-page auto classification to background work that survives navigating back to movie search or rankings, then notifies metadata refresh when tags are written.
+- Relaxed and corrected external movie tag caching so completed placeholder results are cached and partial old cache entries can still trigger a new classification.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No live AI request was executed in this pass; AI response behavior remains dependent on runtime provider availability.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only existing LF-to-CRLF warnings were reported.
+- Migration diff was checked and remained empty.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual runtime acceptance is still needed for search/ranking return flows after a real AI classification completes.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Scroll Corner And Menu Polish Follow-up
+
+Completed:
+
+- Changed the scroll-driven bottom-corner behavior to keep its visual state across page unload/reload and to interpolate bottom radius and bottom margin based on distance from the scroll bottom.
+- Treated no-scroll/empty states as bottom states so media-library, movie-search, and ranking cards keep bottom rounding and breathing room when no content is present.
+- Added bottom scroll padding for media-library poster/list layouts and movie-search poster results so card bottoms and search pagers no longer cover the final content row.
+- Hardened the shell avatar popup toggle so a button click that closes the popup is not immediately interpreted as a new open action.
+- Limited the favorites card click hand area to the poster hit region and made the bottom metadata area use the normal arrow cursor.
+- Shifted the settings about-row chrome left edge inward by 0.5px.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No runtime screenshot sweep was performed in this pass; visual acceptance remains manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for bottom-corner transitions, search pager spacing, avatar menu toggle behavior, favorites cursor hit area, and the about-row 0.5px inset.
+- Noise: Existing adjacent UI follow-up changes remain in the working tree.

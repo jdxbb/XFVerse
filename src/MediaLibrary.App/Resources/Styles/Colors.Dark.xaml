@@ -6,6 +6,7 @@
     <Color x:Key="ColorSidebarRightBorder">#24FFFFFF</Color>
     <Color x:Key="ColorRatingStarStroke">#F2FFFFFF</Color>
     <Color x:Key="ColorRatingStarFill">#D99AAF</Color>
+    <Color x:Key="ColorRatingCardDivider">#73FFFFFF</Color>
     <Color x:Key="ColorWatchProgressFill">#7CCBFF</Color>
     <Color x:Key="ColorTopBar">#22242A</Color>
     <Color x:Key="ColorSurface">#292B31</Color>
@@ -15,6 +16,9 @@
     <Color x:Key="ColorCard">#2C2E35</Color>
     <Color x:Key="ColorCompactCard">#383B43</Color>
     <Color x:Key="ColorBorder">#4D515B</Color>
+    <Color x:Key="ColorMovieDetailTagBorder">#78FFFFFF</Color>
+    <Color x:Key="ColorSeasonEpisodeTargetBackground">#6A4D60</Color>
+    <Color x:Key="ColorSeasonEpisodeTargetBorder">#B3E4AABD</Color>
     <Color x:Key="ColorDivider">#41454E</Color>
     <Color x:Key="ColorAccent">#D99AAF</Color>
     <Color x:Key="ColorAccentHover">#E4AABD</Color>
@@ -89,6 +93,8 @@
     <Color x:Key="ColorScanRunningForeground">#B2C8E6</Color>
     <Color x:Key="ColorScanRunningBackground">#293648</Color>
     <Color x:Key="ColorScanRunningBorder">#5A6E89</Color>
+    <Color x:Key="ColorScoreBadgeGlow">#DDF7FBFF</Color>
+    <Color x:Key="ColorScanProgressGlow">#D0B2C8E6</Color>
 
     <SolidColorBrush x:Key="BrushBackground" Color="{StaticResource ColorBackground}" />
     <SolidColorBrush x:Key="BrushBackgroundAccent" Color="{StaticResource ColorBackgroundAccent}" />
@@ -96,6 +102,7 @@
     <SolidColorBrush x:Key="BrushSidebarRightBorder" Color="{StaticResource ColorSidebarRightBorder}" />
     <SolidColorBrush x:Key="BrushRatingStarStroke" Color="{StaticResource ColorRatingStarStroke}" />
     <SolidColorBrush x:Key="BrushRatingStarFill" Color="{StaticResource ColorRatingStarFill}" />
+    <SolidColorBrush x:Key="BrushRatingCardDivider" Color="{StaticResource ColorRatingCardDivider}" />
     <SolidColorBrush x:Key="BrushWatchProgressFill" Color="{StaticResource ColorWatchProgressFill}" />
     <SolidColorBrush x:Key="BrushTopBar" Color="{StaticResource ColorTopBar}" />
     <SolidColorBrush x:Key="BrushSurface" Color="{StaticResource ColorSurface}" />
@@ -105,6 +112,9 @@
     <SolidColorBrush x:Key="BrushCard" Color="{StaticResource ColorCard}" />
     <SolidColorBrush x:Key="BrushCompactCard" Color="{StaticResource ColorCompactCard}" />
     <SolidColorBrush x:Key="BrushBorder" Color="{StaticResource ColorBorder}" />
+    <SolidColorBrush x:Key="BrushMovieDetailTagBorder" Color="{StaticResource ColorMovieDetailTagBorder}" />
+    <SolidColorBrush x:Key="BrushSeasonEpisodeTargetBackground" Color="{StaticResource ColorSeasonEpisodeTargetBackground}" />
+    <SolidColorBrush x:Key="BrushSeasonEpisodeTargetBorder" Color="{StaticResource ColorSeasonEpisodeTargetBorder}" />
     <SolidColorBrush x:Key="BrushDivider" Color="{StaticResource ColorDivider}" />
     <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
     <SolidColorBrush x:Key="BrushAccentHover" Color="{StaticResource ColorAccentHover}" />
@@ -139,6 +149,8 @@
     <SolidColorBrush x:Key="BrushScrim" Color="{StaticResource ColorScrim}" />
     <SolidColorBrush x:Key="BrushFocusRing" Color="{StaticResource ColorFocusRing}" />
     <SolidColorBrush x:Key="BrushSelection" Color="{StaticResource ColorSelection}" />
+    <SolidColorBrush x:Key="BrushSelectionDotSelectedBackground" Color="#D99AAF" />
+    <SolidColorBrush x:Key="BrushSelectionDotSelectedBorder" Color="#F2E4AABD" />
     <SolidColorBrush x:Key="BrushHoverBackground" Color="{StaticResource ColorHoverBackground}" />
     <SolidColorBrush x:Key="BrushPressedBackground" Color="{StaticResource ColorPressedBackground}" />
     <SolidColorBrush x:Key="BrushInputBackground" Color="{StaticResource ColorInputBackground}" />
@@ -187,16 +199,16 @@
     </LinearGradientBrush>
 
     <LinearGradientBrush x:Key="BrushGlassSurface" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#E0454750" Offset="0" />
-        <GradientStop Color="#D43A3D46" Offset="0.24" />
-        <GradientStop Color="#C93F414A" Offset="0.62" />
-        <GradientStop Color="#BC4A4650" Offset="1" />
+        <GradientStop Color="#F04A4D56" Offset="0" />
+        <GradientStop Color="#EA42454F" Offset="0.24" />
+        <GradientStop Color="#E34A4C56" Offset="0.62" />
+        <GradientStop Color="#DB54505A" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassSurfaceAlt" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#D350535C" Offset="0" />
-        <GradientStop Color="#C7434650" Offset="0.24" />
-        <GradientStop Color="#BA494A54" Offset="0.62" />
-        <GradientStop Color="#AD55515C" Offset="1" />
+        <GradientStop Color="#E8575A64" Offset="0" />
+        <GradientStop Color="#DF4A4D57" Offset="0.24" />
+        <GradientStop Color="#D653555F" Offset="0.62" />
+        <GradientStop Color="#CC5C5863" Offset="1" />
     </LinearGradientBrush>
     <SolidColorBrush x:Key="BrushGlassBorder" Color="#8AC5CAD3" />
     <LinearGradientBrush x:Key="BrushGlassButton" StartPoint="0,0" EndPoint="1,1">
@@ -228,9 +240,9 @@
         <GradientStop Color="#8F6E4757" Offset="1" />
     </LinearGradientBrush>
     <DropShadowEffect x:Key="ShadowLargeCard"
-                      BlurRadius="42"
+                      BlurRadius="45"
                       Direction="270"
-                      Opacity="0.28"
+                      Opacity="0.32"
                       ShadowDepth="0"
                       RenderingBias="Quality"
                       Color="#F7FBFF" />
@@ -241,4 +253,18 @@
                       ShadowDepth="0"
                       RenderingBias="Quality"
                       Color="#F7FBFF" />
+    <DropShadowEffect x:Key="ShadowScoreBadge"
+                      BlurRadius="16"
+                      Direction="270"
+                      Opacity="0.42"
+                      ShadowDepth="0"
+                      RenderingBias="Quality"
+                      Color="{StaticResource ColorScoreBadgeGlow}" />
+    <DropShadowEffect x:Key="ShadowScanProgressIndicator"
+                      BlurRadius="16"
+                      Direction="270"
+                      Opacity="0.46"
+                      ShadowDepth="0"
+                      RenderingBias="Quality"
+                      Color="{StaticResource ColorScanProgressGlow}" />
 </ResourceDictionary>

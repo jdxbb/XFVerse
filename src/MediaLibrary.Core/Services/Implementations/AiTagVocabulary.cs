@@ -2,6 +2,10 @@ namespace MediaLibrary.Core.Services.Implementations;
 
 internal static class AiTagVocabulary
 {
+    public const int MinTagsPerCategory = 2;
+    public const int MaxTagsPerCategory = 4;
+    public const string MissingTagPlaceholder = "-";
+
     public static readonly string[] TypeTags =
     [
         "动作", "冒险", "动画", "喜剧", "犯罪", "纪录片", "剧情", "家庭", "奇幻", "历史",
@@ -75,7 +79,10 @@ internal static class AiTagVocabulary
         ["伤感"] = "感动"
     };
 
-    public static IReadOnlyList<string> Filter(IEnumerable<string> tags, IReadOnlyCollection<string> allowedTags, int take = 4)
+    public static IReadOnlyList<string> Filter(
+        IEnumerable<string> tags,
+        IReadOnlyCollection<string> allowedTags,
+        int take = MaxTagsPerCategory)
     {
         var allowed = allowedTags.ToHashSet(StringComparer.OrdinalIgnoreCase);
         return tags
@@ -96,7 +103,7 @@ internal static class AiTagVocabulary
 
         var picked = allowedTags
             .Where(tag => text.Contains(tag, StringComparison.OrdinalIgnoreCase))
-            .Take(4)
+            .Take(MaxTagsPerCategory)
             .ToList();
 
         if (picked.Count > 0)
@@ -109,7 +116,7 @@ internal static class AiTagVocabulary
             .Select(alias => alias.Value)
             .Where(tag => allowedTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
+            .Take(MaxTagsPerCategory)
             .ToList();
 
         return aliasPicked.Count > 0 ? aliasPicked : fallback;
@@ -119,8 +126,13 @@ internal static class AiTagVocabulary
         string? text,
         IReadOnlyCollection<string> allowedTags,
         IReadOnlyList<string>? fallback = null,
-        int take = 4)
+        int take = MaxTagsPerCategory)
     {
+        if (string.Equals(text?.Trim(), MissingTagPlaceholder, StringComparison.Ordinal))
+        {
+            return MissingTagPlaceholder;
+        }
+
         var tags = SplitTags(text);
         var filtered = Filter(tags, allowedTags, take);
         if (filtered.Count > 0)

@@ -1765,14 +1765,14 @@ public sealed class RecommendationService : IRecommendationService
 类型标签：{{string.Join("、", AiTagVocabulary.TypeTags)}}
 情绪标签：{{string.Join("、", AiTagVocabulary.EmotionTags)}}
 观看场景：{{string.Join("、", AiTagVocabulary.SceneTags)}}
-每类标签选择 1 到 4 个，不允许输出词表外标签。
+每类标签选择 2 到 4 个，不允许输出词表外标签；如果某类无法判断，可以少于 2 个或返回空数组。
 推荐理由只能引用“用户偏好依据”中的已看影片、喜爱影片、想看影片、自定义偏好或未来用户画像；当前没有用户画像时不要假设画像。
 推荐理由不能引用未看且未喜爱的普通片库影片、仅因为存在于资源库中的影片、未识别影片、识别失败占位影片。
 禁止写“因为它和你资源库中的某某影片相似”“根据你片库里的某某影片”；除非影片明确出现在喜爱或想看中，否则不要写“你收藏了某某影片”；除非影片明确出现在已看中，否则不要写“你看过某某影片”。
 不要把片库上下文中的普通未标记影片当作用户偏好依据，也不要在推荐理由中引用普通未标记片库影片。
 {{route.StrategyInstruction}}
 只返回 JSON 数组，不要解释：
-[{"title":"中文片名","originalTitle":"英文名或原名","year":2001,"reason":"推荐理由，70到130个中文字符；只能基于已看、喜爱、想看、自定义偏好或用户画像；不得引用普通未标记片库影片作为偏好依据","aiTags":["剧情"],"emotionTags":["温暖"],"sceneTags":["深夜"]}]
+[{"title":"中文片名","originalTitle":"英文名或原名","year":2001,"reason":"推荐理由，70到130个中文字符；只能基于已看、喜爱、想看、自定义偏好或用户画像；不得引用普通未标记片库影片作为偏好依据","aiTags":["剧情","悬疑"],"emotionTags":["温暖","思考向"],"sceneTags":["独自观看","周末"]}]
 """;
         AiPerfDiagnostics.WriteEvent(
             $"event=recommendation-prompt-estimated-length route={route.Code} chars={userPrompt.Length}");
@@ -2245,38 +2245,25 @@ public sealed class RecommendationService : IRecommendationService
         {
             item.Tags = string.Join("、", aiTags);
         }
-        else if (string.IsNullOrWhiteSpace(item.Tags))
+        else
         {
-            item.Tags = "剧情";
+            item.Tags = BuildAllowedTagsText(item.Tags);
         }
 
         item.EmotionTagsText = emotionTags.Count > 0
             ? string.Join("、", emotionTags)
-            : InferEmotionTags(item.Overview);
+            : AiTagVocabulary.MissingTagPlaceholder;
         item.SceneTagsText = sceneTags.Count > 0
             ? string.Join("、", sceneTags)
-            : "深夜";
+            : AiTagVocabulary.MissingTagPlaceholder;
     }
 
     private static string BuildAllowedTagsText(string? genresText)
     {
-        return string.Join("、", AiTagVocabulary.PickFromText(genresText, AiTagVocabulary.TypeTags, ["剧情"]));
-    }
-
-    private static string InferEmotionTags(string? overview)
-    {
-        var text = overview ?? string.Empty;
-        if (text.Contains("魔法", StringComparison.OrdinalIgnoreCase))
-        {
-            return "温暖、梦幻";
-        }
-
-        if (text.Contains("犯罪", StringComparison.OrdinalIgnoreCase) || text.Contains("悬疑", StringComparison.OrdinalIgnoreCase))
-        {
-            return "紧张、悬疑";
-        }
-
-        return "思考向";
+        var normalized = AiTagVocabulary.NormalizeText(genresText, AiTagVocabulary.TypeTags);
+        return string.IsNullOrWhiteSpace(normalized)
+            ? AiTagVocabulary.MissingTagPlaceholder
+            : normalized;
     }
 
     private static LibraryRecommendationMovie? FindLibraryMatch(
@@ -2872,10 +2859,20 @@ public sealed class RecommendationService : IRecommendationService
     {
         foreach (var item in items)
         {
-            item.Tags = AiTagVocabulary.NormalizeText(item.Tags, AiTagVocabulary.TypeTags, ["剧情"]);
-            item.EmotionTagsText = AiTagVocabulary.NormalizeText(item.EmotionTagsText, AiTagVocabulary.EmotionTags);
-            item.SceneTagsText = AiTagVocabulary.NormalizeText(item.SceneTagsText, AiTagVocabulary.SceneTags);
+            item.Tags = NormalizeTagTextOrPlaceholder(item.Tags, AiTagVocabulary.TypeTags);
+            item.EmotionTagsText = NormalizeTagTextOrPlaceholder(item.EmotionTagsText, AiTagVocabulary.EmotionTags);
+            item.SceneTagsText = NormalizeTagTextOrPlaceholder(item.SceneTagsText, AiTagVocabulary.SceneTags);
         }
+    }
+
+    private static string NormalizeTagTextOrPlaceholder(
+        string? text,
+        IReadOnlyCollection<string> allowedTags)
+    {
+        var normalized = AiTagVocabulary.NormalizeText(text, allowedTags);
+        return string.IsNullOrWhiteSpace(normalized)
+            ? AiTagVocabulary.MissingTagPlaceholder
+            : normalized;
     }
 
     private static List<AiRecommendationItem> FilterSafeRecommendationItems(

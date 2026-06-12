@@ -2347,7 +2347,27 @@ public sealed record TasteCombinationRankItem(
 
     public string SceneLabel => SplitCombinationLabel(2);
 
+    public string TagToolTipText => BuildGroupedTagToolTipText();
+
     public string OccurrenceText => $"出现 {ExtractLeadingNumber(CountText)} 次";
+
+    private string BuildGroupedTagToolTipText()
+    {
+        var lines = new[]
+        {
+            FormatToolTipLine("类型", TypeLabel),
+            FormatToolTipLine("情绪", EmotionLabel),
+            FormatToolTipLine("场景", SceneLabel)
+        };
+
+        var tooltip = string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)));
+        return string.IsNullOrWhiteSpace(tooltip) ? Label : tooltip;
+    }
+
+    private static string FormatToolTipLine(string label, string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : $"{label}: {value.Trim()}";
+    }
 
     private string SplitCombinationLabel(int index)
     {

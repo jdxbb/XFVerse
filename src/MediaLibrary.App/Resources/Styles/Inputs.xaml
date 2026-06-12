@@ -26,6 +26,7 @@
         <Setter Property="FocusVisualStyle" Value="{StaticResource InputFocusVisualStyle}" />
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -36,7 +37,9 @@
                             CornerRadius="{StaticResource RadiusInput}"
                             Padding="{TemplateBinding Padding}">
                         <Grid>
-                            <ScrollViewer x:Name="PART_ContentHost" />
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="0,-1"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                             <TextBlock x:Name="PlaceholderText"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource BrushForegroundMuted}"
@@ -277,6 +280,12 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="CorrectionDialogPlaybackSourceComboBoxStyle"
+           TargetType="ComboBox"
+           BasedOn="{StaticResource CorrectionDialogComboBoxStyle}">
+        <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
     </Style>
 
     <Style x:Key="CheckBoxStyle" TargetType="CheckBox">

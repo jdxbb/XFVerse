@@ -81,6 +81,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                         Title = title,
                         OriginalTitle = season?.OriginalSeriesName ?? item.OriginalSeriesTitle,
                         ReleaseYear = season?.AirYear ?? item.FirstAirYear,
+                        ReleaseDate = season?.AirDate ?? item.AirDate,
                         PosterRemoteUrl = FirstNonEmpty(season?.SeasonPosterRemoteUrl, item.PosterRemoteUrl, season?.SeriesPosterRemoteUrl),
                         Overview = FirstNonEmpty(season?.SeasonOverview, item.Overview),
                         GenresText = FirstNonEmpty(season?.GenresText, item.GenresText),
@@ -1005,6 +1006,7 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
                     SeriesPosterRemoteUrl = x.Series.PosterRemoteUrl ?? string.Empty,
                     SeasonOverview = x.Overview ?? string.Empty,
                     GenresText = x.Series.GenresText ?? string.Empty,
+                    AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.Series.TmdbSeriesId == null && x.IdentificationStatus == IdentificationStatus.Failed
                         ? null
@@ -1117,6 +1119,8 @@ public sealed class TvSeasonCollectionService : ITvSeasonCollectionService
         public string SeasonOverview { get; set; } = string.Empty;
 
         public string GenresText { get; set; } = string.Empty;
+
+        public DateTime? AirDate { get; set; }
 
         public int? AirYear { get; set; }
 

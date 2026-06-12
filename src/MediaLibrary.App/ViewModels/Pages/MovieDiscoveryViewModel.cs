@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Discovery;
 using MediaLibrary.App.Models.Enums;
+using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
 using MediaLibrary.Core.Diagnostics;
@@ -186,6 +188,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private readonly ITvMetadataHydrationService _tvMetadataHydrationService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IUserCollectionService _userCollectionService;
+    private readonly IMovieDetailQueryService _movieDetailQueryService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IConfirmationDialogService _confirmationDialogService;
@@ -224,6 +227,9 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private string _selectedSearchType = SearchTypeMovieTitle;
     private bool _isSearchPosterLayout = true;
     private bool _isDiscoveryPreferencesLoaded;
+    private bool _isActive;
+    private bool _pendingLocalMovieCardRefresh;
+    private int _localMovieCardRefreshVersion;
     private string _selectedGenreFilter = FilterAll;
     private string _selectedRegionFilter = FilterAll;
     private string _selectedWatchStatusFilter = FilterAll;
@@ -334,6 +340,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         ITvMetadataHydrationService tvMetadataHydrationService,
         ITvSeasonCollectionService tvSeasonCollectionService,
         IUserCollectionService userCollectionService,
+        IMovieDetailQueryService movieDetailQueryService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
         IConfirmationDialogService confirmationDialogService,
@@ -349,6 +356,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _tvMetadataHydrationService = tvMetadataHydrationService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _userCollectionService = userCollectionService;
+        _movieDetailQueryService = movieDetailQueryService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _confirmationDialogService = confirmationDialogService;
@@ -441,10 +449,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         GoPreviousRankingPageCommand = new AsyncRelayCommand(GoPreviousRankingPageAsync, () => CanGoPreviousActiveRankingPage);
         GoNextRankingPageCommand = new AsyncRelayCommand(GoNextRankingPageAsync, () => CanGoNextActiveRankingPage);
         OpenRankingMovieCommand = new AsyncRelayCommand(OpenRankingMovieAsync);
+        OpenRankingItemCommand = new AsyncRelayCommand(OpenRankingItemAsync);
         ToggleRankingWantToWatchCommand = new AsyncRelayCommand(ToggleRankingWantToWatchAsync);
         AddRankingMovieToLibraryCommand = new AsyncRelayCommand(AddRankingMovieToLibraryAsync);
         OpenTvSeriesCommand = new RelayCommand(OpenTvSeries, _ => !IsTvSeriesNavigating);
         AddTvSeriesToLibraryCommand = new AsyncRelayCommand(AddTvSeriesToLibraryAsync);
+        _dataRefreshService.DataChanged += OnDataChanged;
     }
 
     public RecommendationsViewModel AiRecommendationViewModel => _aiRecommendationViewModel;
@@ -629,6 +639,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public AsyncRelayCommand OpenRankingMovieCommand { get; }
 
+    public AsyncRelayCommand OpenRankingItemCommand { get; }
+
     public AsyncRelayCommand ToggleRankingWantToWatchCommand { get; }
 
     public RelayCommand OpenTvSeriesCommand { get; }
@@ -804,6 +816,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public IReadOnlyList<string> ActiveSearchSortOptions => IsTvSearchSelected ? TvSortOptions : SortOptions;
 
+    public string ActiveSelectedSearchSortOption => IsTvSearchSelected ? SelectedTvSortOption : SelectedSortOption;
+
     public string SearchSortOptionButtonText => BuildFilterButtonText(
         "排序",
         IsTvSearchSelected ? SelectedTvSortOption : SelectedSortOption);
@@ -918,6 +932,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             {
                 OnPropertyChanged(nameof(TvSearchSortOptionButtonText));
                 OnPropertyChanged(nameof(SearchSortOptionButtonText));
+                OnPropertyChanged(nameof(ActiveSelectedSearchSortOption));
                 ResetTvSearchFromFilterChange();
             }
         }
@@ -1077,6 +1092,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             if (SetProperty(ref _selectedSortOption, value))
             {
                 OnPropertyChanged(nameof(SearchSortOptionButtonText));
+                OnPropertyChanged(nameof(ActiveSelectedSearchSortOption));
                 ResetSearchFromFilterChange();
             }
         }
@@ -1678,6 +1694,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        _isActive = true;
         await EnsureDiscoveryPreferencesLoadedAsync(cancellationToken);
 
         if (_openAiRecommendationsOnNextActivation)
@@ -1686,6 +1703,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             _hasActivatedDiscoveryPage = true;
             SelectedTabIndex = AiRecommendationTabIndex;
             _ = EnsureAiRecommendationsActivatedAsync();
+            RequestCachedMovieCardRefresh();
             return;
         }
 
@@ -1693,6 +1711,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             _hasActivatedDiscoveryPage = true;
             SelectedTabIndex = SearchTabIndex;
+            RequestCachedMovieCardRefresh();
             return;
         }
 
@@ -1704,14 +1723,62 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         {
             _ = EnsureAiRecommendationsActivatedAsync();
         }
+
+        RequestCachedMovieCardRefresh();
     }
 
     public override void Deactivate()
     {
+        _isActive = false;
         _searchCancellationTokenSource?.Cancel();
         _rankingCancellationTokenSource?.Cancel();
         _hasActivatedAiRecommendations = false;
         _aiRecommendationViewModel.Deactivate();
+    }
+
+    private void OnDataChanged(object? sender, AppDataChangedEventArgs e)
+    {
+        if (!ShouldRefreshMovieCardsForDataChange(e))
+        {
+            return;
+        }
+
+        RequestCachedMovieCardRefresh();
+    }
+
+    private static bool ShouldRefreshMovieCardsForDataChange(AppDataChangedEventArgs e)
+    {
+        return e.LibraryChanged
+               || e.Reason is AppDataChangeReason.MetadataChanged
+                   or AppDataChangeReason.CollectionChanged;
+    }
+
+    private void RefreshPendingLocalMovieCardsIfNeeded()
+    {
+        if (!_pendingLocalMovieCardRefresh)
+        {
+            return;
+        }
+
+        _ = RefreshCachedMovieCardsFromLocalDetailsAsync();
+    }
+
+    private void RequestCachedMovieCardRefresh()
+    {
+        _pendingLocalMovieCardRefresh = true;
+        if (!_isActive)
+        {
+            return;
+        }
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            RefreshPendingLocalMovieCardsIfNeeded();
+            return;
+        }
+
+        _ = dispatcher.InvokeAsync(RefreshPendingLocalMovieCardsIfNeeded);
     }
 
     private void SetSearchLayout(bool isPosterLayout)
@@ -3433,6 +3500,19 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         await OpenDiscoveryMovieAsync(item, message => RankingStatusMessage = message);
     }
 
+    private async Task OpenRankingItemAsync(object? parameter)
+    {
+        switch (parameter)
+        {
+            case DiscoveryMovieCardViewModel movie:
+                await OpenRankingMovieAsync(movie);
+                break;
+            case DiscoveryTvSeriesCardViewModel tvSeries when !IsTvSeriesNavigating:
+                await OpenTvSeriesAsync(tvSeries);
+                break;
+        }
+    }
+
     private void OpenTvSeries(object? parameter)
     {
         if (IsTvSeriesNavigating)
@@ -3806,6 +3886,103 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         else
         {
             item.ApplyMissingStatus();
+        }
+    }
+
+    private async Task RefreshCachedMovieCardsFromLocalDetailsAsync()
+    {
+        _pendingLocalMovieCardRefresh = false;
+        var refreshVersion = ++_localMovieCardRefreshVersion;
+        var items = GetCachedMovieCards();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyDictionary<int, DiscoveryMovieStatus> statuses;
+        try
+        {
+            statuses = await _statusResolver.ResolveAsync(
+                items.Select(item => item.TmdbId).Where(tmdbId => tmdbId > 0).Distinct(),
+                CancellationToken.None);
+        }
+        catch
+        {
+            _pendingLocalMovieCardRefresh = true;
+            return;
+        }
+
+        if (refreshVersion != _localMovieCardRefreshVersion)
+        {
+            return;
+        }
+
+        await DispatchAsync(
+            () =>
+            {
+                foreach (var item in items)
+                {
+                    if (statuses.TryGetValue(item.TmdbId, out var status))
+                    {
+                        item.ApplyStatus(status);
+                    }
+                    else
+                    {
+                        item.ApplyMissingStatus();
+                    }
+                }
+
+                ApplyExternalTagCacheSnapshots(items);
+            });
+
+        var itemsByMovieId = items
+            .Where(item => item.MovieId is > 0)
+            .GroupBy(item => item.MovieId!.Value)
+            .ToArray();
+        foreach (var group in itemsByMovieId)
+        {
+            MovieDetailModel? detail;
+            try
+            {
+                detail = await _movieDetailQueryService.GetMovieDetailAsync(group.Key, CancellationToken.None);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (detail is null || refreshVersion != _localMovieCardRefreshVersion)
+            {
+                continue;
+            }
+
+            await DispatchAsync(
+                () =>
+                {
+                    foreach (var item in group)
+                    {
+                        item.ApplyLocalTagSnapshot(detail);
+                    }
+                });
+        }
+    }
+
+    private IReadOnlyList<DiscoveryMovieCardViewModel> GetCachedMovieCards()
+    {
+        return _searchResultPool
+            .Concat(_rankingMovies)
+            .Where(item => item.TmdbId > 0)
+            .ToList();
+    }
+
+    private static void ApplyExternalTagCacheSnapshots(IEnumerable<DiscoveryMovieCardViewModel> items)
+    {
+        foreach (var item in items)
+        {
+            if (ExternalMovieTagCache.TryGet(item.TmdbId, item.ImdbId, item.Title, item.ReleaseYear, out var tags))
+            {
+                item.ApplyExternalTagSnapshot(tags);
+            }
         }
     }
 
@@ -5513,6 +5690,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         OnPropertyChanged(nameof(SearchTypeOptions));
         OnPropertyChanged(nameof(SearchTypeButtonText));
         OnPropertyChanged(nameof(ActiveSearchSortOptions));
+        OnPropertyChanged(nameof(ActiveSelectedSearchSortOption));
         OnPropertyChanged(nameof(SearchSortOptionButtonText));
         OnPropertyChanged(nameof(ActiveSearchSortDirection));
         OnPropertyChanged(nameof(SearchSortDirectionIconData));

@@ -161,6 +161,7 @@ public partial class LibraryPage : UserControl
         _openContextMenu = contextMenu;
         contextMenu.IsOpen = true;
         AlignContextMenuToButtonCenter(button, contextMenu);
+        QueueUpdateSingleSelectMenuChecks(button, contextMenu);
         ConfigureSubmenusToOpenRight(contextMenu);
         e.Handled = true;
     }
@@ -381,6 +382,42 @@ public partial class LibraryPage : UserControl
         _ = menuItem.Dispatcher.BeginInvoke(
             () => ConfigureSubmenuPopupToOpenRight(menuItem),
             DispatcherPriority.Loaded);
+    }
+
+    private void QueueUpdateSingleSelectMenuChecks(Button button, ContextMenu contextMenu)
+    {
+        var selectedValue = button.Tag?.ToString();
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            () => UpdateSingleSelectMenuChecks(contextMenu, selectedValue),
+            DispatcherPriority.Loaded);
+    }
+
+    private static void UpdateSingleSelectMenuChecks(ContextMenu contextMenu, string selectedValue)
+    {
+        contextMenu.UpdateLayout();
+        for (var index = 0; index < contextMenu.Items.Count; index++)
+        {
+            var menuItem = contextMenu.ItemContainerGenerator.ContainerFromIndex(index) as MenuItem
+                           ?? contextMenu.Items[index] as MenuItem;
+            if (menuItem is null)
+            {
+                continue;
+            }
+
+            var optionValue = (menuItem.CommandParameter ?? menuItem.Header)?.ToString();
+            if (string.IsNullOrWhiteSpace(optionValue))
+            {
+                continue;
+            }
+
+            menuItem.IsCheckable = true;
+            menuItem.IsChecked = string.Equals(optionValue, selectedValue, StringComparison.Ordinal);
+        }
     }
 
     private static void ConfigureSubmenuPopupToOpenRight(MenuItem menuItem)

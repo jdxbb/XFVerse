@@ -278,6 +278,7 @@
 
     <Border Height="548"
             Padding="16"
+            ClipToBounds="False"
             Style="{StaticResource GlassInlinePanelStyle}">
         <Grid>
             <Grid.RowDefinitions>

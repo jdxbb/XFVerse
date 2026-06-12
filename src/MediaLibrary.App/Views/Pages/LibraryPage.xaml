@@ -142,7 +142,7 @@
         <Style x:Key="LibrarySearchBoxStyle" TargetType="TextBox" BasedOn="{StaticResource SearchBoxStyle}">
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Height" Value="28" />
-            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Padding" Value="10,0" />
             <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -222,7 +222,6 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12"
                                 Padding="{TemplateBinding Padding}"
-                                Effect="{StaticResource ShadowPopup}"
                                 SnapsToDevicePixels="True">
                             <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
                         </Border>
@@ -312,8 +311,7 @@
                                         BorderBrush="{DynamicResource BrushBorder}"
                                         BorderThickness="1"
                                         CornerRadius="12"
-                                        Padding="10"
-                                        Effect="{StaticResource ShadowPopup}">
+                                        Padding="10">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
                                 </Border>
                             </Popup>
@@ -712,8 +710,8 @@
                     <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource BrushAccent}" />
-                    <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
+                    <Setter Property="Background" Value="{DynamicResource BrushSelectionDotSelectedBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushSelectionDotSelectedBorder}" />
                 </DataTrigger>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
@@ -902,7 +900,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="-32,-24,-32,0"
+    <Grid Margin="-32,-24,-32,-32"
           Background="Transparent"
           PreviewMouseDown="OnRootPreviewMouseDown">
         <Grid.RowDefinitions>
@@ -942,7 +940,7 @@
                                      helpers:TextBoxPlaceholderBehavior.PlaceholderText="请输入需要搜索的影视作品名/导演/演员"
                                      KeyDown="SearchTextBox_KeyDown"
                                      Style="{StaticResource LibrarySearchBoxStyle}"
-                                     Padding="10,3,30,3"
+                                     Padding="10,0,30,0"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
                             <Button HorizontalAlignment="Right"
                                     VerticalAlignment="Center"
@@ -995,6 +993,7 @@
                                 Canvas.Top="0"
                                 Content="{Binding SortButtonText}"
                                 Click="OpenButtonContextMenu"
+                                Tag="{Binding SelectedSortOption}"
                                 Style="{StaticResource LibraryFilterButtonStyle}">
                             <Button.ContextMenu>
                                 <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
@@ -1040,6 +1039,7 @@
                             Grid.Column="0"
                             Content="{Binding PlaybackSourceButtonText}"
                             Click="OpenButtonContextMenu"
+                            Tag="{Binding SelectedLibraryScope}"
                             Style="{StaticResource LibraryFilterButtonStyle}">
                         <Button.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
@@ -1054,6 +1054,7 @@
                             Grid.Column="2"
                             Content="{Binding MediaSourceButtonText}"
                             Click="OpenButtonContextMenu"
+                            Tag="{Binding SelectedSourceFilter}"
                             Style="{StaticResource LibraryFilterButtonStyle}">
                         <Button.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
@@ -1162,6 +1163,7 @@
                             Grid.Column="12"
                             Content="{Binding WatchedFilterButtonText}"
                             Click="OpenButtonContextMenu"
+                            Tag="{Binding SelectedWatchedFilter}"
                             Style="{StaticResource LibraryFilterButtonStyle}">
                         <Button.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
@@ -1181,7 +1183,7 @@
 
                 <Border Grid.Row="4" Style="{StaticResource LibraryBatchToolbarStyle}">
                     <UniformGrid Rows="1"
-                                 Columns="9"
+                                 Columns="8"
                                  Margin="-4,0"
                                  HorizontalAlignment="Stretch"
                                  VerticalAlignment="Center">
@@ -1205,10 +1207,6 @@
                                 Margin="4,0"
                                 Command="{Binding BatchAutoIdentifyCommand}"
                                 Style="{StaticResource LibraryBatchInfoButtonStyle}" />
-                        <Button Content="取消"
-                                Margin="4,0"
-                                Command="{Binding CancelBatchOperationCommand}"
-                                Style="{StaticResource LibraryBatchActionButtonStyle}" />
                         <Button Content="移出媒体库"
                                 Margin="4,0"
                                 Command="{Binding BatchRemoveFromLibraryCommand}"
@@ -1227,7 +1225,9 @@
         </Border>
 
         <Grid Grid.Row="2" Margin="32,0,32,0">
-            <Border Style="{StaticResource GlassPageCardStyle}">
+            <Border Style="{StaticResource GlassPageCardStyle}"
+                    helpers:ScrollDrivenBottomCornerBehavior.AtBottomBottomMargin="18"
+                    helpers:ScrollDrivenBottomCornerBehavior.IsEnabled="True">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -1348,7 +1348,7 @@
                                             <Setter Property="ItemContentWidth" Value="180" />
                                             <Setter Property="ItemHeight" Value="288" />
                                             <Setter Property="OverscanRows" Value="1" />
-                                            <Setter Property="ViewportPadding" Value="0,10,0,30" />
+                                            <Setter Property="ViewportPadding" Value="0,10,0,36" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                                     <Setter Property="ItemWidth" Value="201" />
@@ -1369,7 +1369,7 @@
                                           UseLayoutRounding="True">
                                         <Grid.Style>
                                             <Style TargetType="Grid">
-                                                <Setter Property="Cursor" Value="Arrow" />
+                                                <Setter Property="Cursor" Value="Hand" />
                                                 <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
                                                 <Setter Property="RenderTransform">
                                                     <Setter.Value>
@@ -1377,9 +1377,6 @@
                                                     </Setter.Value>
                                                 </Setter>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
-                                                        <Setter Property="Cursor" Value="Hand" />
-                                                    </DataTrigger>
                                                     <Trigger Property="IsMouseOver" Value="True">
                                                         <Setter Property="RenderTransform">
                                                             <Setter.Value>
@@ -1535,6 +1532,7 @@
                                                            Style="{StaticResource LibraryMediaMutedTextStyle}" />
                                                 <Border Margin="0,5,0,0"
                                                         helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
+                                                        helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True"
                                                         helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
                                                         Style="{StaticResource LibraryTagLineContainerStyle}">
                                                     <TextBlock Style="{StaticResource LibraryMediaMutedTextStyle}">
@@ -1600,6 +1598,7 @@
                              Grid.Row="1"
                              Margin="0,18,0,0"
                              ItemsSource="{Binding Movies}"
+                             Padding="0,0,0,36"
                              ScrollViewer.CanContentScroll="True"
                              ScrollViewer.ScrollChanged="OnLibraryListScrollChanged"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1647,7 +1646,8 @@
                                         Background="{StaticResource LibraryListMediaCardBackgroundBrush}"
                                         BorderBrush="{DynamicResource BrushBorder}"
                                         BorderThickness="1"
-                                        CornerRadius="14">
+                                        CornerRadius="14"
+                                        Cursor="Hand">
                                     <Border.InputBindings>
                                         <MouseBinding MouseAction="LeftClick"
                                                       Command="{Binding DataContext.OpenOrToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -1770,6 +1770,7 @@
                                             </Grid>
                                             <Border Margin="0,5,0,0"
                                                     helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListTagToolTipText}"
+                                                    helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True"
                                                     helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding ListTagLine}"
                                                     Style="{StaticResource LibraryTagLineContainerStyle}">
                                                 <TextBlock Style="{StaticResource LibraryMediaMutedTextStyle}">

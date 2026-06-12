@@ -1,8 +1,12 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MediaLibrary.App.Models.Enums;
+using MediaLibrary.App.Models.Profile;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.Views.Dialogs;
@@ -21,16 +25,21 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly Dictionary<NavigationPageKey, NavigationItemViewModel> _visibleNavigationMap;
     private readonly ISettingsService _settingsService;
     private readonly IThemeService _themeService;
+    private readonly IUserProfileService _userProfileService;
     private NavigationItemViewModel? _selectedNavigationItem;
     private PageViewModelBase? _currentPageViewModel;
     private CancellationTokenSource? _pageActivationCancellation;
     private int _pageActivationVersion;
     private string _currentPageTitle = string.Empty;
     private string _currentPageSubtitle = string.Empty;
+    private string _userDisplayName = "James";
+    private string _userAvatarInitial = "J";
+    private ImageSource? _userAvatarImage;
     private bool _isHomePageActive;
     private bool _isDetailRouteActive;
     private bool _isSidebarExpanded = true;
     private bool _isUserMenuOpen;
+    private bool _hasUserAvatar;
     private string _userMenuStatusMessage = string.Empty;
     private string _themeToggleIcon = "☀";
     private string _themeToggleToolTip = "当前浅色主题，切换到深色主题";
@@ -39,6 +48,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         INavigationStateService navigationStateService,
         ISettingsService settingsService,
         IThemeService themeService,
+        IUserProfileService userProfileService,
         HomeViewModel homeViewModel,
         LibraryViewModel libraryViewModel,
         MovieDiscoveryViewModel movieDiscoveryViewModel,
@@ -56,7 +66,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         NavigationStateService = navigationStateService;
         _settingsService = settingsService;
         _themeService = themeService;
+        _userProfileService = userProfileService;
         _themeService.ThemeChanged += OnThemeChanged;
+        _userProfileService.ProfileChanged += OnUserProfileChanged;
 
         VisibleNavigationItems =
         [
@@ -91,6 +103,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         NavigationStateService.NavigationRequested += OnNavigationRequested;
         _ = InitializeThemePresentationAsync();
+        _ = InitializeUserProfileAsync();
         SelectedNavigationItem = VisibleNavigationItems.First();
     }
 
@@ -112,9 +125,35 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public RelayCommand LogoutCommand { get; }
 
-    public string UserDisplayName => "James";
+    public string UserDisplayName
+    {
+        get => _userDisplayName;
+        private set
+        {
+            if (SetProperty(ref _userDisplayName, value))
+            {
+                OnPropertyChanged(nameof(ShellPageTitle));
+            }
+        }
+    }
 
-    public string UserAvatarInitial => "J";
+    public string UserAvatarInitial
+    {
+        get => _userAvatarInitial;
+        private set => SetProperty(ref _userAvatarInitial, value);
+    }
+
+    public ImageSource? UserAvatarImage
+    {
+        get => _userAvatarImage;
+        private set => SetProperty(ref _userAvatarImage, value);
+    }
+
+    public bool HasUserAvatar
+    {
+        get => _hasUserAvatar;
+        private set => SetProperty(ref _hasUserAvatar, value);
+    }
 
     public string ThemeToggleIcon
     {
@@ -385,7 +424,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void OpenUserProfile()
     {
         IsUserMenuOpen = false;
-        var dialog = new UserProfileDialogWindow();
+        var dialog = new UserProfileDialogWindow(_userProfileService);
         var owner = Application.Current?.MainWindow;
         if (owner is not null)
         {
@@ -393,6 +432,73 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         dialog.ShowDialog();
+    }
+
+    private async Task InitializeUserProfileAsync()
+    {
+        try
+        {
+            ApplyUserProfile(await _userProfileService.LoadAsync());
+        }
+        catch
+        {
+            ApplyUserProfile(new UserProfileModel
+            {
+                UserName = "James",
+                Account = "local_user"
+            });
+        }
+    }
+
+    private void OnUserProfileChanged(object? sender, UserProfileModel profile)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            ApplyUserProfile(profile);
+            return;
+        }
+
+        dispatcher.InvokeAsync(() => ApplyUserProfile(profile), DispatcherPriority.Background);
+    }
+
+    private void ApplyUserProfile(UserProfileModel profile)
+    {
+        UserDisplayName = profile.UserName;
+        UserAvatarInitial = BuildAvatarInitial(profile.UserName);
+        UserAvatarImage = LoadAvatarImage(profile.AvatarPath);
+        HasUserAvatar = UserAvatarImage is not null;
+    }
+
+    private static string BuildAvatarInitial(string userName)
+    {
+        return string.IsNullOrWhiteSpace(userName)
+            ? "X"
+            : userName.Trim()[..1].ToUpperInvariant();
+    }
+
+    private static ImageSource? LoadAvatarImage(string? avatarPath)
+    {
+        if (string.IsNullOrWhiteSpace(avatarPath) || !File.Exists(avatarPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            image.UriSource = new Uri(avatarPath, UriKind.Absolute);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void NavigateFromUserMenu(NavigationPageKey pageKey)

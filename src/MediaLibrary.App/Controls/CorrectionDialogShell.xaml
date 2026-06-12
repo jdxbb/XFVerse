@@ -25,7 +25,8 @@
                 Padding="24"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Style="{StaticResource PageCardStyle}">
+                ClipToBounds="False"
+                Style="{StaticResource GlassPageCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -87,9 +88,14 @@
                 </Grid>
 
                 <ScrollViewer Grid.Row="2"
+                              Margin="-24,-18,-24,-18"
+                              ClipToBounds="False"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
-                    <ContentPresenter Content="{Binding DialogContent, ElementName=Root}" />
+                    <Grid Margin="24,18,24,18"
+                          ClipToBounds="False">
+                        <ContentPresenter Content="{Binding DialogContent, ElementName=Root}" />
+                    </Grid>
                 </ScrollViewer>
 
                 <Grid Grid.Row="4">

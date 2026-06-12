@@ -1,4 +1,5 @@
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Implementations;
@@ -71,6 +72,8 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
     public IReadOnlyList<int> GenreIds { get; }
 
     public string GenresText { get; private set; }
+
+    public string AiTagsText { get; private set; } = string.Empty;
 
     public string DisplayTags { get; private set; }
 
@@ -218,9 +221,9 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public string PosterTagLine => JoinVisibleGroups(PosterTagGroupOneText, PosterTagGroupTwoText, PosterTagGroupThreeText);
 
-    public string PosterTagToolTipText => FullTagLine;
+    public string PosterTagToolTipText => BuildTagToolTipText();
 
-    public string ListTagToolTipText => FullTagLine;
+    public string ListTagToolTipText => BuildTagToolTipText();
 
     public string PosterTagGroupOneText => BuildTagGroups(PosterMovieTagDisplayLength)[0];
 
@@ -278,10 +281,11 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             ReleaseDate = status.ReleaseDate?.ToString("yyyy-MM-dd") ?? ReleaseDate;
             PosterRemoteUrl = string.IsNullOrWhiteSpace(status.PosterRemoteUrl) ? PosterRemoteUrl : status.PosterRemoteUrl;
             Overview = string.IsNullOrWhiteSpace(status.Overview) ? Overview : status.Overview;
-            GenresText = string.IsNullOrWhiteSpace(status.GenresText) ? GenresText : status.GenresText;
-            DisplayTags = GenresText;
-            EmotionTagsText = string.Empty;
-            SceneTagsText = string.Empty;
+            var tagPresentationChanged = ApplyLocalTags(
+                status.GenresText,
+                status.AiTagsText,
+                status.EmotionTagsText,
+                status.SceneTagsText);
             Country = string.IsNullOrWhiteSpace(status.Country) ? Country : status.Country;
             Language = string.IsNullOrWhiteSpace(status.Language) ? Language : status.Language;
             _directorText = string.IsNullOrWhiteSpace(status.DirectorText) ? _directorText : status.DirectorText;
@@ -322,11 +326,11 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             OnPropertyChanged(nameof(HasPoster));
             OnPropertyChanged(nameof(Overview));
             OnPropertyChanged(nameof(OverviewText));
-            OnPropertyChanged(nameof(GenresText));
-            OnPropertyChanged(nameof(DisplayTags));
-            OnPropertyChanged(nameof(EmotionTagsText));
-            OnPropertyChanged(nameof(SceneTagsText));
-            NotifyTagPresentationChanged();
+            if (tagPresentationChanged)
+            {
+                NotifyTagPresentationChanged();
+            }
+
             OnPropertyChanged(nameof(DirectorText));
             OnPropertyChanged(nameof(CastText));
             OnPropertyChanged(nameof(ListDateRuntimeText));
@@ -426,9 +430,13 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(GenresText) && !string.IsNullOrWhiteSpace(details.GenresText))
         {
             GenresText = details.GenresText;
-            DisplayTags = GenresText;
+            if (string.IsNullOrWhiteSpace(AiTagsText))
+            {
+                DisplayTags = GenresText;
+                OnPropertyChanged(nameof(DisplayTags));
+            }
+
             OnPropertyChanged(nameof(GenresText));
-            OnPropertyChanged(nameof(DisplayTags));
             NotifyTagPresentationChanged();
         }
 
@@ -465,6 +473,37 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         }
 
         RefreshRating();
+    }
+
+    public void ApplyLocalTagSnapshot(MovieDetailModel detail)
+    {
+        if (ApplyLocalTags(
+                detail.GenresText,
+                detail.AiTagsText,
+                detail.EmotionTagsText,
+                detail.SceneTagsText,
+                replaceMissingAiTags: true))
+        {
+            NotifyTagPresentationChanged();
+        }
+    }
+
+    public void ApplyExternalTagSnapshot(AiMovieTags tags)
+    {
+        var beforeTypeTags = AiTagsText;
+        var beforeDisplayTags = DisplayTags;
+        var changed = ApplyLocalTags(
+                null,
+                tags.AiTagsText,
+                tags.EmotionTagsText,
+                tags.SceneTagsText,
+                replaceMissingAiTags: false);
+        AiPerfDiagnostics.WriteEvent(
+            $"event=discovery-card-external-tags-apply tmdbId={TmdbId} year={FormatNullable(ReleaseYear)} changed={changed.ToString().ToLowerInvariant()} incomingTypeTags={FormatDiagnosticTags(tags.AiTagsText)} beforeTypeTags={FormatDiagnosticTags(beforeTypeTags)} beforeDisplayTags={FormatDiagnosticTags(beforeDisplayTags)} finalTypeTags={FormatDiagnosticTags(AiTagsText)} finalDisplayTags={FormatDiagnosticTags(DisplayTags)} finalEmotionTags={FormatDiagnosticTags(EmotionTagsText)} finalSceneTags={FormatDiagnosticTags(SceneTagsText)}");
+        if (changed)
+        {
+            NotifyTagPresentationChanged();
+        }
     }
 
     public void SetOmdbRating(MovieRatingItem? rating)
@@ -504,14 +543,68 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
         OnPropertyChanged(nameof(ListTagLine));
     }
 
+    private bool ApplyLocalTags(
+        string? genresText,
+        string? aiTagsText,
+        string? emotionTagsText,
+        string? sceneTagsText,
+        bool replaceMissingAiTags = true)
+    {
+        var changed = false;
+        var normalizedGenresText = genresText ?? string.Empty;
+        var normalizedAiTagsText = aiTagsText ?? string.Empty;
+        var normalizedEmotionTagsText = emotionTagsText ?? string.Empty;
+        var normalizedSceneTagsText = sceneTagsText ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(normalizedGenresText)
+            && !string.Equals(GenresText, normalizedGenresText, StringComparison.Ordinal))
+        {
+            GenresText = normalizedGenresText;
+            OnPropertyChanged(nameof(GenresText));
+            changed = true;
+        }
+
+        if (!string.Equals(AiTagsText, normalizedAiTagsText, StringComparison.Ordinal)
+            && (!string.IsNullOrWhiteSpace(normalizedAiTagsText) || replaceMissingAiTags))
+        {
+            AiTagsText = normalizedAiTagsText;
+            OnPropertyChanged(nameof(AiTagsText));
+            changed = true;
+        }
+
+        var typeTagsText = string.IsNullOrWhiteSpace(normalizedAiTagsText)
+            ? string.IsNullOrWhiteSpace(AiTagsText)
+                ? normalizedGenresText
+                : AiTagsText
+            : normalizedAiTagsText;
+        if (!string.IsNullOrWhiteSpace(typeTagsText)
+            && !string.Equals(DisplayTags, typeTagsText, StringComparison.Ordinal))
+        {
+            DisplayTags = typeTagsText;
+            OnPropertyChanged(nameof(DisplayTags));
+            changed = true;
+        }
+
+        if (!string.Equals(EmotionTagsText, normalizedEmotionTagsText, StringComparison.Ordinal))
+        {
+            EmotionTagsText = normalizedEmotionTagsText;
+            OnPropertyChanged(nameof(EmotionTagsText));
+            changed = true;
+        }
+
+        if (!string.Equals(SceneTagsText, normalizedSceneTagsText, StringComparison.Ordinal))
+        {
+            SceneTagsText = normalizedSceneTagsText;
+            OnPropertyChanged(nameof(SceneTagsText));
+            changed = true;
+        }
+
+        return changed;
+    }
+
     private string[] BuildTagGroups(int? maxDisplayLength)
     {
-        var groups = new[]
-        {
-            ParseTags(DisplayTags),
-            ParseTags(EmotionTagsText),
-            ParseTags(SceneTagsText)
-        };
+        var groups = BuildTagLists();
 
         if (groups.All(group => group.Count == 0))
         {
@@ -524,7 +617,155 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
             return formatted;
         }
 
-        return TruncateVisibleGroupsForDisplay(formatted, maxDisplayLength.Value);
+        var selected = new[]
+        {
+            new List<string>(),
+            new List<string>(),
+            new List<string>()
+        };
+
+        var displayOrder = new List<int>();
+        var maxCount = groups.Max(group => group.Count);
+        for (var index = 0; index < maxCount; index++)
+        {
+            for (var groupIndex = 0; groupIndex < groups.Length; groupIndex++)
+            {
+                if (index < groups[groupIndex].Count)
+                {
+                    var candidate = CloneSelectedGroups(selected);
+                    candidate[groupIndex].Add(groups[groupIndex][index]);
+                    var candidateOrder = displayOrder.Concat([groupIndex]).ToList();
+                    if (FitsDisplayLength(JoinVisibleGroups(candidate.Select(FormatTags).ToArray()), maxDisplayLength.Value))
+                    {
+                        selected[groupIndex].Add(groups[groupIndex][index]);
+                        displayOrder.Add(groupIndex);
+                        continue;
+                    }
+
+                    return FormatOverflowTagGroups(candidate, groups, candidateOrder, maxDisplayLength.Value);
+                }
+            }
+        }
+
+        return selected.Select(FormatTags).ToArray();
+    }
+
+    private string BuildTagToolTipText()
+    {
+        return BuildGroupedTagToolTipText(BuildTagLists(), FullTagLine);
+    }
+
+    private IReadOnlyList<string>[] BuildTagLists()
+    {
+        return
+        [
+            ParseTags(string.IsNullOrWhiteSpace(AiTagsText) ? DisplayTags : AiTagsText),
+            ParseTags(EmotionTagsText),
+            ParseTags(SceneTagsText)
+        ];
+    }
+
+    private static string BuildGroupedTagToolTipText(IReadOnlyList<string>[] groups, string fallback)
+    {
+        if (groups.All(group => group.Count == 0))
+        {
+            return fallback;
+        }
+
+        var lines = new[]
+        {
+            FormatToolTipLine("类型", groups[0]),
+            FormatToolTipLine("情绪", groups[1]),
+            FormatToolTipLine("场景", groups[2])
+        };
+
+        var tooltip = string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)));
+        return string.IsNullOrWhiteSpace(tooltip) ? fallback : tooltip;
+    }
+
+    private static string FormatToolTipLine(string label, IEnumerable<string> tags)
+    {
+        var tagText = FormatTags(tags);
+        return string.IsNullOrWhiteSpace(tagText) ? string.Empty : $"{label}: {tagText}";
+    }
+
+    private static List<string>[] CloneSelectedGroups(IEnumerable<List<string>> groups)
+    {
+        return groups.Select(group => group.ToList()).ToArray();
+    }
+
+    private static string[] FormatOverflowTagGroups(
+        List<string>[] selected,
+        IReadOnlyList<string>[] originalGroups,
+        List<int> displayOrder,
+        int maxDisplayLength)
+    {
+        EnsureAtLeastOneSelectedTag(selected, originalGroups, displayOrder);
+        while (!FitsDisplayLength(JoinVisibleGroups(FormatGroupsWithOverflow(selected, originalGroups)), maxDisplayLength)
+               && displayOrder.Count > 1)
+        {
+            var groupIndex = displayOrder[^1];
+            displayOrder.RemoveAt(displayOrder.Count - 1);
+            if (selected[groupIndex].Count == 0)
+            {
+                continue;
+            }
+
+            selected[groupIndex].RemoveAt(selected[groupIndex].Count - 1);
+        }
+
+        var formatted = FormatGroupsWithOverflow(selected, originalGroups);
+        if (FitsDisplayLength(JoinVisibleGroups(formatted), maxDisplayLength))
+        {
+            return formatted;
+        }
+
+        return TruncateVisibleGroupsForDisplay(formatted, maxDisplayLength);
+    }
+
+    private static void EnsureAtLeastOneSelectedTag(
+        IList<string>[] selected,
+        IReadOnlyList<string>[] originalGroups,
+        ICollection<int> displayOrder)
+    {
+        if (selected.Any(group => group.Count > 0))
+        {
+            return;
+        }
+
+        for (var index = 0; index < originalGroups.Length; index++)
+        {
+            if (originalGroups[index].Count == 0)
+            {
+                continue;
+            }
+
+            selected[index].Add(originalGroups[index][0]);
+            displayOrder.Add(index);
+            return;
+        }
+    }
+
+    private static string[] FormatGroupsWithOverflow(
+        IReadOnlyList<string>[] selected,
+        IReadOnlyList<string>[] originalGroups)
+    {
+        var formatted = new string[selected.Length];
+        for (var index = 0; index < selected.Length; index++)
+        {
+            if (selected[index].Count == 0)
+            {
+                formatted[index] = string.Empty;
+                continue;
+            }
+
+            var groupText = FormatTags(selected[index]);
+            formatted[index] = originalGroups[index].Count > selected[index].Count
+                ? $"{groupText}{TagOverflowMarker}"
+                : groupText;
+        }
+
+        return formatted;
     }
 
     private static IReadOnlyList<string> ParseTags(string? value)
@@ -544,6 +785,16 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
     private static string FormatTags(IEnumerable<string> tags)
     {
         return string.Join(" / ", tags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
+    }
+
+    private static string FormatNullable(int? value)
+    {
+        return value.HasValue ? value.Value.ToString() : "(none)";
+    }
+
+    private static string FormatDiagnosticTags(string? value)
+    {
+        return ScanIdentificationDiagnostics.FormatValue(value, 120);
     }
 
     private static string JoinVisibleGroups(params string[] groups)

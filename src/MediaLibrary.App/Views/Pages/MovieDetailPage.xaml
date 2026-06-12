@@ -67,11 +67,37 @@
 
         <Style x:Key="MovieDetailTagChipStyle" TargetType="Border">
             <Setter Property="Margin" Value="0,0,6,2" />
-            <Setter Property="Padding" Value="7,2" />
+            <Setter Property="Padding" Value="8,3" />
             <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushMovieDetailTagBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+        </Style>
+
+        <Style x:Key="MovieDetailTagLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource MovieDetailMetaLabelStyle}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="MovieDetailTagChipTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="MovieDetailTagItemsControlStyle" TargetType="ItemsControl">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="MovieDetailTagRowStyle" TargetType="Grid">
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsUnidentifiedMovie}" Value="True">
+                    <Setter Property="Margin" Value="0,1,0,0" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <DataTemplate x:Key="MovieDetailTagTemplate">
@@ -82,13 +108,14 @@
                             <DataTrigger Binding="{Binding}" Value="-">
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Effect" Value="{x:Null}" />
                                 <Setter Property="Padding" Value="0" />
                                 <Setter Property="Margin" Value="0" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <TextBlock Style="{StaticResource MovieDetailMetaLabelStyle}" Margin="0" Text="{Binding}" />
+                <TextBlock Style="{StaticResource MovieDetailTagChipTextStyle}" Text="{Binding}" />
             </Border>
         </DataTemplate>
 
@@ -421,7 +448,7 @@
                                                 <Grid Grid.Row="1" Margin="0,7,0,0">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="3*" />
-                                                        <ColumnDefinition Width="3" />
+                                                        <ColumnDefinition Width="2" />
                                                         <ColumnDefinition Width="2*" />
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -449,10 +476,7 @@
                                                                                  Stroke="{DynamicResource BrushRatingStarStroke}"
                                                                                  StrokeThickness="0.65" />
                                                     </StackPanel>
-                                                    <Border Grid.Column="1"
-                                                            Width="3"
-                                                            Margin="0,2"
-                                                            Background="{DynamicResource BrushDivider}" />
+                                                    <Border Grid.Column="1" Style="{StaticResource RatingCardDividerStyle}" />
                                                     <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                         <TextBlock HorizontalAlignment="Center"
                                                                    FontSize="15"
@@ -541,23 +565,23 @@
                             </Grid>
                         </Border>
 
-                        <Border Grid.Row="2" Padding="10" Style="{StaticResource GlassPageCardStyle}">
+                        <Border Grid.Row="2" Padding="10,8" Style="{StaticResource GlassPageCardStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="6" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="2" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Style="{StaticResource MovieDetailSmallCardTitleStyle}" Text="标签" />
-                                <Grid Grid.Row="2">
+                                <Grid Grid.Row="2" Style="{StaticResource MovieDetailTagRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="54" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Style="{StaticResource MovieDetailMetaLabelStyle}" Text="类型" />
-                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding GenreTags}" ItemTemplate="{StaticResource MovieDetailTagTemplate}">
+                                    <TextBlock Style="{StaticResource MovieDetailTagLabelStyle}" Text="类型" />
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding GenreTags}" ItemTemplate="{StaticResource MovieDetailTagTemplate}" Style="{StaticResource MovieDetailTagItemsControlStyle}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <WrapPanel />
@@ -565,13 +589,13 @@
                                         </ItemsControl.ItemsPanel>
                                     </ItemsControl>
                                 </Grid>
-                                <Grid Grid.Row="3">
+                                <Grid Grid.Row="3" Style="{StaticResource MovieDetailTagRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="54" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Style="{StaticResource MovieDetailMetaLabelStyle}" Text="情绪" />
-                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding EmotionTags}" ItemTemplate="{StaticResource MovieDetailTagTemplate}">
+                                    <TextBlock Style="{StaticResource MovieDetailTagLabelStyle}" Text="情绪" />
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding EmotionTags}" ItemTemplate="{StaticResource MovieDetailTagTemplate}" Style="{StaticResource MovieDetailTagItemsControlStyle}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <WrapPanel />
@@ -579,13 +603,13 @@
                                         </ItemsControl.ItemsPanel>
                                     </ItemsControl>
                                 </Grid>
-                                <Grid Grid.Row="4">
+                                <Grid Grid.Row="4" Style="{StaticResource MovieDetailTagRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="54" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Style="{StaticResource MovieDetailMetaLabelStyle}" Text="场景" />
-                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding SceneTags}" ItemTemplate="{StaticResource MovieDetailTagTemplate}">
+                                    <TextBlock Style="{StaticResource MovieDetailTagLabelStyle}" Text="场景" />
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding SceneTags}" ItemTemplate="{StaticResource MovieDetailTagTemplate}" Style="{StaticResource MovieDetailTagItemsControlStyle}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <WrapPanel />
@@ -987,7 +1011,7 @@
                               IsEnabled="{Binding IsCorrectionInteractionEnabled}"
                               ItemsSource="{Binding Sources}"
                               SelectedItem="{Binding SelectedCorrectionSource, Mode=TwoWay}"
-                              Style="{StaticResource CorrectionDialogComboBoxStyle}">
+                              Style="{StaticResource CorrectionDialogPlaybackSourceComboBoxStyle}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding CorrectionSourceDisplayText}"

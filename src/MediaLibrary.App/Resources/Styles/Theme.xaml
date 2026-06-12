@@ -4,6 +4,9 @@
         <Setter Property="Background" Value="{DynamicResource BrushBackground}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyBase}" />
+        <Setter Property="ToolTipService.InitialShowDelay" Value="200" />
+        <Setter Property="ToolTipService.BetweenShowDelay" Value="0" />
+        <Setter Property="ToolTipService.ShowDuration" Value="30000" />
     </Style>
 
     <Style x:Key="PageCardStyle" TargetType="Border">
@@ -23,8 +26,15 @@
     <Style x:Key="HeroCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{DynamicResource ShadowLargeCard}" />
+        <Setter Property="Effect" Value="{StaticResource ShadowStaticLargeCard}" />
         <Setter Property="Padding" Value="{StaticResource HeroCardPadding}" />
+    </Style>
+
+    <Style x:Key="RatingCardDividerStyle" TargetType="Border">
+        <Setter Property="Width" Value="2" />
+        <Setter Property="Margin" Value="0,3" />
+        <Setter Property="Background" Value="{DynamicResource BrushRatingCardDivider}" />
+        <Setter Property="CornerRadius" Value="1" />
     </Style>
 
     <Style x:Key="SidebarBorderStyle" TargetType="Border">

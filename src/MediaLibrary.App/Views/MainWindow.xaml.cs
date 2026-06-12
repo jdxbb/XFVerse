@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MediaLibrary.App.Services;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
@@ -25,9 +26,9 @@ public partial class MainWindow : Window
     private readonly IAppBehaviorPreferencesService _appBehaviorPreferencesService;
     private readonly ITrayIconService _trayIconService;
     private Point? _pendingMaximizedDragStart;
-    private bool _ignoreNextUserMenuButtonClick;
     private bool _isExitRequested;
     private bool _isCloseBehaviorCheckInProgress;
+    private bool _suppressNextUserMenuButtonClick;
 
     public MainWindow()
     {
@@ -136,35 +137,61 @@ public partial class MainWindow : Window
 
     private void UserMenuButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel { IsUserMenuOpen: true } viewModel)
+        if (DataContext is not MainWindowViewModel viewModel
+            || (!viewModel.IsUserMenuOpen && !UserMenuPopup.IsOpen))
         {
             return;
         }
 
-        _ignoreNextUserMenuButtonClick = true;
+        SuppressNextUserMenuButtonClick();
         viewModel.IsUserMenuOpen = false;
+        UserMenuPopup.IsOpen = false;
         e.Handled = true;
     }
 
     private void UserMenuButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_ignoreNextUserMenuButtonClick)
-        {
-            _ignoreNextUserMenuButtonClick = false;
-            e.Handled = true;
-            return;
-        }
-
         if (DataContext is MainWindowViewModel viewModel)
         {
-            viewModel.ToggleUserMenuCommand.Execute(null);
+            if (_suppressNextUserMenuButtonClick)
+            {
+                _suppressNextUserMenuButtonClick = false;
+                viewModel.IsUserMenuOpen = false;
+                UserMenuPopup.IsOpen = false;
+                e.Handled = true;
+                return;
+            }
+
+            if (viewModel.IsUserMenuOpen || UserMenuPopup.IsOpen)
+            {
+                viewModel.IsUserMenuOpen = false;
+                UserMenuPopup.IsOpen = false;
+            }
+            else
+            {
+                viewModel.ToggleUserMenuCommand.Execute(null);
+            }
+
             e.Handled = true;
         }
     }
 
     private void UserMenuPopup_Closed(object sender, EventArgs e)
     {
-        _ignoreNextUserMenuButtonClick = UserMenuButton.IsMouseOver;
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.IsUserMenuOpen = false;
+        }
+
+        SuppressNextUserMenuButtonClick();
+    }
+
+    private void SuppressNextUserMenuButtonClick()
+    {
+        _suppressNextUserMenuButtonClick = true;
+        _ = Dispatcher.BeginInvoke(
+            new Action(() => _suppressNextUserMenuButtonClick = false),
+            DispatcherPriority.Background);
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

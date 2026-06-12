@@ -575,7 +575,7 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
                 PosterTagGroupTwoText = posterTagGroups[1];
                 PosterTagGroupThreeText = posterTagGroups[2];
                 PosterTagLine = JoinVisibleGroups(PosterTagGroupOneText, PosterTagGroupTwoText, PosterTagGroupThreeText);
-                PosterTagToolTipText = JoinVisibleGroups(fullTagGroups);
+                PosterTagToolTipText = BuildGroupedTagToolTipText(fullTagGroups, PosterTagGroupOneText);
             }
 
             PosterTagSeparatorAfterOneText = BuildSeparator(
@@ -725,6 +725,24 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             }
 
             return selected.Select(FormatTags).ToArray();
+        }
+
+        private static string BuildGroupedTagToolTipText(string[] groups, string fallback)
+        {
+            var lines = new[]
+            {
+                FormatToolTipLine("类型", groups[0]),
+                FormatToolTipLine("情绪", groups[1]),
+                FormatToolTipLine("场景", groups[2])
+            };
+
+            var tooltip = string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)));
+            return string.IsNullOrWhiteSpace(tooltip) ? fallback : tooltip;
+        }
+
+        private static string FormatToolTipLine(string label, string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : $"{label}: {value.Trim()}";
         }
 
         private static List<string>[] CloneSelectedGroups(IEnumerable<List<string>> groups)

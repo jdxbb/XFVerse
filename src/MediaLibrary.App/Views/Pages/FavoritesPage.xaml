@@ -251,6 +251,7 @@
             <Setter Property="MinWidth" Value="42" />
             <Setter Property="Height" Value="30" />
             <Setter Property="Padding" Value="8,0" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
         </Style>
 
         <Style x:Key="FavoriteRatingTextStyle" TargetType="{x:Type TextBlock}">
@@ -343,7 +344,7 @@
                                            Opacity="0"
                                            Text="{Binding Text, ElementName=StateIcon}">
                                     <TextBlock.Effect>
-                                        <DropShadowEffect BlurRadius="2.2"
+                                        <DropShadowEffect BlurRadius="3"
                                                           Color="#FFFFFFFF"
                                                           Direction="0"
                                                           Opacity="1"
@@ -392,7 +393,7 @@
             <Grid Width="180"
                   Height="270"
                   ClipToBounds="False"
-                  Cursor="Hand"
+                  Cursor="Arrow"
                   Margin="0,3,14,15"
                   RenderTransformOrigin="0.5,0.5"
                   SnapsToDevicePixels="True"
@@ -415,11 +416,6 @@
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
-                <Grid.InputBindings>
-                    <MouseBinding MouseAction="LeftClick"
-                                  Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                  CommandParameter="{Binding}" />
-                </Grid.InputBindings>
                 <Border x:Name="FavoriteMoviePosterCardClipMask"
                         Background="White"
                         CornerRadius="12"
@@ -511,6 +507,16 @@
                             </LinearGradientBrush>
                         </Border.Background>
                     </Border>
+                    <Border Height="180"
+                            VerticalAlignment="Top"
+                            Background="Transparent"
+                            Cursor="Hand">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          CommandParameter="{Binding}" />
+                        </Border.InputBindings>
+                    </Border>
                     <Border HorizontalAlignment="Left"
                             VerticalAlignment="Top"
                             Margin="8"
@@ -528,6 +534,8 @@
                             Style="{StaticResource FavoritePosterStateIconButtonStyle}" />
                     <Grid HorizontalAlignment="Stretch"
                           VerticalAlignment="Bottom"
+                          Background="Transparent"
+                          Cursor="Arrow"
                           Margin="8,0,8,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -560,11 +568,12 @@
                                        Style="{StaticResource FavoriteRatingTextStyle}" />
                         </Border>
                         <Border Grid.Row="2"
-                                Grid.ColumnSpan="3"
-                                Margin="0,5,0,0"
-                                helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
-                                helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
-                                Style="{StaticResource FavoriteTagLineContainerStyle}">
+          Grid.ColumnSpan="3"
+          Margin="0,5,0,0"
+          helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
+          helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True"
+          helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
+          Style="{StaticResource FavoriteTagLineContainerStyle}">
                             <TextBlock Style="{StaticResource FavoriteMediaMutedTextStyle}">
                                 <Run Text="{Binding PosterTagGroupOneText, Mode=OneWay}" />
                                 <Run Text="{Binding PosterTagSeparatorAfterOneText, Mode=OneWay}"
@@ -661,7 +670,7 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Margin="0,0,0,-32">
         <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
                     ItemContainerStyle="{StaticResource PageTopTabItemStyle}"
                     Style="{StaticResource FavoritesHiddenHeaderTabControlStyle}">

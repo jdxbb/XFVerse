@@ -26,6 +26,7 @@
             <Setter Property="Margin" Value="0,0,0,3" />
             <Setter Property="TextWrapping" Value="NoWrap" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="helpers:TrimmedTextToolTipBehavior.FullText" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
         </Style>
 
         <Style x:Key="EpisodeDetailSmallCardTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
@@ -164,12 +165,12 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="620" />
+                <ColumnDefinition Width="600" />
                 <ColumnDefinition Width="18" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Grid Width="600" Height="338" Margin="-18,14,0,0">
+            <Grid Width="600" Height="338" Margin="0,14,0,0">
                 <Border x:Name="EpisodeStillClipMask"
                         Background="White"
                         CornerRadius="20"
@@ -280,9 +281,9 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="88" />
-                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="2" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="2" />
                                         <ColumnDefinition Width="78" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Horizontal">
@@ -291,7 +292,7 @@
                                         </Border>
                                         <TextBlock VerticalAlignment="Center" Style="{StaticResource EpisodeDetailSmallCardTitleStyle}" Text="TMDB" />
                                     </StackPanel>
-                                    <Border Grid.Column="1" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
+                                    <Border Grid.Column="1" Style="{StaticResource RatingCardDividerStyle}" />
                                     <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
                                             <TextBlock FontSize="15" FontWeight="Bold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding EpisodeTmdbRating.ScoreDisplayText}" />
@@ -307,7 +308,7 @@
                                                                  Stroke="{DynamicResource BrushRatingStarStroke}"
                                                                  StrokeThickness="0.65" />
                                     </StackPanel>
-                                    <Border Grid.Column="3" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
+                                    <Border Grid.Column="3" Style="{StaticResource RatingCardDividerStyle}" />
                                     <StackPanel Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <TextBlock HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="票数" />
                                         <TextBlock HorizontalAlignment="Center" Margin="0,2,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding EpisodeTmdbRating.VoteCountDisplayText}" />
@@ -677,7 +678,7 @@
                               IsEnabled="{Binding IsCorrectionInteractionEnabled}"
                               ItemsSource="{Binding Sources}"
                               SelectedItem="{Binding SelectedCorrectionSource, Mode=TwoWay}"
-                              Style="{StaticResource CorrectionDialogComboBoxStyle}">
+                              Style="{StaticResource CorrectionDialogPlaybackSourceComboBoxStyle}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding CorrectionSourceDisplayText}"

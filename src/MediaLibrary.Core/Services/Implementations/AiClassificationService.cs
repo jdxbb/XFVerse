@@ -35,7 +35,6 @@ public sealed class AiClassificationService : IAiClassificationService
             return;
         }
 
-        var local = BuildLocalTags(movie.GenresText, movie.Overview);
         movie.AiTagsText = null;
         movie.EmotionTagsText = null;
         movie.SceneTagsText = null;
@@ -51,9 +50,9 @@ public sealed class AiClassificationService : IAiClassificationService
                 1. 只返回 JSON，不要解释。
                 2. 字段固定为 aiTags、emotionTags、sceneTags。
                 3. 每个字段都是中文字符串数组。
-                4. 每类选择 1 到 4 个标签。
+                4. 每类选择 2 到 4 个标签；如果无法判断某类，可以少于 2 个或返回空数组。
                 5. 所有标签必须来自对应词表。
-                示例：{"aiTags":["剧情"],"emotionTags":["温暖"],"sceneTags":["独自观看"]}
+                示例：{"aiTags":["剧情","悬疑"],"emotionTags":["温暖","思考向"],"sceneTags":["独自观看","周末"]}
                 """,
                 $"片名：{movie.Title}\n年份：{movie.ReleaseYear}\n类型：{movie.GenresText}\n简介：{movie.Overview}",
                 AiRequestOptions.MovieTaggingFlash,
@@ -62,18 +61,50 @@ public sealed class AiClassificationService : IAiClassificationService
             if (!string.IsNullOrWhiteSpace(text))
             {
                 var parsed = ParseTags(text);
-                movie.AiTagsText = parsed.aiTags.Count > 0 ? string.Join("、", parsed.aiTags) : local.aiTags;
-                movie.EmotionTagsText = parsed.emotionTags.Count > 0 ? string.Join("、", parsed.emotionTags) : local.emotionTags;
-                movie.SceneTagsText = parsed.sceneTags.Count > 0 ? string.Join("、", parsed.sceneTags) : local.sceneTags;
+                var tags = BuildTagsFromParsed(parsed, movie.GenresText);
+                WriteAiTagClassificationDiagnostic(
+                    "local-detail",
+                    "parsed",
+                    movie.Id,
+                    movie.TmdbId,
+                    movie.ReleaseYear,
+                    text,
+                    parsed,
+                    tags,
+                    movie.GenresText);
+                ApplyTags(movie, tags);
             }
             else
             {
-                ApplyLocalTags(movie, local);
+                var tags = BuildFallbackTags(movie.GenresText);
+                WriteAiTagClassificationDiagnostic(
+                    "local-detail",
+                    "empty",
+                    movie.Id,
+                    movie.TmdbId,
+                    movie.ReleaseYear,
+                    text,
+                    null,
+                    tags,
+                    movie.GenresText);
+                ApplyTags(movie, tags);
             }
         }
-        catch
+        catch (Exception exception)
         {
-            ApplyLocalTags(movie, local);
+            var tags = BuildFallbackTags(movie.GenresText);
+            WriteAiTagClassificationDiagnostic(
+                "local-detail",
+                "failed",
+                movie.Id,
+                movie.TmdbId,
+                movie.ReleaseYear,
+                null,
+                null,
+                tags,
+                movie.GenresText,
+                TrimMessage(exception.Message));
+            ApplyTags(movie, tags);
         }
 
         movie.UpdatedAt = DateTime.UtcNow;
@@ -152,7 +183,6 @@ public sealed class AiClassificationService : IAiClassificationService
                 return new MovieClassificationOutcome("skipped", "movie-not-recognized");
             }
 
-            var local = BuildLocalTags(movie.GenresText, movie.Overview);
             movie.AiTagsText = null;
             movie.EmotionTagsText = null;
             movie.SceneTagsText = null;
@@ -169,13 +199,33 @@ public sealed class AiClassificationService : IAiClassificationService
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     var parsed = ParseTags(text);
-                    movie.AiTagsText = parsed.aiTags.Count > 0 ? string.Join(",", parsed.aiTags) : local.aiTags;
-                    movie.EmotionTagsText = parsed.emotionTags.Count > 0 ? string.Join(",", parsed.emotionTags) : local.emotionTags;
-                    movie.SceneTagsText = parsed.sceneTags.Count > 0 ? string.Join(",", parsed.sceneTags) : local.sceneTags;
+                    var tags = BuildTagsFromParsed(parsed, movie.GenresText);
+                    WriteAiTagClassificationDiagnostic(
+                        $"scan:{sourceKind}",
+                        "parsed",
+                        movie.Id,
+                        movie.TmdbId,
+                        movie.ReleaseYear,
+                        text,
+                        parsed,
+                        tags,
+                        movie.GenresText);
+                    ApplyTags(movie, tags);
                 }
                 else
                 {
-                    ApplyLocalTags(movie, local);
+                    var tags = BuildFallbackTags(movie.GenresText);
+                    WriteAiTagClassificationDiagnostic(
+                        $"scan:{sourceKind}",
+                        "empty",
+                        movie.Id,
+                        movie.TmdbId,
+                        movie.ReleaseYear,
+                        text,
+                        null,
+                        tags,
+                        movie.GenresText);
+                    ApplyTags(movie, tags);
                     status = "skipped";
                     reason = "ai-returned-empty";
                 }
@@ -186,7 +236,19 @@ public sealed class AiClassificationService : IAiClassificationService
             }
             catch (Exception exception)
             {
-                ApplyLocalTags(movie, local);
+                var tags = BuildFallbackTags(movie.GenresText);
+                WriteAiTagClassificationDiagnostic(
+                    $"scan:{sourceKind}",
+                    "failed",
+                    movie.Id,
+                    movie.TmdbId,
+                    movie.ReleaseYear,
+                    null,
+                    null,
+                    tags,
+                    movie.GenresText,
+                    TrimMessage(exception.Message));
+                ApplyTags(movie, tags);
                 status = "failed";
                 reason = TrimMessage(exception.Message);
             }
@@ -229,8 +291,8 @@ public sealed class AiClassificationService : IAiClassificationService
             Emotion tag vocabulary: {{string.Join(",", AiTagVocabulary.EmotionTags)}}
             Viewing scene vocabulary: {{string.Join(",", AiTagVocabulary.SceneTags)}}
             Return JSON only with fixed keys: aiTags, emotionTags, sceneTags.
-            Each field must be a string array and should contain 1 to 4 Chinese tags from its matching vocabulary.
-            Example: {"aiTags":["tag"],"emotionTags":["tag"],"sceneTags":["tag"]}
+            Each field must be a string array and should contain 2 to 4 Chinese tags from its matching vocabulary. If a category cannot be inferred, return fewer tags or an empty array for that category.
+            Example: {"aiTags":["剧情","悬疑"],"emotionTags":["温暖","思考向"],"sceneTags":["独自观看","周末"]}
             """,
             $"title={movie.Title}\nyear={movie.ReleaseYear}\ngenres={movie.GenresText}\noverview={movie.Overview}",
             AiRequestOptions.MovieTaggingFlash,
@@ -241,7 +303,6 @@ public sealed class AiClassificationService : IAiClassificationService
         AiRecommendationItem recommendation,
         CancellationToken cancellationToken = default)
     {
-        var local = BuildLocalTags(recommendation.Tags, recommendation.Overview);
         try
         {
             var text = await _aiService.GenerateTextAsync(
@@ -254,9 +315,9 @@ public sealed class AiClassificationService : IAiClassificationService
                 1. 只返回 JSON，不要解释。
                 2. 字段固定为 aiTags、emotionTags、sceneTags。
                 3. 每个字段都是中文字符串数组。
-                4. 每类选择 1 到 4 个标签。
+                4. 每类选择 2 到 4 个标签；如果无法判断某类，可以少于 2 个或返回空数组。
                 5. 所有标签必须来自对应词表。
-                示例：{"aiTags":["剧情"],"emotionTags":["温暖"],"sceneTags":["独自观看"]}
+                示例：{"aiTags":["剧情","悬疑"],"emotionTags":["温暖","思考向"],"sceneTags":["独自观看","周末"]}
                 """,
                 $"片名：{recommendation.Title}\n原名：{recommendation.OriginalTitle}\n年份：{recommendation.ReleaseYear}\n类型：{recommendation.Tags}\n简介：{recommendation.Overview}",
                 AiRequestOptions.MovieTaggingFlash,
@@ -265,24 +326,49 @@ public sealed class AiClassificationService : IAiClassificationService
             if (!string.IsNullOrWhiteSpace(text))
             {
                 var parsed = ParseTags(text);
-                return new AiMovieTags
-                {
-                    AiTagsText = parsed.aiTags.Count > 0 ? string.Join("、", parsed.aiTags) : local.aiTags,
-                    EmotionTagsText = parsed.emotionTags.Count > 0 ? string.Join("、", parsed.emotionTags) : local.emotionTags,
-                    SceneTagsText = parsed.sceneTags.Count > 0 ? string.Join("、", parsed.sceneTags) : local.sceneTags
-                };
+                var tags = BuildTagsFromParsed(parsed, recommendation.Tags);
+                WriteAiTagClassificationDiagnostic(
+                    "external",
+                    "parsed",
+                    null,
+                    recommendation.TmdbId,
+                    recommendation.ReleaseYear,
+                    text,
+                    parsed,
+                    tags,
+                    recommendation.Tags);
+                return tags;
             }
-        }
-        catch
-        {
-        }
 
-        return new AiMovieTags
+            var fallbackTags = BuildFallbackTags(recommendation.Tags);
+            WriteAiTagClassificationDiagnostic(
+                "external",
+                "empty",
+                null,
+                recommendation.TmdbId,
+                recommendation.ReleaseYear,
+                text,
+                null,
+                fallbackTags,
+                recommendation.Tags);
+            return fallbackTags;
+        }
+        catch (Exception exception)
         {
-            AiTagsText = local.aiTags,
-            EmotionTagsText = local.emotionTags,
-            SceneTagsText = local.sceneTags
-        };
+            var fallbackTags = BuildFallbackTags(recommendation.Tags);
+            WriteAiTagClassificationDiagnostic(
+                "external",
+                "failed",
+                null,
+                recommendation.TmdbId,
+                recommendation.ReleaseYear,
+                null,
+                null,
+                fallbackTags,
+                recommendation.Tags,
+                TrimMessage(exception.Message));
+            return fallbackTags;
+        }
     }
 
     public async Task<AiSearchSuggestion> SuggestSearchQueryAsync(int movieId, CancellationToken cancellationToken = default)
@@ -803,35 +889,50 @@ public sealed class AiClassificationService : IAiClassificationService
             : null;
     }
 
-    private static void ApplyLocalTags(Movie movie, (string aiTags, string emotionTags, string sceneTags) local)
+    private static void ApplyTags(Movie movie, AiMovieTags tags)
     {
-        movie.AiTagsText = local.aiTags;
-        movie.EmotionTagsText = local.emotionTags;
-        movie.SceneTagsText = local.sceneTags;
+        movie.AiTagsText = tags.AiTagsText;
+        movie.EmotionTagsText = tags.EmotionTagsText;
+        movie.SceneTagsText = tags.SceneTagsText;
     }
 
-    private static (string aiTags, string emotionTags, string sceneTags) BuildLocalTags(string? genresText, string? overview)
+    private static AiMovieTags BuildTagsFromParsed(
+        ParsedTagResult parsed,
+        string? typeFallbackText)
     {
-        var aiTags = AiTagVocabulary.PickFromText(genresText, AiTagVocabulary.TypeTags, ["剧情"]);
-        var overviewText = overview ?? string.Empty;
-        IReadOnlyList<string> emotionTags = overviewText.Contains("魔法", StringComparison.OrdinalIgnoreCase)
-            ? ["梦幻", "温暖"]
-            : overviewText.Contains("梦", StringComparison.OrdinalIgnoreCase)
-                ? ["思考向", "悬疑"]
-                : ["思考向", "温暖"];
-        IReadOnlyList<string> sceneTags = aiTags.Contains("动画") || aiTags.Contains("家庭")
-            ? ["亲子", "家人"]
-            : aiTags.Contains("动作")
-                ? ["周末", "朋友"]
-                : ["独自观看"];
-
-        return (
-            string.Join("、", aiTags),
-            string.Join("、", AiTagVocabulary.Filter(emotionTags, AiTagVocabulary.EmotionTags).DefaultIfEmpty("思考向")),
-            string.Join("、", AiTagVocabulary.Filter(sceneTags, AiTagVocabulary.SceneTags).DefaultIfEmpty("独自观看")));
+        return new AiMovieTags
+        {
+            AiTagsText = parsed.AiTags.Count > 0
+                ? string.Join("、", parsed.aiTags)
+                : BuildTypeFallbackTags(typeFallbackText),
+            EmotionTagsText = parsed.EmotionTags.Count > 0
+                ? string.Join("、", parsed.emotionTags)
+                : AiTagVocabulary.MissingTagPlaceholder,
+            SceneTagsText = parsed.SceneTags.Count > 0
+                ? string.Join("、", parsed.sceneTags)
+                : AiTagVocabulary.MissingTagPlaceholder
+        };
     }
 
-    private static (List<string> aiTags, List<string> emotionTags, List<string> sceneTags) ParseTags(string text)
+    private static AiMovieTags BuildFallbackTags(string? typeFallbackText)
+    {
+        return new AiMovieTags
+        {
+            AiTagsText = BuildTypeFallbackTags(typeFallbackText),
+            EmotionTagsText = AiTagVocabulary.MissingTagPlaceholder,
+            SceneTagsText = AiTagVocabulary.MissingTagPlaceholder
+        };
+    }
+
+    private static string BuildTypeFallbackTags(string? typeFallbackText)
+    {
+        var normalized = AiTagVocabulary.NormalizeText(typeFallbackText, AiTagVocabulary.TypeTags);
+        return string.IsNullOrWhiteSpace(normalized)
+            ? AiTagVocabulary.MissingTagPlaceholder
+            : normalized;
+    }
+
+    private static ParsedTagResult ParseTags(string text)
     {
         var start = text.IndexOf('{');
         var end = text.LastIndexOf('}');
@@ -841,10 +942,18 @@ public sealed class AiClassificationService : IAiClassificationService
         }
 
         using var document = JsonDocument.Parse(text);
-        return (
-            AiTagVocabulary.Filter(ReadArray(document.RootElement, "aiTags"), AiTagVocabulary.TypeTags).ToList(),
-            AiTagVocabulary.Filter(ReadArray(document.RootElement, "emotionTags"), AiTagVocabulary.EmotionTags).ToList(),
-            AiTagVocabulary.Filter(ReadArray(document.RootElement, "sceneTags"), AiTagVocabulary.SceneTags).ToList());
+        var rawAiTags = ReadArray(document.RootElement, "aiTags");
+        var rawEmotionTags = ReadArray(document.RootElement, "emotionTags");
+        var rawSceneTags = ReadArray(document.RootElement, "sceneTags");
+        return new ParsedTagResult
+        {
+            RawAiTags = rawAiTags,
+            RawEmotionTags = rawEmotionTags,
+            RawSceneTags = rawSceneTags,
+            AiTags = AiTagVocabulary.Filter(rawAiTags, AiTagVocabulary.TypeTags).ToList(),
+            EmotionTags = AiTagVocabulary.Filter(rawEmotionTags, AiTagVocabulary.EmotionTags).ToList(),
+            SceneTags = AiTagVocabulary.Filter(rawSceneTags, AiTagVocabulary.SceneTags).ToList()
+        };
     }
 
     private static List<string> ReadArray(JsonElement element, string propertyName)
@@ -867,12 +976,56 @@ public sealed class AiClassificationService : IAiClassificationService
         return string.IsNullOrWhiteSpace(message) ? "未知错误" : message.Trim();
     }
 
+    private static void WriteAiTagClassificationDiagnostic(
+        string scope,
+        string status,
+        int? movieId,
+        int? tmdbId,
+        int? releaseYear,
+        string? rawText,
+        ParsedTagResult? parsed,
+        AiMovieTags finalTags,
+        string? typeFallbackText,
+        string? error = null)
+    {
+        AiPerfDiagnostics.WriteEvent(
+            $"event=ai-tag-classification scope={ScanIdentificationDiagnostics.FormatValue(scope)} status={ScanIdentificationDiagnostics.FormatValue(status)} movieId={ScanIdentificationDiagnostics.FormatNullable(movieId)} tmdbId={ScanIdentificationDiagnostics.FormatNullable(tmdbId)} year={ScanIdentificationDiagnostics.FormatNullable(releaseYear)} responseChars={rawText?.Length ?? 0} rawTypeTags={FormatDiagnosticTags(parsed?.RawAiTags)} filteredTypeTags={FormatDiagnosticTags(parsed?.AiTags)} rawEmotionTags={FormatDiagnosticTags(parsed?.RawEmotionTags)} filteredEmotionTags={FormatDiagnosticTags(parsed?.EmotionTags)} rawSceneTags={FormatDiagnosticTags(parsed?.RawSceneTags)} filteredSceneTags={FormatDiagnosticTags(parsed?.SceneTags)} fallbackTypeTags={ScanIdentificationDiagnostics.FormatValue(BuildTypeFallbackTags(typeFallbackText), 120)} finalTypeTags={ScanIdentificationDiagnostics.FormatValue(finalTags.AiTagsText, 120)} finalEmotionTags={ScanIdentificationDiagnostics.FormatValue(finalTags.EmotionTagsText, 120)} finalSceneTags={ScanIdentificationDiagnostics.FormatValue(finalTags.SceneTagsText, 120)} error={ScanIdentificationDiagnostics.FormatValue(error, 160)}");
+    }
+
+    private static string FormatDiagnosticTags(IEnumerable<string>? tags)
+    {
+        return tags is null
+            ? "(none)"
+            : ScanIdentificationDiagnostics.FormatValue(string.Join("|", tags), 160);
+    }
+
     private static string FirstNonEmpty(params string?[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
     }
 
     private sealed record MovieClassificationOutcome(string Status, string Reason);
+
+    private sealed class ParsedTagResult
+    {
+        public List<string> RawAiTags { get; init; } = [];
+
+        public List<string> RawEmotionTags { get; init; } = [];
+
+        public List<string> RawSceneTags { get; init; } = [];
+
+        public List<string> AiTags { get; init; } = [];
+
+        public List<string> EmotionTags { get; init; } = [];
+
+        public List<string> SceneTags { get; init; } = [];
+
+        public List<string> aiTags => AiTags;
+
+        public List<string> emotionTags => EmotionTags;
+
+        public List<string> sceneTags => SceneTags;
+    }
 
     private sealed class SearchSuggestionMovieContext
     {

@@ -226,6 +226,10 @@ public sealed class UserCollectionService : IUserCollectionService
                 {
                     MovieId = x.Id,
                     TmdbId = x.TmdbId,
+                    GenresText = x.GenresText ?? string.Empty,
+                    AiTagsText = x.AiTagsText ?? string.Empty,
+                    EmotionTagsText = x.EmotionTagsText ?? string.Empty,
+                    SceneTagsText = x.SceneTagsText ?? string.Empty,
                     TmdbRating = x.RatingSources
                         .Where(rating => rating.SourceName == "TMDB")
                         .Select(rating => (double?)rating.ScoreValue)
@@ -270,6 +274,10 @@ public sealed class UserCollectionService : IUserCollectionService
                 continue;
             }
 
+            item.GenresText = rating.GenresText;
+            item.AiTagsText = rating.AiTagsText;
+            item.EmotionTagsText = rating.EmotionTagsText;
+            item.SceneTagsText = rating.SceneTagsText;
             item.TmdbRating ??= rating.TmdbRating;
             item.TmdbVoteCount ??= rating.TmdbVoteCount;
             item.OmdbScoreValue ??= rating.OmdbScoreValue;
@@ -1530,6 +1538,14 @@ public sealed class UserCollectionService : IUserCollectionService
         public int MovieId { get; init; }
 
         public int? TmdbId { get; init; }
+
+        public string GenresText { get; init; } = string.Empty;
+
+        public string AiTagsText { get; init; } = string.Empty;
+
+        public string EmotionTagsText { get; init; } = string.Empty;
+
+        public string SceneTagsText { get; init; } = string.Empty;
 
         public double? TmdbRating { get; init; }
 

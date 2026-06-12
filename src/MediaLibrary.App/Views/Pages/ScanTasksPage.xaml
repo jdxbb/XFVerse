@@ -262,27 +262,37 @@
         </Style>
 
         <Style x:Key="ScanIndeterminateProgressBarStyle" TargetType="ProgressBar">
-            <Setter Property="Height" Value="12" />
+            <Setter Property="Height" Value="14" />
             <Setter Property="Background" Value="{DynamicResource BrushForegroundMuted}" />
             <Setter Property="Foreground" Value="{DynamicResource BrushInfo}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
                         <Grid x:Name="ProgressRoot"
-                              ClipToBounds="True"
+                              ClipToBounds="False"
                               Height="{TemplateBinding Height}">
                             <Border Background="{TemplateBinding Background}"
-                                    Opacity="0.28"
-                                    CornerRadius="5" />
-                            <Border x:Name="AnimatedIndicator"
-                                    Width="210"
-                                    HorizontalAlignment="Left"
-                                    Background="{TemplateBinding Foreground}"
-                                    CornerRadius="5"
-                                    Opacity="0">
-                                <Border.RenderTransform>
-                                    <TranslateTransform X="-230" />
-                                </Border.RenderTransform>
+                                    BorderBrush="{DynamicResource BrushInfoBorder}"
+                                    BorderThickness="1"
+                                    Opacity="0.34"
+                                    CornerRadius="6" />
+                            <Border Margin="1"
+                                    ClipToBounds="True"
+                                    CornerRadius="5">
+                                <Border x:Name="AnimatedIndicator"
+                                        Width="230"
+                                        HorizontalAlignment="Left"
+                                        Background="{TemplateBinding Foreground}"
+                                        BorderBrush="{DynamicResource BrushInfoHover}"
+                                        BorderThickness="1"
+                                        CacheMode="BitmapCache"
+                                        CornerRadius="5"
+                                        Effect="{StaticResource ShadowStaticScanProgressIndicator}"
+                                        Opacity="0">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform X="-250" />
+                                    </Border.RenderTransform>
+                                </Border>
                             </Border>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -293,9 +303,13 @@
                                         <Storyboard RepeatBehavior="Forever">
                                             <DoubleAnimation Storyboard.TargetName="AnimatedIndicator"
                                                              Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                             From="-230"
-                                                             To="920"
-                                                             Duration="0:0:1.25" />
+                                                             From="-250"
+                                                             To="980"
+                                                             Duration="0:0:0.72">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -311,28 +325,28 @@
     </UserControl.Resources>
 
     <ScrollViewer x:Name="RootScrollViewer"
-                  Margin="-28,-28,-28,0"
-                  ClipToBounds="False"
+                  Margin="-40,0,-40,-40"
+                  ClipToBounds="True"
                   PreviewMouseWheel="RootScrollViewer_PreviewMouseWheel"
                   Style="{StaticResource ScanPageScrollViewerStyle}">
         <Grid Width="{Binding ActualWidth, ElementName=RootScrollViewer}"
               ClipToBounds="False">
             <Grid.RowDefinitions>
-                <RowDefinition Height="50" />
+                <RowDefinition Height="16" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="58" />
+                <RowDefinition Height="64" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="46" />
+                <ColumnDefinition Width="56" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="46" />
+                <ColumnDefinition Width="56" />
             </Grid.ColumnDefinitions>
-        <Grid Grid.Row="1" Grid.Column="1" MinWidth="1020" ClipToBounds="False">
+        <Grid Grid.Row="1" Grid.Column="1" MinWidth="900" ClipToBounds="False">
             <Grid ClipToBounds="False">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="7*" MinWidth="670" />
-                    <ColumnDefinition Width="20" />
-                    <ColumnDefinition Width="3*" MinWidth="320" />
+                    <ColumnDefinition Width="7*" MinWidth="600" />
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="3*" MinWidth="280" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel x:Name="LeftColumn">
@@ -914,7 +928,8 @@
                                            Style="{StaticResource ScanEmptyStateTextStyle}" />
                             </Border>
 
-                            <ScrollViewer PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
+                            <ScrollViewer ClipToBounds="False"
+                                          PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                                 <ScrollViewer.Style>
                                     <Style TargetType="ScrollViewer" BasedOn="{StaticResource ScanPageScrollViewerStyle}">
                                         <Setter Property="Visibility" Value="Visible" />
@@ -925,7 +940,9 @@
                                         </Style.Triggers>
                                     </Style>
                                 </ScrollViewer.Style>
-                                <ItemsControl ItemsSource="{Binding RecentLogs}">
+                                <ItemsControl ClipToBounds="False"
+                                              Margin="12,8,12,8"
+                                              ItemsSource="{Binding RecentLogs}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <controls:ScanLogCard />

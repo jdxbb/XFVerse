@@ -1,6 +1,19 @@
 # Phase 7.7 观影历史 / 收藏夹 / 观影洞察执行计划
 
-Last updated: 2026-06-11
+Last updated: 2026-06-12
+
+## 7.7g Follow-up (2026-06-12, scoped popup and poster badge polish)
+
+- Scope remains Phase 7.7g. This is not Phase 7.8.
+- Confirmed the WebDAV configuration area no longer has a separate vertical divider. The local configuration divider was intentionally kept.
+- Reworked the Scan Tasks shadow-safe gutter so large-card shadows/glow have more drawing room while visible left/right spacing remains symmetric and slightly smaller.
+- Reduced Scan Tasks column minimum widths to prevent the scan-record card from being pushed into the right clipping edge.
+- Increased dark-theme large-card glow with a half-step rollback from the strongest setting, and made the dark glass surfaces more opaque, reducing the black rectangular underlay feel on large cards.
+- Thickened only the poster top-right filled want/favorite star/heart outline in Movie Discovery and Favorites. Text chips, rating badges, poster text and progress bars were not changed.
+- Kept the removed-library popup, custom preference popup and correction-dialog masks transparent, and removed clipping on the custom preference dialog panel so its shadow does not leave a rectangular residue.
+- Updated the correction dialog shell to use a glass large-card shell with a shadow-safe content gutter; correction content panels keep the existing inline glass style with clipping disabled, and correction source dropdowns now use the inline shadow/glow.
+- No scan behavior, WebDAV/local path semantics, movie/TV correction behavior, recommendation behavior, database schema, migration, database update, commit, or push change.
+- Validation: `dotnet build MediaLibrary.sln -v:minimal -p:OutDir="$env:TEMP\XFVerseCodexBuild77gPopupCorrections\"` passed with 0 warnings and 0 errors; temporary build output was removed after success.
 
 ## 7.7g Follow-up (2026-06-11, Scan Tasks shadow-safe layout correction)
 

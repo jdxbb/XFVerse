@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Net.Http;
 using System.Windows;
@@ -17,7 +18,7 @@ namespace MediaLibrary.App.ViewModels.Pages;
 public sealed class MovieDetailViewModel : PageViewModelBase
 {
     private const string ExternalAiAnalyzingText = "AI 正在分析影片";
-    private const string ExternalAiMissingText = "尚未分类";
+    private const string ExternalAiMissingText = "-";
     private const string CorrectionTargetMovieText = "修正为电影";
     private const string CorrectionTargetTvEpisodeText = "修正为电视剧集";
     private const string CorrectionTargetUnknownSeasonText = "加入已有未识别季";
@@ -38,6 +39,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly HashSet<int> _lazyProbeCheckedMediaFileIds = [];
     private readonly HashSet<int> _probingMediaFileIds = [];
+    private readonly ConcurrentDictionary<int, byte> _backgroundClassifyingMovieIds = new();
+    private readonly ConcurrentDictionary<string, byte> _backgroundClassifyingExternalKeys = new(StringComparer.OrdinalIgnoreCase);
     private bool _isProbeCompletionRefreshQueued;
     private AiRecommendationItem? _externalRecommendation;
     private int? _movieId;
@@ -586,6 +589,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(CanUseIdentificationCorrection));
                 OnPropertyChanged(nameof(ShowLibrarySections));
                 OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
+                OnPropertyChanged(nameof(IsUnidentifiedMovie));
                 OnPropertyChanged(nameof(HasNoSources));
                 OnPropertyChanged(nameof(ShowExternalWantToWatchAction));
                 OnPropertyChanged(nameof(ShowPreferenceAction));
@@ -819,6 +823,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                                          && (_externalRecommendation is not null
                                              || _identificationStatus is IdentificationStatus.Matched or IdentificationStatus.ManualConfirmed);
 
+    public bool IsUnidentifiedMovie => HasMovie && _identificationStatus == IdentificationStatus.Failed;
+
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         if (_navigationStateService.SelectedExternalRecommendation is { } externalRecommendation)
@@ -940,6 +946,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             }
 
             OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
+            OnPropertyChanged(nameof(IsUnidentifiedMovie));
             ConfidenceText = detail.IdentifiedConfidence.HasValue ? $"{detail.IdentifiedConfidence:P0}" : "-";
             TmdbIdText = detail.TmdbId?.ToString() ?? "-";
             ImdbIdText = string.IsNullOrWhiteSpace(detail.ImdbId) ? "-" : detail.ImdbId;
@@ -1050,16 +1057,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
             if (NeedsAutoClassification(detail))
             {
-                await _aiClassificationService.ClassifyMovieAsync(detail.MovieId, cancellationToken);
-                var classified = await _movieDetailQueryService.GetMovieDetailAsync(movieId, cancellationToken);
-                if (classified is not null)
-                {
-                    AiTagsText = string.IsNullOrWhiteSpace(classified.AiTagsText) ? AiTagsText : classified.AiTagsText;
-                    EmotionTagsText = string.IsNullOrWhiteSpace(classified.EmotionTagsText) ? EmotionTagsText : classified.EmotionTagsText;
-                    SceneTagsText = string.IsNullOrWhiteSpace(classified.SceneTagsText) ? SceneTagsText : classified.SceneTagsText;
-                    StatusMessage = "详情已加载，AI 分类已自动更新。";
-                    _dataRefreshService.NotifyMetadataChanged();
-                }
+                StartMovieAutoClassification(detail.MovieId);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1303,8 +1301,8 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     private async Task LoadExternalRecommendationAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken)
     {
-        ApplyCachedExternalTags(recommendation);
-        var shouldAutoClassify = NeedsExternalAutoClassification(recommendation);
+        var hasCachedClassification = ApplyCachedExternalTags(recommendation);
+        var shouldAutoClassify = !hasCachedClassification && NeedsExternalAutoClassification(recommendation);
         var shouldResetLibraryVisibilityTracking = !ReferenceEquals(_externalRecommendation, recommendation) || IsLibraryMovie;
 
         _movieId = null;
@@ -1329,6 +1327,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(IsCorrectionPanelVisible));
         _identificationStatus = IdentificationStatus.Pending;
         OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
+        OnPropertyChanged(nameof(IsUnidentifiedMovie));
         IsFavorite = false;
         IsWatched = recommendation.IsWatched;
         IsWantToWatch = recommendation.IsWantToWatch;
@@ -1414,35 +1413,112 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         IsDetailLoading = false;
         if (shouldAutoClassify)
         {
-            await ClassifyExternalRecommendationAsync(recommendation, cancellationToken);
+            StartExternalAutoClassification(recommendation);
         }
     }
 
-    private async Task ClassifyExternalRecommendationAsync(
-        AiRecommendationItem recommendation,
-        CancellationToken cancellationToken)
+    private void StartMovieAutoClassification(int movieId)
     {
-        ShowExternalAiAnalyzingState(recommendation);
-        StatusMessage = "正在为无播放源候选生成 AI 标签。";
+        if (!_backgroundClassifyingMovieIds.TryAdd(movieId, 0))
+        {
+            return;
+        }
+
+        _ = ClassifyMovieInBackgroundAsync(movieId);
+    }
+
+    private async Task ClassifyMovieInBackgroundAsync(int movieId)
+    {
         try
         {
-            var tags = await _aiClassificationService.ClassifyExternalMovieAsync(recommendation, cancellationToken);
-            recommendation.Tags = string.IsNullOrWhiteSpace(tags.AiTagsText) ? recommendation.Tags : tags.AiTagsText;
-            recommendation.EmotionTagsText = string.IsNullOrWhiteSpace(tags.EmotionTagsText) ? recommendation.EmotionTagsText : tags.EmotionTagsText;
-            recommendation.SceneTagsText = string.IsNullOrWhiteSpace(tags.SceneTagsText) ? recommendation.SceneTagsText : tags.SceneTagsText;
-            CacheExternalTags(recommendation);
-            ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
-            _dataRefreshService.NotifyMetadataChanged();
-            StatusMessage = "无播放源候选 AI 标签已自动生成。";
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
+            await _aiClassificationService.ClassifyMovieAsync(movieId, CancellationToken.None);
+            var classified = await _movieDetailQueryService.GetMovieDetailAsync(movieId, CancellationToken.None);
+            await DispatchToUiAsync(
+                () =>
+                {
+                    if (_externalRecommendation is null && _movieId == movieId && classified is not null)
+                    {
+                        ApplyClassifiedLocalTagsToCurrentDetail(classified);
+                        StatusMessage = "详情已加载，AI 分类已自动更新。";
+                    }
+
+                    _dataRefreshService.NotifyMetadataChanged();
+                });
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-ai-classification-background-complete contentKind=movie movieId={movieId} status=completed");
         }
         catch (Exception exception)
         {
-            ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
-            StatusMessage = $"无播放源候选 AI 标签生成失败：{DescribeException(exception)}";
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-ai-classification-background-failed contentKind=movie movieId={movieId} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+        finally
+        {
+            _backgroundClassifyingMovieIds.TryRemove(movieId, out _);
+        }
+    }
+
+    private void StartExternalAutoClassification(AiRecommendationItem recommendation)
+    {
+        var key = BuildExternalClassificationKey(recommendation);
+        if (!_backgroundClassifyingExternalKeys.TryAdd(key, 0))
+        {
+            return;
+        }
+
+        _ = ClassifyExternalRecommendationInBackgroundAsync(recommendation, key);
+    }
+
+    private async Task ClassifyExternalRecommendationInBackgroundAsync(
+        AiRecommendationItem recommendation,
+        string classificationKey)
+    {
+        try
+        {
+            await DispatchToUiAsync(
+                () =>
+                {
+                    if (IsCurrentExternalRecommendation(classificationKey))
+                    {
+                        ShowExternalAiAnalyzingState(recommendation);
+                        StatusMessage = "正在为无播放源候选生成 AI 标签。";
+                    }
+                });
+
+            var tags = await _aiClassificationService.ClassifyExternalMovieAsync(recommendation, CancellationToken.None);
+            ApplyExternalClassificationResult(recommendation, tags);
+            CacheExternalTags(recommendation);
+            await DispatchToUiAsync(
+                () =>
+                {
+                    if (IsCurrentExternalRecommendation(classificationKey))
+                    {
+                        ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
+                        StatusMessage = "无播放源候选 AI 标签已自动生成。";
+                    }
+
+                    _dataRefreshService.NotifyMetadataChanged();
+                });
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-ai-classification-background-complete contentKind=external tmdbId={FormatNullable(recommendation.TmdbId)} status=completed");
+        }
+        catch (Exception exception)
+        {
+            await DispatchToUiAsync(
+                () =>
+                {
+                    if (IsCurrentExternalRecommendation(classificationKey))
+                    {
+                        ApplyExternalTagDisplay(recommendation, ExternalAiMissingText);
+                        StatusMessage = $"无播放源候选 AI 标签生成失败：{DescribeException(exception)}";
+                    }
+                });
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-ai-classification-background-failed contentKind=external tmdbId={FormatNullable(recommendation.TmdbId)} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+        finally
+        {
+            _backgroundClassifyingExternalKeys.TryRemove(classificationKey, out _);
         }
     }
 
@@ -3514,6 +3590,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _identificationStatus = IdentificationStatus.Pending;
         RefreshResetSourceRecognitionCommandState();
         OnPropertyChanged(nameof(ShowRatingsAndTagsTab));
+        OnPropertyChanged(nameof(IsUnidentifiedMovie));
         ManualSearchQuery = string.Empty;
         ManualSearchYear = string.Empty;
         Ratings.Clear();
@@ -3605,7 +3682,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             : recommendation.SceneTagsText;
     }
 
-    private static void ApplyCachedExternalTags(AiRecommendationItem recommendation)
+    private static bool ApplyCachedExternalTags(AiRecommendationItem recommendation)
     {
         if (!ExternalMovieTagCache.TryGet(
                 recommendation.TmdbId,
@@ -3614,7 +3691,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 recommendation.ReleaseYear,
                 out var cachedTags))
         {
-            return;
+            return false;
         }
 
         recommendation.Tags = string.IsNullOrWhiteSpace(cachedTags.AiTagsText) ? recommendation.Tags : cachedTags.AiTagsText;
@@ -3624,15 +3701,11 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         recommendation.SceneTagsText = string.IsNullOrWhiteSpace(cachedTags.SceneTagsText)
             ? recommendation.SceneTagsText
             : cachedTags.SceneTagsText;
+        return !NeedsExternalAutoClassification(recommendation);
     }
 
     private static void CacheExternalTags(AiRecommendationItem recommendation)
     {
-        if (NeedsExternalAutoClassification(recommendation))
-        {
-            return;
-        }
-
         ExternalMovieTagCache.Set(recommendation);
     }
 
@@ -3641,6 +3714,68 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         return string.IsNullOrWhiteSpace(recommendation.Tags)
                || string.IsNullOrWhiteSpace(recommendation.EmotionTagsText)
                || string.IsNullOrWhiteSpace(recommendation.SceneTagsText);
+    }
+
+    private void ApplyClassifiedLocalTagsToCurrentDetail(MovieDetailModel classified)
+    {
+        AiTagsText = string.IsNullOrWhiteSpace(classified.AiTagsText)
+            ? ExternalAiMissingText
+            : classified.AiTagsText;
+        EmotionTagsText = string.IsNullOrWhiteSpace(classified.EmotionTagsText)
+            ? ExternalAiMissingText
+            : classified.EmotionTagsText;
+        SceneTagsText = string.IsNullOrWhiteSpace(classified.SceneTagsText)
+            ? ExternalAiMissingText
+            : classified.SceneTagsText;
+    }
+
+    private static void ApplyExternalClassificationResult(AiRecommendationItem recommendation, AiMovieTags tags)
+    {
+        recommendation.Tags = string.IsNullOrWhiteSpace(tags.AiTagsText) ? string.Empty : tags.AiTagsText;
+        recommendation.EmotionTagsText = string.IsNullOrWhiteSpace(tags.EmotionTagsText) ? string.Empty : tags.EmotionTagsText;
+        recommendation.SceneTagsText = string.IsNullOrWhiteSpace(tags.SceneTagsText) ? string.Empty : tags.SceneTagsText;
+    }
+
+    private bool IsCurrentExternalRecommendation(string classificationKey)
+    {
+        return !IsLibraryMovie
+               && _externalRecommendation is not null
+               && string.Equals(
+                   BuildExternalClassificationKey(_externalRecommendation),
+                   classificationKey,
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildExternalClassificationKey(AiRecommendationItem recommendation)
+    {
+        if (recommendation.TmdbId is > 0)
+        {
+            return $"tmdb:{recommendation.TmdbId.Value}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(recommendation.ImdbId))
+        {
+            return $"imdb:{recommendation.ImdbId.Trim().ToLowerInvariant()}";
+        }
+
+        return $"title:{recommendation.Title.Trim().ToLowerInvariant()}:{recommendation.ReleaseYear?.ToString() ?? string.Empty}";
+    }
+
+    private static string FormatNullable(int? value)
+    {
+        return value.HasValue ? value.Value.ToString() : "(none)";
+    }
+
+    private static Task DispatchToUiAsync(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return dispatcher.InvokeAsync(action).Task;
     }
 
     private static string DescribeException(Exception exception)

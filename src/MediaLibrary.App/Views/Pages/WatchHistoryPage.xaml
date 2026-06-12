@@ -184,7 +184,7 @@
         </Style>
 
         <Style x:Key="WatchHistoryDateFilterBarCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource GlassCompactCardStyle}">
-            <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
             <Setter Property="ClipToBounds" Value="False" />
         </Style>
 
@@ -416,6 +416,7 @@
                                    Text="{Binding ReleaseDateText}" />
                         <Border Margin="0,5,0,0"
                                 helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
+                                helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True"
                                 helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
                                 Style="{StaticResource LibraryTagLineContainerStyle}">
                             <TextBlock Style="{StaticResource LibraryMediaMutedTextStyle}">
@@ -508,7 +509,7 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid Margin="-32,-24,-32,0"
+    <Grid Margin="-32,-24,-32,-32"
           Background="Transparent">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

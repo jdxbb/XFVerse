@@ -240,7 +240,7 @@
                             </Viewbox>
                         </Border>
                         <TextBlock Grid.Column="1"
-                                   Margin="12,0,0,0"
+                                   Margin="7,0,0,0"
                                    Text="XFVerse"
                                    VerticalAlignment="Center">
                             <TextBlock.Style>
@@ -355,12 +355,41 @@
                                     Height="32"
                                     CornerRadius="16"
                                     Background="{DynamicResource BrushAccent}">
-                                <TextBlock HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Text="{Binding UserAvatarInitial}"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource BrushOnAccent}" />
+                                <Grid ClipToBounds="False">
+                                    <Ellipse>
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasUserAvatar}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                        <Ellipse.Fill>
+                                            <ImageBrush ImageSource="{Binding UserAvatarImage}"
+                                                        Stretch="UniformToFill" />
+                                        </Ellipse.Fill>
+                                    </Ellipse>
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding UserAvatarInitial}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource BrushOnAccent}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasUserAvatar}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
                             </Border>
                             <StackPanel Grid.Column="1"
                                         Margin="10,0,0,0"
@@ -410,6 +439,7 @@
                            VerticalOffset="-8">
                         <Border Width="246"
                                 Padding="14"
+                                Effect="{x:Null}"
                                 Style="{StaticResource PopupSurfaceStyle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
@@ -417,11 +447,40 @@
                                             Height="42"
                                             CornerRadius="21"
                                             Background="{DynamicResource BrushAccent}">
-                                        <TextBlock HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Text="{Binding UserAvatarInitial}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource BrushOnAccent}" />
+                                        <Grid ClipToBounds="False">
+                                            <Ellipse>
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasUserAvatar}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                                <Ellipse.Fill>
+                                                    <ImageBrush ImageSource="{Binding UserAvatarImage}"
+                                                                Stretch="UniformToFill" />
+                                                </Ellipse.Fill>
+                                            </Ellipse>
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding UserAvatarInitial}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource BrushOnAccent}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasUserAvatar}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
                                     </Border>
                                     <StackPanel Margin="10,0,0,0"
                                                 VerticalAlignment="Center">

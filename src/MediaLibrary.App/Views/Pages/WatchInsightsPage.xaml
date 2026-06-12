@@ -245,11 +245,13 @@
                                             ClipToBounds="False"
                                             Orientation="Horizontal"
                                             Style="{StaticResource WatchInsightsProfileTabActionPanelStyle}">
-                                    <TextBlock Margin="0,0,10,0"
-                                               MaxWidth="260"
+                                    <TextBlock Width="420"
+                                               Margin="0,0,10,0"
+                                               HorizontalAlignment="Right"
                                                VerticalAlignment="Center"
+                                               TextAlignment="Right"
                                                Text="{Binding DataContext.ProfileRefreshStatusText, RelativeSource={RelativeSource TemplatedParent}}"
-                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap"
                                                Style="{StaticResource BodyMutedTextStyle}" />
                                     <Button Command="{Binding DataContext.RefreshProfileCommand, RelativeSource={RelativeSource TemplatedParent}}"
                                             Style="{StaticResource WatchInsightsRefreshIconButtonStyle}">
@@ -263,11 +265,13 @@
                                             ClipToBounds="False"
                                             Orientation="Horizontal"
                                             Style="{StaticResource WatchInsightsStatisticsTabActionPanelStyle}">
-                                    <TextBlock Margin="0,0,10,0"
-                                               MaxWidth="260"
+                                    <TextBlock Width="420"
+                                               Margin="0,0,10,0"
+                                               HorizontalAlignment="Right"
                                                VerticalAlignment="Center"
+                                               TextAlignment="Right"
                                                Text="{Binding DataContext.StatisticsRefreshStatusText, RelativeSource={RelativeSource TemplatedParent}}"
-                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap"
                                                Style="{StaticResource BodyMutedTextStyle}" />
                                     <Button Command="{Binding DataContext.RefreshStatisticsCommand, RelativeSource={RelativeSource TemplatedParent}}"
                                             Style="{StaticResource WatchInsightsRefreshIconButtonStyle}"
@@ -304,7 +308,7 @@
             <Setter Property="Padding" Value="10,5" />
             <Setter Property="CornerRadius" Value="999" />
             <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
-            <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
         </Style>
 
         <Style x:Key="InsightEmptyBorderStyle" TargetType="Border">
@@ -314,7 +318,7 @@
             <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
         </Style>
 
         <Style x:Key="CalendarDayButtonStyle" TargetType="Button">
@@ -333,7 +337,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="10"
-                                Effect="{DynamicResource ShadowInlineCard}">
+                                Effect="{StaticResource ShadowStaticInlineCard}">
                             <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -378,7 +382,7 @@
             <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Kind}" Value="场景">
                     <Setter Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
@@ -422,7 +426,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
         </Style>
 
         <Style x:Key="ProfileKeywordSlotBorderStyle" TargetType="{x:Type Border}">
@@ -434,7 +438,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Opacity" Value="0.16" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Effect" Value="{DynamicResource ShadowInlineCard}" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
         </Style>
 
         <Style x:Key="ProfileSummaryQuoteTextStyle" TargetType="{x:Type TextBlock}">
@@ -590,7 +594,7 @@
                     Background="{DynamicResource BrushAccentSoft}"
                     BorderBrush="{DynamicResource BrushAccent}"
                     BorderThickness="1"
-                    Effect="{DynamicResource ShadowInlineCard}">
+                    Effect="{StaticResource ShadowStaticInlineCard}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Border Width="28"
                             Height="28"
@@ -638,7 +642,7 @@
                     Background="{DynamicResource BrushSurface}"
                     BorderBrush="{DynamicResource BrushBorder}"
                     BorderThickness="1"
-                    Effect="{DynamicResource ShadowInlineCard}">
+                    Effect="{StaticResource ShadowStaticInlineCard}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -962,7 +966,7 @@
                     Style="{StaticResource WatchInsightsHiddenHeaderTabControlStyle}">
             <TabItem Header="画像分析">
                 <ScrollViewer x:Name="ProfileInsightsScrollViewer"
-                              Margin="-32,-8,-32,0"
+                              Margin="-32,-8,-32,-32"
                               Cursor="Arrow"
                               helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
                               HorizontalScrollBarVisibility="Disabled"
@@ -1022,7 +1026,8 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <ScrollViewer Margin="30,8,12,16">
+                                        <ScrollViewer Margin="30,8,12,16"
+                                                      PreviewMouseWheel="ProfileSummaryScrollViewer_PreviewMouseWheel">
                                             <ScrollViewer.Resources>
                                                 <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource InsightModernScrollBarStyle}" />
                                             </ScrollViewer.Resources>
@@ -1292,16 +1297,16 @@
                                             Height="260"
                                             HorizontalAlignment="Right"
                                             Background="{DynamicResource BrushSurfaceAlt}">
-                                        <Border Canvas.Left="16" Canvas.Top="18" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{DynamicResource ShadowInlineCard}">
+                                        <Border Canvas.Left="16" Canvas.Top="18" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{StaticResource ShadowStaticInlineCard}">
                                             <TextBlock Text="熟悉安全 × 情绪沉浸" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
-                                        <Border Canvas.Left="162" Canvas.Top="18" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{DynamicResource ShadowInlineCard}">
+                                        <Border Canvas.Left="162" Canvas.Top="18" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{StaticResource ShadowStaticInlineCard}">
                                             <TextBlock Text="新鲜探索 × 情绪沉浸" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
-                                        <Border Canvas.Left="16" Canvas.Top="152" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{DynamicResource ShadowInlineCard}">
+                                        <Border Canvas.Left="16" Canvas.Top="152" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{StaticResource ShadowStaticInlineCard}">
                                             <TextBlock Text="熟悉安全 × 轻松消遣" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
-                                        <Border Canvas.Left="162" Canvas.Top="152" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{DynamicResource ShadowInlineCard}">
+                                        <Border Canvas.Left="162" Canvas.Top="152" Width="132" Height="88" Padding="10" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="12" Effect="{StaticResource ShadowStaticInlineCard}">
                                             <TextBlock Text="新鲜探索 × 轻松消遣" TextWrapping="Wrap" Style="{StaticResource BodyMutedTextStyle}" />
                                         </Border>
                                         <Line X1="155" Y1="16" X2="155" Y2="242" Stroke="{DynamicResource BrushAccent}" StrokeThickness="1" Opacity="0.45" />
@@ -1360,7 +1365,7 @@
 
             <TabItem Header="观影统计">
                 <ScrollViewer x:Name="StatisticsInsightsScrollViewer"
-                              Margin="-32,-8,-32,0"
+                              Margin="-32,-8,-32,-32"
                               Cursor="Arrow"
                               helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
                               HorizontalScrollBarVisibility="Disabled"
@@ -2132,13 +2137,13 @@
                                                     <StackPanel Grid.Column="1" Margin="10,0">
                                                         <WrapPanel>
                                                             <Border Margin="0,0,6,6" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushInfoBackground}" BorderBrush="{DynamicResource BrushInfoBorder}" BorderThickness="1">
-                                                                <TextBlock MaxWidth="92" helpers:TrimmedTextToolTipBehavior.FullText="{Binding TypeLabel}" Text="{Binding TypeLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock MaxWidth="92" helpers:TrimmedTextToolTipBehavior.FullText="{Binding TagToolTipText}" helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True" Text="{Binding TypeLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
                                                             </Border>
                                                             <Border Margin="0,0,6,6" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushAccent}" BorderThickness="1">
-                                                                <TextBlock MaxWidth="92" helpers:TrimmedTextToolTipBehavior.FullText="{Binding EmotionLabel}" Text="{Binding EmotionLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock MaxWidth="92" helpers:TrimmedTextToolTipBehavior.FullText="{Binding TagToolTipText}" helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True" Text="{Binding EmotionLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
                                                             </Border>
                                                             <Border Margin="0,0,0,6" Padding="8,4" CornerRadius="999" Background="{DynamicResource BrushSuccessBackground}" BorderBrush="{DynamicResource BrushSuccessBorder}" BorderThickness="1">
-                                                                <TextBlock MaxWidth="92" helpers:TrimmedTextToolTipBehavior.FullText="{Binding SceneLabel}" Text="{Binding SceneLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
+                                                                <TextBlock MaxWidth="92" helpers:TrimmedTextToolTipBehavior.FullText="{Binding TagToolTipText}" helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True" Text="{Binding SceneLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextStyle}" />
                                                             </Border>
                                                         </WrapPanel>
                                                         <ProgressBar Margin="0,2,0,0" Height="7" Maximum="100" Value="{Binding ProgressValue, Mode=OneWay}" />

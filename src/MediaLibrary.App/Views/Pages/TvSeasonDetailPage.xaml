@@ -300,9 +300,9 @@
                                 <Grid Width="330">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="92" />
-                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="2" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="2" />
                                         <ColumnDefinition Width="92" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Horizontal">
@@ -311,7 +311,7 @@
                                         </Border>
                                         <TextBlock VerticalAlignment="Center" Style="{StaticResource TvSeasonSmallCardTitleStyle}" Text="TMDB" />
                                     </StackPanel>
-                                    <Border Grid.Column="1" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
+                                    <Border Grid.Column="1" Style="{StaticResource RatingCardDividerStyle}" />
                                     <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
                                             <TextBlock FontSize="15" FontWeight="Bold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeasonTmdbRating.ScoreDisplayText}" />
@@ -327,7 +327,7 @@
                                                                  Stroke="{DynamicResource BrushRatingStarStroke}"
                                                                  StrokeThickness="0.65" />
                                     </StackPanel>
-                                    <Border Grid.Column="3" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
+                                    <Border Grid.Column="3" Style="{StaticResource RatingCardDividerStyle}" />
                                     <StackPanel Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <TextBlock HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="票数" />
                                         <TextBlock HorizontalAlignment="Center" Margin="0,2,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonTmdbRating.VoteCountDisplayText}" />
@@ -517,13 +517,16 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Border Padding="22,8,36,8"
-                                    BorderThickness="0">
+                                    BorderThickness="1"
+                                    CornerRadius="14">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderBrush" Value="Transparent" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsTargetEpisode}" Value="True">
-                                                <Setter Property="Background" Value="{DynamicResource BrushGlassSelected}" />
+                                                <Setter Property="Background" Value="{DynamicResource BrushSeasonEpisodeTargetBackground}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BrushSeasonEpisodeTargetBorder}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

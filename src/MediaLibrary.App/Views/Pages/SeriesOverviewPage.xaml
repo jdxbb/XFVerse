@@ -287,7 +287,7 @@
                                             <Grid Grid.Row="1" Margin="0,7,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="3*" />
-                                                    <ColumnDefinition Width="3" />
+                                                    <ColumnDefinition Width="2" />
                                                     <ColumnDefinition Width="2*" />
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -305,7 +305,7 @@
                                                                              Stroke="{DynamicResource BrushRatingStarStroke}"
                                                                              StrokeThickness="0.65" />
                                                 </StackPanel>
-                                                <Border Grid.Column="1" Width="3" Margin="0,2" Background="{DynamicResource BrushDivider}" />
+                                                <Border Grid.Column="1" Style="{StaticResource RatingCardDividerStyle}" />
                                                 <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                     <TextBlock HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="票数" />
                                                     <TextBlock HorizontalAlignment="Center" Margin="0,2,0,0" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding VoteCountDisplayText}" />

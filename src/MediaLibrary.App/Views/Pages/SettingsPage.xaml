@@ -156,7 +156,7 @@
 
         <Style x:Key="SettingsAboutRowButtonStyle" TargetType="Button">
             <Setter Property="MinHeight" Value="56" />
-            <Setter Property="Padding" Value="0,8,0,8" />
+            <Setter Property="Padding" Value="37,8,38,8" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="0,1,0,0" />
@@ -169,6 +169,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="AboutRowChrome"
+                                Margin="0.5,0,0,0"
                                 Padding="{TemplateBinding Padding}"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
@@ -178,7 +179,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="AboutRowChrome" Property="Background" Value="{DynamicResource BrushSurfaceAlt}" />
+                                <Setter TargetName="AboutRowChrome" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -874,10 +875,9 @@
                                 </StackPanel>
                             </Border>
                             <Button Grid.Row="3"
-                                    Margin="38,0,38,0"
+                                    Margin="1,0,0,0"
                                     Command="{Binding OpenOfficialWebsiteCommand}"
-                                    Style="{StaticResource SettingsAboutRowButtonStyle}"
-                                    ToolTip="{Binding AboutStatusMessage}">
+                                    Style="{StaticResource SettingsAboutRowButtonStyle}">
                                 <Button.RenderTransform>
                                     <TranslateTransform Y="28" />
                                 </Button.RenderTransform>
@@ -960,8 +960,7 @@
                                     </Border>
 
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock helpers:TrimmedTextToolTipBehavior.FullText="关于 XFVerse"
-                                                   Text="关于 XFVerse"
+                                        <TextBlock Text="关于 XFVerse"
                                                    Style="{StaticResource SettingsDraftLabelTextStyle}" />
                                         <TextBlock Margin="0,2,0,0"
                                                    Text="{Binding AppVersionText}"
@@ -982,7 +981,8 @@
 
                     <TabItem Header="API 配置">
                         <ScrollViewer x:Name="ApiConfigScrollViewer"
-                                      Margin="-32,-24,-32,0"
+                                      Margin="-32,0,-32,-32"
+                                      ClipToBounds="True"
                                       Cursor="Arrow"
                                       HorizontalScrollBarVisibility="Disabled"
                                       VerticalScrollBarVisibility="Auto"
@@ -993,7 +993,7 @@
                             </ScrollViewer.Resources>
                             <Grid Width="{Binding ActualWidth, ElementName=ApiConfigScrollViewer}">
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="42" />
+                                    <RowDefinition Height="18" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="42" />
                                 </Grid.RowDefinitions>

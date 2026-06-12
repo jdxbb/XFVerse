@@ -82,6 +82,7 @@ public static class AppServiceProvider
         services.AddSingleton<IPlayerPreferencesService, PlayerPreferencesService>();
         services.AddSingleton<ILibraryPreferencesService, LibraryPreferencesService>();
         services.AddSingleton<IDiscoveryPreferencesService, DiscoveryPreferencesService>();
+        services.AddSingleton<IUserProfileService, UserProfileService>();
         services.AddSingleton<IPlayerWindowService, PlayerWindowService>();
         services.AddSingleton<IPosterCacheService, PosterCacheService>();
         services.AddSingleton<ISoftwareCacheManagementService, SoftwareCacheManagementService>();

@@ -13,6 +13,8 @@ namespace MediaLibrary.App.ViewModels.Pages;
 public sealed class FavoritesViewModel : PageViewModelBase
 {
     private const string CollectionChangeSource = "Collection";
+    private const int PosterTagDisplayLength = 18;
+    private const string TagOverflowMarker = "..";
     private const int RatingVoteWeightCap = 100_000;
     private readonly IUserCollectionService _userCollectionService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
@@ -766,11 +768,10 @@ public sealed class FavoritesViewModel : PageViewModelBase
         public bool IsHighRating => TryGetDisplayRatingScore(out var score)
                                     && DiscoveryRatingPresenter.IsHighDisplayRating(score);
 
-        public string ReleaseDateText => IsTvSeason
-            ? BuildSeasonAuxiliaryText()
-            : ReleaseDate.HasValue
-                ? ReleaseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                : ReleaseYear?.ToString(CultureInfo.InvariantCulture) ?? "年份未知";
+        public string ReleaseDateText => ReleaseDate.HasValue
+            ? ReleaseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : ReleaseYear?.ToString(CultureInfo.InvariantCulture)
+              ?? (IsTvSeason ? BuildSeasonFallbackDateText() : "年份未知");
 
         public string SourceSummaryText => IsTvSeason && !string.IsNullOrWhiteSpace(_item.SourceSummary)
             ? _item.SourceSummary
@@ -778,22 +779,22 @@ public sealed class FavoritesViewModel : PageViewModelBase
 
         public string PosterTagLine => BuildPosterTagLine();
 
-        public string PosterTagToolTipText => PosterTagLine;
+        public string PosterTagToolTipText => BuildPosterTagToolTipText();
 
-        public string PosterTagGroupOneText => BuildPosterTagGroupOneText();
+        public string PosterTagGroupOneText => BuildPosterTagGroups(PosterTagDisplayLength)[0];
 
         public string PosterTagSeparatorAfterOneText => BuildPosterTagSeparator(
             PosterTagGroupOneText,
             PosterTagGroupTwoText,
             PosterTagGroupThreeText);
 
-        public string PosterTagGroupTwoText => SourceSummaryText;
+        public string PosterTagGroupTwoText => BuildPosterTagGroups(PosterTagDisplayLength)[1];
 
         public string PosterTagSeparatorAfterTwoText => BuildPosterTagSeparator(
             PosterTagGroupTwoText,
             PosterTagGroupThreeText);
 
-        public string PosterTagGroupThreeText => WatchStateText;
+        public string PosterTagGroupThreeText => BuildPosterTagGroups(PosterTagDisplayLength)[2];
 
         public void BeginAction()
         {
@@ -877,24 +878,9 @@ public sealed class FavoritesViewModel : PageViewModelBase
             return Math.Round(score, 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture);
         }
 
-        private string BuildSeasonAuxiliaryText()
+        private string BuildSeasonFallbackDateText()
         {
-            var parts = new List<string>
-            {
-                SeasonNumber > 0 ? $"S{SeasonNumber:D2}" : "未识别季"
-            };
-
-            if (TotalEpisodeCount > 0)
-            {
-                parts.Add($"共 {TotalEpisodeCount} 集");
-            }
-
-            if (ReleaseYear.HasValue)
-            {
-                parts.Add(ReleaseYear.Value.ToString(CultureInfo.InvariantCulture));
-            }
-
-            return string.Join(" · ", parts);
+            return SeasonNumber > 0 ? $"S{SeasonNumber:D2}" : MediaKindText;
         }
 
         private string BuildPosterTagLine()
@@ -902,12 +888,224 @@ public sealed class FavoritesViewModel : PageViewModelBase
             return JoinNonEmpty(" | ", PosterTagGroupOneText, PosterTagGroupTwoText, PosterTagGroupThreeText);
         }
 
-        private string BuildPosterTagGroupOneText()
+        private string[] BuildPosterTagGroups(int? maxDisplayLength)
         {
-            return FirstNonEmpty(
-                BuildLimitedTagText(GenresText),
-                BuildLimitedTagText(AiTagsText),
-                MediaKindText);
+            if (IsTvSeason)
+            {
+                return [BuildSinglePosterTagLine(maxDisplayLength), string.Empty, string.Empty];
+            }
+
+            var groups = BuildPosterTagLists();
+
+            if (groups.All(group => group.Count == 0))
+            {
+                return [MediaKindText, string.Empty, string.Empty];
+            }
+
+            var formatted = groups.Select(FormatTags).ToArray();
+            if (!maxDisplayLength.HasValue || FitsDisplayLength(JoinNonEmpty(" | ", formatted), maxDisplayLength.Value))
+            {
+                return formatted;
+            }
+
+            var selected = new[]
+            {
+                new List<string>(),
+                new List<string>(),
+                new List<string>()
+            };
+
+            var displayOrder = new List<int>();
+            var maxCount = groups.Max(group => group.Count);
+            for (var index = 0; index < maxCount; index++)
+            {
+                for (var groupIndex = 0; groupIndex < groups.Length; groupIndex++)
+                {
+                    if (index < groups[groupIndex].Count)
+                    {
+                        var candidate = CloneSelectedGroups(selected);
+                        candidate[groupIndex].Add(groups[groupIndex][index]);
+                        var candidateOrder = displayOrder.Concat([groupIndex]).ToList();
+                        if (FitsDisplayLength(JoinNonEmpty(" | ", candidate.Select(FormatTags).ToArray()), maxDisplayLength.Value))
+                        {
+                            selected[groupIndex].Add(groups[groupIndex][index]);
+                            displayOrder.Add(groupIndex);
+                            continue;
+                        }
+
+                        return FormatOverflowPosterTagGroups(candidate, groups, candidateOrder, maxDisplayLength.Value);
+                    }
+                }
+            }
+
+            return selected.Select(FormatTags).ToArray();
+        }
+
+        private string BuildPosterTagToolTipText()
+        {
+            return IsTvSeason
+                ? BuildSinglePosterTagLine(null)
+                : BuildGroupedTagToolTipText(BuildPosterTagLists(), MediaKindText);
+        }
+
+        private IReadOnlyList<string>[] BuildPosterTagLists()
+        {
+            return
+            [
+                ParseTags(string.IsNullOrWhiteSpace(AiTagsText) ? GenresText : AiTagsText),
+                ParseTags(EmotionTagsText),
+                ParseTags(SceneTagsText)
+            ];
+        }
+
+        private static string BuildGroupedTagToolTipText(IReadOnlyList<string>[] groups, string fallback)
+        {
+            if (groups.All(group => group.Count == 0))
+            {
+                return fallback;
+            }
+
+            var lines = new[]
+            {
+                FormatToolTipLine("类型", groups[0]),
+                FormatToolTipLine("情绪", groups[1]),
+                FormatToolTipLine("场景", groups[2])
+            };
+
+            var tooltip = string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)));
+            return string.IsNullOrWhiteSpace(tooltip) ? fallback : tooltip;
+        }
+
+        private static string FormatToolTipLine(string label, IEnumerable<string> tags)
+        {
+            var tagText = FormatTags(tags);
+            return string.IsNullOrWhiteSpace(tagText) ? string.Empty : $"{label}: {tagText}";
+        }
+
+        private string BuildSinglePosterTagLine(int? maxDisplayLength)
+        {
+            return maxDisplayLength.HasValue
+                ? BuildLimitedSingleTagLine(GenresText, MediaKindText, maxDisplayLength.Value)
+                : FormatSingleTagLine(GenresText, MediaKindText);
+        }
+
+        private static List<string>[] CloneSelectedGroups(IEnumerable<List<string>> groups)
+        {
+            return groups.Select(group => group.ToList()).ToArray();
+        }
+
+        private static string[] FormatOverflowPosterTagGroups(
+            List<string>[] selected,
+            IReadOnlyList<string>[] originalGroups,
+            List<int> displayOrder,
+            int maxDisplayLength)
+        {
+            EnsureAtLeastOneSelectedTag(selected, originalGroups, displayOrder);
+            while (!FitsDisplayLength(JoinNonEmpty(" | ", FormatGroupsWithOverflow(selected, originalGroups)), maxDisplayLength)
+                   && displayOrder.Count > 1)
+            {
+                var groupIndex = displayOrder[^1];
+                displayOrder.RemoveAt(displayOrder.Count - 1);
+                if (selected[groupIndex].Count == 0)
+                {
+                    continue;
+                }
+
+                selected[groupIndex].RemoveAt(selected[groupIndex].Count - 1);
+            }
+
+            var formatted = FormatGroupsWithOverflow(selected, originalGroups);
+            if (FitsDisplayLength(JoinNonEmpty(" | ", formatted), maxDisplayLength))
+            {
+                return formatted;
+            }
+
+            return TruncateVisibleGroupsForDisplay(formatted, maxDisplayLength);
+        }
+
+        private static void EnsureAtLeastOneSelectedTag(
+            IList<string>[] selected,
+            IReadOnlyList<string>[] originalGroups,
+            ICollection<int> displayOrder)
+        {
+            if (selected.Any(group => group.Count > 0))
+            {
+                return;
+            }
+
+            for (var index = 0; index < originalGroups.Length; index++)
+            {
+                if (originalGroups[index].Count == 0)
+                {
+                    continue;
+                }
+
+                selected[index].Add(originalGroups[index][0]);
+                displayOrder.Add(index);
+                return;
+            }
+        }
+
+        private static string[] FormatGroupsWithOverflow(
+            IReadOnlyList<string>[] selected,
+            IReadOnlyList<string>[] originalGroups)
+        {
+            var formatted = new string[selected.Length];
+            for (var index = 0; index < selected.Length; index++)
+            {
+                if (selected[index].Count == 0)
+                {
+                    formatted[index] = string.Empty;
+                    continue;
+                }
+
+                var groupText = FormatTags(selected[index]);
+                formatted[index] = originalGroups[index].Count > selected[index].Count
+                    ? $"{groupText}{TagOverflowMarker}"
+                    : groupText;
+            }
+
+            return formatted;
+        }
+
+        private static string BuildLimitedSingleTagLine(string? value, string fallback, int maxDisplayLength)
+        {
+            var tags = ParseTags(value);
+            if (tags.Count == 0)
+            {
+                return fallback;
+            }
+
+            var fullLine = FormatTags(tags);
+            if (FitsDisplayLength(fullLine, maxDisplayLength))
+            {
+                return fullLine;
+            }
+
+            var selected = new List<string>();
+            foreach (var tag in tags)
+            {
+                var candidate = selected.Concat([tag]).ToArray();
+                if (!FitsDisplayLength(FormatTags(candidate), maxDisplayLength))
+                {
+                    break;
+                }
+
+                selected.Add(tag);
+            }
+
+            if (selected.Count == 0)
+            {
+                return TruncateForDisplay(tags[0], maxDisplayLength);
+            }
+
+            return $"{FormatTags(selected)}{TagOverflowMarker}";
+        }
+
+        private static string FormatSingleTagLine(string? value, string fallback)
+        {
+            var tags = ParseTags(value);
+            return tags.Count == 0 ? fallback : FormatTags(tags);
         }
 
         private static string BuildPosterTagSeparator(string currentGroup, params string[] followingGroups)
@@ -917,15 +1115,83 @@ public sealed class FavoritesViewModel : PageViewModelBase
                 : string.Empty;
         }
 
-        private static string BuildLimitedTagText(string text)
+        private static IReadOnlyList<string> ParseTags(string? value)
         {
-            var tags = text
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return Array.Empty<string>();
+            }
+
+            return value
                 .Split(['、', ',', '，', '|', '/', ';', '；'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Take(2)
-                .ToArray();
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
 
-            return tags.Length == 0 ? string.Empty : string.Join(" / ", tags);
+        private static string FormatTags(IEnumerable<string> tags)
+        {
+            return string.Join(" / ", tags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
+        }
+
+        private static bool FitsDisplayLength(string value, int maxDisplayLength)
+        {
+            return CalculateDisplayLength(value) <= maxDisplayLength;
+        }
+
+        private static int CalculateDisplayLength(string value)
+        {
+            return value.Count(character => !char.IsWhiteSpace(character));
+        }
+
+        private static string[] TruncateVisibleGroupsForDisplay(string[] groups, int maxDisplayLength)
+        {
+            var result = groups.ToArray();
+            while (!FitsDisplayLength(JoinNonEmpty(" | ", result), maxDisplayLength))
+            {
+                var groupIndex = Enumerable.Range(0, result.Length)
+                    .Where(index => !string.IsNullOrWhiteSpace(result[index]))
+                    .LastOrDefault(-1);
+                if (groupIndex < 0)
+                {
+                    break;
+                }
+
+                var current = result[groupIndex];
+                if (CalculateDisplayLength(current) <= TagOverflowMarker.Length + 1)
+                {
+                    result[groupIndex] = string.Empty;
+                    continue;
+                }
+
+                result[groupIndex] = TruncateForDisplay(current, CalculateDisplayLength(current) - 1);
+            }
+
+            return result;
+        }
+
+        private static string TruncateForDisplay(string value, int maxDisplayLength)
+        {
+            if (maxDisplayLength <= TagOverflowMarker.Length)
+            {
+                return TagOverflowMarker;
+            }
+
+            var builder = new System.Text.StringBuilder();
+            var length = 0;
+            foreach (var character in value)
+            {
+                var characterLength = char.IsWhiteSpace(character) ? 0 : 1;
+                if (length + characterLength + TagOverflowMarker.Length > maxDisplayLength)
+                {
+                    break;
+                }
+
+                builder.Append(character);
+                length += characterLength;
+            }
+
+            return builder.ToString().TrimEnd(' ', '/', '|') + TagOverflowMarker;
         }
 
         private static string JoinNonEmpty(string separator, params string[] values)
@@ -933,9 +1199,5 @@ public sealed class FavoritesViewModel : PageViewModelBase
             return string.Join(separator, values.Where(x => !string.IsNullOrWhiteSpace(x)));
         }
 
-        private static string FirstNonEmpty(params string[] values)
-        {
-            return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
-        }
     }
 }

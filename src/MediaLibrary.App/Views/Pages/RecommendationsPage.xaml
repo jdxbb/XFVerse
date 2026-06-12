@@ -133,7 +133,6 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12"
                                 Padding="{TemplateBinding Padding}"
-                                Effect="{StaticResource ShadowPopup}"
                                 SnapsToDevicePixels="True">
                             <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
                         </Border>
@@ -586,7 +585,7 @@
             <Setter Property="MaxHeight" Value="384" />
             <Setter Property="Padding" Value="26" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="ClipToBounds" Value="False" />
         </Style>
 
         <Style x:Key="RecommendationPreferenceInputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
@@ -807,7 +806,8 @@
                                         <TextBlock Grid.Row="2"
                                                    Grid.ColumnSpan="3"
                                                    Margin="0,2,0,0"
-                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding RecommendationTagLineText}"
+                                                   helpers:TrimmedTextToolTipBehavior.FullText="{Binding RecommendationTagToolTipText}"
+                                                   helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True"
                                                    Style="{StaticResource RecommendationPosterMetaTextStyle}">
                                             <Run Text="{Binding RecommendationTagGroupOneText, Mode=OneWay}" />
                                             <Run Text="{Binding RecommendationTagSeparatorAfterOneText, Mode=OneWay}"

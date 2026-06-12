@@ -144,6 +144,14 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
 
     public string RecommendationTagLineText => JoinDisplayParts(Tags, EmotionTagsText, SceneTagsText);
 
+    public string RecommendationTagToolTipText => BuildGroupedTagToolTipText(
+        [
+            ("类型", Tags),
+            ("情绪", EmotionTagsText),
+            ("场景", SceneTagsText)
+        ],
+        RecommendationTagLineText);
+
     public string RecommendationTagGroupOneText => GetRecommendationTagPart(0);
 
     public string RecommendationTagSeparatorAfterOneText => GetRecommendationTagParts().Length > 1 ? " | " : string.Empty;
@@ -330,6 +338,22 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
         return parts.Length == 0 ? "-" : string.Join(" | ", parts);
     }
 
+    private static string BuildGroupedTagToolTipText(IEnumerable<(string Label, string? Value)> groups, string fallback)
+    {
+        var lines = groups
+            .Select(group => FormatGroupedTagToolTipLine(group.Label, group.Value))
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToArray();
+
+        return lines.Length == 0 ? fallback : string.Join(Environment.NewLine, lines);
+    }
+
+    private static string FormatGroupedTagToolTipLine(string label, string? value)
+    {
+        var text = FormatDisplayPart(value);
+        return IsMissingDisplayValue(text) ? string.Empty : $"{label}: {text}";
+    }
+
     private string GetRecommendationTagPart(int index)
     {
         var parts = GetRecommendationTagParts();
@@ -394,6 +418,7 @@ public sealed class AiRecommendationItem : INotifyPropertyChanged
         OnPropertyChanged(nameof(OriginalTitleDisplayText));
         OnPropertyChanged(nameof(TitleOriginalSeparatorText));
         OnPropertyChanged(nameof(RecommendationTagLineText));
+        OnPropertyChanged(nameof(RecommendationTagToolTipText));
         OnPropertyChanged(nameof(RecommendationTagGroupOneText));
         OnPropertyChanged(nameof(RecommendationTagSeparatorAfterOneText));
         OnPropertyChanged(nameof(RecommendationTagGroupTwoText));

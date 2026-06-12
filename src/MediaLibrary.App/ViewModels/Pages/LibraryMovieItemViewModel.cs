@@ -171,9 +171,9 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     public string MovieTagLine => JoinVisibleGroups(BuildMovieTagGroups(null));
 
-    public string PosterTagToolTipText => FullTagLine;
+    public string PosterTagToolTipText => BuildTagToolTipText();
 
-    public string ListTagToolTipText => FullTagLine;
+    public string ListTagToolTipText => BuildTagToolTipText();
 
     public string PosterTagGroupOneText => IsMovie
         ? BuildMovieTagGroups(PosterMovieTagDisplayLength)[0]
@@ -442,12 +442,7 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
 
     private string[] BuildMovieTagGroups(int? maxDisplayLength)
     {
-        var groups = new[]
-        {
-            ParseTags(TypeTagSourceText),
-            ParseTags(Movie.EmotionTagsText),
-            ParseTags(Movie.SceneTagsText)
-        };
+        var groups = BuildMovieTagLists();
 
         if (groups.All(group => group.Count == 0))
         {
@@ -491,6 +486,47 @@ public sealed class LibraryMovieItemViewModel : ObservableObject
         }
 
         return selected.Select(FormatTags).ToArray();
+    }
+
+    private string BuildTagToolTipText()
+    {
+        return IsMovie
+            ? BuildGroupedTagToolTipText(BuildMovieTagLists(), MissingSingleTagFallback)
+            : FullTagLine;
+    }
+
+    private IReadOnlyList<string>[] BuildMovieTagLists()
+    {
+        return
+        [
+            ParseTags(TypeTagSourceText),
+            ParseTags(Movie.EmotionTagsText),
+            ParseTags(Movie.SceneTagsText)
+        ];
+    }
+
+    private static string BuildGroupedTagToolTipText(IReadOnlyList<string>[] groups, string fallback)
+    {
+        if (groups.All(group => group.Count == 0))
+        {
+            return fallback;
+        }
+
+        var lines = new[]
+        {
+            FormatToolTipLine("类型", groups[0]),
+            FormatToolTipLine("情绪", groups[1]),
+            FormatToolTipLine("场景", groups[2])
+        };
+
+        var tooltip = string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)));
+        return string.IsNullOrWhiteSpace(tooltip) ? fallback : tooltip;
+    }
+
+    private static string FormatToolTipLine(string label, IEnumerable<string> tags)
+    {
+        var tagText = FormatTags(tags);
+        return string.IsNullOrWhiteSpace(tagText) ? string.Empty : $"{label}: {tagText}";
     }
 
     private static List<string>[] CloneSelectedGroups(IEnumerable<List<string>> groups)

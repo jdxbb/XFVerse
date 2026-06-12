@@ -23,6 +23,13 @@ public static class TrimmedTextToolTipBehavior
             typeof(TrimmedTextToolTipBehavior),
             new PropertyMetadata(string.Empty, OnToolTipSourceChanged));
 
+    public static readonly DependencyProperty OnlyWhenVisibleTextTruncatedProperty =
+        DependencyProperty.RegisterAttached(
+            "OnlyWhenVisibleTextTruncated",
+            typeof(bool),
+            typeof(TrimmedTextToolTipBehavior),
+            new PropertyMetadata(false, OnToolTipSourceChanged));
+
     public static string GetFullText(DependencyObject element)
     {
         return (string)element.GetValue(FullTextProperty);
@@ -41,6 +48,16 @@ public static class TrimmedTextToolTipBehavior
     public static void SetVisibleText(DependencyObject element, string value)
     {
         element.SetValue(VisibleTextProperty, value);
+    }
+
+    public static bool GetOnlyWhenVisibleTextTruncated(DependencyObject element)
+    {
+        return (bool)element.GetValue(OnlyWhenVisibleTextTruncatedProperty);
+    }
+
+    public static void SetOnlyWhenVisibleTextTruncated(DependencyObject element, bool value)
+    {
+        element.SetValue(OnlyWhenVisibleTextTruncatedProperty, value);
     }
 
     private static void OnToolTipSourceChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs e)
@@ -114,10 +131,24 @@ public static class TrimmedTextToolTipBehavior
             visibleText = GetInlineText(textBlock);
         }
 
+        var visuallyTrimmed = IsTextVisuallyTrimmed(textBlock, visibleText);
+        if (GetOnlyWhenVisibleTextTruncated(owner))
+        {
+            owner.ToolTip = visuallyTrimmed || HasOverflowMarker(visibleText)
+                ? fullText
+                : null;
+            return;
+        }
+
         var logicallyTruncated = !string.Equals(Normalize(fullText), Normalize(visibleText), StringComparison.Ordinal);
-        owner.ToolTip = logicallyTruncated || IsTextVisuallyTrimmed(textBlock, visibleText)
+        owner.ToolTip = logicallyTruncated || visuallyTrimmed
             ? fullText
             : null;
+    }
+
+    private static bool HasOverflowMarker(string visibleText)
+    {
+        return visibleText.Contains("..", StringComparison.Ordinal);
     }
 
     private static bool IsTextVisuallyTrimmed(TextBlock textBlock, string visibleText)

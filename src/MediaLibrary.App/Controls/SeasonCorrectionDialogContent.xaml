@@ -301,6 +301,7 @@
 
     <Border Height="548"
             Padding="16"
+            ClipToBounds="False"
             Style="{StaticResource GlassInlinePanelStyle}">
         <Grid>
             <Grid.RowDefinitions>
@@ -846,7 +847,7 @@
                                         <ComboBox Grid.Column="2"
                                                   ItemsSource="{Binding SourceOptions}"
                                                   SelectedItem="{Binding SelectedSourceOption, Mode=TwoWay}"
-                                                  Style="{StaticResource CorrectionDialogComboBoxStyle}">
+                                                  Style="{StaticResource CorrectionDialogPlaybackSourceComboBoxStyle}">
                                             <ComboBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding DisplayText}"

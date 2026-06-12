@@ -4,9 +4,10 @@
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
         <Style x:Key="ScanLogCardShellStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
-            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Margin" Value="0,6,0,16" />
             <Setter Property="Padding" Value="12" />
             <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
         </Style>
 
         <Storyboard x:Key="ScanLogStatusLightStoryboard"
