@@ -158,6 +158,7 @@ public sealed class HomeViewModel : PageViewModelBase
         {
             ApplyActivePlaybackState();
             ContinuePlaybackCommand.RaiseCanExecuteChanged();
+            StartRecommendationsRefresh(CancellationToken.None);
             return;
         }
 
@@ -261,10 +262,10 @@ public sealed class HomeViewModel : PageViewModelBase
                     break;
                 case AppDataChangeReason.CollectionChanged:
                     await RefreshLibraryOverviewAsync();
-                    await RefreshRecommendationsAsync();
+                    NotifyAiRecommendationBindings();
                     break;
                 case AppDataChangeReason.RecommendationChanged:
-                    await RefreshRecommendationsAsync();
+                    NotifyAiRecommendationBindings();
                     break;
                 case AppDataChangeReason.ScanChanged:
                     await RefreshScanOverviewAsync();
@@ -298,21 +299,21 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private void StartRecommendationsRefresh(CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         var refreshVersion = unchecked(_recommendationRefreshVersion + 1);
         _recommendationRefreshVersion = refreshVersion;
-        _ = RefreshRecommendationsInBackgroundAsync(refreshVersion, cancellationToken);
+        _ = RefreshRecommendationsInBackgroundAsync(refreshVersion);
     }
 
-    private async Task RefreshRecommendationsInBackgroundAsync(
-        int refreshVersion,
-        CancellationToken cancellationToken)
+    private async Task RefreshRecommendationsInBackgroundAsync(int refreshVersion)
     {
         try
         {
-            await RefreshRecommendationsAsync(cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
+            await RefreshRecommendationsAsync();
         }
         catch (Exception exception)
         {
@@ -348,7 +349,7 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private async Task RefreshLibraryOverviewAsync(CancellationToken cancellationToken = default)
     {
-        var dashboard = await _dashboardQueryService.GetLibraryOverviewAsync(cancellationToken);
+        var dashboard = await RunQueryOffUiThreadAsync(_dashboardQueryService.GetLibraryOverviewAsync, cancellationToken);
         MovieCount = dashboard.MovieCount;
         SourceCount = dashboard.SourceCount;
         WatchedCount = dashboard.WatchedCount;
@@ -367,7 +368,7 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private async Task RefreshScanOverviewAsync(CancellationToken cancellationToken = default)
     {
-        var dashboard = await _dashboardQueryService.GetScanOverviewAsync(cancellationToken);
+        var dashboard = await RunQueryOffUiThreadAsync(_dashboardQueryService.GetScanOverviewAsync, cancellationToken);
         MovieCount = dashboard.MovieCount;
         SourceCount = dashboard.SourceCount;
         WatchedCount = dashboard.WatchedCount;
@@ -381,7 +382,9 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private async Task RefreshRecentPlaybackAsync(CancellationToken cancellationToken = default)
     {
-        Replace(RecentlyPlayed, await _dashboardQueryService.GetRecentlyPlayedAsync(cancellationToken));
+        Replace(
+            RecentlyPlayed,
+            await RunQueryOffUiThreadAsync(_dashboardQueryService.GetRecentlyPlayedAsync, cancellationToken));
         ApplyActivePlaybackState();
         OnPropertyChanged(nameof(RecentlyPlayedPreview));
         ContinuePlaybackCommand.RaiseCanExecuteChanged();
@@ -389,7 +392,7 @@ public sealed class HomeViewModel : PageViewModelBase
 
     private async Task RefreshCollectionAsync(CancellationToken cancellationToken = default)
     {
-        var dashboard = await _dashboardQueryService.GetCollectionPreviewAsync(cancellationToken);
+        var dashboard = await RunQueryOffUiThreadAsync(_dashboardQueryService.GetCollectionPreviewAsync, cancellationToken);
         Replace(FavoriteCollectionItems, dashboard.FavoriteCollectionItems);
         Replace(WantToWatchItems, dashboard.WantToWatchItems);
     }
@@ -397,27 +400,26 @@ public sealed class HomeViewModel : PageViewModelBase
     private async Task RefreshRecommendationsAsync(CancellationToken cancellationToken = default)
     {
         await AiRecommendationViewModel.ActivateAsync(cancellationToken);
-        OnPropertyChanged(nameof(AiRecommendationPreview));
-        OnPropertyChanged(nameof(AiRecommendationStatusText));
-        OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine1));
-        OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine2));
-        OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine1));
-        OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine2));
+        NotifyAiRecommendationBindings();
     }
 
     private async Task RefreshLibraryStatusOverviewAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            var snapshot = await _watchStatisticsService.GetStatisticsAsync(
-                WatchStatisticsTimeRange.All,
-                calendarMonth: null,
-                forceRefresh: false,
+            var snapshot = await RunQueryOffUiThreadAsync(
+                token => _watchStatisticsService.GetStatisticsAsync(
+                    WatchStatisticsTimeRange.All,
+                    calendarMonth: null,
+                    forceRefresh: false,
+                    token),
                 cancellationToken);
-            var monthSnapshot = await _watchStatisticsService.GetStatisticsAsync(
-                WatchStatisticsTimeRange.Month,
-                calendarMonth: null,
-                forceRefresh: false,
+            var monthSnapshot = await RunQueryOffUiThreadAsync(
+                token => _watchStatisticsService.GetStatisticsAsync(
+                    WatchStatisticsTimeRange.Month,
+                    calendarMonth: null,
+                    forceRefresh: false,
+                    token),
                 cancellationToken);
             ReplaceLibraryStatusOverview(
                 snapshot.WatchedCount,
@@ -521,6 +523,23 @@ public sealed class HomeViewModel : PageViewModelBase
         }
 
         return text[..maxLineLength].TrimEnd(' ', '，', '、', '/', '|');
+    }
+
+    private void NotifyAiRecommendationBindings()
+    {
+        OnPropertyChanged(nameof(AiRecommendationPreview));
+        OnPropertyChanged(nameof(AiRecommendationStatusText));
+        OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine1));
+        OnPropertyChanged(nameof(AiRecommendationStatusExpandedLine2));
+        OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine1));
+        OnPropertyChanged(nameof(AiRecommendationStatusCollapsedLine2));
+    }
+
+    private static Task<T> RunQueryOffUiThreadAsync<T>(
+        Func<CancellationToken, Task<T>> queryAsync,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() => queryAsync(cancellationToken), cancellationToken);
     }
 
     private void NavigateToMovieDiscoveryAiTab()

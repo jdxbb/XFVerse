@@ -1329,6 +1329,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         }
 
         var ratings = new List<MovieRatingItem>();
+        var ratingSourceName = "TMDB/IMDb";
         if (item.IsSeason && item.SeasonId > 0)
         {
             var seasonTmdbRating = await _tvDetailQueryService.GetSeasonTmdbRatingAsync(item.SeasonId, cancellationToken);
@@ -1336,9 +1337,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             {
                 ratings.Add(seasonTmdbRating);
             }
-
-            var seriesRatings = await _tvDetailQueryService.GetSeriesRatingsAsync(item.SeriesId, cancellationToken);
-            ratings.AddRange(seriesRatings.Where(rating => string.Equals(rating.SourceName, "IMDb", StringComparison.OrdinalIgnoreCase)));
+            ratingSourceName = "TMDB 季评分";
         }
         else
         {
@@ -1351,7 +1350,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             return false;
         }
 
-        var ratingOverride = new ListRatingOverride(weightedRating.Value, "TMDB/IMDb");
+        var ratingOverride = new ListRatingOverride(weightedRating.Value, ratingSourceName);
         _listRatingOverrides[BuildTvRatingHydrationKey(item)] = ratingOverride;
         await Application.Current.Dispatcher.InvokeAsync(
             () => viewModel.ApplyRatingOverride(ratingOverride.Value, ratingOverride.SourceName));
@@ -2872,8 +2871,8 @@ public sealed class LibraryViewModel : PageViewModelBase
                 ? query.OrderByDescending(item => item.ReleaseYear ?? 0).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
                 : query.OrderBy(item => item.ReleaseYear ?? 0).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase),
             "评分" => descending
-                ? query.OrderByDescending(item => item.PrimaryRatingValue ?? -1d).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
-                : query.OrderBy(item => item.PrimaryRatingValue ?? -1d).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase),
+                ? query.OrderByDescending(GetLibraryRatingSortValue).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+                : query.OrderBy(GetLibraryRatingSortValue).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase),
             _ => descending
                 ? query.OrderByDescending(item => item.UpdatedAt).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
                 : query.OrderBy(item => item.UpdatedAt).ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
@@ -2891,7 +2890,8 @@ public sealed class LibraryViewModel : PageViewModelBase
                 group => new BatchSelectionSeriesSortKey(
                     group.Max(item => item.UpdatedAt),
                     group.Select(GetBatchSelectionSeriesKey).FirstOrDefault(title => !string.IsNullOrWhiteSpace(title)) ?? string.Empty,
-                    group.Where(item => item.ReleaseYear is > 0).Select(item => item.ReleaseYear!.Value).DefaultIfEmpty(0).Min()),
+                    group.Where(item => item.ReleaseYear is > 0).Select(item => item.ReleaseYear!.Value).DefaultIfEmpty(0).Min(),
+                    group.Select(GetBatchSelectionSeriesRatingSortValue).DefaultIfEmpty(-1d).Max()),
                 StringComparer.OrdinalIgnoreCase);
         var descending = string.Equals(SelectedSortDirection, "降序", StringComparison.Ordinal);
 
@@ -2906,9 +2906,9 @@ public sealed class LibraryViewModel : PageViewModelBase
                 : items.OrderBy(item => GetBatchSelectionGroupReleaseYear(item, seriesGroups))
                     .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase),
             "评分" => descending
-                ? items.OrderByDescending(item => item.PrimaryRatingValue ?? -1d)
+                ? items.OrderByDescending(item => GetBatchSelectionGroupRating(item, seriesGroups))
                     .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase)
-                : items.OrderBy(item => item.PrimaryRatingValue ?? -1d)
+                : items.OrderBy(item => GetBatchSelectionGroupRating(item, seriesGroups))
                     .ThenBy(item => GetBatchSelectionGroupTitle(item, seriesGroups), StringComparer.CurrentCultureIgnoreCase),
             _ => descending
                 ? items.OrderByDescending(item => GetBatchSelectionGroupUpdatedAt(item, seriesGroups))
@@ -2995,6 +2995,34 @@ public sealed class LibraryViewModel : PageViewModelBase
             : item.ReleaseYear ?? 0;
     }
 
+    private double GetBatchSelectionGroupRating(
+        LibraryMovieListItem item,
+        IReadOnlyDictionary<string, BatchSelectionSeriesSortKey> seriesGroups)
+    {
+        if (!IsSeasonLikeBatchItem(item))
+        {
+            return GetLibraryRatingSortValue(item);
+        }
+
+        return seriesGroups.TryGetValue(GetBatchSelectionSeriesGroupKey(item), out var sortKey)
+            ? sortKey.RatingValue
+            : GetBatchSelectionSeriesRatingSortValue(item);
+    }
+
+    private double GetBatchSelectionSeriesRatingSortValue(LibraryMovieListItem item)
+    {
+        return item.SeriesPrimaryRatingValue
+               ?? (IsSeasonLikeBatchItem(item) ? null : item.PrimaryRatingValue)
+               ?? -1d;
+    }
+
+    private double GetLibraryRatingSortValue(LibraryMovieListItem item)
+    {
+        return TryGetListRatingOverride(item, out var ratingOverride)
+            ? ratingOverride.Value
+            : item.PrimaryRatingValue ?? -1d;
+    }
+
     private static int GetBatchSelectionSeasonNumber(LibraryMovieListItem item)
     {
         return IsSeasonLikeBatchItem(item) && item.SeasonNumber >= 0
@@ -3012,7 +3040,7 @@ public sealed class LibraryViewModel : PageViewModelBase
         return item.IsMovie || item.IsSeason || item.IsOther;
     }
 
-    private sealed record BatchSelectionSeriesSortKey(DateTime UpdatedAt, string Title, int ReleaseYear);
+    private sealed record BatchSelectionSeriesSortKey(DateTime UpdatedAt, string Title, int ReleaseYear, double RatingValue);
 
     private sealed record RefreshRequestSnapshot(
         IReadOnlyList<string> Reasons,

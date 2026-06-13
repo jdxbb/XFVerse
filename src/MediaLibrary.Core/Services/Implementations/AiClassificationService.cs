@@ -988,15 +988,8 @@ public sealed class AiClassificationService : IAiClassificationService
         string? typeFallbackText,
         string? error = null)
     {
-        AiPerfDiagnostics.WriteEvent(
-            $"event=ai-tag-classification scope={ScanIdentificationDiagnostics.FormatValue(scope)} status={ScanIdentificationDiagnostics.FormatValue(status)} movieId={ScanIdentificationDiagnostics.FormatNullable(movieId)} tmdbId={ScanIdentificationDiagnostics.FormatNullable(tmdbId)} year={ScanIdentificationDiagnostics.FormatNullable(releaseYear)} responseChars={rawText?.Length ?? 0} rawTypeTags={FormatDiagnosticTags(parsed?.RawAiTags)} filteredTypeTags={FormatDiagnosticTags(parsed?.AiTags)} rawEmotionTags={FormatDiagnosticTags(parsed?.RawEmotionTags)} filteredEmotionTags={FormatDiagnosticTags(parsed?.EmotionTags)} rawSceneTags={FormatDiagnosticTags(parsed?.RawSceneTags)} filteredSceneTags={FormatDiagnosticTags(parsed?.SceneTags)} fallbackTypeTags={ScanIdentificationDiagnostics.FormatValue(BuildTypeFallbackTags(typeFallbackText), 120)} finalTypeTags={ScanIdentificationDiagnostics.FormatValue(finalTags.AiTagsText, 120)} finalEmotionTags={ScanIdentificationDiagnostics.FormatValue(finalTags.EmotionTagsText, 120)} finalSceneTags={ScanIdentificationDiagnostics.FormatValue(finalTags.SceneTagsText, 120)} error={ScanIdentificationDiagnostics.FormatValue(error, 160)}");
-    }
-
-    private static string FormatDiagnosticTags(IEnumerable<string>? tags)
-    {
-        return tags is null
-            ? "(none)"
-            : ScanIdentificationDiagnostics.FormatValue(string.Join("|", tags), 160);
+        // Temporary verbose diagnostics are intentionally disabled after the tag replacement investigation.
+        // Re-enable this method body only when diagnosing AI tag parsing/replacement regressions.
     }
 
     private static string FirstNonEmpty(params string?[] values)

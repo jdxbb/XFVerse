@@ -1225,7 +1225,9 @@
         </Border>
 
         <Grid Grid.Row="2" Margin="32,0,32,0">
-            <Border Style="{StaticResource GlassPageCardStyle}"
+            <Border x:Name="LibraryScrollCornerCard"
+                    Style="{StaticResource GlassPageCardStyle}"
+                    Padding="22,22,22,0"
                     helpers:ScrollDrivenBottomCornerBehavior.AtBottomBottomMargin="18"
                     helpers:ScrollDrivenBottomCornerBehavior.IsEnabled="True">
                 <Grid>
@@ -1598,7 +1600,7 @@
                              Grid.Row="1"
                              Margin="0,18,0,0"
                              ItemsSource="{Binding Movies}"
-                             Padding="0,0,0,36"
+                             Padding="0"
                              ScrollViewer.CanContentScroll="True"
                              ScrollViewer.ScrollChanged="OnLibraryListScrollChanged"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"

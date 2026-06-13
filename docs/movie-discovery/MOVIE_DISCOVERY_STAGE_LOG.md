@@ -1916,3 +1916,161 @@ Known Issues:
 - Blocker: None.
 - Deferred: Manual visual acceptance is still needed for the toast position/duration and for season-rating values against live TMDB season data.
 - Noise: Existing adjacent UI and migration follow-up changes remain in the working tree.
+
+## 2026-06-13 - Search Paging And Library Rating Sort Follow-up
+
+Completed:
+
+- Movie and TV search no longer grows the filtered-result page range one display page at a time when local filters or local sorting are active.
+- Expanded search criteria now buffer a fixed candidate pool of up to 30 TMDB source pages before computing filtered total count, total pages, and sorted display pages.
+- Plain relevance search still uses the TMDB-reported total count and lazy-loads page content as before.
+- Media-library rating sort now uses the list rating override when available, so TV list rating hydration is reflected by later sort passes.
+- Batch-selection mode keeps series grouped by the series rating sort key; expanding a series into seasons no longer sorts seasons by season score.
+
+Not done:
+
+- No database update, migration, commit, push, scanner behavior, playback-source creation, or media-file creation was changed.
+- No unbounded TMDB full-result fetch was added; the existing 30-source-page cap remains in effect for locally filtered/sorted search pools.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only existing LF-to-CRLF conversion warnings were reported.
+- Migration diff was checked and remained empty.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: Manual acceptance is still needed against live TMDB result sets, especially for high-volume keyword searches where only the first 30 source pages are intentionally considered for local filtering/sorting.
+- Noise: Existing adjacent UI, AI-tag, and profile-dialog changes remain in the working tree.
+
+## 2026-06-13 - Home AI Recommendation Responsiveness Follow-up
+
+Completed:
+
+- Home dashboard data queries and watch-statistics reads now run off the UI thread, so the first-entry loading spinner should not freeze while the dashboard overview is being read and projected.
+- Home no longer reloads AI recommendations on every collection-state notification; it refreshes home overview data and lets the shared recommendation view model update visible recommendation item states.
+- Home recommendation status bindings now refresh without forcing an AI recommendation request on `RecommendationChanged` notifications.
+- AI recommendation "want to watch" now uses the same self-reload suppression path as "not interested", avoiding an immediate recommendation reload after the button has already updated the card state.
+- The "not interested" command is no longer disabled merely because a recommendation request is loading; existing visible cards remain actionable while a same-view recommendation request is in flight.
+- Re-entering Home reactivates the shared recommendation view model in the background so Home and Discovery AI recommendation status text converge without requiring a manual detour.
+- Recommendation activation no longer cancels an already-running recommendation load just because another page reactivates the shared view model.
+- Home-started recommendation refreshes are no longer linked to the Home page activation cancellation token after they have been scheduled, allowing the in-flight request to continue in the background.
+
+Not done:
+
+- No recommendation algorithm, prompt content, ranking, scanner behavior, database update, migration, commit, or push was changed.
+- No WPF runtime profiling or frame-time capture was performed in this pass.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: Manual acceptance is still needed for first-launch spinner smoothness and button responsiveness against a real library and real AI provider latency.
+- Noise: Existing adjacent UI, AI-tag, profile-dialog, and search-paging changes remain in the working tree.
+
+## 2026-06-13 - Search Loading And Recommendation Factor Follow-up
+
+Completed:
+
+- Batch-selection season rows continue to sort by their series rating group, but no longer apply the hydrated series/list rating override to the displayed season rating; the visible score remains the season score.
+- Movie and TV search result summaries now say `已加载` instead of `共找到`, matching the buffered-result semantics.
+- Search requests that must build the full locally filtered pool of up to 30 TMDB source pages now use a dedicated 90-second page-load attempt timeout; ordinary search, discovery paging, and ranking keep the existing 5-second timeout.
+- No-keyword non-relevance movie/TV discovery now lazy-loads source pages by display page and stops at 30 TMDB source pages instead of preloading the entire capped pool.
+- No-keyword discovery total display pages are capped from the first TMDB response to the 30-source-page result capacity.
+- Want-to-watch, not-interested, and saved custom recommendation preference changes once again trigger an automatic recommendation refresh.
+- A newer recommendation-factor refresh increments the request version before canceling the previous request, preventing a canceled stale request from replacing the newest state after rapid changes or a revert.
+
+Not done:
+
+- No recommendation algorithm, AI prompt, TMDB HTTP timeout, database update, migration, scanner behavior, commit, or push was changed.
+- The 30-source-page search/discovery cap was retained.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Focused `git diff --check` passed; only existing LF-to-CRLF conversion warnings were reported.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: Manual acceptance is still needed for live TMDB filter latency, no-keyword discovery pagination, season rating display, and rapid recommendation-factor changes against the configured AI provider.
+- Noise: Existing adjacent working-tree changes remain present.
+
+## 2026-06-13 - Season Rating And Search Page-Cap Correction
+
+Completed:
+
+- Restored TV season rating hydration in media-library batch/list mode, using only the TMDB season score for the displayed season rating.
+- Kept batch rating sorting independent from display: season groups still use the series rating sort key while each season card displays its own season rating.
+- Corrected the search cap unit from 30 TMDB source pages to 30 application display pages.
+- With 30 items per application page and 20 items per TMDB page, capped discovery and complete filtered searches now allow up to 45 TMDB source pages, representing up to 30 application pages.
+- Applied the same cap conversion to movie and TV no-keyword discovery and keyword searches with complete local filtering/sorting.
+- Extended only the complete-filter pool attempt timeout proportionally from 90 to 135 seconds; other page-load attempt timeouts remain unchanged.
+
+Not done:
+
+- No rating sort semantics, TMDB HTTP timeout, recommendation algorithm, database update, migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: Manual acceptance is still needed for season scores returned by live TMDB data and for movie/TV searches whose TMDB totals exceed 900 results.
+- Noise: Existing adjacent working-tree changes remain present.
+
+## 2026-06-13 - Person Search Credit Matching Correction
+
+Completed:
+
+- Identified that person search previously selected only the first TMDB person result, causing shortened names such as `诺兰` to resolve to an unrelated same-name person and return the wrong credits.
+- Person search now includes every person result whose localized or original name contains the normalized search text; person popularity is not used to exclude or select candidates.
+- Movie and TV credits for all matching people are fetched concurrently, merged, deduplicated by TMDB media ID, and then paginated.
+- Actor cast credits remain eligible.
+- Crew credits are restricted to the roles represented by the app information card: movie director/writer/screenplay/story, and TV director/series director/writer/screenplay/story/teleplay/creator.
+- Producer, cinematography, editing, thanks, and unrelated crew credits no longer appear in person-search results.
+
+Not done:
+
+- No fuzzy transliteration service, manual person selector, database update, migration, recommendation behavior, commit, or push was added.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Focused `git diff --check` passed; only existing LF-to-CRLF conversion warnings were reported.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: Manual acceptance is still needed with live TMDB data for abbreviated names, full Chinese names, English names, and genuine same-name people.
+- Noise: Existing adjacent working-tree changes remain present.
+
+## 2026-06-13 - Discover Search 100-Page Display Limit
+
+Completed:
+
+- Increased the movie and TV no-keyword, non-relevance discover-search display limit from 30 pages to 100 pages.
+- Kept the existing 30-page source-pool limit and extended timeout behavior for keyword searches and local post-filtering unchanged.
+- The 100 display pages are loaded on demand and map to at most 150 TMDB source pages at 20 source results and 30 displayed results per page.
+- Confirmed that person search uses complete director, writer, and cast credits while information-card metadata intentionally stores only the first 6 directors, 8 writers, and 10 actors. Therefore a valid minor cast or later crew credit can be searchable without appearing in the shortened card text.
+
+Not done:
+
+- Person-search results were not restricted to the shortened card-name lists because that would omit genuine works from a person's filmography.
+- No database update, migration, recommendation behavior, commit, or push was changed.
+
+Validation:
+
+- Build and focused diff validation are recorded in the task completion report.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: The product still needs a separate UX decision on whether information cards should expose complete credit lists, for example through an expanded view or complete tooltip.
+- Noise: Existing adjacent working-tree changes remain present.

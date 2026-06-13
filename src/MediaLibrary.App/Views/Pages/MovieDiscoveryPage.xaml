@@ -2358,10 +2358,12 @@
                         </Grid>
                         </Border>
 
-                        <Border Grid.Row="2"
+                        <Border x:Name="SearchScrollCornerCard"
+                                Grid.Row="2"
                                 Margin="32,0,32,0"
                                 Cursor="Arrow"
                                 Style="{StaticResource GlassPageCardStyle}"
+                                Padding="22,22,22,0"
                                 helpers:ScrollDrivenBottomCornerBehavior.AtBottomBottomMargin="18"
                                 helpers:ScrollDrivenBottomCornerBehavior.IsEnabled="True">
                             <Grid>
@@ -2716,7 +2718,7 @@
 
                                             <StackPanel x:Name="SearchMoviePosterPagerPanel"
                                                         Panel.ZIndex="1"
-                                                        Margin="0,0,0,4"
+                                                        Margin="0,0,0,22"
                                                         HorizontalAlignment="Center"
                                                         VerticalAlignment="Bottom"
                                                         Orientation="Horizontal"
@@ -2967,7 +2969,7 @@
                                             </ItemsControl>
 
                                             <StackPanel Grid.Row="1"
-                                                        Margin="0,4,0,0"
+                                                        Margin="0,4,0,22"
                                                         HorizontalAlignment="Center"
                                                         Orientation="Horizontal">
                                                 <Button Command="{Binding GoPreviousSearchPageCommand}"
@@ -3058,7 +3060,7 @@
 
                                             <StackPanel x:Name="SearchTvPosterPagerPanel"
                                                         Panel.ZIndex="1"
-                                                        Margin="0,0,0,4"
+                                                        Margin="0,0,0,22"
                                                         HorizontalAlignment="Center"
                                                         VerticalAlignment="Bottom"
                                                         Orientation="Horizontal"
@@ -3311,7 +3313,7 @@
                                             </ItemsControl>
 
                                             <StackPanel Grid.Row="1"
-                                                        Margin="0,4,0,0"
+                                                        Margin="0,4,0,22"
                                                         HorizontalAlignment="Center"
                                                         Orientation="Horizontal">
                                                 <Button Command="{Binding GoPreviousSearchPageCommand}"
@@ -3356,9 +3358,11 @@
                 </TabItem>
                 <TabItem Header="姒滃崟" Style="{StaticResource DiscoveryTabItemStyle}">
                     <Grid Margin="-32,-24,-32,-32">
-                        <Border Margin="32,24,32,0"
+                        <Border x:Name="RankingScrollCornerCard"
+                                Margin="32,24,32,0"
                                 Cursor="Arrow"
                                 Style="{StaticResource GlassPageCardStyle}"
+                                Padding="22,22,22,0"
                                 helpers:ScrollDrivenBottomCornerBehavior.AtBottomBottomMargin="18"
                                 helpers:ScrollDrivenBottomCornerBehavior.IsEnabled="True">
                             <Grid>
@@ -3572,7 +3576,7 @@
                                         </ItemsControl>
                                     </StackPanel>
                                     <StackPanel Grid.Row="1"
-                                                Margin="0,4,0,0"
+                                                Margin="0,4,0,26"
                                                 HorizontalAlignment="Center"
                                                 Orientation="Horizontal">
                                         <StackPanel.Style>
@@ -3773,7 +3777,7 @@
                                         </ItemsControl>
                                     </StackPanel>
                                     <StackPanel Grid.Row="1"
-                                                Margin="0,4,0,0"
+                                                Margin="0,4,0,26"
                                                 HorizontalAlignment="Center"
                                                 Orientation="Horizontal">
                                         <StackPanel.Style>

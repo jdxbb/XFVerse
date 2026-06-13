@@ -182,15 +182,9 @@
                                                Height="848"
                                                RadiusX="196"
                                                RadiusY="196"
-                                               Fill="#0B0B0D" />
-                                    <Rectangle Canvas.Left="88"
-                                               Canvas.Top="88"
-                                               Width="848"
-                                               Height="848"
-                                               RadiusX="196"
-                                               RadiusY="196"
+                                               Fill="#0B0B0D"
                                                Stroke="#F7F7F5"
-                                               StrokeThickness="16" />
+                                               StrokeThickness="34" />
                                     <Line X1="258"
                                           Y1="350"
                                           X2="605"
@@ -354,7 +348,9 @@
                             <Border Width="32"
                                     Height="32"
                                     CornerRadius="16"
-                                    Background="{DynamicResource BrushAccent}">
+                                    Background="{DynamicResource BrushAccent}"
+                                    BorderBrush="#F7F7F5"
+                                    BorderThickness="1.2">
                                 <Grid ClipToBounds="False">
                                     <Ellipse>
                                         <Ellipse.Style>
@@ -435,7 +431,7 @@
                             IsOpen="{Binding IsUserMenuOpen, Mode=TwoWay}"
                            Placement="Top"
                            PlacementTarget="{Binding ElementName=UserMenuButton}"
-                           StaysOpen="False"
+                           StaysOpen="True"
                            VerticalOffset="-8">
                         <Border Width="246"
                                 Padding="14"
@@ -446,7 +442,9 @@
                                     <Border Width="42"
                                             Height="42"
                                             CornerRadius="21"
-                                            Background="{DynamicResource BrushAccent}">
+                                            Background="{DynamicResource BrushAccent}"
+                                            BorderBrush="#F7F7F5"
+                                            BorderThickness="1.4">
                                         <Grid ClipToBounds="False">
                                             <Ellipse>
                                                 <Ellipse.Style>

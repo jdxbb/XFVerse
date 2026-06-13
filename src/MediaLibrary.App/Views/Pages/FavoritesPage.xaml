@@ -94,6 +94,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Arrow" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
@@ -109,6 +110,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="Cursor" Value="Arrow" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="VerticalContentAlignment" Value="Top" />
@@ -670,12 +672,12 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid Margin="0,0,0,-32">
+    <Grid Margin="0,0,0,-32" Cursor="Arrow">
         <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
                     ItemContainerStyle="{StaticResource PageTopTabItemStyle}"
                     Style="{StaticResource FavoritesHiddenHeaderTabControlStyle}">
             <TabItem Header="喜爱">
-                <Grid>
+                <Grid Background="Transparent" Cursor="Arrow">
                     <ContentControl Content="{Binding}"
                                     ContentTemplate="{StaticResource FavoriteLoadingStateTemplate}"
                                     Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -721,7 +723,7 @@
             </TabItem>
 
             <TabItem Header="想看">
-                <Grid>
+                <Grid Background="Transparent" Cursor="Arrow">
                     <ContentControl Content="{Binding}"
                                     ContentTemplate="{StaticResource FavoriteLoadingStateTemplate}"
                                     Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />

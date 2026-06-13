@@ -1286,6 +1286,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         PrimaryRatingValue = primaryRating.Value,
                         PrimaryRatingScale = primaryRating.Scale,
                         PrimaryRatingVoteCount = primaryRating.VoteCount,
+                        SeriesPrimaryRatingValue = primaryRating.Value,
                         TmdbRating = series.TmdbRating,
                         TmdbVoteCount = series.TmdbVoteCount,
                         OmdbScoreValue = series.OmdbScoreValue,
@@ -1339,6 +1340,26 @@ public sealed class LibraryQueryService : ILibraryQueryService
                     Language = x.Series.Language ?? string.Empty,
                     DirectorText = x.Series.DirectorText ?? string.Empty,
                     ActorsText = x.Series.ActorsText ?? string.Empty,
+                    SeriesTmdbRating = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    SeriesTmdbVoteCount = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    SeriesOmdbScoreValue = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    SeriesOmdbScoreScale = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreScale)
+                        .FirstOrDefault(),
+                    SeriesOmdbVoteCount = x.Series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
                     AirDate = x.AirDate,
                     AirYear = x.AirDate.HasValue ? x.AirDate.Value.Year : x.Series.FirstAirYear,
                     TotalEpisodeCount = x.TmdbEpisodeCount,
@@ -1396,6 +1417,12 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         season.OmdbScoreValue,
                         season.OmdbScoreScale,
                         season.OmdbVoteCount);
+                    var seriesPrimaryRating = BuildMoviePrimaryRating(
+                        season.SeriesTmdbRating,
+                        season.SeriesTmdbVoteCount,
+                        season.SeriesOmdbScoreValue,
+                        season.SeriesOmdbScoreScale,
+                        season.SeriesOmdbVoteCount);
                     return new LibraryMovieListItem
                     {
                         ItemKind = ResolveTvSeasonItemKind(season.IdentificationStatus),
@@ -1434,6 +1461,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         PrimaryRatingValue = primaryRating.Value,
                         PrimaryRatingScale = primaryRating.Scale,
                         PrimaryRatingVoteCount = primaryRating.VoteCount,
+                        SeriesPrimaryRatingValue = seriesPrimaryRating.Value,
                         TmdbRating = season.TmdbRating,
                         TmdbVoteCount = season.TmdbVoteCount,
                         OmdbScoreValue = season.OmdbScoreValue,
@@ -1917,6 +1945,16 @@ public sealed class LibraryQueryService : ILibraryQueryService
         public double? OmdbScoreScale { get; set; }
 
         public int? OmdbVoteCount { get; set; }
+
+        public double? SeriesTmdbRating { get; set; }
+
+        public int? SeriesTmdbVoteCount { get; set; }
+
+        public double? SeriesOmdbScoreValue { get; set; }
+
+        public double? SeriesOmdbScoreScale { get; set; }
+
+        public int? SeriesOmdbVoteCount { get; set; }
 
         public string OmdbSourceUrl { get; set; } = string.Empty;
 

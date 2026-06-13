@@ -1,5 +1,4 @@
 using MediaLibrary.App.ViewModels.Base;
-using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Implementations;
@@ -490,17 +489,12 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
 
     public void ApplyExternalTagSnapshot(AiMovieTags tags)
     {
-        var beforeTypeTags = AiTagsText;
-        var beforeDisplayTags = DisplayTags;
-        var changed = ApplyLocalTags(
+        if (ApplyLocalTags(
                 null,
                 tags.AiTagsText,
                 tags.EmotionTagsText,
                 tags.SceneTagsText,
-                replaceMissingAiTags: false);
-        AiPerfDiagnostics.WriteEvent(
-            $"event=discovery-card-external-tags-apply tmdbId={TmdbId} year={FormatNullable(ReleaseYear)} changed={changed.ToString().ToLowerInvariant()} incomingTypeTags={FormatDiagnosticTags(tags.AiTagsText)} beforeTypeTags={FormatDiagnosticTags(beforeTypeTags)} beforeDisplayTags={FormatDiagnosticTags(beforeDisplayTags)} finalTypeTags={FormatDiagnosticTags(AiTagsText)} finalDisplayTags={FormatDiagnosticTags(DisplayTags)} finalEmotionTags={FormatDiagnosticTags(EmotionTagsText)} finalSceneTags={FormatDiagnosticTags(SceneTagsText)}");
-        if (changed)
+                replaceMissingAiTags: false))
         {
             NotifyTagPresentationChanged();
         }
@@ -785,16 +779,6 @@ public sealed class DiscoveryMovieCardViewModel : ObservableObject
     private static string FormatTags(IEnumerable<string> tags)
     {
         return string.Join(" / ", tags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
-    }
-
-    private static string FormatNullable(int? value)
-    {
-        return value.HasValue ? value.Value.ToString() : "(none)";
-    }
-
-    private static string FormatDiagnosticTags(string? value)
-    {
-        return ScanIdentificationDiagnostics.FormatValue(value, 120);
     }
 
     private static string JoinVisibleGroups(params string[] groups)

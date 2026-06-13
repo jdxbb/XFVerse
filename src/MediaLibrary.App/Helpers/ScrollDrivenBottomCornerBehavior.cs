@@ -84,6 +84,13 @@ public static class ScrollDrivenBottomCornerBehavior
             typeof(ScrollDrivenBottomCornerBehavior),
             new PropertyMetadata(0));
 
+    private static readonly DependencyProperty BottomMarginAppliedOffsetProperty =
+        DependencyProperty.RegisterAttached(
+            "BottomMarginAppliedOffset",
+            typeof(double),
+            typeof(ScrollDrivenBottomCornerBehavior),
+            new PropertyMetadata(double.NaN));
+
     public static bool GetIsEnabled(DependencyObject target)
     {
         return (bool)target.GetValue(IsEnabledProperty);
@@ -188,6 +195,7 @@ public static class ScrollDrivenBottomCornerBehavior
         border.SizeChanged -= OnTargetSizeChanged;
         border.ClearValue(IsRefreshQueuedProperty);
         border.ClearValue(DiscoveryRetryCountProperty);
+        border.ClearValue(BottomMarginAppliedOffsetProperty);
 
         foreach (var viewer in GetSubscribedScrollViewers(border))
         {
@@ -343,29 +351,60 @@ public static class ScrollDrivenBottomCornerBehavior
     {
         var restored = (CornerRadius)border.GetValue(OriginalCornerRadiusProperty);
         var originalMargin = (Thickness)border.GetValue(OriginalMarginProperty);
+        var atBottomBottomMargin = Math.Max(0d, GetAtBottomBottomMargin(border));
+        var currentBottomMargin = Math.Max(0d, border.Margin.Bottom - originalMargin.Bottom);
         var viewer = FindActiveScrollViewer(border);
-        var bottomProgress = CalculateBottomProgress(viewer, border);
+        var shouldApplyBottomMargin = ShouldApplyBottomMargin(
+            viewer,
+            border,
+            currentBottomMargin > double.Epsilon,
+            atBottomBottomMargin);
+        UpdateBottomMarginAppliedOffset(border, viewer, shouldApplyBottomMargin, currentBottomMargin > double.Epsilon);
+
+        var bottomProgress = shouldApplyBottomMargin
+            ? 1d
+            : CalculateBottomProgress(viewer, border, currentBottomMargin);
         var collapsedBottomRadius = Math.Max(0d, GetCollapsedBottomRadius(border));
         var desiredCornerRadius = new CornerRadius(
             restored.TopLeft,
             restored.TopRight,
             Lerp(collapsedBottomRadius, restored.BottomRight, bottomProgress),
             Lerp(collapsedBottomRadius, restored.BottomLeft, bottomProgress));
-        var desiredMargin = originalMargin;
-        var atBottomBottomMargin = Math.Max(0d, GetAtBottomBottomMargin(border));
-        if (atBottomBottomMargin > 0d)
-        {
-            desiredMargin.Bottom = originalMargin.Bottom + (atBottomBottomMargin * bottomProgress);
-        }
 
         if (!CornerRadiusEquals(border.CornerRadius, desiredCornerRadius))
         {
             border.CornerRadius = desiredCornerRadius;
         }
 
+        var desiredMargin = originalMargin;
+        if (shouldApplyBottomMargin)
+        {
+            desiredMargin.Bottom = originalMargin.Bottom + atBottomBottomMargin;
+        }
+
         if (!ThicknessEquals(border.Margin, desiredMargin))
         {
             border.Margin = desiredMargin;
+        }
+    }
+
+    private static void UpdateBottomMarginAppliedOffset(
+        Border border,
+        ScrollViewer? viewer,
+        bool shouldApplyBottomMargin,
+        bool isCurrentlyApplied)
+    {
+        if (!shouldApplyBottomMargin)
+        {
+            border.SetValue(BottomMarginAppliedOffsetProperty, double.NaN);
+            return;
+        }
+
+        var currentOffset = viewer?.VerticalOffset ?? 0d;
+        var storedOffset = (double)border.GetValue(BottomMarginAppliedOffsetProperty);
+        if (!isCurrentlyApplied || double.IsNaN(storedOffset) || currentOffset > storedOffset)
+        {
+            border.SetValue(BottomMarginAppliedOffsetProperty, currentOffset);
         }
     }
 
@@ -389,7 +428,7 @@ public static class ScrollDrivenBottomCornerBehavior
         return fallback;
     }
 
-    private static double CalculateBottomProgress(ScrollViewer? viewer, Border border)
+    private static double CalculateBottomProgress(ScrollViewer? viewer, Border border, double currentBottomMargin)
     {
         if (viewer is null)
         {
@@ -397,19 +436,66 @@ public static class ScrollDrivenBottomCornerBehavior
         }
 
         var tolerance = Math.Max(0d, GetAtBottomTolerance(border));
+        var usesLogicalScrollUnits = viewer.CanContentScroll;
         if (viewer.ScrollableHeight <= tolerance)
         {
             return 1d;
         }
 
-        var distanceToBottom = Math.Max(0d, viewer.ScrollableHeight - viewer.VerticalOffset);
+        var rawDistanceToBottom = Math.Max(0d, viewer.ScrollableHeight - viewer.VerticalOffset);
+        var distanceToBottom = usesLogicalScrollUnits
+            ? rawDistanceToBottom
+            : Math.Max(0d, rawDistanceToBottom - currentBottomMargin);
         if (distanceToBottom <= tolerance)
         {
             return 1d;
         }
 
-        var transitionRange = Math.Max(1d, GetAtBottomBottomMargin(border));
+        var transitionRange = usesLogicalScrollUnits ? 1d : 24d;
         return Math.Clamp(1d - ((distanceToBottom - tolerance) / transitionRange), 0d, 1d);
+    }
+
+    private static bool ShouldApplyBottomMargin(
+        ScrollViewer? viewer,
+        Border border,
+        bool isCurrentlyApplied,
+        double bottomMargin)
+    {
+        if (bottomMargin <= 0d)
+        {
+            return false;
+        }
+
+        if (viewer is null)
+        {
+            return true;
+        }
+
+        var tolerance = Math.Max(0d, GetAtBottomTolerance(border));
+        if (viewer.ScrollableHeight <= tolerance)
+        {
+            return true;
+        }
+
+        var distanceToBottom = Math.Max(0d, viewer.ScrollableHeight - viewer.VerticalOffset);
+        if (distanceToBottom <= tolerance)
+        {
+            return true;
+        }
+
+        if (!isCurrentlyApplied)
+        {
+            return false;
+        }
+
+        var appliedOffset = (double)border.GetValue(BottomMarginAppliedOffsetProperty);
+        if (double.IsNaN(appliedOffset))
+        {
+            return true;
+        }
+
+        var releaseOffsetDelta = viewer.CanContentScroll ? 2d : 24d;
+        return viewer.VerticalOffset >= appliedOffset - releaseOffsetDelta;
     }
 
     private static double Lerp(double from, double to, double progress)

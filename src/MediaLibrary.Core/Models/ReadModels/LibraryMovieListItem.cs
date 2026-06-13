@@ -88,6 +88,8 @@ public sealed class LibraryMovieListItem
 
     public int? PrimaryRatingVoteCount { get; set; }
 
+    public double? SeriesPrimaryRatingValue { get; set; }
+
     public double? TmdbRating { get; set; }
 
     public int? TmdbVoteCount { get; set; }

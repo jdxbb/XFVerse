@@ -64,8 +64,6 @@ public static class ExternalMovieTagCache
         }
 
         Save();
-        AiPerfDiagnostics.WriteEvent(
-            $"event=external-ai-tag-cache-set tmdbId={FormatNullable(recommendation.TmdbId)} year={FormatNullable(recommendation.ReleaseYear)} aiTags={FormatTags(tags.AiTagsText)} emotionTags={FormatTags(tags.EmotionTagsText)} sceneTags={FormatTags(tags.SceneTagsText)}");
     }
 
     public static bool TryGet(int? tmdbId, string? imdbId, string? title, int? releaseYear, out AiMovieTags tags)
@@ -75,8 +73,6 @@ public static class ExternalMovieTagCache
         {
             if (TagsByKey.TryGetValue(key, out tags!))
             {
-                AiPerfDiagnostics.WriteEvent(
-                    $"event=external-ai-tag-cache-hit tmdbId={FormatNullable(tmdbId)} year={FormatNullable(releaseYear)} keyKind={FormatKeyKind(key)} aiTags={FormatTags(tags.AiTagsText)} emotionTags={FormatTags(tags.EmotionTagsText)} sceneTags={FormatTags(tags.SceneTagsText)}");
                 return true;
             }
         }
@@ -99,7 +95,6 @@ public static class ExternalMovieTagCache
                 return;
             }
 
-            var loadedCount = 0;
             try
             {
                 var path = GetCacheFilePath();
@@ -121,12 +116,8 @@ public static class ExternalMovieTagCache
                         {
                             TagsByKey[key] = tags;
                         }
-
-                        loadedCount++;
                     }
                 }
-
-                AiPerfDiagnostics.WriteEvent($"event=external-ai-tag-cache-load status=completed entries={loadedCount}");
             }
             catch (Exception exception)
             {
@@ -156,7 +147,6 @@ public static class ExternalMovieTagCache
                         .ToList()
                 };
                 File.WriteAllText(path, JsonSerializer.Serialize(document, JsonOptions));
-                AiPerfDiagnostics.WriteEvent($"event=external-ai-tag-cache-save status=completed entries={document.Entries.Count}");
             }
             catch (Exception exception)
             {
@@ -226,22 +216,6 @@ public static class ExternalMovieTagCache
         }
 
         return $"title:{title?.Trim().ToLowerInvariant() ?? string.Empty}:{releaseYear?.ToString() ?? string.Empty}";
-    }
-
-    private static string FormatNullable(int? value)
-    {
-        return value.HasValue ? value.Value.ToString() : "(none)";
-    }
-
-    private static string FormatTags(string? value)
-    {
-        return ScanIdentificationDiagnostics.FormatValue(value, 120);
-    }
-
-    private static string FormatKeyKind(string key)
-    {
-        var separatorIndex = key.IndexOf(':', StringComparison.Ordinal);
-        return separatorIndex <= 0 ? "unknown" : key[..separatorIndex];
     }
 
     private sealed class ExternalMovieTagCacheDocument

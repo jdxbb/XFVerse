@@ -1,5 +1,135 @@
 # UI 初级重构阶段日志
 
+## 2026-06-13 - User Profile Dialog Visual Polish Follow-up
+
+Goal:
+- Polish the personal profile dialog and related user avatar surfaces based on visual feedback.
+- Keep the changes scoped to WPF UI presentation and profile dialog behavior.
+
+Completed:
+- Added white outlines to the navigation avatar and expanded user-menu avatar.
+- Added a white outline to the personal profile dialog's top-left logo only.
+- Matched the personal profile dialog close button hover/pressed colors to the app title-bar close-button danger treatment.
+- Enlarged the profile summary user name and moved it slightly to the right.
+- Replaced the custom skewed edit pencil path with the existing Segoe MDL2 edit glyph and changed edit-button hover color away from white-on-light emphasis.
+- Tightened profile field label/value spacing and allocated more height to the signature value/input area.
+- Moved profile toast positioning toward the upper 30% of the screen work area while keeping it inside the dialog window.
+- Preloaded the user profile before showing the dialog, avoiding the visible default-profile flash on open.
+- Added an avatar-upload success toast immediately after a selected image is processed; save success still remains a separate toast on completion.
+- Increased profile edit input height, reduced input corner radius, centered input content vertically, and kept inputs left-aligned with their labels.
+
+Not done:
+- No database schema change, migration, database update, media semantics change, commit or push change.
+- No runtime screenshot sweep was performed for the WPF dialog in this pass.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check -- src/MediaLibrary.App/Views/MainWindow.xaml src/MediaLibrary.App/Views/Dialogs/UserProfileDialogWindow.xaml src/MediaLibrary.App/Views/Dialogs/UserProfileDialogWindow.xaml.cs src/MediaLibrary.App/ViewModels/Main/MainWindowViewModel.cs` returned no whitespace errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Manual WPF visual acceptance is still needed for exact avatar outline contrast, dialog close hover color, edit input vertical alignment, screen-relative toast placement, and profile-open transition on the user's display scale.
+- Noise: Existing adjacent UI and diagnostics changes remain in the working tree.
+
+## 2026-06-13 - Scroll Bottom Padding And User Menu Diagnostics Follow-up
+
+Goal:
+- Remove the fixed bottom strip that prevented Library / Movie Discovery search / ranking scroll content from visually reaching the card bottom.
+- Remove the excessive bottom whitespace in Library list layout while keeping stable bottom breathing room for Movie Discovery search/ranking at the bottom state.
+- Fix the avatar popup reopen-on-second-click issue and add diagnostics for the event sequence.
+
+Completed:
+- Set the Library, Movie Discovery search and Movie Discovery ranking content-body cards to keep top/side card padding but remove bottom card padding, so the card surface no longer creates a fixed bottom bar over the scrollable content.
+- Removed the Library list `ListBox` bottom padding that created a larger final-row gap than Movie Discovery list layout.
+- Added stable bottom content margins inside Movie Discovery search list and ranking scroll content instead of using dynamic card margins.
+- Changed the avatar popup to `StaysOpen=True` and added main-window outside-click handling so clicking the avatar again closes the menu instead of being reopened by the old Popup auto-close + Button click order.
+- Added `event=user-menu-toggle` diagnostics for avatar preview/click/popup/outside-close phases, logging only state flags and source control type.
+
+Not done:
+- No business semantic change, tag refresh change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Use the new `event=user-menu-toggle` diagnostics if the avatar menu still fails to close on the user's machine.
+- Noise: Existing unrelated working-tree changes may remain present in this branch.
+
+## 2026-06-13 - Scroll Corner Menu Cursor Follow-up
+
+Goal:
+- Stop scroll-driven bottom corner changes from feeding back into page layout and freezing Library / Movie Discovery search / ranking at the bottom edge.
+- Make the navigation avatar menu close when clicking the avatar button again, matching the page filter dropdown interaction.
+- Ensure Favorites uses a pointer cursor only on the poster/open hit area instead of the whole content surface.
+
+Completed:
+- Removed the dynamic bottom-margin mutation from `ScrollDrivenBottomCornerBehavior`; it now only updates bottom corner radius and no longer changes the card's layout size while scrolling.
+- Removed stale `AtBottomBottomMargin` usage from Library, Movie Discovery search and Movie Discovery ranking card containers.
+- Reworked the avatar menu button handler so the preview click closes an already-open popup and the popup close event no longer suppresses the next avatar click.
+- Added explicit Arrow cursor surfaces to Favorites page containers, poster list boxes and list-box items while keeping the poster hit layer as Hand.
+
+Not done:
+- No business semantic change, tag refresh change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Manual WPF QA is still needed for bottom-edge scrolling in Library poster/list, Movie Discovery search poster/list, and Movie Discovery ranking.
+- Noise: Existing unrelated working-tree changes may remain present in this branch.
+
+## 2026-06-13 - Discovery Ai Tag Diagnostic Cleanup Follow-up
+
+Goal:
+- Remove temporary high-frequency diagnostics after confirming external AI tag replacement behavior, so Movie Discovery search/ranking refreshes do not keep synchronously appending per-card cache hit/apply logs.
+
+Completed:
+- Disabled the verbose `ai-tag-classification` write path while leaving a small commented placeholder for future targeted debugging.
+- Removed external tag cache success logs for load/save/set/hit; failure logs remain for cache persistence problems.
+- Removed per-card `discovery-card-external-tags-apply` logging from discovery movie cards.
+- Kept the actual persistent cache and initial search/ranking cache application behavior unchanged.
+
+Not done:
+- No recommendation algorithm change, scan matching rule change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: If AI tag replacement regresses again, temporarily re-enable the commented classification diagnostic and add scoped cache/apply sampling instead of restoring always-on per-card logs.
+- Noise: Existing unrelated working-tree changes may remain present in this branch.
+
+## 2026-06-13 - Discovery External Ai Tag Startup Cache Follow-up
+
+Goal:
+- Use the new diagnostics to locate why Movie Discovery search/ranking cards still showed TMDB tags after app restart even though external no-source detail pages could read cached AI tags.
+- Apply cached external AI tags during initial search/ranking card loading, not only after returning from detail or later metadata refresh.
+
+Completed:
+- Reviewed `ai-perf-debug.log` and confirmed external AI type tags were returned and vocabulary-filtered correctly; cache load/hit also worked.
+- Identified the missing path: search and ranking initial page fetch created cards, applied local status, then added cards to the result buffers without calling the external tag cache snapshot path.
+- Added external tag cache application immediately after initial search/ranking status resolution and before cards are added to the visible buffers.
+- Scoped external cache application to cards without a local `MovieId`, so persisted no-source tags do not override local media-library movie tags.
+
+Not done:
+- No recommendation algorithm change, scan matching rule change, database schema change, migration, database update, commit or push change.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` returned empty.
+
+Known Issues:
+- Blocker: None.
+- Deferred: Reopen the app and confirm initial Movie Discovery search/ranking cards show cached AI tags before entering detail.
+- Noise: Existing unrelated working-tree changes may remain present in this branch.
+
 ## 2026-06-12 - Discovery External Ai Tag Diagnostics And Cache Follow-up
 
 Goal:
@@ -1526,3 +1656,79 @@ Known Issues:
 - Blocker: None.
 - Deferred: Manual visual acceptance is still needed for bottom-corner transitions, search pager spacing, avatar menu toggle behavior, favorites cursor hit area, and the about-row 0.5px inset.
 - Noise: Existing adjacent UI follow-up changes remain in the working tree.
+
+## Scroll Corner External Bottom Gap Follow-up
+
+Completed:
+
+- Reverted the bottom gap overlay approach because the fake bottom edge could not reliably match page background color, card corner masking, and static glow/shadow in dark theme.
+- Restored dynamic bottom margin for the bottom-state external gap, with a release threshold so the margin is not immediately removed by its own viewport-size change.
+- Locked the bottom margin to the scroll offset where bottom state is first reached, so poster and ranking layouts do not oscillate when layout recalculates scrollable height at the bottom.
+- Removed bottom clipping and overlay layers from the main cards so the restored bottom border, glow/shadow, and search/ranking pager controls remain native card content.
+- Added bottom spacing to movie-search pagers and slightly larger bottom spacing to ranking pagers so they sit above the bottom-state gap.
+- Treated `CanContentScroll` list scroll viewers as logical-scroll surfaces, so media-library list layout no longer starts restoring bottom corners many items before the actual bottom.
+- Applied the external bottom gap behavior to media-library, movie-search, and ranking content cards without moving their top edge.
+- Kept the main content cards' bottom padding at zero so the card chrome does not form a fixed bottom strip over scrolling content.
+- Reverted the movie-search and ranking list/grid bottom spacing that incorrectly put the requested gap inside the card.
+- Kept the media-library list `ListBox` bottom padding removal so its list layout no longer has an extra internal bottom gap compared with movie-search list layout.
+
+Not done:
+
+- No database update, new migration, commit, push, scanner matching rule, media deletion behavior, or business-state semantics were changed.
+- No runtime screenshot sweep was performed in this pass; visual acceptance remains manual.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None.
+- Deferred: Manual visual acceptance is still needed for bottom-corner transitions and external bottom gap behavior in media-library, movie-search, and ranking poster/list layouts.
+- Noise: Existing adjacent UI and AI-tag follow-up changes remain in the working tree.
+
+## 2026-06-13 - Watch History Theme Refresh Follow-up
+
+Completed:
+
+- Watch History page header, status, and empty-state text now use dynamic theme brushes instead of static theme brush references.
+- Active date-filter button accent brushes also use dynamic resources, reducing stale colors after switching between light and dark themes without leaving the page.
+- A focused scan of page/control theme brush references found the same stale theme-brush pattern only on Watch History; poster overlay brushes on other pages were left unchanged because they are local fixed overlay colors.
+
+Not done:
+
+- No layout, navigation, data query, scan behavior, database update, migration, commit, or push was changed for this UI fix.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only existing LF-to-CRLF conversion warnings were reported.
+- Migration diff was checked and remained empty.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: Manual WPF acceptance is still needed for live theme switching while staying on Watch History.
+- Noise: Existing adjacent UI and profile-dialog changes remain in the working tree.
+
+## 2026-06-13 - Profile Dialog Logo And Toast Follow-up
+
+Completed:
+
+- Updated the sidebar navigation logo to use a white outline with the same visual weight as the profile-dialog logo, drawn directly on the black rounded logo edge so no transparent gap remains.
+- Changed the profile signature edit box to a top-aligned two-line input shape so the caret starts at the first line instead of the vertical center.
+- Moved profile toast placement much higher by targeting the upper screen area and falling back closer to the dialog top.
+
+Not done:
+
+- No business behavior, profile persistence schema, database update, migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None found in code inspection.
+- Deferred: Manual visual acceptance is still needed for the sidebar logo outline, signature caret position, and higher save toast position.
+- Noise: Existing adjacent UI and feature follow-up changes remain in the working tree.

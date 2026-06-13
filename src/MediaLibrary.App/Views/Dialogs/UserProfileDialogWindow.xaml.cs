@@ -17,6 +17,7 @@ public partial class UserProfileDialogWindow : Window
     private const int SignatureMaxLength = 48;
     private const int AvatarRenderSize = 512;
     private const int ToastDurationMilliseconds = 1600;
+    private const double ToastScreenTopRatio = 0.16d;
 
     private readonly IUserProfileService _userProfileService;
     private readonly List<string> _temporaryAvatarPaths = [];
@@ -27,16 +28,22 @@ public partial class UserProfileDialogWindow : Window
     private int _toastVersion;
 
     public UserProfileDialogWindow(IUserProfileService userProfileService)
+        : this(userProfileService, CreateDefaultProfile())
+    {
+    }
+
+    public UserProfileDialogWindow(IUserProfileService userProfileService, UserProfileModel initialProfile)
     {
         _userProfileService = userProfileService;
+        _profile = initialProfile;
+        _draftAvatarPath = _profile.AvatarPath;
         InitializeComponent();
         DataObject.AddPastingHandler(SignatureTextBox, SignatureTextBox_OnPaste);
         RefreshProfileDisplay();
     }
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        await LoadProfileAsync();
         BringDialogToFront();
         EditSaveButton.Focus();
     }
@@ -44,20 +51,6 @@ public partial class UserProfileDialogWindow : Window
     private void Window_Closed(object? sender, EventArgs e)
     {
         DeleteDiscardedTemporaryAvatars(string.Empty);
-    }
-
-    private async Task LoadProfileAsync()
-    {
-        try
-        {
-            _profile = await _userProfileService.LoadAsync();
-            _draftAvatarPath = _profile.AvatarPath;
-            RefreshProfileDisplay();
-        }
-        catch
-        {
-            ShowToast("资料读取失败，已显示默认本地资料。", ProfileToastKind.Warning);
-        }
     }
 
     private void BringDialogToFront()
@@ -240,6 +233,7 @@ public partial class UserProfileDialogWindow : Window
             _temporaryAvatarPaths.Add(avatarPath);
             _draftAvatarPath = avatarPath;
             RefreshAvatarDisplay();
+            ShowToast("头像上传成功，点击完成后保存到个人资料。", ProfileToastKind.Success);
         }
         catch
         {
@@ -358,7 +352,21 @@ public partial class UserProfileDialogWindow : Window
         }
 
         ProfileToastBorder.Visibility = Visibility.Visible;
+        ProfileToastBorder.Margin = new Thickness(0, CalculateToastTopOffset(), 0, 0);
         _ = HideToastAfterDelayAsync(version);
+    }
+
+    private double CalculateToastTopOffset()
+    {
+        var targetScreenTop = SystemParameters.WorkArea.Top + (SystemParameters.WorkArea.Height * ToastScreenTopRatio);
+        var offset = targetScreenTop - Top;
+        if (double.IsNaN(offset) || double.IsInfinity(offset))
+        {
+            offset = ActualHeight * 0.10d;
+        }
+
+        var maxOffset = Math.Max(48d, ActualHeight - 96d);
+        return Math.Clamp(offset, 48d, maxOffset);
     }
 
     private async Task HideToastAfterDelayAsync(int version)

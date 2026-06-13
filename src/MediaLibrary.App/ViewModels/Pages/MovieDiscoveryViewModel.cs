@@ -61,9 +61,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const int TvDetailResolveConcurrency = 3;
     private const int SearchTmdbPageSize = 20;
     private const int SearchDisplayPageSize = 30;
-    private const int SearchFilteredInitialSourcePages = 10;
-    private const int SearchFilteredSourcePagesPerDisplayPage = 5;
-    private const int SearchFilteredMaxSourcePages = 30;
+    private const int SearchFilteredMaxDisplayPages = 30;
+    private const int SearchDiscoverMaxDisplayPages = 100;
+    private const int SearchFilteredMaxSourcePages =
+        (SearchFilteredMaxDisplayPages * SearchDisplayPageSize + SearchTmdbPageSize - 1) / SearchTmdbPageSize;
+    private const int SearchDiscoverMaxSourcePages =
+        (SearchDiscoverMaxDisplayPages * SearchDisplayPageSize + SearchTmdbPageSize - 1) / SearchTmdbPageSize;
     private const int RankingTmdbPageSize = 20;
     private const int MaxRankingMovies = 200;
     private const int RankingFirstDisplayPageSize = 21;
@@ -71,6 +74,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private const int PageLoadMaxRetryAttempts = 3;
     private const int PageLoadRetryDelayMilliseconds = 350;
     private const int PageLoadAttemptTimeoutSeconds = 5;
+    private const int SearchFilteredPageLoadAttemptTimeoutSeconds = SearchFilteredMaxSourcePages * 3;
     private const int PageLoadFailureToastMilliseconds = 1500;
     private const string TransientPageMessageKindInfo = "Info";
     private const string TransientPageMessageKindWarning = "Warning";
@@ -2210,18 +2214,21 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             CaptureTvSearchPageState,
             state => RestoreTvSearchPageState(state, restoreDisplay: false),
             attemptToken => EnsureTvSearchPoolForDisplayPageAsync(displayPage, requestVersion, attemptToken),
-            cancellationToken);
+            cancellationToken,
+            RequiresCompleteTvSearchPool()
+                ? SearchFilteredPageLoadAttemptTimeoutSeconds
+                : PageLoadAttemptTimeoutSeconds);
     }
 
     private bool HasEnoughTvSearchResultsForDisplayPage(int displayPage)
     {
         var required = displayPage * SearchDisplayPageSize;
-        if (!HasExpandedTvSearchCriteria())
+        if (!RequiresCompleteTvSearchPool())
         {
             return _tvSearchResultPool.Count >= required || _tvSearchSourceExhausted;
         }
 
-        return BuildFilteredTvSearchSeries().Count >= required || _tvSearchSourceExhausted;
+        return !CanFetchNextTvSearchSourcePage(SearchFilteredMaxSourcePages);
     }
 
     private bool CanFetchNextTvSearchSourcePage(int sourcePageLimit)
@@ -2241,15 +2248,15 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private int GetTvSearchSourcePageLimit(int displayPage)
     {
-        if (!HasExpandedTvSearchCriteria())
+        if (RequiresCompleteTvSearchPool())
         {
-            return (int)Math.Ceiling(displayPage * SearchDisplayPageSize / (double)SearchTmdbPageSize);
+            return SearchFilteredMaxSourcePages;
         }
 
-        var pageDrivenLimit = Math.Max(
-            SearchFilteredInitialSourcePages,
-            displayPage * SearchFilteredSourcePagesPerDisplayPage);
-        return Math.Min(SearchFilteredMaxSourcePages, pageDrivenLimit);
+        var pageDrivenLimit = (int)Math.Ceiling(displayPage * SearchDisplayPageSize / (double)SearchTmdbPageSize);
+        return CanUseTvDiscoverSearch()
+            ? Math.Min(SearchDiscoverMaxSourcePages, pageDrivenLimit)
+            : pageDrivenLimit;
     }
 
     private async Task FetchNextTvSearchSourcePageAsync(
@@ -2340,9 +2347,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         var loadedPages = filteredCount == 0
             ? 0
             : (int)Math.Ceiling(filteredCount / (double)SearchDisplayPageSize);
-        if (!HasExpandedTvSearchCriteria() && _tvSearchTotalResults > 0)
+        if (!RequiresCompleteTvSearchPool() && _tvSearchTotalResults > 0)
         {
-            TvSearchTotalPages = Math.Max(1, (int)Math.Ceiling(_tvSearchTotalResults / (double)SearchDisplayPageSize));
+            var availableResults = CanUseTvDiscoverSearch()
+                ? Math.Min(_tvSearchTotalResults, SearchDiscoverMaxDisplayPages * SearchDisplayPageSize)
+                : _tvSearchTotalResults;
+            TvSearchTotalPages = Math.Max(1, (int)Math.Ceiling(availableResults / (double)SearchDisplayPageSize));
         }
         else if (_canGoToNextTvSearchPage)
         {
@@ -2461,6 +2471,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                || !IsDefaultCollectionStatusFilter(_selectedTvCollectionStatusFilters)
                || !string.Equals(SelectedTvSortOption, SortRelevance, StringComparison.Ordinal)
                || !string.Equals(SelectedTvSortDirection, DirectionDescending, StringComparison.Ordinal);
+    }
+
+    private bool RequiresCompleteTvSearchPool()
+    {
+        return HasExpandedTvSearchCriteria() && !CanUseTvDiscoverSearch();
     }
 
     private bool CanLoadMovieSearchSource()
@@ -2802,18 +2817,21 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             CaptureMovieSearchPageState,
             state => RestoreMovieSearchPageState(state, restoreDisplay: false),
             attemptToken => EnsureSearchPoolForDisplayPageAsync(displayPage, requestVersion, attemptToken),
-            cancellationToken);
+            cancellationToken,
+            RequiresCompleteSearchPool()
+                ? SearchFilteredPageLoadAttemptTimeoutSeconds
+                : PageLoadAttemptTimeoutSeconds);
     }
 
     private bool HasEnoughSearchResultsForDisplayPage(int displayPage)
     {
         var required = displayPage * SearchDisplayPageSize;
-        if (!HasExpandedSearchCriteria())
+        if (!RequiresCompleteSearchPool())
         {
             return _searchResultPool.Count >= required || _searchSourceExhausted;
         }
 
-        return BuildFilteredSearchMovies().Count >= required || _searchSourceExhausted;
+        return !CanFetchNextSearchSourcePage(SearchFilteredMaxSourcePages);
     }
 
     private bool CanFetchNextSearchSourcePage(int sourcePageLimit)
@@ -2833,15 +2851,15 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
 
     private int GetSearchSourcePageLimit(int displayPage)
     {
-        if (!HasExpandedSearchCriteria())
+        if (RequiresCompleteSearchPool())
         {
-            return (int)Math.Ceiling(displayPage * SearchDisplayPageSize / (double)SearchTmdbPageSize);
+            return SearchFilteredMaxSourcePages;
         }
 
-        var pageDrivenLimit = Math.Max(
-            SearchFilteredInitialSourcePages,
-            displayPage * SearchFilteredSourcePagesPerDisplayPage);
-        return Math.Min(SearchFilteredMaxSourcePages, pageDrivenLimit);
+        var pageDrivenLimit = (int)Math.Ceiling(displayPage * SearchDisplayPageSize / (double)SearchTmdbPageSize);
+        return CanUseMovieDiscoverSearch()
+            ? Math.Min(SearchDiscoverMaxSourcePages, pageDrivenLimit)
+            : pageDrivenLimit;
     }
 
     private async Task FetchNextSearchSourcePageAsync(
@@ -2903,6 +2921,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             }
         }
 
+        ApplyExternalTagCacheSnapshots(pageItems);
         _searchResultPool.AddRange(pageItems);
     }
 
@@ -3304,9 +3323,12 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         var loadedPages = filteredCount == 0
             ? 0
             : (int)Math.Ceiling(filteredCount / (double)SearchDisplayPageSize);
-        if (!HasExpandedSearchCriteria() && _searchTotalResults > 0)
+        if (!RequiresCompleteSearchPool() && _searchTotalResults > 0)
         {
-            SearchTotalPages = Math.Max(1, (int)Math.Ceiling(_searchTotalResults / (double)SearchDisplayPageSize));
+            var availableResults = CanUseMovieDiscoverSearch()
+                ? Math.Min(_searchTotalResults, SearchDiscoverMaxDisplayPages * SearchDisplayPageSize)
+                : _searchTotalResults;
+            SearchTotalPages = Math.Max(1, (int)Math.Ceiling(availableResults / (double)SearchDisplayPageSize));
         }
         else if (_canGoToNextSearchPage)
         {
@@ -3337,7 +3359,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     private static string BuildSearchResultSummaryText(int totalCount, int inLibraryCount)
     {
         var notInLibraryCount = Math.Max(0, totalCount - inLibraryCount);
-        return $"共找到 {totalCount} 项媒体 · 已入库 {inLibraryCount} 项 · 未入库 {notInLibraryCount} 项";
+        return $"已加载 {totalCount} 项媒体 · 已入库 {inLibraryCount} 项 · 未入库 {notInLibraryCount} 项";
     }
 
     private bool HasExpandedSearchCriteria()
@@ -3352,6 +3374,11 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
                || !IsDefaultCollectionStatusFilter(_selectedCollectionStatusFilters)
                || !string.Equals(SelectedSortOption, SortRelevance, StringComparison.Ordinal)
                || !string.Equals(SelectedSortDirection, DirectionDescending, StringComparison.Ordinal);
+    }
+
+    private bool RequiresCompleteSearchPool()
+    {
+        return HasExpandedSearchCriteria() && !CanUseMovieDiscoverSearch();
     }
 
     private void ClearSearchFilters()
@@ -3979,10 +4006,20 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     {
         foreach (var item in items)
         {
-            if (ExternalMovieTagCache.TryGet(item.TmdbId, item.ImdbId, item.Title, item.ReleaseYear, out var tags))
-            {
-                item.ApplyExternalTagSnapshot(tags);
-            }
+            ApplyExternalTagCacheSnapshot(item);
+        }
+    }
+
+    private static void ApplyExternalTagCacheSnapshot(DiscoveryMovieCardViewModel item)
+    {
+        if (item.HasLocalMovie)
+        {
+            return;
+        }
+
+        if (ExternalMovieTagCache.TryGet(item.TmdbId, item.ImdbId, item.Title, item.ReleaseYear, out var tags))
+        {
+            item.ApplyExternalTagSnapshot(tags);
         }
     }
 
@@ -4861,6 +4898,7 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
             }
         }
 
+        ApplyExternalTagCacheSnapshots(pageItems);
         _rankingMovies.AddRange(pageItems);
         UpdateRankingTotalPages();
         WriteRankingDiagnostics(
@@ -5192,13 +5230,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         Func<TState> captureState,
         Action<TState> restoreState,
         Func<CancellationToken, Task> loadAsync,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int attemptTimeoutSeconds = PageLoadAttemptTimeoutSeconds)
     {
         for (var attempt = 1; attempt <= PageLoadMaxRetryAttempts; attempt++)
         {
             var attemptState = captureState();
             using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            attemptCts.CancelAfter(TimeSpan.FromSeconds(PageLoadAttemptTimeoutSeconds));
+            attemptCts.CancelAfter(TimeSpan.FromSeconds(attemptTimeoutSeconds));
             try
             {
                 await loadAsync(attemptCts.Token);

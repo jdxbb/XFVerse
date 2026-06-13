@@ -484,12 +484,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var creditsResponse = await SendGetAsync($"person/{personId}/movie_credits?language={TmdbLanguage}", options, "tmdb-person-movie-credits", cancellationToken);
-            EnsureSuccessStatusCode(creditsResponse);
-
-            await using var creditsStream = await creditsResponse.Content.ReadAsStreamAsync(cancellationToken);
-            using var creditsDocument = await JsonDocument.ParseAsync(creditsStream, cancellationToken: cancellationToken);
-            var allCredits = BuildPersonMovieCredits(creditsDocument.RootElement);
+            var allCredits = await LoadPersonMovieCreditsAsync(personId, options, cancellationToken);
             var totalResults = allCredits.Count;
             var totalPages = totalResults == 0 ? 0 : (int)Math.Ceiling(totalResults / (double)DiscoveryPageSize);
             var pageItems = allCredits
@@ -537,13 +532,36 @@ public sealed class TmdbService : ITmdbService
         try
         {
             var people = await SearchPeopleAsync(query, 1, cancellationToken);
-            var person = people.Results.FirstOrDefault();
-            if (person is null)
+            var matchingPeople = SelectMatchingPeople(query, people.Results);
+            if (matchingPeople.Count == 0)
             {
                 return CreateEmptyDiscoveryPage(safePage, "未找到相关人物，可尝试英文名或原名。");
             }
 
-            return await GetPersonMovieCreditsAsync(person.TmdbId, safePage, person.Name, cancellationToken);
+            var options = await GetRequestOptionsAsync(cancellationToken);
+            if (!options.HasCredential)
+            {
+                return CreateEmptyDiscoveryPage(safePage, "未配置 TMDB API。");
+            }
+
+            var creditsByPerson = await Task.WhenAll(
+                matchingPeople.Select(person => LoadPersonMovieCreditsAsync(person.TmdbId, options, cancellationToken)));
+            var allCredits = MergePersonMovieCredits(creditsByPerson);
+            var totalResults = allCredits.Count;
+            var totalPages = totalResults == 0 ? 0 : (int)Math.Ceiling(totalResults / (double)DiscoveryPageSize);
+            return new TmdbMovieDiscoveryPage
+            {
+                Results = allCredits
+                    .Skip((safePage - 1) * DiscoveryPageSize)
+                    .Take(DiscoveryPageSize)
+                    .ToList(),
+                Page = safePage,
+                TotalPages = totalPages,
+                TotalResults = totalResults,
+                ResultMessage = totalResults == 0
+                    ? "未找到该人物作为导演、编剧或演员参与的电影。"
+                    : $"已匹配姓名包含“{query.Trim()}”的人物相关电影。"
+            };
         }
         catch
         {
@@ -677,16 +695,7 @@ public sealed class TmdbService : ITmdbService
         var isError = false;
         try
         {
-            using var creditsResponse = await SendGetAsync(
-                $"person/{personId}/tv_credits?language={Uri.EscapeDataString(safeLanguage)}",
-                options,
-                "tmdb-person-tv-credits",
-                cancellationToken);
-            EnsureSuccessStatusCode(creditsResponse);
-
-            await using var creditsStream = await creditsResponse.Content.ReadAsStreamAsync(cancellationToken);
-            using var creditsDocument = await JsonDocument.ParseAsync(creditsStream, cancellationToken: cancellationToken);
-            var allCredits = BuildPersonTvCredits(creditsDocument.RootElement);
+            var allCredits = await LoadPersonTvCreditsAsync(personId, safeLanguage, options, cancellationToken);
             var totalResults = allCredits.Count;
             var totalPages = totalResults == 0 ? 0 : (int)Math.Ceiling(totalResults / (double)DiscoveryPageSize);
             var pageItems = allCredits
@@ -735,13 +744,38 @@ public sealed class TmdbService : ITmdbService
         try
         {
             var people = await SearchPeopleAsync(query, 1, cancellationToken);
-            var person = people.Results.FirstOrDefault();
-            if (person is null)
+            var matchingPeople = SelectMatchingPeople(query, people.Results);
+            if (matchingPeople.Count == 0)
             {
                 return CreateEmptyTvSeriesPage(safePage, "未找到相关人物，可尝试英文名或原名。");
             }
 
-            return await GetPersonTvCreditsAsync(person.TmdbId, safePage, person.Name, language, cancellationToken);
+            var options = await GetRequestOptionsAsync(cancellationToken);
+            if (!options.HasCredential)
+            {
+                return CreateEmptyTvSeriesPage(safePage, "未配置 TMDB API。");
+            }
+
+            var safeLanguage = NormalizeLanguage(language);
+            var creditsByPerson = await Task.WhenAll(
+                matchingPeople.Select(
+                    person => LoadPersonTvCreditsAsync(person.TmdbId, safeLanguage, options, cancellationToken)));
+            var allCredits = MergePersonTvCredits(creditsByPerson);
+            var totalResults = allCredits.Count;
+            var totalPages = totalResults == 0 ? 0 : (int)Math.Ceiling(totalResults / (double)DiscoveryPageSize);
+            return new TmdbTvSeriesSearchPage
+            {
+                Results = allCredits
+                    .Skip((safePage - 1) * DiscoveryPageSize)
+                    .Take(DiscoveryPageSize)
+                    .ToList(),
+                Page = safePage,
+                TotalPages = totalPages,
+                TotalResults = totalResults,
+                ResultMessage = totalResults == 0
+                    ? "未找到该人物作为导演、编剧或演员参与的电视剧。"
+                    : $"已匹配姓名包含“{query.Trim()}”的人物相关电视剧。"
+            };
         }
         catch
         {
@@ -1968,6 +2002,73 @@ public sealed class TmdbService : ITmdbService
         };
     }
 
+    private async Task<IReadOnlyList<TmdbMovieDiscoveryItem>> LoadPersonMovieCreditsAsync(
+        int personId,
+        TmdbRequestOptions options,
+        CancellationToken cancellationToken)
+    {
+        using var response = await SendGetAsync(
+            $"person/{personId}/movie_credits?language={TmdbLanguage}",
+            options,
+            "tmdb-person-movie-credits",
+            cancellationToken);
+        EnsureSuccessStatusCode(response);
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        return BuildPersonMovieCredits(document.RootElement);
+    }
+
+    private async Task<IReadOnlyList<TmdbTvSeriesSearchItem>> LoadPersonTvCreditsAsync(
+        int personId,
+        string language,
+        TmdbRequestOptions options,
+        CancellationToken cancellationToken)
+    {
+        using var response = await SendGetAsync(
+            $"person/{personId}/tv_credits?language={Uri.EscapeDataString(language)}",
+            options,
+            "tmdb-person-tv-credits",
+            cancellationToken);
+        EnsureSuccessStatusCode(response);
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        return BuildPersonTvCredits(document.RootElement);
+    }
+
+    private static IReadOnlyList<TmdbMovieDiscoveryItem> MergePersonMovieCredits(
+        IEnumerable<IReadOnlyList<TmdbMovieDiscoveryItem>> creditsByPerson)
+    {
+        return creditsByPerson
+            .SelectMany(credits => credits)
+            .GroupBy(movie => movie.TmdbId)
+            .Select(
+                group => group
+                    .OrderByDescending(movie => movie.Popularity ?? 0d)
+                    .ThenByDescending(movie => movie.TmdbVoteCount ?? 0)
+                    .First())
+            .OrderByDescending(movie => movie.Popularity ?? 0d)
+            .ThenByDescending(movie => movie.TmdbVoteCount ?? 0)
+            .ThenByDescending(movie => movie.ReleaseYear ?? 0)
+            .ToList();
+    }
+
+    private static IReadOnlyList<TmdbTvSeriesSearchItem> MergePersonTvCredits(
+        IEnumerable<IReadOnlyList<TmdbTvSeriesSearchItem>> creditsByPerson)
+    {
+        return creditsByPerson
+            .SelectMany(credits => credits)
+            .GroupBy(series => series.TmdbId)
+            .Select(
+                group => group
+                    .OrderByDescending(series => series.Popularity ?? 0d)
+                    .ThenByDescending(series => series.TmdbVoteCount ?? 0)
+                    .First())
+            .OrderByDescending(series => series.Popularity ?? 0d)
+            .ThenByDescending(series => series.TmdbVoteCount ?? 0)
+            .ThenByDescending(series => series.FirstAirYear ?? 0)
+            .ToList();
+    }
+
     private static IReadOnlyList<TmdbMovieDiscoveryItem> BuildPersonMovieCredits(JsonElement root)
     {
         var candidates = new List<PersonCreditCandidate>();
@@ -2003,6 +2104,12 @@ public sealed class TmdbService : ITmdbService
 
         foreach (var item in array.EnumerateArray())
         {
+            var job = GetString(item, "job");
+            if (rolePriority > 0 && !IsPrimaryCrewJob(job))
+            {
+                continue;
+            }
+
             if (BuildDiscoveryItem(item) is not { } movie)
             {
                 continue;
@@ -2011,7 +2118,6 @@ public sealed class TmdbService : ITmdbService
             var order = GetInt(item, "order") ?? int.MaxValue;
             if (rolePriority > 0)
             {
-                var job = GetString(item, "job");
                 order = IsPrimaryCrewJob(job) ? 0 : 50;
             }
 
@@ -2054,6 +2160,12 @@ public sealed class TmdbService : ITmdbService
 
         foreach (var item in array.EnumerateArray())
         {
+            var job = GetString(item, "job");
+            if (rolePriority > 0 && !IsPrimaryTvCrewJob(job))
+            {
+                continue;
+            }
+
             if (BuildTvSeriesSearchItem(item) is not { } series)
             {
                 continue;
@@ -2062,7 +2174,6 @@ public sealed class TmdbService : ITmdbService
             var order = GetInt(item, "order") ?? int.MaxValue;
             if (rolePriority > 0)
             {
-                var job = GetString(item, "job");
                 order = IsPrimaryTvCrewJob(job) ? 0 : 50;
             }
 
@@ -2081,10 +2192,54 @@ public sealed class TmdbService : ITmdbService
     private static bool IsPrimaryTvCrewJob(string job)
     {
         return string.Equals(job, "Director", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Series Director", StringComparison.OrdinalIgnoreCase)
                || string.Equals(job, "Writer", StringComparison.OrdinalIgnoreCase)
                || string.Equals(job, "Screenplay", StringComparison.OrdinalIgnoreCase)
                || string.Equals(job, "Story", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(job, "Teleplay", StringComparison.OrdinalIgnoreCase)
                || string.Equals(job, "Creator", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<TmdbPersonSearchItem> SelectMatchingPeople(
+        string query,
+        IReadOnlyList<TmdbPersonSearchItem> people)
+    {
+        var normalizedQuery = NormalizePersonName(query);
+        if (string.IsNullOrEmpty(normalizedQuery))
+        {
+            return [];
+        }
+
+        return people
+            .Where(person => IsContainedPersonNameMatch(normalizedQuery, person))
+            .GroupBy(person => person.TmdbId)
+            .Select(group => group.First())
+            .OrderBy(person => person.TmdbId)
+            .ToList();
+    }
+
+    private static bool IsContainedPersonNameMatch(string normalizedQuery, TmdbPersonSearchItem person)
+    {
+        return !string.IsNullOrEmpty(normalizedQuery)
+               && EnumerateNormalizedPersonNames(person)
+                   .Any(name => name.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<string> EnumerateNormalizedPersonNames(TmdbPersonSearchItem person)
+    {
+        return new[] { person.Name, person.OriginalName }
+            .Select(NormalizePersonName)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizePersonName(string? value)
+    {
+        return string.Concat(
+                (value ?? string.Empty)
+                .Normalize(NormalizationForm.FormKC)
+                .Where(char.IsLetterOrDigit))
+            .ToUpperInvariant();
     }
 
     private static IReadOnlyList<MetadataSearchCandidate> CloneCandidates(IEnumerable<MetadataSearchCandidate> candidates)

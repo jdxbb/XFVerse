@@ -322,7 +322,12 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     {
         _isActive = true;
         await LoadCustomPreferenceAsync(cancellationToken);
-        await RequestReloadAsync(forceRefresh: false, cancellationToken);
+        if (IsLoading)
+        {
+            return;
+        }
+
+        await RequestReloadAsync(forceRefresh: false);
     }
 
     public override void Deactivate()
@@ -402,6 +407,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             StatusMessage = isEnabled
                 ? "自定义推荐偏好已开启，下一次推荐将生效"
                 : "自定义推荐偏好已关闭，下一次推荐将生效";
+            await RequestReloadAsync(forceRefresh: false);
         }
         catch (Exception exception)
         {
@@ -468,6 +474,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             _originalCustomPreferenceText = saved.Text;
             IsPreferenceDialogOpen = false;
             StatusMessage = "推荐偏好已保存，下一次推荐将生效";
+            await RequestReloadAsync(forceRefresh: false);
         }
         catch (Exception exception)
         {
@@ -507,6 +514,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             DraftCustomPreferenceText = string.Empty;
             IsPreferenceDialogOpen = false;
             StatusMessage = "推荐偏好已清空，下一次推荐将生效";
+            await RequestReloadAsync(forceRefresh: false);
         }
         catch (Exception exception)
         {
@@ -592,9 +600,10 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     private async Task<bool> LoadRecommendationsAsync(CancellationToken cancellationToken = default, bool forceRefresh = false)
     {
-        _loadCancellation?.Cancel();
+        var previousLoadCancellation = _loadCancellation;
         var requestVersion = unchecked(_loadVersion + 1);
         _loadVersion = requestVersion;
+        previousLoadCancellation?.Cancel();
         using var loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _loadCancellation = loadCancellation;
         var activeCancellationToken = loadCancellation.Token;
@@ -1294,10 +1303,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             AddWantToWatchCommand.RaiseCanExecuteChanged();
             ToggleNotInterestedCommand.RaiseCanExecuteChanged();
             _dataRefreshService.NotifyCollectionChanged();
-            if (item.TmdbId is > 0)
-            {
-                _dataRefreshService.NotifyRecommendationChanged();
-            }
+            _dataRefreshService.NotifyRecommendationChanged();
         }
         catch (Exception exception)
         {
@@ -1316,7 +1322,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     private async Task ToggleNotInterestedAsync(object? parameter)
     {
-        if (parameter is not AiRecommendationItem item || IsLoading)
+        if (parameter is not AiRecommendationItem item)
         {
             return;
         }
@@ -1338,7 +1344,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             AddWantToWatchCommand.RaiseCanExecuteChanged();
             ToggleNotInterestedCommand.RaiseCanExecuteChanged();
             _dataRefreshService.NotifyCollectionChanged();
-            NotifyRecommendationChangedWithoutReload();
+            _dataRefreshService.NotifyRecommendationChanged();
         }
         catch (Exception exception)
         {
@@ -1351,7 +1357,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     private bool CanToggleNotInterested(object? parameter)
     {
-        return !IsLoading && parameter is AiRecommendationItem;
+        return parameter is AiRecommendationItem;
     }
 
     private async Task RefreshRecommendationItemStatesAsync(int requestVersion, CancellationToken cancellationToken = default)

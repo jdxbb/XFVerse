@@ -96,7 +96,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ToggleThemeCommand = new AsyncRelayCommand(ToggleThemeAsync);
         ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
         ToggleUserMenuCommand = new RelayCommand(ToggleUserMenu);
-        OpenUserProfileCommand = new RelayCommand(OpenUserProfile);
+        OpenUserProfileCommand = new AsyncRelayCommand(OpenUserProfileAsync);
         OpenScanTasksFromMenuCommand = new RelayCommand(() => NavigateFromUserMenu(NavigationPageKey.ScanTasks));
         OpenSettingsFromMenuCommand = new RelayCommand(() => NavigateFromUserMenu(NavigationPageKey.Settings));
         LogoutCommand = new RelayCommand(ShowLogoutPlaceholder);
@@ -117,7 +117,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public RelayCommand ToggleUserMenuCommand { get; }
 
-    public RelayCommand OpenUserProfileCommand { get; }
+    public AsyncRelayCommand OpenUserProfileCommand { get; }
 
     public RelayCommand OpenScanTasksFromMenuCommand { get; }
 
@@ -421,10 +421,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         IsUserMenuOpen = !IsUserMenuOpen;
     }
 
-    private void OpenUserProfile()
+    private async Task OpenUserProfileAsync()
     {
         IsUserMenuOpen = false;
-        var dialog = new UserProfileDialogWindow(_userProfileService);
+        UserMenuStatusMessage = string.Empty;
+
+        var profile = await _userProfileService.LoadAsync();
+        ApplyUserProfile(profile);
+
+        var dialog = new UserProfileDialogWindow(_userProfileService, profile);
         var owner = Application.Current?.MainWindow;
         if (owner is not null)
         {

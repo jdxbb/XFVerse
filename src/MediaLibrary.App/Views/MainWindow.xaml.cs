@@ -6,11 +6,11 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 using MediaLibrary.App.Services;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Main;
+using MediaLibrary.Core.Diagnostics;
 
 namespace MediaLibrary.App.Views;
 
@@ -28,7 +28,6 @@ public partial class MainWindow : Window
     private Point? _pendingMaximizedDragStart;
     private bool _isExitRequested;
     private bool _isCloseBehaviorCheckInProgress;
-    private bool _suppressNextUserMenuButtonClick;
 
     public MainWindow()
     {
@@ -40,6 +39,7 @@ public partial class MainWindow : Window
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
         StateChanged += OnWindowStateChanged;
+        PreviewMouseDown += OnWindowPreviewMouseDown;
         UpdateMaximizeRestoreButton();
     }
 
@@ -50,6 +50,7 @@ public partial class MainWindow : Window
         SourceInitialized -= OnSourceInitialized;
         Loaded -= OnLoaded;
         StateChanged -= OnWindowStateChanged;
+        PreviewMouseDown -= OnWindowPreviewMouseDown;
         base.OnClosed(e);
     }
 
@@ -137,61 +138,140 @@ public partial class MainWindow : Window
 
     private void UserMenuButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel viewModel
-            || (!viewModel.IsUserMenuOpen && !UserMenuPopup.IsOpen))
+        if (DataContext is not MainWindowViewModel viewModel)
         {
+            WriteUserMenuDiagnostic("button-preview-no-view-model", null, e.Handled, e.OriginalSource);
             return;
         }
 
-        SuppressNextUserMenuButtonClick();
-        viewModel.IsUserMenuOpen = false;
-        UserMenuPopup.IsOpen = false;
+        WriteUserMenuDiagnostic("button-preview", viewModel, e.Handled, e.OriginalSource);
+        if (!IsUserMenuOpen(viewModel))
+        {
+            WriteUserMenuDiagnostic("button-preview-pass-through-closed", viewModel, e.Handled, e.OriginalSource);
+            return;
+        }
+
+        CloseUserMenu(viewModel);
         e.Handled = true;
+        WriteUserMenuDiagnostic("button-preview-close", viewModel, e.Handled, e.OriginalSource);
     }
 
     private void UserMenuButton_Click(object sender, RoutedEventArgs e)
     {
-        if (DataContext is MainWindowViewModel viewModel)
+        if (DataContext is not MainWindowViewModel viewModel)
         {
-            if (_suppressNextUserMenuButtonClick)
-            {
-                _suppressNextUserMenuButtonClick = false;
-                viewModel.IsUserMenuOpen = false;
-                UserMenuPopup.IsOpen = false;
-                e.Handled = true;
-                return;
-            }
-
-            if (viewModel.IsUserMenuOpen || UserMenuPopup.IsOpen)
-            {
-                viewModel.IsUserMenuOpen = false;
-                UserMenuPopup.IsOpen = false;
-            }
-            else
-            {
-                viewModel.ToggleUserMenuCommand.Execute(null);
-            }
-
-            e.Handled = true;
+            WriteUserMenuDiagnostic("button-click-no-view-model", null, e.Handled, e.OriginalSource);
+            return;
         }
+
+        WriteUserMenuDiagnostic("button-click-before", viewModel, e.Handled, e.OriginalSource);
+        if (IsUserMenuOpen(viewModel))
+        {
+            CloseUserMenu(viewModel);
+            WriteUserMenuDiagnostic("button-click-close", viewModel, e.Handled, e.OriginalSource);
+        }
+        else
+        {
+            viewModel.ToggleUserMenuCommand.Execute(null);
+            WriteUserMenuDiagnostic("button-click-open", viewModel, e.Handled, e.OriginalSource);
+        }
+
+        e.Handled = true;
+        WriteUserMenuDiagnostic("button-click-after", viewModel, e.Handled, e.OriginalSource);
     }
 
     private void UserMenuPopup_Closed(object sender, EventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)
         {
+            WriteUserMenuDiagnostic("popup-closed-before-sync", viewModel, handled: false);
             viewModel.IsUserMenuOpen = false;
+            WriteUserMenuDiagnostic("popup-closed-after-sync", viewModel, handled: false);
         }
-
-        SuppressNextUserMenuButtonClick();
+        else
+        {
+            WriteUserMenuDiagnostic("popup-closed-no-view-model", null, handled: false);
+        }
     }
 
-    private void SuppressNextUserMenuButtonClick()
+    private bool IsUserMenuOpen(MainWindowViewModel viewModel)
     {
-        _suppressNextUserMenuButtonClick = true;
-        _ = Dispatcher.BeginInvoke(
-            new Action(() => _suppressNextUserMenuButtonClick = false),
-            DispatcherPriority.Background);
+        return viewModel.IsUserMenuOpen || UserMenuPopup.IsOpen;
+    }
+
+    private void CloseUserMenu(MainWindowViewModel viewModel)
+    {
+        viewModel.IsUserMenuOpen = false;
+        UserMenuPopup.IsOpen = false;
+    }
+
+    private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel || !IsUserMenuOpen(viewModel))
+        {
+            return;
+        }
+
+        var source = e.OriginalSource as DependencyObject;
+        if (IsWithinElement(source, UserMenuButton) || IsWithinElement(source, UserMenuPopup.Child))
+        {
+            WriteUserMenuDiagnostic("window-preview-inside-menu", viewModel, e.Handled, e.OriginalSource);
+            return;
+        }
+
+        WriteUserMenuDiagnostic("window-preview-outside-close-before", viewModel, e.Handled, e.OriginalSource);
+        CloseUserMenu(viewModel);
+        WriteUserMenuDiagnostic("window-preview-outside-close-after", viewModel, e.Handled, e.OriginalSource);
+    }
+
+    private void WriteUserMenuDiagnostic(
+        string phase,
+        MainWindowViewModel? viewModel,
+        bool handled,
+        object? originalSource = null)
+    {
+        AiPerfDiagnostics.WriteEvent(
+            $"event=user-menu-toggle phase={AiPerfDiagnostics.FormatValue(phase)} vmOpen={FormatBool(viewModel?.IsUserMenuOpen)} popupOpen={FormatBool(UserMenuPopup?.IsOpen)} handled={FormatBool(handled)} source={AiPerfDiagnostics.FormatValue(FormatSourceType(originalSource))}");
+    }
+
+    private static string FormatBool(bool? value)
+    {
+        return value.HasValue ? value.Value.ToString().ToLowerInvariant() : "none";
+    }
+
+    private static string FormatSourceType(object? source)
+    {
+        return source?.GetType().Name ?? "none";
+    }
+
+    private static bool IsWithinElement(DependencyObject? source, DependencyObject? root)
+    {
+        for (var current = source; current is not null; current = GetParent(current))
+        {
+            if (ReferenceEquals(current, root))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetParent(DependencyObject current)
+    {
+        try
+        {
+            var visualParent = VisualTreeHelper.GetParent(current);
+            if (visualParent is not null)
+            {
+                return visualParent;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        return LogicalTreeHelper.GetParent(current);
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
