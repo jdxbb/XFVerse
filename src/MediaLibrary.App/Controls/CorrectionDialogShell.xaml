@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Controls.CorrectionDialogShell"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              xmlns:local="clr-namespace:MediaLibrary.App.Controls"
              x:Name="Root">
     <UserControl.Style>
@@ -19,7 +20,7 @@
           IsHitTestVisible="True">
         <Border Background="Transparent"
                 Cursor="Arrow" />
-        <Border
+        <helpers:CachedShadowBorder
                 Width="{Binding DialogWidth, ElementName=Root}"
                 MaxHeight="{Binding DialogMaxHeight, ElementName=Root}"
                 Padding="24"
@@ -137,6 +138,6 @@
                     </Button>
                 </Grid>
             </Grid>
-        </Border>
+        </helpers:CachedShadowBorder>
     </Grid>
 </UserControl>

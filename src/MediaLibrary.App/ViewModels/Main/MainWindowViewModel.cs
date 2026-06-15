@@ -242,7 +242,9 @@ public sealed class MainWindowViewModel : ViewModelBase
                 _currentPageViewModel.PropertyChanged += OnCurrentPagePropertyChanged;
             }
 
-            OnPropertyChanged(nameof(DetailBackdropSource));
+            OnPropertyChanged(nameof(IsPosterBackdropActive));
+            OnPropertyChanged(nameof(IsWatchInsightsRouteActive));
+            OnPropertyChanged(nameof(PosterBackdropSource));
         }
     }
 
@@ -285,18 +287,25 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(SidebarColumnWidth));
                 OnPropertyChanged(nameof(IsShellChromeVisible));
+                OnPropertyChanged(nameof(IsPosterBackdropActive));
             }
         }
     }
 
     public bool IsShellChromeVisible => !IsDetailRouteActive;
 
-    public string DetailBackdropSource => CurrentPageViewModel switch
+    public bool IsPosterBackdropActive => IsDetailRouteActive
+        || CurrentPageViewModel is WatchInsightsViewModel;
+
+    public bool IsWatchInsightsRouteActive => CurrentPageViewModel is WatchInsightsViewModel;
+
+    public string PosterBackdropSource => CurrentPageViewModel switch
     {
         MovieDetailViewModel movieDetail => movieDetail.PosterDisplayUrl,
         SeriesOverviewViewModel seriesOverview => seriesOverview.PosterDisplayUrl,
         TvSeasonDetailViewModel seasonDetail => seasonDetail.PosterDisplayUrl,
         EpisodeDetailViewModel episodeDetail => episodeDetail.StillDisplayUrl,
+        WatchInsightsViewModel watchInsights => watchInsights.PersonaPosterImageUri,
         _ => string.Empty
     };
 
@@ -309,9 +318,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (e.PropertyName is nameof(MovieDetailViewModel.PosterDisplayUrl)
             or nameof(SeriesOverviewViewModel.PosterDisplayUrl)
             or nameof(TvSeasonDetailViewModel.PosterDisplayUrl)
-            or nameof(EpisodeDetailViewModel.StillDisplayUrl))
+            or nameof(EpisodeDetailViewModel.StillDisplayUrl)
+            or nameof(WatchInsightsViewModel.PersonaPosterImageUri))
         {
-            OnPropertyChanged(nameof(DetailBackdropSource));
+            OnPropertyChanged(nameof(PosterBackdropSource));
         }
     }
 

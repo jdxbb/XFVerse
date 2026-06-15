@@ -4,7 +4,7 @@
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              x:Name="Root">
     <UserControl.Resources>
-        <Style x:Key="ApiConfigInnerPanelStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+        <Style x:Key="ApiConfigInnerPanelStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassInlinePanelStyle}">
             <Setter Property="Padding" Value="16" />
             <Setter Property="CornerRadius" Value="12" />
         </Style>
@@ -19,7 +19,7 @@
         </Storyboard>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource GlassPageCardStyle}">
+    <helpers:CachedShadowBorder Style="{StaticResource GlassPageCardStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -108,7 +108,7 @@
                 </Border>
             </Grid>
 
-            <Border Grid.Row="1"
+            <helpers:CachedShadowBorder Grid.Row="1"
                     Margin="0,18,0,0"
                     Style="{StaticResource ApiConfigInnerPanelStyle}">
                 <Grid>
@@ -155,7 +155,7 @@
                         </ContentPresenter>
                     </Grid>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Grid>
-    </Border>
+    </helpers:CachedShadowBorder>
 </UserControl>

@@ -1441,6 +1441,142 @@ Suggested commit message:
 
 - `Polish home cards and media filters`
 
+### 7.7g Follow-up - Poster Glow And Viewport Compensation Correction
+
+Completed:
+
+- Reverted the direct symmetric `VirtualizingWrapPanel` width/padding change because poster shadow paint room must not reduce or shift the virtualized column layout.
+- Restored the Phase 7 viewport compensation strategy: Media Library and Discovery search ListBox viewports expand on clipped sides while panel padding preserves the original poster coordinates and column count.
+- Extended the existing Discovery ranking `-84/+84` ScrollViewer compensation model to the right side with matching `-24/+24` viewport and inner-root offsets.
+- Increased non-detail poster palette/base opacity without changing blur radius, bitmap padding, poster dimensions, or detail-page poster styling.
+- Increased only the expanded-sidebar account avatar to 38px inside a fixed 32px layout column, preserving its right edge and the collapsed 32px state.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- `git diff -- src/MediaLibrary.App/Controls/VirtualizingWrapPanel.cs` returned empty after reverting the incorrect layout algorithm change.
+
+Explicit non-goals:
+
+- no detail-page poster glow change;
+- no search, ranking, recommendation, media-library, profile, scan, database schema, migration, database update, commit or push behavior change.
+
+### 7.7g Follow-up - Poster Top Gutter And Expanded Avatar Correction
+
+Completed:
+
+- Removed the negative top viewport expansion from Media Library and Discovery search poster lists. Their horizontal shadow-safe expansion remains, while the existing top `ViewportPadding` now provides real in-scroll paint room so scrolled card bodies cannot render above the content boundary.
+- Added a real 36px top gutter inside both ranking ScrollViewers so the first hero poster glow is painted inside the viewport instead of being clipped at its top edge.
+- Increased cached palette/base opacity again for every non-detail poster surface, including the movie-correction candidate poster. Detail-page poster opacity remains unchanged.
+- Gave the expanded account avatar a real 38px layout column and translated only the visual 6px left. Its right edge and following text coordinates remain unchanged; the collapsed avatar and column remain 32px.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Explicit non-goals:
+
+- no virtualized column-count algorithm change;
+- no detail-page poster glow change;
+- no search, ranking, recommendation, media-library, profile, correction, scan, database schema, migration, database update, commit or push behavior change.
+
+### 7.7g Follow-up - Poster Glow Midpoint And First-row Spacing Restoration
+
+Completed:
+
+- Reduced the latest non-detail poster glow increase by half, using the exact midpoint between the previous accepted opacity and the latest stronger opacity.
+- Restored Media Library and Discovery Movie/TV search `ViewportPadding.Top` from 44px to the original 10px, removing the added first-row whitespace.
+- Kept the ListBox top boundary at its normal position, so vertical scrolling cannot paint poster bodies into the toolbar/content area.
+- Kept horizontal poster paint-room compensation and the ranking hero top gutter unchanged.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Explicit non-goals:
+
+- no detail-page poster glow change;
+- no virtualized layout algorithm, search, ranking, recommendation, correction, database, migration, database update, commit or push behavior change.
+
+### 7.7g Follow-up - Poster Scrollbar Alignment And Ranking Top Gap
+
+Completed:
+
+- Shifted only Media Library and Discovery Movie/TV poster-view scrollbars 34px left with `RenderTransform`, compensating for the horizontal shadow-safe viewport expansion without changing measured viewport width or poster columns.
+- Changed the ranking scrollbar transform from 4px right to 20px left. This is the smaller correction appropriate for the ranking viewport's 24px right expansion.
+- Reduced the ranking hero top content gutter from 36px to 18px while retaining space for the first poster glow.
+
+Validation:
+
+- The first temp-output build attempt failed because prior Codex temp build directories exhausted disk space. After removing only verified `%TEMP%\\XFVerseCodexBuild*` directories, the retry passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- `git diff -- src/MediaLibrary.App/Controls/VirtualizingWrapPanel.cs` remained empty.
+
+Explicit non-goals:
+
+- no poster column, card coordinate, shadow texture, search, ranking, recommendation, database, migration, database update, commit or push behavior change.
+
+### 7.7g Follow-up - Correction Playback-source Shadow Scope
+
+Completed:
+
+- Added cached inline shadow/glow only around the playback-source selector inside the Season correction episode-mapping panel.
+- Kept the shared playback-source ComboBox style free of live `Effect`, so Movie/Episode detail-page playback-source selectors and ordinary correction ComboBoxes are unchanged.
+- Reused theme-specific cached inline shadow color, opacity, blur and depth tokens.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Explicit non-goals:
+
+- no other ComboBox, correction field, detail-page playback-source selector, mapping behavior, database, migration, database update, commit or push change.
+
+### 7.7g Follow-up - Correction Playback-source Shadow Paint Box
+
+Completed:
+
+- Corrected the playback-source selector cached shadow after runtime feedback showed the first wrapper remained visually clipped by the 48px mapping row.
+- Kept the row height unchanged and reserved `10px` horizontal / `6px` vertical paint room inside the existing row.
+- Inset the cached shadow card boundary to the actual ComboBox bounds and raised only this selector above its row siblings.
+- Increased this selector's cached shadow opacity to `0.40`; no other dropdown was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Explicit non-goals:
+
+- no other ComboBox, popup template, detail page, mapping behavior, database, migration, database update, commit or push change.
+
+### 7.7g Follow-up - Correction Playback-source Instance Correction
+
+Root cause:
+
+- The previous two passes targeted the Season correction episode-mapping source ComboBox, but the reported control is the playback-source selector in the Movie/Episode correction shell header.
+- Cached shadow rendering itself was working; the wrong control instance meant the user-visible selector remained unchanged.
+
+Completed:
+
+- Fully reverted the cached-shadow wrapper from the Season episode-mapping source selector.
+- Added cached inline shadow hosts only around the Movie and Episode correction HeaderContent selectors bound to `SelectedCorrectionSource`.
+- Used `-12,-8` outer compensation with matching `12,8` inner paint space, preserving selector coordinates and size.
+- Set local opacity to `0.40`; color, blur and depth remain theme-aware.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Explicit non-goals:
+
+- no ordinary correction ComboBox, Season mapping selector, detail-page normal playback selector, data binding, correction behavior, database, migration, database update, commit or push change.
+
 ### 7.2-post-closeout follow-up - Home Navigation Stall Diagnosis
 
 Completed:
@@ -2075,3 +2211,59 @@ Validation:
 Suggested commit message:
 
 - `Align discovery search UI visuals`
+
+### Watch Insights Restore and Profile Visual Follow-up
+
+Completed:
+- Removed redundant scroll restore opacity toggles that caused navigation and no-op refresh flashes.
+- Fixed Watch Insights scrollbar hover reveal and draggable track bindings.
+- Added the personality-poster page backdrop through the existing local cached palette-bitmap pipeline.
+- Refined keyword breathing, theme contrast, summary pixel scrolling, DNA tag palettes/layout, progress indicators, description spacing, and subtle asynchronous card motion.
+- Constrained narrative DNA prompt tags to 2-4 Chinese characters and advanced the profile prompt version.
+
+Not done:
+- No application launch, database update, migration, commit, or push was executed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+
+Suggested commit message:
+- `Polish watch insights restore and profile visuals`
+
+### Watch Insights Persona and Quadrant Follow-up
+
+Completed:
+- Enlarged the persona poster by 20 percent while retaining its left/top anchor and cached glow strategy.
+- Moved the persona heading to the top, enlarged/spaced the persona label, and placed a bold AI lead plus scrollable body to its right.
+- Added backward-compatible `persona.lead` profile data and advanced the profile prompt version without changing recommendation prompt context.
+- Replaced the quadrant's four decorative cards with an enlarged, transparent cross-axis plot driven by the existing AI X/Y values.
+- Added a cached-glow breathing coordinate point and a direct, scrollable quadrant analysis region.
+
+Not done:
+- No application launch, database update, migration, commit, or push was executed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+
+Suggested commit message:
+- `Rework watch insights persona and quadrant cards`
+
+### Watch Insights Watch-vs-Like Triptych Follow-up
+
+Completed:
+- Converted the watch/like/want cards from a flat three-column row into a layered triptych with a raised center card and inward-overlapping recessed side cards.
+- Added smooth hover scale, translation, opacity, and cached-shadow response with code-behind Z-order control.
+- Replaced liked ranks with hollow hearts and wanted ranks with hollow stars while preserving watched numeric ranks.
+- Darkened the light-theme progress track and added a small bottom breathing area after the final module.
+
+Not done:
+- No application launch, profile/prompt change, database update, migration, commit, or push was executed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+
+Suggested commit message:
+- `Add watch insights comparison triptych interaction`

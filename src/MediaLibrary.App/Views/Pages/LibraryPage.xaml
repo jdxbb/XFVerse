@@ -724,7 +724,7 @@
             <Setter Property="Height" Value="18" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
-        <Style x:Key="BatchSelectableCardStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
+        <Style x:Key="BatchSelectableCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassCompactCardStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsBatchSelectionMode}" Value="True">
                     <Setter Property="Cursor" Value="Hand" />
@@ -909,7 +909,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Margin="32,24,32,0"
+        <helpers:CachedShadowBorder Margin="32,24,32,0"
                 Padding="14"
                 Style="{StaticResource GlassPageCardStyle}">
             <Grid>
@@ -1222,10 +1222,10 @@
                     </UniformGrid>
                 </Border>
             </Grid>
-        </Border>
+        </helpers:CachedShadowBorder>
 
         <Grid Grid.Row="2" Margin="32,0,32,0">
-            <Border x:Name="LibraryScrollCornerCard"
+            <helpers:CachedShadowBorder x:Name="LibraryScrollCornerCard"
                     Style="{StaticResource GlassPageCardStyle}"
                     Padding="22,22,22,0"
                     helpers:ScrollDrivenBottomCornerBehavior.AtBottomBottomMargin="18"
@@ -1296,7 +1296,7 @@
 
                     <ListBox x:Name="PosterLibraryListBox"
                              Grid.Row="1"
-                             Margin="0,18,0,0"
+                             Margin="-34,18,-34,0"
                              Background="Transparent"
                              BorderThickness="0"
                              ItemsSource="{Binding Movies}"
@@ -1307,7 +1307,13 @@
                              VirtualizingPanel.IsVirtualizing="True"
                              VirtualizingPanel.VirtualizationMode="Recycling">
                         <ListBox.Resources>
-                            <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource LibraryModernScrollBarStyle}" />
+                            <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource LibraryModernScrollBarStyle}">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform X="-34" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
                         </ListBox.Resources>
                         <ListBox.Style>
                             <Style TargetType="ListBox">
@@ -1350,7 +1356,7 @@
                                             <Setter Property="ItemContentWidth" Value="180" />
                                             <Setter Property="ItemHeight" Value="288" />
                                             <Setter Property="OverscanRows" Value="1" />
-                                            <Setter Property="ViewportPadding" Value="0,10,0,36" />
+                                            <Setter Property="ViewportPadding" Value="0,10,68,36" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                                     <Setter Property="ItemWidth" Value="201" />
@@ -1412,7 +1418,7 @@
                                                    helpers:PosterCachedShadowBehavior.Direction="270"
                                                    helpers:PosterCachedShadowBehavior.InnerMargin="0,3,0,0"
                                                    helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                                                   helpers:PosterCachedShadowBehavior.Opacity="0.42"
+                                                   helpers:PosterCachedShadowBehavior.Opacity="0.56"
                                                    helpers:PosterCachedShadowBehavior.Padding="84"
                                                    helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                                                    helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -1430,7 +1436,7 @@
                                                    helpers:PosterCachedShadowBehavior.CornerRadius="12"
                                                    helpers:PosterCachedShadowBehavior.Direction="270"
                                                    helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                                                   helpers:PosterCachedShadowBehavior.Opacity="0.28"
+                                                   helpers:PosterCachedShadowBehavior.Opacity="0.37"
                                                    helpers:PosterCachedShadowBehavior.Padding="84"
                                                    helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                                                    helpers:PosterCachedShadowBehavior.ShadowDepth="3"
@@ -1886,7 +1892,7 @@
                                    Style="{StaticResource EmptyStateTitleStyle}" />
                     </Border>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Grid>
 
         <Border Grid.RowSpan="3"
@@ -1901,7 +1907,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Border Width="980"
+            <helpers:CachedShadowBorder Width="980"
                     MaxHeight="700"
                     Padding="24"
                     HorizontalAlignment="Center"
@@ -2093,7 +2099,7 @@
                                    Style="{StaticResource BodyMutedTextStyle}" />
                     </DockPanel>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Border>
 
         <Border Grid.RowSpan="3"
@@ -2108,7 +2114,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Border Width="760"
+            <helpers:CachedShadowBorder Width="760"
                     MaxHeight="720"
                     Padding="18"
                     HorizontalAlignment="Center"
@@ -2457,7 +2463,7 @@
                         </ListBox>
                     </Grid>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Border>
     </Grid>
 </UserControl>

@@ -1,6 +1,7 @@
 <Window x:Class="MediaLibrary.App.Views.Dialogs.UserProfileDialogWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
         Title="个人资料"
         SizeToContent="WidthAndHeight"
         ResizeMode="NoResize"
@@ -23,9 +24,15 @@
             <Setter Property="Padding" Value="28,24,28,24" />
         </Style>
 
-        <Style x:Key="ProfileInnerCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
+        <Style x:Key="ProfileInnerCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassPageCardStyle}">
             <Setter Property="Padding" Value="18,16" />
-            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+            <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="ShadowPadding" Value="34" />
+            <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowInlineBlurRadius}" />
+            <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowInlineOpacity}" />
+            <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowInline}" />
+            <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowInlineDepth}" />
         </Style>
 
         <Style x:Key="ProfileHeaderIconButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
@@ -266,7 +273,7 @@
                     </Button>
                 </Grid>
 
-                <Border Grid.Row="1"
+                <helpers:CachedShadowBorder Grid.Row="1"
                         Margin="0,18,0,0"
                         ClipToBounds="False"
                         Style="{StaticResource ProfileInnerCardStyle}">
@@ -333,9 +340,9 @@
                                    Text="James"
                                    TextTrimming="CharacterEllipsis" />
                     </Grid>
-                </Border>
+                </helpers:CachedShadowBorder>
 
-                <Border Grid.Row="2"
+                <helpers:CachedShadowBorder Grid.Row="2"
                         Margin="0,14,0,0"
                         ClipToBounds="False"
                         Style="{StaticResource ProfileInnerCardStyle}">
@@ -519,7 +526,7 @@
                             </Grid>
                         </Grid>
                     </Grid>
-                </Border>
+                </helpers:CachedShadowBorder>
             </Grid>
         </Border>
 

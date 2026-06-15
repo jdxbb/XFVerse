@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -16,9 +17,9 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
     private const string StatisticsKind = "statistics";
     private const int CacheHours = 12;
     private const int ValidWatchSecondsThreshold = 60;
-    private const int TopTagCount = 10;
+    private const int TopTagCount = 6;
     private const int TopSmallTagCount = 3;
-    private const string StatisticsLogicVersion = "wi-6.2-month-active-state-v1";
+    private const string StatisticsLogicVersion = "wi-6.6-rhythm-two-hour-spline-v1";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -27,13 +28,18 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
 
     private static readonly ViewingTimeBucketDefinition[] ViewingTimeBucketDefinitions =
     [
-        new(0, 6, "0-6"),
-        new(6, 9, "6-9"),
-        new(9, 12, "9-12"),
-        new(12, 15, "12-15"),
-        new(15, 18, "15-18"),
-        new(18, 21, "18-21"),
-        new(21, 24, "21-24")
+        new(0, 2, "0-2"),
+        new(2, 4, "2-4"),
+        new(4, 6, "4-6"),
+        new(6, 8, "6-8"),
+        new(8, 10, "8-10"),
+        new(10, 12, "10-12"),
+        new(12, 14, "12-14"),
+        new(14, 16, "14-16"),
+        new(16, 18, "16-18"),
+        new(18, 20, "18-20"),
+        new(20, 22, "20-22"),
+        new(22, 24, "22-24")
     ];
 
     private readonly IWatchInsightCacheService _cacheService;
@@ -105,7 +111,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 + $"range={FormatRange(normalizedRange)} "
                 + $"elapsedMs={computeStopwatch.ElapsedMilliseconds} "
                 + $"movieCount={snapshot.WatchedCount + snapshot.FavoriteCount + snapshot.WantToWatchCount + snapshot.NotInterestedCount} "
-                + $"historyCount={snapshot.MonthlyWatchCount}");
+                + $"watchDays={snapshot.WatchDays}");
 
             var payloadJson = JsonSerializer.Serialize(snapshot, JsonOptions);
             var upsertStopwatch = Stopwatch.StartNew();
@@ -371,6 +377,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         var rangeEnd = timeRange == WatchStatisticsTimeRange.Month ? currentMonthStart.AddMonths(1) : (DateTime?)null;
         var rangeHistories = FilterHistoriesByRange(histories, rangeStart, rangeEnd);
         var calendarHistories = FilterHistoriesByRange(histories, calendarMonth, calendarMonth.AddMonths(1));
+        var (calendarGridStart, calendarGridEnd) = GetCalendarGridRange(calendarMonth);
+        var calendarGridHistories = FilterHistoriesByRange(histories, calendarGridStart, calendarGridEnd);
         var earliestHistoryMonth = histories.Count == 0
             ? currentMonthStart
             : histories
@@ -394,9 +402,13 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
 
         ApplyStatusCounts(snapshot, identifiedMovies, collectionItems, stateHistories, timeRange, currentMonthStart);
         snapshot.TotalWatchSeconds = rangeHistories.Sum(x => (long)x.DurationWatchedSeconds);
-        snapshot.MonthlyWatchCount = CountDistinctWatchedMovies(rangeHistories, movieById);
+        snapshot.WatchDays = rangeHistories
+            .Select(x => ToLocalTime(x.StartedAt).Date)
+            .Distinct()
+            .Count();
+        ApplyWatchHistoryDeltas(snapshot, histories, timeRange, currentMonthStart);
         snapshot.MonthlyFrequentTags = BuildMonthlyFrequentTags(rangeHistories, movieById, TopTagCount);
-        snapshot.CalendarDays = BuildCalendarDays(calendarMonth, calendarHistories);
+        snapshot.CalendarDays = BuildCalendarDays(calendarMonth, calendarGridHistories);
         ApplyMonthlyCards(snapshot, calendarHistories);
         var rangeProfileRows = BuildRangeProfileRows(rangeHistories, movieById, profileRows);
         ApplyDistributions(snapshot, rangeProfileRows);
@@ -630,6 +642,40 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             currentMonthEnd);
     }
 
+    private static void ApplyWatchHistoryDeltas(
+        WatchStatisticsSnapshot snapshot,
+        IReadOnlyCollection<WatchHistoryStatsRow> histories,
+        WatchStatisticsTimeRange timeRange,
+        DateTime currentMonthStart)
+    {
+        if (timeRange == WatchStatisticsTimeRange.All)
+        {
+            snapshot.TotalWatchSecondsDeltaFromLastMonth = null;
+            snapshot.WatchDaysDeltaFromLastMonth = null;
+            return;
+        }
+
+        var previousMonthStart = currentMonthStart.AddMonths(-1);
+        var previousMonthHistories = FilterHistoriesByRange(
+            histories,
+            previousMonthStart,
+            currentMonthStart);
+        if (previousMonthHistories.Count == 0)
+        {
+            snapshot.TotalWatchSecondsDeltaFromLastMonth = null;
+            snapshot.WatchDaysDeltaFromLastMonth = null;
+            return;
+        }
+
+        var previousWatchSeconds = previousMonthHistories.Sum(x => (long)x.DurationWatchedSeconds);
+        var previousWatchDays = previousMonthHistories
+            .Select(x => ToLocalTime(x.StartedAt).Date)
+            .Distinct()
+            .Count();
+        snapshot.TotalWatchSecondsDeltaFromLastMonth = snapshot.TotalWatchSeconds - previousWatchSeconds;
+        snapshot.WatchDaysDeltaFromLastMonth = snapshot.WatchDays - previousWatchDays;
+    }
+
     private static int CountMonthlyActiveStateAdds(
         IReadOnlyCollection<StateChangeStatsRow> stateHistories,
         string stateType,
@@ -740,23 +786,24 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
 
     private static List<WatchCalendarDay> BuildCalendarDays(
         DateTime monthStart,
-        IReadOnlyCollection<WatchHistoryStatsRow> monthlyHistories)
+        IReadOnlyCollection<WatchHistoryStatsRow> calendarHistories)
     {
-        var daysInMonth = DateTime.DaysInMonth(monthStart.Year, monthStart.Month);
-        var byDate = monthlyHistories
+        var (gridStart, gridEnd) = GetCalendarGridRange(monthStart);
+        var byDate = calendarHistories
             .GroupBy(x => ToLocalTime(x.StartedAt).Date)
             .ToDictionary(
                 x => x.Key,
                 x => new
                 {
                     WatchSeconds = x.Sum(item => (long)item.DurationWatchedSeconds),
-                    WatchCount = x.Count()
+                    WatchCount = x.Select(item => item.MovieId).Distinct().Count()
                 });
-        var days = new List<WatchCalendarDay>(daysInMonth);
+        var cellCount = (gridEnd - gridStart).Days;
+        var days = new List<WatchCalendarDay>(cellCount);
 
-        for (var day = 1; day <= daysInMonth; day++)
+        for (var offset = 0; offset < cellCount; offset++)
         {
-            var date = new DateTime(monthStart.Year, monthStart.Month, day);
+            var date = gridStart.AddDays(offset);
             byDate.TryGetValue(date, out var item);
             var watchSeconds = item?.WatchSeconds ?? 0;
             days.Add(new WatchCalendarDay
@@ -765,7 +812,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
                 WatchSeconds = watchSeconds,
                 WatchCount = item?.WatchCount ?? 0,
                 HeatLevel = CalculateHeatLevel(watchSeconds),
-                HasValidWatch = watchSeconds > 0
+                HasValidWatch = watchSeconds > 0,
+                IsCurrentMonth = date.Year == monthStart.Year && date.Month == monthStart.Month
             });
         }
 
@@ -781,14 +829,18 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             .Select(x => new
             {
                 Date = x.Key,
-                WatchSeconds = x.Sum(item => (long)item.DurationWatchedSeconds)
+                WatchSeconds = x.Sum(item => (long)item.DurationWatchedSeconds),
+                WatchCount = x.Select(item => item.MovieId).Distinct().Count()
             })
             .OrderBy(x => x.Date)
             .ToList();
 
         snapshot.MonthlyWatchDays = byDate.Count;
         var activeDates = byDate.Select(x => x.Date).ToHashSet();
-        snapshot.ContinuousWatchDays = CalculateLongestContinuousWatchDays(activeDates);
+        var longestRange = CalculateLongestContinuousWatchRange(activeDates);
+        snapshot.ContinuousWatchDays = longestRange.Days;
+        snapshot.ContinuousWatchStartDate = longestRange.Start;
+        snapshot.ContinuousWatchEndDate = longestRange.End;
         var mostActive = byDate
             .OrderByDescending(x => x.WatchSeconds)
             .ThenBy(x => x.Date)
@@ -797,6 +849,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         {
             snapshot.MostActiveDate = mostActive.Date;
             snapshot.MostActiveDateWatchSeconds = mostActive.WatchSeconds;
+            snapshot.MostActiveDateWatchCount = mostActive.WatchCount;
         }
     }
 
@@ -946,18 +999,36 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
             ["ExtraLong"] = 0
         };
 
-        foreach (var runtimeMinutes in runtimeByMovieId.Values)
+        var bucketWatchSeconds = new Dictionary<string, long>(StringComparer.Ordinal)
         {
-            bucketCounts[BuildDurationBucket(runtimeMinutes)]++;
+            ["Short"] = 0,
+            ["Medium"] = 0,
+            ["Long"] = 0,
+            ["ExtraLong"] = 0
+        };
+
+        foreach (var runtime in runtimeByMovieId)
+        {
+            bucketCounts[BuildDurationBucket(runtime.Value)]++;
         }
 
-        var total = bucketCounts.Values.Sum();
+        foreach (var history in histories)
+        {
+            if (!runtimeByMovieId.TryGetValue(history.MovieId, out var runtimeMinutes))
+            {
+                continue;
+            }
+
+            bucketWatchSeconds[BuildDurationBucket(runtimeMinutes)] += Math.Max(0, history.DurationWatchedSeconds);
+        }
+
+        var totalWatchSeconds = bucketWatchSeconds.Values.Sum();
         return
         [
-            BuildDurationDistributionItem("Short", bucketCounts["Short"], total, 0, 60),
-            BuildDurationDistributionItem("Medium", bucketCounts["Medium"], total, 61, 120),
-            BuildDurationDistributionItem("Long", bucketCounts["Long"], total, 121, 180),
-            BuildDurationDistributionItem("ExtraLong", bucketCounts["ExtraLong"], total, 181, null)
+            BuildDurationDistributionItem("Short", bucketCounts["Short"], bucketWatchSeconds["Short"], totalWatchSeconds, 0, 60),
+            BuildDurationDistributionItem("Medium", bucketCounts["Medium"], bucketWatchSeconds["Medium"], totalWatchSeconds, 61, 120),
+            BuildDurationDistributionItem("Long", bucketCounts["Long"], bucketWatchSeconds["Long"], totalWatchSeconds, 121, 180),
+            BuildDurationDistributionItem("ExtraLong", bucketCounts["ExtraLong"], bucketWatchSeconds["ExtraLong"], totalWatchSeconds, 181, null)
         ];
     }
 
@@ -1239,26 +1310,53 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         };
     }
 
-    private static int CalculateLongestContinuousWatchDays(IReadOnlySet<DateTime> activeDates)
+    private static (int Days, DateTime? Start, DateTime? End) CalculateLongestContinuousWatchRange(
+        IReadOnlySet<DateTime> activeDates)
     {
         if (activeDates.Count == 0)
         {
-            return 0;
+            return (0, null, null);
         }
 
         var longest = 0;
         var current = 0;
+        DateTime? currentStart = null;
+        DateTime? longestStart = null;
+        DateTime? longestEnd = null;
         DateTime? previous = null;
         foreach (var date in activeDates.OrderBy(x => x))
         {
-            current = previous.HasValue && date == previous.Value.AddDays(1)
-                ? current + 1
-                : 1;
-            longest = Math.Max(longest, current);
+            if (previous.HasValue && date == previous.Value.AddDays(1))
+            {
+                current++;
+            }
+            else
+            {
+                current = 1;
+                currentStart = date;
+            }
+
+            if (current > longest)
+            {
+                longest = current;
+                longestStart = currentStart;
+                longestEnd = date;
+            }
+
             previous = date;
         }
 
-        return longest;
+        return (longest, longestStart, longestEnd);
+    }
+
+    private static (DateTime Start, DateTime End) GetCalendarGridRange(DateTime monthStart)
+    {
+        var normalizedMonth = new DateTime(monthStart.Year, monthStart.Month, 1);
+        var leadingDays = ((int)normalizedMonth.DayOfWeek + 6) % 7;
+        var gridStart = normalizedMonth.AddDays(-leadingDays);
+        var occupiedCells = leadingDays + DateTime.DaysInMonth(normalizedMonth.Year, normalizedMonth.Month);
+        var cellCount = occupiedCells <= 35 ? 35 : 42;
+        return (gridStart, gridStart.AddDays(cellCount));
     }
 
     private static bool IsWeekend(DateTime date)
@@ -1269,7 +1367,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
     private static DurationDistributionItem BuildDurationDistributionItem(
         string label,
         int count,
-        int total,
+        long watchSeconds,
+        long totalWatchSeconds,
         int minMinutes,
         int? maxMinutes)
     {
@@ -1277,7 +1376,8 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         {
             Label = label,
             Count = count,
-            Percent = total == 0 ? 0 : count / (double)total,
+            WatchSeconds = watchSeconds,
+            Percent = totalWatchSeconds == 0 ? 0 : watchSeconds / (double)totalWatchSeconds,
             MinMinutes = minMinutes,
             MaxMinutes = maxMinutes
         };
@@ -1477,13 +1577,6 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
         }
     }
 
-    private static int CountDistinctWatchedMovies(
-        IEnumerable<WatchHistoryStatsRow> histories,
-        IReadOnlyDictionary<int, MovieStatsRow> movieById)
-    {
-        return EnumerateDistinctWatchedMovies(histories, movieById).Count();
-    }
-
     private static List<MovieProfileRow> BuildRangeProfileRows(
         IEnumerable<WatchHistoryStatsRow> histories,
         IReadOnlyDictionary<int, MovieStatsRow> movieById,
@@ -1553,6 +1646,7 @@ public sealed class WatchStatisticsService : IWatchStatisticsService
     private static void Log(string message)
     {
         Debug.WriteLine("[WATCH-STATISTICS] " + message);
+        WatchInsightsDiagnostics.Write("layer=statistics-service " + message);
     }
 
     private readonly record struct ViewingTimeBucketDefinition(int StartHour, int EndHour, string Label);

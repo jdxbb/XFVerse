@@ -4138,3 +4138,71 @@ Known Issues:
 - Blocker: None.
 - Deferred: Manual runtime acceptance is still needed for Season detail state toggles opened from every entry route.
 - Noise: This follow-up only changes visibility preservation around user state toggles; it does not change delete-record semantics.
+
+### Phase 4 Season Correction Playback-source Visual Follow-up
+
+Completed:
+
+- Added cached theme-aware shadow/glow only to the playback-source selector in the Season correction episode-mapping panel.
+- Kept source-option binding, selected-source persistence and target-episode mapping behavior unchanged.
+- Did not apply the shadow to correction-target selectors, text fields, detail-page playback-source selectors or other ComboBoxes.
+
+Not done:
+
+- No TV identification, source mapping, correction transaction, schema, migration, database update, commit or push behavior changed.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual theme validation is required for the single playback-source selector.
+- Noise: Visual-only cached shadow wrapper.
+
+### Phase 4 Season Correction Playback-source Paint-box Follow-up
+
+Completed:
+
+- Corrected the selector shadow clipping by reserving paint space inside the existing mapping row and insetting the cached shadow to the ComboBox bounds.
+- Kept row height, source binding, selected value and target episode mapping unchanged.
+- Scope remains limited to the Season correction playback-source selector.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual light/dark theme validation remains required.
+- Noise: Visual-only correction.
+
+### Phase 4 Correction Playback-source Target-instance Correction
+
+Root cause:
+
+- The prior visual patch targeted the Season episode-mapping source selector. The reported playback-source selector is hosted in the Movie/Episode correction shell header.
+
+Completed:
+
+- Restored the Season mapping source selector to its original ComboBox structure.
+- Applied cached shadow only to the Movie and Episode correction-header source selectors.
+- Source collections, selected-source binding and correction behavior remain unchanged.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed with line-ending warnings only.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual correction-dialog validation remains required.
+- Noise: Visual-only target correction.

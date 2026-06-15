@@ -67,4 +67,12 @@ public interface INavigationStateService
     double GetFavoritesScrollOffset(int selectedTabIndex);
 
     void SetFavoritesScrollOffset(int selectedTabIndex, double offset);
+
+    int GetWatchInsightsSelectedTabIndex();
+
+    void SetWatchInsightsSelectedTabIndex(int selectedTabIndex);
+
+    double GetWatchInsightsScrollOffset(int selectedTabIndex);
+
+    void SetWatchInsightsScrollOffset(int selectedTabIndex, double offset);
 }

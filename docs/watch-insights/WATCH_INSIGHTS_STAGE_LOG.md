@@ -1457,3 +1457,1419 @@ Boundaries kept:
 Validation:
 - `dotnet build MediaLibrary.sln`
 - Result: 0 warnings, 0 errors.
+
+## Watch Insights Profile Layout And State Polish
+
+Stage goal:
+- Improve the Profile Analysis hierarchy and interaction feedback without changing profile generation, prompts, database schema, or media-library semantics.
+
+Completed:
+- Split `你的观影人格` and `口味象限` into separate full-width module rows so they match the width of other large Watch Insights cards.
+- Persisted the selected Watch Insights Tab and separate scroll offsets for `画像分析` and `观影统计` through the existing in-memory navigation-state service.
+- Centered the taste-summary text inside its left inner card.
+- Reworked the six profile keywords into a staggered, slightly rotated tag cloud with per-tag color variants and hover lift feedback.
+- Reworked the four tag-based DNA cards to use three evenly distributed rounded-rectangle tags with matching colors and hover lift feedback.
+- Replaced both DNA progress components and the `看得多 vs 真喜欢` progress bars with the same 4-pixel rounded progress visual used by the media library.
+- Standardized DNA card header, component, and description regions so descriptions align by row.
+- Added two-character local indentation to DNA descriptions without changing the AI prompt.
+- Limited DNA description viewports to roughly three lines, using the Watch Insights modern scrollbar for overflow; mouse-wheel input remains inside overflowing text and returns to page scrolling when no internal overflow exists.
+- Enlarged the persona poster, added rounded clipping, and reused the media-library palette shadow behavior.
+- Added hover lift feedback to the `经常观看` / `喜爱` / `想看` group cards.
+
+Explicitly not done:
+- No profile prompt, profile service, statistics service, recommendation, player, scan, or collection behavior change.
+- No database update and no migration.
+- No new automated test project.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+- Desktop visual automation could not start because the Computer Use runtime reported a package export error; manual visual acceptance remains required.
+
+Known Issues:
+- Blocker: none confirmed by build or static review.
+- Deferred: global animation timing/easing and unrelated Watch Insights polish remain outside this patch.
+- Noise: the desktop automation runtime failure is external to XFVerse and does not affect the application build.
+
+## Watch Statistics Component Polish
+
+Stage goal:
+- Simplify Watch Statistics component hierarchy and align selected visual details with the Profile Analysis component language.
+
+Completed:
+- Removed the dynamic secondary text below `你的观影世界，一目了然` in the overview header.
+- Removed the inner glass card around `本月偏好图谱` / `累计偏好图谱`; the bubble visualization now renders directly in the full-width module card content area.
+- Increased the preference-graph share of the two-column row and widened the module gap for clearer visual hierarchy.
+- Updated statistic metric panels to use the same rounded inner-panel spacing and subtle hover lift used by Profile Analysis interactive cards.
+- Added subtle hover lift feedback to preference bubbles while preserving type/emotion color semantics.
+- Reused the media-library rounded progress-bar style for ranking, week-part, duration-distribution, and taste-combination progress displays.
+- Slightly increased overview metric card height and padding to reduce crowding.
+
+Explicitly not done:
+- No statistics calculation, cache, time-range, calendar, profile, prompt, recommendation, player, or database behavior change.
+- No database update and no migration.
+- No broad redesign of every Watch Statistics module.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+Known Issues:
+- Blocker: none confirmed by build or static review.
+- Deferred: manual visual acceptance and remaining global Watch Statistics polish.
+- Noise: existing line-ending normalization warnings do not affect the application build.
+
+## Watch Insights Loading And Profile Detail Polish
+
+Stage goal:
+- Replace dirty first-load content with a focused loading state, remove visible scroll restoration, and refine profile keyword, DNA, persona, and bottom-spacing details.
+
+Completed:
+- Added centered initial-loading overlays for Profile Analysis and Watch Statistics, using the shared rotating loading spinner and concise status text.
+- Kept manual/background refresh behavior unchanged when existing content is already available; the full overlay only covers first load without data.
+- Hid the active Tab scroll viewer while a saved non-zero offset is being restored, then revealed it after the target offset is applied, preventing the visible top-to-saved-position movement.
+- Restored taste-summary text to left text alignment while keeping the text block itself evenly inset inside the left inner card.
+- Updated the summary-card prompt to require exactly six keyword objects with 2-6-character labels and scores restricted to 1/2/3, with exactly two keywords at each score.
+- Bumped the profile prompt version so newly generated profiles use the scored-keyword contract.
+- Added backward-compatible scored-keyword parsing and normalization; legacy `keywords: string[]` caches remain displayable without database changes.
+- Arranged keyword scores in `1 / 3 / 2` and `2 / 3 / 1` rows.
+- Applied score-based tag sizing: score 1 keeps base size, score 2 grows by 10%, and score 3 grows by 20%.
+- Made keyword tag width adapt to label length while retaining bounded placement within the keyword cloud.
+- Added a subtle repeating opacity breath to keyword tags without removing hover lift feedback.
+- Moved all DNA tag/progress components upward and aligned the progress components to the same centered component row as tag-based genes.
+- Enabled the existing half-line overflow cue behavior for DNA descriptions while preserving nested-wheel handling.
+- Removed the persona text inner card and duplicate small persona title; the remaining persona type uses a reduced display size.
+- Reduced Profile Analysis bottom whitespace by removing the final module bottom margin and shrinking the trailing spacer.
+
+Explicitly not done:
+- No database field, database update, or migration.
+- No statistics calculation, recommendation, player, scan, collection, or media-file behavior change.
+- No prompt change outside the profile summary keyword contract.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+Known Issues:
+- Blocker: none confirmed by build or static review.
+- Deferred: manual visual acceptance of loading overlay timing, keyword-cloud spacing, and DNA half-line cue.
+- Noise: legacy cached keywords receive deterministic local scores until a new profile is generated with the updated prompt.
+
+## Watch Profile Refresh Failure Status
+
+Stage goal:
+- Make profile refresh failures actionable when the previous profile cache is restored.
+
+Completed:
+- Confirmed the reported immediate fallback was caused by the configured AI provider returning HTTP 402, rather than by the scored-keyword parser.
+- Added a shared, privacy-safe AI failure formatter for authentication, billing/quota, permission, model/endpoint, rate-limit, timeout, and service-availability failures.
+- Profile refresh now stores the safe failure reason, preserves it after cache normalization, and displays it in the profile status and cached-fallback module state.
+- Existing profile cache remains available after a failed refresh; no profile payload or media-library state is deleted.
+
+Explicitly not done:
+- No AI account balance, provider configuration, API key, endpoint, or model setting was changed.
+- No profile prompt, recommendation algorithm, database schema, database update, or migration was changed in this failure-status fix.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+Known Issues:
+- Blocker: the external AI provider must have usable quota/billing status before a new profile can be generated.
+- Deferred: manual WPF acceptance of long failure text and tooltip behavior.
+- Noise: the previous profile remains visible by design when refresh fails.
+
+## Watch Insights Performance Diagnostics
+
+Stage goal:
+- Add enough timing diagnostics to separate service/query cost, ViewModel projection cost, WPF layout/render cost, scroll restoration, and frame stalls for both Watch Insights tabs.
+
+Completed:
+- Added `logs/watch-insights-perf.log` as a dedicated Watch Insights performance log, separate from the large AI perf log.
+- The new log records profile/statistics service events, profile input events, ViewModel projection stages, selected tab changes, activation timing, scroll restoration attempts, first idle layout metrics, visual/effect counts, render tier, and slow-frame summaries.
+- Stopped eager loading the hidden Watch Insights tab on activation. The page now loads only the selected tab first; the other tab loads when selected.
+- Removed forced `UpdateLayout()` calls from Watch Insights scroll restoration and nested text mouse-wheel handling.
+- Preserved existing tab and scroll-offset persistence behavior.
+
+Root-cause findings from code inspection:
+- The previous activation path could load Profile and Statistics at the same time; Profile input can also request all-time statistics, so the page could issue overlapping statistics work before the user opened the second tab.
+- Scroll restoration and nested text wheel handling forced synchronous layout on the UI thread.
+- Both tabs use a dense non-virtualized WPF visual tree with multiple live drop shadows and small animations; the new layout diagnostics will quantify whether this is the remaining bottleneck during manual reproduction.
+
+Explicitly not done:
+- No application launch or local reproduction was performed by Codex; reproduction is left to the user as requested.
+- No statistics calculation, profile prompt, database schema, database update, migration, recommendation, scan, player, or collection behavior was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+- Blocker: none confirmed after build.
+- Deferred: user-side reproduction is needed to compare `serviceMs`, `projectionMs`, `layout-idle idleMs`, `visuals`, `dropShadows`, and `slowFrames` in `logs/watch-insights-perf.log`.
+- Noise: slow-frame diagnostics only summarize frames at or above 50 ms and log individual frames at or above 100 ms to avoid log spam.
+
+## Static Cached Shadow Migration
+
+Stage goal:
+- Replace Watch Insights card/tag glow paths that still used WPF `DropShadowEffect` with the same cached bitmap shadow strategy used by media-library poster shadows.
+
+Completed:
+- Added a reusable `CachedShadowBorder` that draws a cached bitmap shadow from the existing poster shadow generator, sized from the control's runtime `RenderSize`; cache misses are generated off the UI thread and then repainted.
+- Exposed the poster cached-shadow generator for non-poster border rendering without changing poster behavior.
+- Migrated Watch Insights module cards, inner panels, keyword tags, DNA tags, preference bubbles, graph nodes, calendar cells, and quadrant cards from live `ShadowStatic*` effects to cached bitmap shadows.
+- Audited other pages and migrated the shared glass-card style chain (`HeroCardStyle`, `GlassPageCardStyle`, `GlassInlinePanelStyle`, `GlassHome*`, and `GlassCompactCardStyle`) plus their Border usages to `CachedShadowBorder`.
+- Removed the remaining static glow usage from correction combo boxes and scan progress indicators; poster-adjacent small card shadows were also moved to cached bitmap borders.
+- Extended poster palette shadow coloring to `CachedShadowBorder`, then migrated Home poster palette/base shadows from live `DropShadowEffect` to runtime-sized cached bitmap shadows.
+
+Explicitly not done:
+- Popup, dialog, menu, and player overlay shadows still use their existing popup/dialog effects; these are separate transient surfaces and not part of the card/glow performance issue.
+- Unused `ShadowStatic*` token definitions remain for compatibility until a dedicated style-token cleanup.
+- No database schema, database update, migration, prompt, recommendation, scan, player, or media-library semantic behavior change.
+
+Validation:
+- Global XAML scan shows no actual `ShadowStatic*` usage outside token definitions.
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+Known Issues:
+- Blocker: none confirmed by build.
+- Deferred: user-side WPF reproduction should confirm lower `effects/dropShadows` counts in `logs/watch-insights-perf.log`.
+- Noise: cached shadows are regenerated in the background when runtime size or shadow parameters change, then reused from the in-memory bitmap cache.
+
+## Light Theme Cached Shadow Parity
+
+Stage goal:
+- Restore visible light-theme shadow depth after the static cached-shadow migration while keeping dark-theme glow behavior unchanged.
+
+Completed:
+- Added theme-level cached-shadow color, opacity, and depth tokens for large cards, inline cards, compact poster base shadows, score badges, and scan progress glow.
+- Light theme now uses black cached shadows with non-zero depth for card surfaces; dark theme keeps the existing pale glow with zero depth where appropriate.
+- Updated shared glass-card styles, Watch Insights local cached-shadow styles, scan logs, profile dialog cards, movie detail tags, watch-history filter cards, discovery score badges, scan progress glow, and Home poster base shadows to read cached-shadow parameters from theme resources.
+- Rechecked migrated `CachedShadowBorder` usages so local card shadows no longer depend on fixed dark-theme glow values.
+
+Explicitly not done:
+- Home poster palette glow default color remains poster/palette-driven and can still be overwritten by the poster palette behavior at runtime.
+- Existing popup, icon, menu, date-picker, and media-library poster effects remain outside this card cached-shadow parity fix.
+- No database schema, database update, migration, prompt, recommendation, scan, player, or media-library semantic behavior change.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+- Blocker: none confirmed by build.
+- Deferred: user-side WPF validation should compare light and dark themes on Watch Insights, Home, Movie Discovery ranking badges, scan progress, movie detail tags, and watch-history filters.
+- Noise: fixed `ShadowStatic*` compatibility tokens and non-card transient effects still exist by design.
+
+## Cached Shadow Hit-Test Boundary Fix
+
+Stage goal:
+- Prevent cached shadow drawings from blocking buttons outside the owning card.
+
+Completed:
+- Identified that `CachedShadowBorder` draws its bitmap shadow outside the control's render bounds via negative padding.
+- Limited `CachedShadowBorder` hit testing to the control's actual `RenderSize`, so the out-of-bounds shadow remains visible but no longer intercepts clicks on neighboring buttons or cards.
+- Kept child interaction inside the card unchanged.
+
+Explicitly not done:
+- No page-specific `IsHitTestVisible` workaround was added.
+- No layout, navigation, database schema, database update, migration, prompt, recommendation, scan, player, or media-library semantic behavior change.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+- Blocker: none confirmed by build.
+- Deferred: user-side WPF validation should confirm buttons next to cached-shadow cards are clickable after entering affected pages.
+- Noise: cached shadows still render outside card bounds by design; only hit testing is clipped to the card bounds.
+
+## Cached Shadow Blur Density Follow-up
+
+Stage goal:
+- Bring cached card/tag shadow spread closer to the old theme-specific `DropShadowEffect` resources.
+
+Completed:
+- Added theme-level cached-shadow blur-radius tokens for large cards, inline cards, compact poster base shadows, score badges, and scan progress glow.
+- Routed shared glass-card styles and Watch Insights local cached-shadow styles through the blur-radius tokens instead of fixed high blur values.
+- Light theme now uses the old light-theme blur levels for large/inline/score/scan shadows, reducing the overly diffuse look introduced by the static cached-shadow migration.
+
+Explicitly not done:
+- Poster palette shadows remain poster/image-color driven and keep their poster-specific blur settings.
+- No database schema, database update, migration, prompt, recommendation, scan, player, or media-library semantic behavior change.
+
+Validation:
+- `dotnet build MediaLibrary.sln`
+- Result: 0 warnings, 0 errors.
+
+Known Issues:
+- Blocker: none confirmed by build.
+- Deferred: user-side WPF validation should compare cached shadow density against the previous theme look in both light and dark themes.
+- Noise: cached shadows are still bitmap-rendered local assets; this pass only adjusts spread, not the caching strategy.
+
+## Cached Shadow Extra Tightening
+
+Stage goal:
+- Make cached card/tag shadows slightly more concentrated after visual feedback.
+
+Completed:
+- Reduced the theme cached-shadow blur-radius tokens again for large cards, inline cards, compact poster base shadows, score badges, and scan progress glow.
+- Kept the existing theme colors, opacities, depths, cached bitmap strategy, and poster palette shadow behavior unchanged.
+
+Explicitly not done:
+- No database schema, database update, migration, prompt, recommendation, scan, player, or media-library semantic behavior change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>`
+- Result: 0 warnings, 0 errors.
+- Normal output build was blocked by a running `MediaLibrary.App` process holding the app exe.
+
+Known Issues:
+- Blocker: none confirmed by temp-output build.
+- Deferred: user-side WPF validation should confirm the updated shadow density in light and dark themes.
+- Noise: cached shadows remain bitmap-rendered local assets; this pass only adjusts spread.
+
+## Poster Base Shadow Parameter Restoration
+
+Stage goal:
+- Keep the Watch Insights personality poster on the cached bitmap shadow strategy while restoring the original poster-specific base shadow color.
+
+Completed:
+- Restored the personality poster base shadow color from the generic cached compact token to explicit `#000000`, matching the original poster shadow parameters used before the shared cached-shadow token migration.
+
+Explicitly not done:
+- No prompt, profile generation, statistics, cache schema, database update, migration, recommendation, scan, player, or media-library semantic behavior change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+- Blocker: none confirmed by temp-output build.
+- Deferred: user-side WPF validation should confirm the personality poster glow strength after the shared shadow follow-up.
+- Noise: poster palette glow remains poster/image-color driven.
+
+## Non-detail Poster Glow Strength Follow-up
+
+Stage goal:
+- Strengthen the Watch Insights personality poster glow consistently with other non-detail poster surfaces.
+
+Completed:
+- Increased the personality poster palette opacity from `0.40` to `0.50` and base shadow opacity from `0.24` to `0.30`.
+- Kept poster dimensions, blur radius, cached bitmap padding, palette color behavior, and profile data unchanged.
+
+Explicitly not done:
+- No detail-page poster styling, prompt, profile generation, statistics, cache schema, database update, migration, recommendation, scan, player, or media-library semantic behavior change.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+- Blocker: none confirmed by temp-output build.
+- Deferred: user-side WPF validation should confirm the stronger personality poster glow in both themes.
+- Noise: this is opacity-only and does not widen the glow.
+
+## Non-detail Poster Glow Strength Follow-up 2
+
+Stage goal:
+- Keep the Watch Insights personality poster aligned with the second non-detail poster glow increase.
+
+Completed:
+- Increased personality poster palette/base opacity from `0.50/0.30` to `0.58/0.36`.
+- Kept dimensions, blur radius, bitmap padding, palette behavior, profile generation, and all detail-page poster values unchanged.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+- Blocker: none confirmed by temp-output build.
+- Deferred: user-side visual validation remains required.
+- Noise: opacity-only visual adjustment.
+
+## Non-detail Poster Glow Midpoint Follow-up
+
+Completed:
+- Reduced personality poster palette/base opacity from `0.58/0.36` to `0.54/0.33`, the midpoint between the previous and latest versions.
+- Detail-page poster values and profile behavior remain unchanged.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+- Blocker: none confirmed by temp-output build.
+- Deferred: user-side visual validation remains required.
+- Noise: opacity-only adjustment.
+
+## Watch Insights Restore, Backdrop, Scrollbar, Taste and DNA Polish
+
+Stage goal:
+- Remove navigation/refresh flashes and finish the requested profile-analysis interaction and visual refinements without reintroducing live shadow effects.
+
+Completed:
+- Limited scroll restoration to real offset mismatches. Refresh completion no longer hides and re-shows an already restored tab, while a genuinely reset viewer is still restored before it becomes visible.
+- Fixed the Watch Insights scrollbar template range/value bindings, added hover reveal, and retained wheel-triggered auto reveal so both main tabs and overflowing text areas can be dragged.
+- Added a page-local personality-poster palette backdrop using the same quantized, cached bitmap strategy as the detail backdrop. No live blur or per-frame palette sampling is used.
+- Changed taste-summary wheel handling to a fixed 36-pixel step and increased only the summary body line height.
+- Added dedicated light/dark score colors for the six keywords and a cached-shadow breathing treatment based on draw opacity and tiny bitmap scaling. The underlying shadow bitmap is not regenerated per frame.
+- Added dedicated soft-pink, pale-yellow, and pale-green DNA tag palettes for type, emotion, and scene genes, including brighter dark-theme borders/backgrounds.
+- Reduced DNA tag widths through asymmetric outer-item margins so the first and third outer edges stay fixed while inner gaps grow.
+- Moved tag/progress/text regions to their requested vertical positions, kept the description viewport at approximately three and a half lines, and increased only DNA description line height.
+- Added a shorter DNA progress track and a breathing endpoint indicator.
+- Added asynchronous cached-card ambient floating near Y +/-2 px with smooth hover lift and deeper cached-shadow draw opacity.
+- Updated the DNA prompt version and constrained narrative tags to the maintained 2-4 Chinese-character whitelist.
+
+Explicitly not done:
+- No application launch or user-flow reproduction was performed; runtime visual acceptance remains user-owned for this pass.
+- No database update, migration, commit, push, recommendation behavior, scan behavior, player behavior, or media-library semantic behavior changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none confirmed by build/static validation.
+- Deferred: manually verify theme contrast, backdrop intensity, scrollbar dragging, restored-offset first frame, keyword breathing, and DNA motion in the running WPF app.
+- Noise: prompt version `wi-profile-persona-23-parallel-v11-dna-tag-length` intentionally marks older cached profiles as generated by an older rule set until manually refreshed.
+
+## Persona and Taste Quadrant Layout Follow-up
+
+Stage goal:
+- Recompose the persona and taste-quadrant cards around larger visual anchors, dedicated analysis text regions, and an actual AI-coordinate visualization.
+
+Completed:
+- Expanded the personality poster from `278x370` to `334x444`, preserving its left/top anchor so growth occurs toward the right and bottom. Cached poster glow dimensions were updated with the poster.
+- Moved the persona title block from vertical center to the top of the card and increased the poster-to-content gap.
+- Increased the persona label from 28 to 50, strengthened its weight, and added subtle visual character spacing through a dedicated display projection.
+- Rebuilt the persona content area as two columns: the large persona label on the left and analysis on the right, beginning slightly below the title row.
+- Added optional `persona.lead` profile data. The AI prompt now requests one concise lead sentence followed by a distinct evidence-based body; old caches receive a local neutral lead during normalization.
+- Added a bold lead style and a 6.5-line scrollable body with the modern auto-reveal scrollbar and overflow cue. Persona body line height is 27.
+- Removed the four decorative quadrant cards and the quadrant canvas background.
+- Expanded the quadrant canvas from `310x260` to `465x390`, shifted it left relative to the previous right-side footprint, and aligned its top with the card title row.
+- Added a true cross-axis layout with `情绪沉浸/轻松消遣` on Y and `熟悉安全/新鲜探索` on X.
+- Reprojected the existing AI-provided `xAxisScore/yAxisScore` values onto the enlarged plot area and replaced the old point with a cached-glow breathing indicator. No quadrant-specific point color is used.
+- Removed the quadrant text sub-card and placed the quadrant name/analysis directly in the module card. The body uses the same 27 line height and a 7.5-line modern scroll area.
+- Advanced the profile prompt version to `wi-profile-persona-23-parallel-v12-persona-lead` without changing recommendation prompt context.
+
+Explicitly not done:
+- No application launch or runtime screenshot verification was performed.
+- No recommendation algorithm/prompt, database update, migration, scan, player, or media-library semantic behavior changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none confirmed by build/static validation.
+- Deferred: manually verify poster/content proportions, long persona names, both text scroll areas, and coordinate-point placement at representative axis extremes.
+- Noise: old cached profiles display the local neutral lead until a manual refresh generates the AI lead required by prompt v12.
+
+## Watch-vs-Like Triptych Interaction Follow-up
+
+Stage goal:
+- Turn the three watch/like/want comparison cards into a layered, depth-oriented triptych while preserving their existing profile semantics.
+
+Completed:
+- Replaced the three-column `ItemsControl` layout with three explicit `ContentControl` surfaces bound to the existing watch, like, and want groups.
+- Default state now uses a raised middle card (`scale=1.05`, `ZIndex=2`) and recessed side cards (`scale=0.93`, `ZIndex=1`) translated 30px inward for overlap.
+- Hovering any card immediately promotes it to `ZIndex=3`, animates it to `scale=1.05`, and deepens its cached shadow. The other two animate to `scale=0.93` and `opacity=0.65`.
+- Side-card hover adds a small additional inward translation to strengthen the parallax/overlap response.
+- Leaving the whole triptych restores the middle-forward default state with 190ms cubic easing.
+- Kept shadows on the cached bitmap path; the interaction animates only draw opacity, transform, and element opacity.
+- Replaced liked-item numeric ranks with `♡` and wanted-item ranks with `☆`; watched items retain `1/2/3`.
+- Darkened the light-theme Watch Insights progress track from `#C5CDD8` to `#AEB9C8`.
+- Increased the final profile-module bottom margin by 18px to restore a small page-bottom breathing area.
+
+Explicitly not done:
+- No profile generation, prompt, recommendation, statistics calculation, database update, migration, application launch, commit, or push was performed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none confirmed by build/static validation.
+- Deferred: manually verify overlap hit targets, animation feel, card content clipping, and light-theme track contrast in the running WPF app.
+- Noise: the heart/star glyphs use `Segoe UI Symbol`; appearance follows the installed Windows font rendering.
+
+## 2026-06-14 Statistics Overview and Calendar Redesign
+
+Stage goal:
+- Rebuild the Statistics overview metrics and monthly calendar around viewing-day semantics, a Top 6 tag cloud, and a complete fixed calendar grid.
+
+Completed:
+- Removed range prefixes from the overview metric-card titles and replaced the watched-movie metric with distinct viewing days for both month and all-time ranges.
+- Added `WatchDays`, longest-streak start/end dates, most-active-day movie count, and current-month state to the statistics snapshot contract.
+- Advanced the statistics logic version so older cached payloads cannot retain the previous watched-count/calendar-cell contract.
+- Reused Movie Detail semantic icons for watched, favorite, want-to-watch, and not-interested states; added clock, calendar, and price-tag icons to the second row.
+- Reduced the four first-row card widths by one quarter while preserving the outer edges, and reused the same card width for viewing duration and viewing days.
+- Centered all overview values except the tag cloud.
+- Limited frequent tags to Top 6, displayed occurrence counts, scaled them by relative frequency, and placed ranks 1-6 in the requested center/corner arrangement using the cached keyword-chip style.
+- Changed the calendar service output to a Monday-first 35/42-cell grid containing disabled adjacent-month dates instead of UI-generated placeholders.
+- Reduced the visible calendar width, increased cell spacing, kept weekday headers aligned to the seven columns, and limited cells to a centered day number.
+- Added two-line day tooltips with weekday, distinct movie count, and accumulated watch duration.
+- Moved month navigation below the title and to the left of the legend, aligned the first summary card to that row, narrowed all three summary cards, and increased their vertical gaps.
+- Replaced the summary abbreviations with calendar-check, flame, and trophy icons; enlarged primary values and added the longest-streak `MM.dd-MM.dd` range.
+
+Explicitly not done:
+- No application launch, runtime screenshot, database update, migration, commit, or push was performed.
+- No recommendation, profile-generation, scan, player, or media-library business semantics were changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed apart from expected LF-to-CRLF working-copy warnings.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none confirmed by build/static validation.
+- Deferred: user-side visual validation is required for the 25% card-width reduction, fixed 560px calendar footprint, tooltip placement, and Top 6 tag-cloud balance at supported window sizes.
+- Noise: the statistics cache logic version changed intentionally; the first statistics load recomputes the snapshot.
+
+## 2026-06-14 DNA Card Frozen-Transform Crash Fix
+
+Stage goal:
+- Stop Watch Insights from terminating while loading DNA-card ambient animations.
+
+Completed:
+- Confirmed through the Windows `.NET Runtime` event that `ProfileDnaCard_Loaded` was animating a sealed/frozen `TranslateTransform.Y` and throwing an unhandled `InvalidOperationException`.
+- Added a shared transform accessor that clones frozen template transforms into a mutable per-card `TransformGroup` before ambient or hover animation begins.
+- Preserved the existing asynchronous DNA float and hover behavior; no animation was removed.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none confirmed after the targeted code fix and solution build.
+- Deferred: user-side reproduction is required to confirm Watch Insights opens normally and DNA cards continue animating.
+- Noise: none.
+
+## 2026-06-14 DNA Progress Indicator Name-Scope Crash Fix
+
+Stage goal:
+- Fix the second Watch Insights load crash exposed after the frozen-transform issue was removed.
+
+Completed:
+- Confirmed from the Windows `.NET Runtime` event at `2026-06-14 15:23:24` that the DNA progress template's Loaded Storyboard could not resolve `ProgressIndicatorDot` in the `ControlTemplate` name scope.
+- Moved the opacity and scale breathing Storyboard onto the indicator ellipse itself, where no cross-template target-name resolution is required.
+- Preserved the existing endpoint breathing effect and progress-bar layout.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none confirmed by build/static validation after both observed unhandled exceptions were fixed.
+- Deferred: user-side reproduction is required to confirm the page now opens and remains stable.
+- Noise: none.
+
+## 2026-06-14 Window-Level Persona Poster Backdrop Fix
+
+Stage goal:
+- Make the personality-poster palette background use the same full-window cached backdrop path as Movie Detail.
+
+Completed:
+- Extended the existing `MainWindow` poster-palette backdrop host to Watch Insights without changing Watch Insights into a detail route.
+- Routed the local `PersonaPosterImageUri` through the same palette extraction and frozen cached-bitmap backdrop behaviors used by Movie Detail.
+- Removed the page-local backdrop and its extra opacity/gradient layers, which were confined by the normal content-host margin and muted the extracted colors.
+- Reused the Movie Detail translucent title-bar treatment while keeping its normal Watch Insights layout, controls, and navigation semantics.
+- Kept the sidebar, navigation state, and page content margins unchanged while allowing the palette background to cover the complete window root and remain visible through the title bar.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+- No profile-generation, statistics, navigation, or detail-page business behavior was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed apart from expected line-ending warnings.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side visual verification is required for full-window coverage and palette appearance in both themes.
+- Noise: the first uncached persona poster still requires one local palette extraction; subsequent applications reuse the existing caches.
+
+## 2026-06-14 Vivid Persona Backdrop Palette
+
+Stage goal:
+- Increase Watch Insights personality-poster backdrop color clarity without changing Movie Detail or other detail-page backgrounds.
+
+Completed:
+- Added an opt-in `Vivid` poster-palette mode while retaining the existing extraction and cached frozen-bitmap pipeline.
+- Applied the vivid mode only while Watch Insights is the active route.
+- Increased extracted palette saturation and usable brightness range before static backdrop generation; Movie Detail and other poster backdrops remain on the unchanged standard mode.
+- Kept the base extracted palette cache shared and deterministic while allowing the final Watch Insights palette to generate its own cached backdrop bitmap.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+- No persona poster assets, profile-generation prompts, theme resources, or detail-page color parameters were changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed apart from expected line-ending warnings.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side visual verification is required to judge the vivid-mode strength in both themes and across different persona posters.
+- Noise: switching between standard and vivid modes can create one additional cached backdrop bitmap per distinct quantized palette.
+
+## 2026-06-14 Force-Directed Preference Bubble Graph
+
+Stage goal:
+- Upgrade the preference graph into a full-width, three-category force-directed bubble visualization without reintroducing expensive dynamic shadow rendering.
+
+Completed:
+- Changed the preference-graph subtitle to `你的偏好，汇聚于此`.
+- Added scene-tag bubbles from the existing `SceneDistribution` snapshot data and updated the legend to type blue, emotion pink, and scene soft green.
+- Selected up to six labels from each category so lower-frequency scene labels cannot be displaced entirely by the other categories.
+- Removed the white category circles from inside bubbles; each bubble now contains only a larger semibold label and a smaller occurrence count.
+- Removed the right-side tag-ranking card and expanded the preference graph into one full-width module card.
+- Replaced fixed ViewModel coordinates and the `ItemsControl` layout with a named `BubbleCanvas` populated by lightweight runtime bubble controls.
+- Added center gravity, pairwise collision repulsion, bounded elastic response, low-amplitude sinusoidal drift, velocity damping, and speed limiting in the existing rendering loop.
+- Added hover radius easing; the enlarged physical radius pushes neighboring bubbles away and returns them after pointer exit.
+- Paused physics while the statistics tab or bubble canvas is outside the active scroll viewport.
+- Used fixed layout hosts plus `ScaleTransform` for radius animation so each frame does not trigger bubble remeasurement.
+- Kept dynamic bubbles free of cached or live shadows; the proposed radius-shadow pre-cache was explicitly not added.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+- No third-party physics library, new statistics query, schema field, or shadow-cache expansion was added.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by build or static inspection.
+- Deferred: user-side validation is required for collision spacing, hover expansion strength, drift speed, and label readability at supported window widths.
+- Noise: the physics loop intentionally uses O(n²) pair checks, bounded to at most 18 bubbles and paused outside the viewport.
+
+## 2026-06-14 Viewing Rhythm Chart Redesign
+
+Stage goal:
+- Replace the rigid rhythm charts with smoother semantic visualizations and make duration distribution represent actual watched time.
+
+Completed:
+- Replaced the viewing-time column chart with a lightweight custom spline-area chart using a smooth cubic curve, vertical brand-color gradient fill, and a radial highlight at the peak.
+- Removed the high/middle/low labels and rendered three subtle dashed horizontal grid lines behind the curve.
+- Kept the time-bucket labels and watched-duration captions aligned below the curve.
+- Replaced weekday/weekend progress rows with a centered two-segment donut chart.
+- Replaced the weekday/weekend text boxes with custom vector office-computer and popcorn icons inside their corresponding blue and pink rounded legend swatches.
+- Kept ratio, total watched time, and daily average details below each semantic icon.
+- Changed duration distribution from distinct-movie count share to accumulated actual `DurationWatchedSeconds` share within each movie-runtime bucket.
+- Added watched-duration text to each duration row and changed the dominant-duration summary to rank by actual watched time.
+- Advanced the statistics cache logic version so cached count-based duration distributions are recomputed.
+- Implemented all three visuals as local WPF drawing controls that redraw only when data, theme brushes, or size change; no third-party chart library or rendering-loop animation was added.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+- No watch-history write semantics, media duration inference rules, or unrelated statistics modules were changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by build or static inspection.
+- Deferred: user-side visual verification is required for spline curvature, peak highlight strength, donut spacing, icon clarity, and small-window label density.
+- Noise: histories whose movie runtime cannot be resolved remain excluded from runtime-bucket percentages, matching the previous bucket eligibility rule.
+
+## 2026-06-14 Watch Insights Transition and Motion Polish
+
+Stage goal:
+- Remove page-return and no-op refresh flashes, restore direct scrollbar interaction, and strengthen the requested profile animations without changing insight semantics.
+
+Completed:
+- Removed the scroll-restoration opacity gate that temporarily hid the active tab while a persisted offset was reapplied.
+- Applied immediately available scroll offsets synchronously and kept retry-based restoration only for layouts whose scroll extent is not ready yet.
+- Reused the existing profile and statistics UI projections when cache metadata or source fingerprints confirm that the returned data is unchanged, avoiding collection clear/repopulate flashes.
+- Initialized the Watch Insights backdrop source from the local fallback persona poster before profile loading completes.
+- Kept the backdrop on the same window-level palette extraction and cached frozen-bitmap pipeline used by detail routes, so it covers the full shell and page background.
+- Enlarged the invisible scrollbar interaction lane while retaining a narrow visual thumb, revealed the scrollbar while its ScrollViewer is hovered, and kept it visible during mouse capture for dragging.
+- Strengthened keyword breathing through a wider cached-shadow opacity/radius range and a small card-opacity pulse.
+- Restored the required WPF progress-template parts for DNA progress bars, fixing percentage width calculation and exposing a larger breathing endpoint indicator.
+- Lightened the DNA progress track in both themes.
+- Increased the six DNA cards' asynchronous ambient vertical movement and shadow breathing while removing card-level mouse-hover lift; DNA tag hover remains unchanged.
+
+Explicitly not done:
+- No application launch, process termination, database update, migration, commit, or push was performed.
+- No prompt, profile score, navigation persistence, or watch-history business semantics were changed.
+
+Validation:
+- The normal solution build was blocked only because the user-running application held the default executable open.
+- An isolated-output `MediaLibrary.App` build passed with 0 warnings and 0 errors without stopping the running application.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated build or static inspection.
+- Deferred: user-side runtime verification is required for transition continuity, scrollbar drag behavior, full-window palette coverage, and final animation strength.
+- Noise: the currently running application must be restarted before it can load these newly built changes.
+
+## 2026-06-14 Persona and Taste Quadrant Refinement
+
+Stage goal:
+- Separate the persona poster from its analysis card, make the text layout respond to the persona-label width, and improve the taste-quadrant axis layout and point animation smoothness.
+
+Completed:
+- Moved the persona poster out of the large analysis card so it renders directly over the Watch Insights backdrop while the analysis card occupies only the remaining width.
+- Restored the persona card title to the standard module-card top and left padding.
+- Made the persona label non-wrapping and used its measured width to size the lead column, leaving the remaining card width to the body text.
+- Moved the lead below the persona label and kept only the body in the right-side scrollable text region.
+- Added the two-character local indentation to the persona body without changing the AI prompt.
+- Set the persona body viewport to an exact half-line height so overflowing text retains the final partial-line continuation cue.
+- Strengthened only the persona poster's cached palette glow and local shadow while preserving the static local-resource rendering strategy.
+- Reduced the quadrant text column, widened the coordinate canvas, and placed the horizontal-axis labels outside the two axis endpoints.
+- Updated the quadrant point coordinate projection for the wider axis bounds.
+- Replaced animated cached-shadow properties with a static cached point plus a transform-only radial halo pulse to avoid per-frame shadow regeneration.
+
+Explicitly not done:
+- No application launch, process termination, prompt change, database update, migration, commit, or push was performed.
+- No profile generation semantics, persona classification, or quadrant score semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors without stopping the running application.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for long persona labels, poster glow strength, half-line visibility, narrow-window layout, and perceived quadrant pulse smoothness.
+- Noise: the currently running application must be restarted before it can load these changes.
+
+## 2026-06-14 Watch-vs-Like Folded Triptych Refinement
+
+Stage goal:
+- Turn the flat watch-vs-like overlap into a folded-screen composition with perspective cues, semantic rank outlines, and clearer shared progress tracks.
+
+Completed:
+- Added edge-anchored `SkewTransform` states to the left and right cards with default angles of -8 and +8 degrees and horizontal compression to 0.9.
+- Kept the center card flat and prominent while allowing it to fold slightly backward when either side card becomes active.
+- Added a topmost translucent fold-shade template part to every card; side cards show it by default, the active card fades it out, and inactive cards fade it in.
+- Extended the code-behind animation state to coordinate skew, horizontal and vertical scale, overlap translation, opacity, cached-shadow opacity, shade opacity, and `Panel.ZIndex`.
+- Restored numeric ranks for all three groups and rendered the liked and wanted ranks inside local vector outline-heart and outline-star shapes.
+- Shortened only the triptych progress bars with additional right-side inset.
+- Replaced the opaque Watch Insights progress-track colors with theme-specific translucent tracks; all Watch Insights controls sharing the media-progress style receive the same update.
+- Increased the final module card's bottom padding to create more space below the conclusion panel.
+
+Explicitly not done:
+- No application launch, process termination, profile prompt change, database update, migration, commit, or push was performed.
+- No watch/like/wanted ranking data or progress-value calculation semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by solution build or static inspection.
+- Deferred: user-side runtime verification is required for fold direction, overlap depth, shade strength, hover handoff, outline readability, and track contrast in both themes.
+- Noise: the running application must be restarted before the new XAML and animation code can be observed.
+
+## 2026-06-14 Statistics Overview and Calendar Polish
+
+Stage goal:
+- Align the statistics overview metrics with the profile keyword language and improve calendar readability, spacing, and theme behavior.
+
+Completed:
+- Changed the frequent-tag visual content to match the profile core-keyword chips exactly: one centered label, the same rotated cloud placement, the same breathing cached shadow, and occurrence count retained as the tooltip and size input.
+- Replaced the overview favorite and wanted glyphs with local filled vector heart and star icons.
+- Added a shared overview metric-value style and applied it to the first-row counts and second-row watch-time/day values.
+- Fixed the second-row watch-time and watch-day cards to the same 164-pixel height as the first row so their values no longer drop to the bottom of the taller frequent-tag row.
+- Increased the overview module's bottom padding.
+- Set calendar-day foreground explicitly from the themed button foreground, while retaining the muted disabled state for adjacent-month dates.
+- Changed the calendar legend from a wrapping panel to a single horizontal row and allowed the control row to span the calendar's flexible middle column.
+- Increased the calendar grid width from 560 to 588 pixels and slightly increased horizontal cell margins.
+- Increased the right-side calendar value font, reduced the caption font, and expanded the icon-to-text gap.
+- Increased the calendar module's bottom padding.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+- No statistics query, count, watch-duration, calendar-date, or frequent-tag ranking semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by solution build or static inspection.
+- Deferred: user-side runtime verification is required for single-line legend fit, filled-icon weight, keyword-cloud readability, calendar density, and metric alignment in both ranges and themes.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-14 Preference Bubble Physics and Session Persistence
+
+Stage goal:
+- Preserve the preference-bubble simulation across page visits, rebalance the force model, and add pointer-driven fluid interaction and disposable visual ripples.
+
+Completed:
+- Vertically aligned all three legend dots with their labels and aligned the complete legend row with the subtitle line.
+- Added process-lifetime bubble-state persistence keyed by statistics range and the complete type/emotion/scene label dataset.
+- Persisted normalized position, velocity, and radius before canvas rebuild or page unload, then restored the same state after tab changes, navigation, page recreation, and canvas-size changes.
+- Kept persistence memory-only so restarting the application resets the simulation without creating settings files or database records.
+- Replaced linear diameter sizing with a 76-pixel base diameter and an 80% maximum radius increase using `sqrt(count / maxCount)`.
+- Reduced center gravity from `0.18` to `0.008` and added localized soft edge constraints instead of relying on central clustering.
+- Increased asynchronous low-frequency drift with independent phase-derived frequencies and secondary wave components.
+- Strengthened collision separation with same-frame 52% overlap correction per particle, stronger repulsion, and a closing-velocity impulse.
+- Added a 180-pixel pointer influence field combining distance-weighted radial repulsion and pointer-velocity fluid drag.
+- Preserved individual bubble hover expansion and its collision-driven neighbor displacement.
+- Added distance-thresholded pointer ripples that scale and fade for 900 milliseconds, ignore hit testing, and remove themselves from the canvas on completion.
+
+Explicitly not done:
+- No application launch, persistent settings file, database update, migration, commit, or push was performed.
+- No preference-tag counts, category selection, or top-item limits were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by solution build or static inspection.
+- Deferred: user-side runtime verification is required for long-running separation stability, pointer-force strength, ripple density, state restoration, and behavior at supported window sizes.
+- Noise: process-lifetime persistence intentionally resets when the application exits.
+
+## 2026-06-15 Viewing Rhythm Chart and Layout Refinement
+
+Stage goal:
+- Make the viewing-time curve terminate cleanly at the baseline, accurately mark its spline peak, correct donut segment rendering, and reorganize the rhythm module into a clearer two-row layout.
+
+Completed:
+- Anchored the spline at the absolute bottom baseline on both sides while placing every zero-minute bucket directly on that same baseline.
+- Replaced the old top/middle/bottom guides with three evenly spaced dashed guides at 25%, 50%, and 75% of the plot height.
+- Derived the highlight position from the vertical extrema of every cubic Bezier segment instead of selecting only the largest discrete data bucket.
+- Added a lightweight opacity pulse to the spline peak halo while retaining data-driven chart geometry.
+- Changed donut arc caps from round to flat and scaled the inter-segment gap to protect very small percentages such as 2%.
+- Added arc-aware donut tooltips with weekday/weekend, total duration, and daily average on three lines.
+- Moved the weekday/weekend legend to the right of the donut, retained semantic icons, and placed each percentage at the right edge of its legend row.
+- Removed the always-visible total and daily-average text below the legend.
+- Rebuilt the module as a full-width viewing-time card on the first row and two equal-width, equal-height weekday/weekend and duration cards on the second row.
+- Removed the duration subtitle and dominant-duration text, vertically centered percentages with their progress bars, and increased the module's bottom padding.
+
+Explicitly not done:
+- No application launch, process termination, statistics query change, database update, migration, commit, or push was performed.
+- No viewing-time bucket, weekday/weekend ratio, or duration-distribution calculation semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for spline shape, mathematical peak placement, pulse strength, 2%/98% donut readability, arc tooltip hit areas, and equal-card layout at supported window sizes.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Taste Combination Graph Spacing Refinement
+
+Stage goal:
+- Separate the taste-combination legend from the graph content and simplify the graph presentation inside the main module card.
+
+Completed:
+- Removed the left graph's nested chart-card background so the graph renders directly inside the outer Watch Insights module card.
+- Moved the frequency legend out of the fixed graph canvas and placed it below the complete 430-pixel graph region.
+- Added an 18-pixel graph-to-legend gap so the legend no longer overlaps the lowest graph nodes.
+- Increased the taste-combination module's bottom padding to 32 pixels, adding space below the inner ranking card.
+
+Explicitly not done:
+- No application launch, graph-data calculation change, database update, migration, commit, or push was performed.
+- No taste-combination node, link, ranking, or frequency semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for legend spacing, graph width, and bottom whitespace at supported window sizes.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Initial Loading, Keyword Breathing, and DNA Indicator Refinement
+
+Stage goal:
+- Prevent profile cards from appearing beneath the first-load spinner, improve scrollbar drag affordance without thickening the visible thumb, restore clearly visible keyword breathing, and distinguish the DNA progress endpoint.
+
+Completed:
+- Changed both profile and statistics content ScrollViewers to start collapsed and become visible only after their initial-loading state ends.
+- Changed both loading overlays to start visible and collapse only after the corresponding initial-loading state ends, eliminating the pre-binding card flash.
+- Increased the scrollbar hit-test width from 12 to 18 pixels while retaining the existing 6-pixel visual thumb.
+- Moved keyword breathing from the inherited style-level load trigger to each concrete keyword-chip instance so every generated chip starts its animation reliably.
+- Increased the cached keyword-shadow opacity, assigned score-specific shadow colors, and strengthened the cached-shadow opacity and scale pulse while keeping the card-opacity change above 0.92.
+- Kept keyword shadows on the local cached bitmap path; the breathing animation transforms the cached visual and does not regenerate a blur resource per frame.
+- Increased the taste-summary card bottom padding from 22 to 28 pixels.
+- Increased the DNA endpoint indicator from 14/7 to 18/10 pixels and changed it from the blue progress fill to the themed accent color with a surface outline.
+
+Explicitly not done:
+- No application launch, profile prompt change, statistics query change, database update, migration, commit, or push was performed.
+- No profile keyword score, DNA score, or progress-value semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for first-frame loading visibility, scrollbar drag acquisition, keyword breathing strength, and DNA indicator contrast in both themes.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Persona Typography and Quadrant Detail Refinement
+
+Stage goal:
+- Recompose the persona analysis into three centered rows, derive the persona-title treatment from the local poster palette, strengthen the persona-poster glow, and improve quadrant labels, explanation layout, and score discovery.
+
+Completed:
+- Added a lightweight local `PersonaPaletteText` control that renders the persona label with a mostly deep-ink vertical gradient, a small contribution from poster palette colors, a one-pixel light palette outline, and layered palette-colored projection shadows.
+- Reused the existing local poster-palette extraction and cache through an invisible palette host; no remote color service or per-frame blur generation was introduced.
+- Increased the persona label from 50 to 56 pixels and centered it in the first content row.
+- Centered the lead in the second row and applied narrower hair-space character spacing than the persona label's thin-space spacing.
+- Centered the body in the third row inside a 70%-width column while preserving the local two-character indentation and half-line scroll viewport behavior.
+- Increased only the persona poster's palette glow padding, blur radius, and opacity to produce a stronger, more dispersed halo.
+- Replaced the quadrant explanation title with a local axis-direction pair such as `熟悉安全 x 情绪沉浸`, derived from the signs of the existing X/Y coordinates.
+- Added a two-line point tooltip showing the active horizontal and vertical direction scores from 0 to 100.
+- Applied local two-character indentation to the quadrant body, centered its title and body, widened the explanation region, and shifted it slightly right.
+- Vertically centered both horizontal-axis captions with the axis, moved them inward, and moved the top and bottom captions farther away from the axis endpoints.
+
+Explicitly not done:
+- No application launch, AI prompt change, profile schema change, database update, migration, commit, or push was performed.
+- No persona classification, quadrant coordinate, or score calculation source semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for palette typography contrast, outline weight, poster glow spread, three-row balance, tooltip wording, and axis-caption alignment in both themes.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Watch-vs-Like True 3D Triptych Refinement
+
+Stage goal:
+- Replace the overlapping two-dimensional triptych approximation with perspective-correct WPF 3D cards, unify all rank outlines, and create enough vertical space for the conclusion panel.
+
+Completed:
+- Changed the frequently-watched rank wrapper from a filled badge to the same transparent accent-colored outline treatment used by the heart and star ranks.
+- Replaced the `SkewTransform` and inward translation composition with a `Viewport3D` containing three interactive `Viewport2DVisual3D` card surfaces.
+- Added a perspective camera and real Y-axis rotations so the left and right cards recede through foreshortening instead of becoming flat parallelograms.
+- Positioned the three cards at separate X coordinates with visible gaps, removing the previous intentional overlap and card-to-card obstruction.
+- Positioned the center card slightly forward on the Z axis and the side cards slightly behind it for the default hierarchy.
+- Updated hover animation to flatten and move the active card forward while rotating, shrinking, dimming, and moving the other cards backward without changing their horizontal spacing.
+- Preserved the semantic fold shade and cached-shadow opacity animation on the hosted card visuals.
+- Increased the triptych viewport height from 256 to 320 pixels, set the outer module minimum height to 548 pixels, increased bottom padding, and moved the conclusion panel down with a 30-pixel top gap.
+
+Explicitly not done:
+- No application launch, ranking-data change, database update, migration, commit, or push was performed.
+- No often-watched, liked, or wanted score semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for perspective strength, card spacing, hover depth transitions, mouse hit testing on tilted surfaces, and conclusion spacing at supported window sizes.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Statistics Overview Range Layout and Comparison Refinement
+
+Stage goal:
+- Align the statistics overview with the profile keyword language, add meaningful month-over-month watch-history comparisons, and give the all-time range a denser layout without changing business semantics.
+
+Completed:
+- Reused the profile core-keyword chip layout, score-based sizing, rotation, cached shadow, hover feedback, and per-instance breathing animation for the top-six frequent tags.
+- Changed the favorite and want-to-watch solid icons to the same themed `BrushRatingStarFill` color used by existing filled preference-state icons.
+- Split watch days into a metric number and a small `天` unit so it follows the same typography and alignment as the `部` metrics.
+- Added in-memory snapshot fields and service calculations for watch-time and watch-day deltas versus the previous month; when no previous-month history exists, the cards display the existing unavailable-comparison wording.
+- Reduced the watch-time metric from the shared 34-pixel metric style to a dedicated 22-pixel style.
+- Added a small `共` prefix to every all-time count, watch-day, and watch-time value.
+- Reduced all-time overview metric cards from 164 to 140 pixels, vertically centered values below the header, and allowed the second row and outer module to move upward by the same 24-pixel reduction.
+- Vertically centered the watch-time and watch-day cards against the frequent-tag card in both ranges.
+- Bumped the statistics logic version so older cached snapshots without the new comparison fields are recomputed.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+- No watch-history validity threshold, status-count semantics, tag ranking, or profile prompt was changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed for the four implementation files before the documentation update.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for both themes, long all-time duration strings, month/all height transitions, comparison wording, and visual centering against the frequent-tag card.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Viewing Calendar Spatial Alignment Refinement
+
+Stage goal:
+- Rebalance the viewing-calendar content, legend, and summary-card positions without moving the module title or month-navigation controls.
+
+Completed:
+- Shifted only the weekday header, date grid, and calendar notice 16 pixels right while leaving the title, subtitle, month navigation, and legend row at their existing vertical position.
+- Changed the legend from right alignment to left alignment exactly 24 pixels after the next-month button, and placed the conditional return-to-current-month button after the legend so it cannot alter that interval.
+- Shifted the three calendar summary cards 24 pixels left and 22 pixels down as one group.
+- Shifted each summary icon 6 pixels right and increased the icon-to-text spacing from 18 to 26 pixels, moving the text regions right with the icons.
+- Increased each date cell's horizontal margin from 7 to 9 pixels while retaining the existing fixed seven-column grid and vertical spacing.
+
+Explicitly not done:
+- No application launch, calendar data calculation, navigation behavior, database update, migration, commit, or push was performed.
+- No calendar card width, typography, tooltip, heat-level, or click semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for legend spacing when the return-to-current-month button is visible and for summary-card clearance at supported window widths.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Preference Bubble Roaming and Directional Water Interaction
+
+Stage goal:
+- Prevent long-running preference bubbles from collapsing toward the center and make pointer movement behave like a pen disturbing a broad water surface.
+
+Completed:
+- Shifted the three-item preference legend 18 pixels left without changing the title or subtitle position.
+- Removed the shared center-attraction target that caused all bubbles to converge over time.
+- Added independent, phase-shifted roaming targets and a low-frequency spatial flow field so each bubble traverses a different part of the canvas instead of oscillating around one center.
+- Reduced the soft edge inset, increased velocity retention, and added non-contact personal-space repulsion before collision, allowing bubbles to use more of the canvas while remaining separated.
+- Replaced the hard 180-pixel circular pointer cutoff with a broad elliptical directional field derived from pointer velocity, with strong near radial displacement, forward flow drag, and side separation around the pointer path.
+- Added persistent directional flow-wave particles that propagate from near to far over 1.45 seconds and continue applying weaker physical force as their elliptical wavefront expands.
+- Changed visual ripples from uniform circles to velocity-oriented ellipses whose length, width, origin offset, and duration respond to pointer speed and direction.
+- Hid the system cursor only while it is over the bubble canvas using `Cursor=None` and `ForceCursor=True`; hit testing, hover expansion, tooltips, and mouse movement remain enabled.
+
+Explicitly not done:
+- No application launch, preference-bubble data calculation, database update, migration, commit, or push was performed.
+- No bubble count, count-based radius formula, color semantics, state persistence, or hover-radius semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for long-duration distribution, directional wake strength, ripple density during rapid movement, tooltip usability with a hidden cursor, and frame pacing on lower render tiers.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Viewing Rhythm Spline, Donut Tooltip, and Layout Refinement
+
+Stage goal:
+- Increase viewing-time resolution, remove visible spline joins, restore reliable donut-segment tooltips, and refine the lower rhythm-card layout.
+
+Completed:
+- Replaced the seven coarse viewing-time ranges with twelve fixed two-hour ranges from `0-2` through `22-24` and bumped the statistics logic version so cached rhythm snapshots are rebuilt.
+- Replaced the Catmull-Rom-like per-segment control calculation with a natural cubic spline solved through a tridiagonal system, providing continuous first and second derivatives at every segment boundary.
+- Clipped the spline and filled area to the plot region so natural-spline overshoot cannot render beyond the baseline or chart top, while retaining the mathematically calculated peak marker.
+- Increased the rhythm module bottom padding from 32 to 38 pixels.
+- Shifted the weekday/weekend donut and legend region 22 pixels right.
+- Placed each percentage directly after its weekday/weekend label with an 8-pixel gap and changed it to the same body-text style.
+- Replaced dynamic assignment to the control's `ToolTip` property with an explicit mouse-positioned `ToolTip` popup, added whole-control hit testing, and close handling outside the ring.
+- Shortened the duration-distribution progress tracks by increasing their left inset from 10 to 28 pixels while retaining the right inset.
+- Confirmed the duration card currently has no card-level subtitle binding; the per-row actual-time values remain because they are part of the requested time-based distribution data.
+
+Explicitly not done:
+- No application launch, watch-duration bucket semantics, database update, migration, commit, or push was performed.
+- No duration-distribution percentage calculation, weekday/weekend calculation, chart height, or peak calculation semantics were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for twelve-label readability, spline overshoot clipping, donut tooltip placement, shifted lower-card balance, and progress-track length at supported window widths.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Loading, Glass Chrome, Keyword Breathing, and DNA Indicator Polish
+
+Stage goal:
+- Align Watch Insights initial loading with the shared page loading presentation, protect title/tab readability over the poster-derived backdrop, strengthen keyword breathing, and remove DNA progress-indicator clipping.
+
+Completed:
+- Replaced both oversized Watch Insights loading indicators with a local `34x34` spinner that matches the shared visual language, uses a cached rotating layer, and requests a steady 60 fps animation cadence.
+- Switched loading captions to the shared inline-loading text style and spacing used by other pages.
+- Added theme-aware glass surfaces between the dynamic poster backdrop and the Watch Insights shell title bar/tab bar; light and dark themes resolve through their existing glass resources.
+- Added a visible `0.98-1.045` card-scale cycle to profile/statistics keyword chips and strengthened their cached-shadow scale range while preserving staggered rotation and hover lift.
+- Raised the DNA progress template to an 18px visual lane while retaining a 4px track, then rebuilt the endpoint as a borderless solid accent dot with a radial glow and breathing scale/opacity animation.
+
+Explicitly not done:
+- No application launch, data-service change, prompt change, database update, migration, commit, or push was performed.
+- No global loading-spinner template or non-Watch-Insights title/tab chrome was changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed apart from existing line-ending notices.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for spinner smoothness under real loading pressure, glass contrast in both themes, keyword breathing strength, and DNA endpoint overflow at low/high progress values.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Persona Theme Text and Taste Quadrant Layout Refinement
+
+Stage goal:
+- Improve persona typography in dark theme and rebalance the persona/quadrant text and coordinate layouts without changing insight data semantics.
+
+Completed:
+- Added theme-aware persona-title rendering: dark theme now uses a mostly white-gray vertical gradient with a small poster-palette tint, a poster-derived dark 1-pixel outline, and stronger poster-colored projection/glow; light theme retains the existing deep-ink direction.
+- Increased the persona body width from approximately 70% to 85%, kept the block centered, and changed the body to left-aligned text while preserving the local two-character paragraph indent.
+- Rebuilt the taste-quadrant horizontal grid with three equal flexible gaps around the fixed text and coordinate regions so navigation-bar collapse width is distributed evenly across the left margin, middle gap, and right margin.
+- Moved the coordinate system left, moved the text region right, increased the axis-pair title size, and increased the spacing before the quadrant body.
+- Moved the horizontal-axis endpoint labels farther outward while keeping them vertically centered on the axis.
+- Added a point-local tooltip delay of 80 milliseconds so only the quadrant coordinate point responds faster.
+- Kept the quadrant body left aligned and locally indented while stretching its text area within the centered text region.
+
+Explicitly not done:
+- No application launch, AI prompt change, coordinate calculation change, data-service change, database update, migration, commit, or push was performed.
+- No global tooltip timing or non-Watch-Insights typography was changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for persona contrast against varied poster palettes, projection strength in both themes, narrow-window quadrant spacing, and the faster coordinate-point tooltip.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Watch-versus-Like Triptych Overflow Fix
+
+Stage goal:
+- Stop the center card in the watch-versus-like triptych from being enlarged by perspective depth until it escapes the visible page.
+
+Completed:
+- Constrained the triptych to a maximum `1040x300` rendering stage and enabled clipping at both the stage and `Viewport3D` boundaries.
+- Widened the perspective-camera field of view from 30 to 36 degrees so all three cards remain inside the module at supported widths.
+- Reduced the center card's default scale from `1.03` to `1.01` and removed its forward Z offset.
+- Reduced hover scale from `1.04` to `1.02` and limited the active card's forward Z offset from `0.38` to `0.08`, preventing perspective depth from multiplying the intended hover scale.
+- Retained the side-card fold angles, dark overlays, opacity response, and card data content.
+
+Explicitly not done:
+- No application launch, triptych data change, card-template content change, database update, migration, commit, or push was performed.
+- No other Watch Insights modules or global 3D rendering behavior were changed.
+
+Validation:
+- Static XAML/C# inspection confirmed that center-card scale and depth now return to the bounded defaults on mouse leave.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for card size, edge clipping, fold readability, and hover transitions at the actual application window width.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Statistics Overview and Calendar Spacing Refinement
+
+Stage goal:
+- Align the statistics overview metrics and make the calendar layout respond predictably when navigation width changes.
+
+Completed:
+- Removed the statistics frequent-tag `Viewbox` scaling layer and switched its canvas, tag-width formula, and anchor positions to the same `386x146` coordinate system used by profile core keywords while retaining count-based ranking and tooltips.
+- Centered comparison text in all overview metric cards.
+- Vertically centered the watch-duration and watch-day value rows using the same row alignment and top inset.
+- Added equal left and right insets to both overview card rows, moving all metric cards toward the module center without changing their relative column proportions.
+- Rebuilt the calendar body as three equal flexible gaps around a fixed 588-pixel calendar and a fixed 236-pixel summary-card column. Extra width from navigation collapse is therefore split equally between the module left edge/calendar, calendar/summary cards, and summary cards/module right edge.
+- Kept the month-navigation and legend row in its existing position while shifting the calendar right beneath their combined visual center.
+- Moved the three calendar summary cards left into the new fixed column and slightly lower relative to the control row.
+- Shifted all three summary icons and their text regions right inside their cards.
+- Increased calendar-cell horizontal spacing by two pixels per cell.
+
+Explicitly not done:
+- No application launch, statistics calculation change, calendar data change, database update, migration, commit, or push was performed.
+- No non-Watch-Insights calendar or global metric-card styles were changed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --check` passed apart from existing line-ending notices.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for frequent-tag scale parity, comparison alignment, calendar centering, and equal-gap behavior with expanded/collapsed navigation.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Preference Bubble Inertia and Directional Ripple Refinement
+
+Stage goal:
+- Reduce excessive fluid resistance, prevent long-lived corner stalls, and make bubble weight and directional water-wave depth physically coherent.
+
+Completed:
+- Reduced frame damping from `0.982` to `0.99`, allowing momentum to decay more gradually instead of losing roughly two-thirds of its speed each second.
+- Made pointer-velocity sampling more responsive while reducing direct radial, drag, and lateral pointer forces, producing a lighter interaction without binding bubbles too tightly to the pointer.
+- Added a phase-shifted corner escape field that combines diagonal inward force with a small tangential component, preventing stable force equilibria from trapping bubbles in corners.
+- Added a bounded radius-derived mobility coefficient. Large bubbles now react up to roughly 25 percent less than small bubbles, while the clamp prevents unrealistic weight differences.
+- Applied mobility to external acceleration, collision impulses, and overlap correction so smaller bubbles yield more while larger bubbles retain more inertia.
+- Changed visual ripple strokes to a movement-aligned gradient with a faint trailing edge and stronger leading edge.
+- Added the same forward/backward depth asymmetry to the physical wave shell, making the force stronger ahead of pointer motion and softer in its wake.
+
+Explicitly not done:
+- No application launch, preference-bubble sizing formula, bubble persistence key, statistics data, database update, migration, commit, or push was changed.
+- No third-party physics or rendering library was added.
+
+Validation:
+- Static inspection confirmed that mobility remains constrained to `0.84-1.12`, collision correction remains near full overlap separation, and ripple direction is derived from pointer velocity.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for damping feel, long-duration corner escape, large-bubble inertia, directional ripple readability, and frame pacing during rapid pointer movement.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Viewing Rhythm Baseline and Lower-Card Spacing Fix
+
+Stage goal:
+- Keep the viewing-time spline above its X-axis baseline and refine the duration and weekday/weekend horizontal layout.
+
+Completed:
+- Clamped every natural-spline Bezier control point to the plot's top and bottom bounds, preventing the mathematical curve from dipping below the zero baseline between valid data points.
+- Increased the duration-label column from 108 to 154 pixels and removed character ellipsis so labels such as `中等 60-120min` remain fully visible.
+- Kept the duration percentage column fixed while moving the progress-track start right and shortening its maximum available width.
+- Shifted the weekday/weekend donut 14 pixels right.
+- Increased the donut-to-legend spacing and added a separate legend inset, moving the legend substantially farther right than the chart.
+
+Explicitly not done:
+- No application launch, viewing-time data, duration-distribution calculation, donut ratio calculation, database update, migration, commit, or push was changed.
+- No chart colors, tooltip content, card heights, or rhythm-card width split was changed.
+
+Validation:
+- Static inspection confirmed that the spline's Bezier convex hull cannot cross the bottom plot bound.
+- `git diff --check` passed apart from existing line-ending notices.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for zero-baseline rendering, full duration-label visibility, progress-track length, and donut/legend balance at the actual window width.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Watch-versus-Like Triptych Projection Replacement
+
+Stage goal:
+- Eliminate the oversized single-card rendering caused by the `Viewport2DVisual3D` projection and guarantee that all three watch-versus-like cards remain visible.
+
+Root cause:
+- The previous implementation mapped three fixed-size WPF visuals onto identical 3D mesh planes. Their on-screen size was controlled by camera projection and mesh units rather than the declared card pixel dimensions, while depth ordering allowed one projected visual to cover the others.
+- Reducing `ScaleTransform3D` values did not address that projection mismatch, so the center card could still occupy nearly the complete viewport.
+
+Completed:
+- Removed the `Viewport3D`, perspective camera, mesh geometry, 3D transforms, and `Media3D` dependency from the triptych.
+- Added a fixed `960x280` stage inside a down-only `Viewbox`: wide layouts never enlarge the cards, while narrow layouts scale the complete three-card composition down uniformly.
+- Fixed each card at `320x252` and positioned all three independently, with approximately 18 pixels of controlled overlap between the center and side cards.
+- Recreated the folded-screen appearance using edge-based transform origins, horizontal compression, small `SkewTransform.AngleY` values, vertical offsets, dark fold overlays, opacity, shadow depth, and explicit `Panel.ZIndex` ordering.
+- Rebuilt hover and reset animations around mutable 2D scale, skew, and translation transforms. The active card rises only slightly and cannot alter the stage or sibling layout dimensions.
+
+Explicitly not done:
+- No application launch, card content, insight data, prompt, database update, migration, commit, or push was changed.
+- No other 3D or animation component was modified.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Static search confirmed that no `Viewport3D`, `Viewport2DVisual3D`, perspective-camera, or `Media3D` reference remains in the triptych implementation.
+- `git diff --check` passed apart from existing line-ending notices.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for three-card visibility, overlap amount, fold-angle readability, hover Z-order, and narrow-window down-scaling.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Loading, Chrome Glass, Palette, and DNA Motion Refinement
+
+Stage goal:
+- Align the initial loading indicator with the shared application spinner, replace the solid Watch Insights chrome with continuous cached glass, strengthen the persona-poster palette, and refine the DNA progress/card motion layout.
+
+Completed:
+- Removed the page-local loading spinner template and switched both initial loading overlays to the shared `LoadingSpinnerTemplate`, matching the static ring and rotating arc geometry used by other pages.
+- Removed the page-local forced 60-fps/cache spinner path; the shared spinner now uses the standard render-transform animation path.
+- Added a cached `Glass` backdrop variant rendered as a low-resolution, broad-diffusion local bitmap. The title bar and tab strip reuse the same persona-poster palette without live blur effects.
+- Joined the 56px title glass and the tab glass continuously; the tab glass covers its 48px header plus the following 8px down to the scroll-content clipping line.
+- Added theme-specific high-transparency glass tint, sheen, and border resources for light and dark themes.
+- Increased the Watch Insights `Vivid` palette saturation/brightness and raised its minimum channel floor so extracted colors remain more distinct and avoid overly dark results.
+- Rebuilt the DNA progress indicator with an 18px unclipped indicator host, a 9px pale solid endpoint, and a smaller/lighter 16px glow.
+- Increased the DNA module's three vertical breathing intervals equally by 18px: title-to-first-row, row-to-row, and second-row-to-card-bottom.
+- Replaced the DNA `UniformGrid` with explicit 3-by-2 layouts. Expanded navigation uses 14px horizontal gaps; collapsed navigation uses 104px gaps, making each card 8px narrower while assigning the removed width to the two gaps.
+- Replaced the six independent float animations with a planned travelling double-helix cycle: three column phases are separated by 120 degrees, the lower row is phase-inverted, and small horizontal orbit, depth scale, and shadow changes accompany the larger 7.2px vertical motion.
+
+Explicitly not done:
+- No application launch, prompt, watch-insight data contract, database update, migration, commit, or push was performed.
+
+Validation:
+- An isolated-output `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Focused `git diff --check` passed apart from existing line-ending notices.
+
+Known Issues:
+- Blocker: none identified by isolated solution build or static inspection.
+- Deferred: user-side runtime verification is required for spinner smoothness under real loading, glass continuity/transparency, extracted palette intensity, DNA endpoint shape, and double-helix motion balance.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Persona Typography, Lead, and Body Overflow Refinement
+
+Stage goal:
+- Correct the persona-label gradient and theme shadow, enforce the two-clause lead contract, and keep long persona analysis text scrollable instead of truncating it.
+
+Completed:
+- Reversed the persona-label fill to run from a lighter top to a slightly darker bottom in both themes.
+- Strengthened and moved the projected label shadow farther below the glyphs; dark theme now uses a light poster-derived shadow so it remains visible.
+- Wrapped the lead with the `⌜` and `⌟` corner marks.
+- Upgraded the persona prompt version and required a lead of at most 33 characters including punctuation, exactly one Chinese comma, two complete clauses, and a final Chinese period.
+- Added local lead normalization so malformed or legacy AI output falls back to a contract-compliant sentence.
+- Kept the expanded-navigation lead on one line with down-only scaling, while collapsed navigation displays the two comma-separated clauses on separate lines.
+- Moved the persona label upward and the body downward slightly.
+- Removed service-layer length truncation from the persona body so long analysis remains complete and is handled by the UI scroll region.
+- Preserved the modern auto-reveal scrollbar and half-line overflow cue, increased the viewport to 6.5 text lines, and added bottom content padding so the final text remains reachable.
+
+Explicitly not done:
+- No application launch, database update, migration, commit, or push was performed.
+- No other Watch Insights card or AI schema was changed.
+
+Validation:
+- The fallback lead contains 24 characters, exactly one Chinese comma, and one final Chinese period.
+- Focused `git diff --check` passed apart from existing line-ending notices.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for theme shadow strength, single-line lead fit, collapsed two-line lead balance, and half-line body overflow behavior with a long AI response.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Taste Quadrant Semantic Axis and Analysis Layout Refinement
+
+Stage goal:
+- Align the taste-quadrant card with the shared module header layout, improve semantic readability of the coordinate system, and provide more complete AI analysis text.
+
+Completed:
+- Moved the `口味象限` title and subtitle into a full-width top row so their left and top offsets match the other large Watch Insights cards.
+- Added four theme-aware semantic colors: blue for `熟悉安全`, teal for `新鲜探索`, amber for `轻松消遣`, and rose for `情绪沉浸`.
+- Replaced the neutral axes with semantic gradients: familiar-to-explore on the X axis and emotion-to-relax on the Y axis; endpoint arrows use their corresponding terminal colors.
+- Moved the left and right X-axis labels farther outward and expanded the coordinate canvas so neither label relies on drawing outside its bounds.
+- Matched the `A标签 x B标签` heading to the persona-lead typography, including its 20px size, bold weight, line height, and local hair-space character spacing.
+- Expanded the analysis column from the previous 340px target to a responsive maximum of 400px and moved the heading/body group downward.
+- Made the lower layout responsive: the analysis and chart use proportional columns, and the chart scales down only when the available width is insufficient.
+- Updated the quadrant prompt to request 110-170 Chinese characters across 2-3 complete sentences, covering both axes and concrete viewing-state evidence.
+- Advanced the profile prompt version so cached profiles generated under the shorter quadrant contract are refreshed.
+
+Explicitly not done:
+- No application launch, data schema change, database update, migration, commit, or push was performed.
+- No quadrant score calculation, tooltip conversion, or point animation logic was changed.
+
+Validation:
+- Focused `git diff --check` passed apart from existing line-ending notices.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for semantic color balance in both themes, axis-gradient direction, minimum-width chart scaling, text-column width, and the longer AI response after refresh.
+- Noise: the running application must be restarted before it can load these changes.
+
+## 2026-06-15 Watch-versus-Like Conclusion Bottom Alignment
+
+Stage goal:
+- Move the watch-versus-like conclusion downward and match its bottom spacing to the second DNA card row.
+
+Completed:
+- Replaced the card's top-stacked content layout with a four-row grid.
+- Added a flexible spacer between the triptych and conclusion so the conclusion is anchored near the bottom instead of leaving unused space below it.
+- Increased the large card's bottom padding from 38 to 54 pixels, matching the Watch DNA card's second-row-to-card-bottom spacing.
+- Preserved the existing 30-pixel separation between the triptych region and the conclusion card as the minimum gap.
+
+Explicitly not done:
+- No application launch, triptych sizing, hover animation, conclusion text, database update, migration, commit, or push was changed.
+
+Validation:
+- A single-node isolated-output `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- Focused `git diff --check` passed apart from the existing line-ending notice.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for the final conclusion position at normal and minimum window heights.
+- Noise: the first parallel build hit a transient duplicate `ApiConfigCard.baml` resource-generation key; the immediate single-node rebuild passed. The running application must be restarted before it can load this change.
+
+## 2026-06-15 Viewing Calendar Horizontal Balance and Metric Spacing
+
+Stage goal:
+- Refine the relative horizontal alignment of the calendar header, calendar grid, and right-side metric cards while increasing the metric-card breathing room.
+
+Completed:
+- Shifted the complete calendar grid 14 pixels left.
+- Shifted the first-row month navigation, legend, and current-month action 6 pixels right, intentionally using a smaller movement than the calendar body.
+- Shifted the right-side three-card metric group 20 pixels left.
+- Moved the metric group's layout origin down by removing the previous 8-pixel negative top margin, then raised each individual card 4 pixels within its slot; the resulting first-card position is 4 pixels lower than before while preserving the requested local upward adjustment.
+- Increased both vertical gaps between the three metric cards from 18 to 24 pixels.
+- Used wrapper transforms for the local card lift so the existing card hover transform remains untouched.
+
+Explicitly not done:
+- No application launch, calendar data, navigation behavior, card content, hover animation, database update, migration, commit, or push was changed.
+
+Validation:
+- Focused `git diff --check` passed apart from the existing line-ending notice.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for calendar/header balance and the three-card group's final vertical rhythm.
+- Noise: the running application must be restarted before it can load this change.
+
+## 2026-06-15 Preference Bubble Boundary Physics, Far Ripples, and Surface Depth
+
+Stage goal:
+- Reduce the pointer interaction's damped feel, add physically coherent boundary rebound, extend visible wave propagation, and give the preference bubbles more dimensional surfaces.
+
+Completed:
+- Increased pointer-velocity sample responsiveness from an `0.22/0.78` history/current blend to `0.12/0.88` and reduced stale-pointer velocity decay from `0.90` to `0.94` per 60Hz step.
+- Reduced particle motion damping from `0.99` to `0.993` per 60Hz step so bubbles preserve slightly more momentum after pointer interaction.
+- Expanded the soft boundary spring zone from radius plus 28 pixels to radius plus 34 pixels and increased its force; the existing inverse-mass mobility now makes lighter bubbles respond more and heavier bubbles respond less.
+- Replaced the fixed boundary velocity flip with a wall-collision impulse. Impulse magnitude scales with particle mass, restitution remains a shared material property, and a small tangential loss prevents indefinite edge sliding.
+- Extended physical wave lifetime from 1.45 to 1.85 seconds, increased maximum travel to the full canvas diagonal, broadened the shell, and slowed far-field decay.
+- Added a delayed far-field visual ring behind the near-field directional ripple. It travels substantially farther and is generated every second pointer sample, or every sample during fast motion, limiting visual-tree pressure.
+- Rebuilt each bubble surface with a lightweight layered treatment: lower-volume shading, a bright-to-dark inner rim, angled specular highlight, and a local radial depth shadow.
+- Kept all new dimensional layers free of live blur or drop-shadow effects and disabled their hit testing so existing bubble hover interaction remains intact.
+
+Explicitly not done:
+- No application launch, bubble sizing formula, state-persistence key, statistics data, database update, migration, commit, or push was changed.
+- No third-party physics or rendering dependency was added.
+
+Validation:
+- A single-node isolated-output `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- Focused `git diff --check` passed apart from the existing line-ending notice.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by build or static inspection.
+- Deferred: user-side runtime verification is required for pointer responsiveness, light/heavy edge rebound, far-wave readability, bubble depth in both themes, and frame pacing during sustained rapid pointer motion.
+- Noise: the running application must be restarted before it can load this change.
+
+## 2026-06-15 Viewing Rhythm Baseline Stroke and Horizontal Insets
+
+Stage goal:
+- Prevent zero-level spline segments from being visually clipped and make small horizontal refinements to the duration and weekday/weekend panels.
+
+Completed:
+- Moved the spline's mathematical zero baseline 2 pixels above the former clip boundary.
+- Updated zero-value points, natural-spline control-point bounds, area closure, and peak clamping to use the same inset baseline, keeping the complete curve mathematically above zero.
+- Extended only the drawing clip by the reserved 2-pixel stroke allowance, allowing the full 3-pixel line stroke to render without exposing geometry below the zero domain.
+- Shifted the duration bucket's label/time stack 6 pixels right without changing its column width or the progress-track position.
+- Shifted the complete weekday/weekend chart-and-legend content group 8 pixels right, preserving their internal spacing.
+
+Explicitly not done:
+- No application launch, rhythm data, duration calculations, donut ratios, tooltip content, database update, migration, commit, or push was changed.
+
+Validation:
+- Focused `git diff --check` passed apart from existing line-ending notices.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by static inspection.
+- Deferred: user-side runtime verification is required for full zero-line visibility, the small duration-label inset, and the final donut/legend horizontal balance.
+- Noise: the running application must be restarted before it can load this change.

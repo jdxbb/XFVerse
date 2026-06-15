@@ -65,6 +65,15 @@ public sealed class WatchProfileSummary
     public string Text { get; set; } = string.Empty;
 
     public List<string> Keywords { get; set; } = [];
+
+    public List<WatchProfileKeyword> KeywordScores { get; set; } = [];
+}
+
+public sealed class WatchProfileKeyword
+{
+    public string Label { get; set; } = string.Empty;
+
+    public int Score { get; set; }
 }
 
 public sealed class WatchProfilePersona
@@ -72,6 +81,8 @@ public sealed class WatchProfilePersona
     public string Type { get; set; } = string.Empty;
 
     public string Title { get; set; } = string.Empty;
+
+    public string Lead { get; set; } = string.Empty;
 
     public string Description { get; set; } = string.Empty;
 

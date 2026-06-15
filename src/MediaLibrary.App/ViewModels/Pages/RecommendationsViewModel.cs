@@ -7,6 +7,7 @@ using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
 using MediaLibrary.Core.Diagnostics;
+using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Models.Settings;
 using MediaLibrary.Core.Services.Interfaces;
@@ -787,7 +788,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             SetWaitingForCandidatePoolRefill(false);
             CanRequestRecommendations = true;
             SetRetryMode(true);
-            StatusMessage = $"AI 推荐生成失败：{exception.Message}";
+            StatusMessage = $"AI 推荐生成失败：{AiFailureMessageFormatter.Build(exception)}";
             NotifyRecommendationChangedWithoutReload();
             perfOutcome = "failed";
             perfError = $"{exception.GetType().Name}: {exception.Message}";
@@ -1085,7 +1086,9 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
         return refillResult.Outcome switch
         {
-            CandidatePoolRefillOutcome.Failed => CandidatePoolRefillFailedMessage,
+            CandidatePoolRefillOutcome.Failed => string.IsNullOrWhiteSpace(refillResult.Message)
+                ? CandidatePoolRefillFailedMessage
+                : $"候选补充失败：{AiFailureMessageFormatter.Build(refillResult.Message)}",
             CandidatePoolRefillOutcome.NoGeneratedCandidates => CandidatePoolRefillNoCandidatesMessage,
             _ => BuildRecommendationStatusMessage()
         };
@@ -1099,7 +1102,9 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         {
             await _recommendationService.SaveCandidatePoolRefillFailureAsync(
                 queryOptions,
-                CandidatePoolRefillFailedMessage,
+                string.IsNullOrWhiteSpace(refillResult?.Message)
+                    ? CandidatePoolRefillFailedMessage
+                    : $"候选补充失败：{AiFailureMessageFormatter.Build(refillResult.Message)}",
                 refillResult?.Fingerprint);
         }
         catch
@@ -1179,7 +1184,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
                 ApplyRecommendations([], targetCombinationKey);
             }
 
-            StatusMessage = $"AI 推荐状态刷新失败：{exception.Message}";
+            StatusMessage = $"AI 推荐状态刷新失败：{AiFailureMessageFormatter.Build(exception)}";
             return true;
         }
     }

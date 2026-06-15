@@ -91,6 +91,13 @@ public static class ScrollDrivenBottomCornerBehavior
             typeof(ScrollDrivenBottomCornerBehavior),
             new PropertyMetadata(double.NaN));
 
+    private static readonly DependencyProperty BottomMarginAppliedScrollableHeightProperty =
+        DependencyProperty.RegisterAttached(
+            "BottomMarginAppliedScrollableHeight",
+            typeof(double),
+            typeof(ScrollDrivenBottomCornerBehavior),
+            new PropertyMetadata(double.NaN));
+
     public static bool GetIsEnabled(DependencyObject target)
     {
         return (bool)target.GetValue(IsEnabledProperty);
@@ -196,6 +203,7 @@ public static class ScrollDrivenBottomCornerBehavior
         border.ClearValue(IsRefreshQueuedProperty);
         border.ClearValue(DiscoveryRetryCountProperty);
         border.ClearValue(BottomMarginAppliedOffsetProperty);
+        border.ClearValue(BottomMarginAppliedScrollableHeightProperty);
 
         foreach (var viewer in GetSubscribedScrollViewers(border))
         {
@@ -397,15 +405,19 @@ public static class ScrollDrivenBottomCornerBehavior
         if (!shouldApplyBottomMargin)
         {
             border.SetValue(BottomMarginAppliedOffsetProperty, double.NaN);
+            border.SetValue(BottomMarginAppliedScrollableHeightProperty, double.NaN);
             return;
         }
 
         var currentOffset = viewer?.VerticalOffset ?? 0d;
+        var currentScrollableHeight = viewer?.ScrollableHeight ?? 0d;
         var storedOffset = (double)border.GetValue(BottomMarginAppliedOffsetProperty);
         if (!isCurrentlyApplied || double.IsNaN(storedOffset) || currentOffset > storedOffset)
         {
             border.SetValue(BottomMarginAppliedOffsetProperty, currentOffset);
         }
+
+        border.SetValue(BottomMarginAppliedScrollableHeightProperty, currentScrollableHeight);
     }
 
     private static ScrollViewer? FindActiveScrollViewer(Border border)
@@ -495,6 +507,14 @@ public static class ScrollDrivenBottomCornerBehavior
         }
 
         var releaseOffsetDelta = viewer.CanContentScroll ? 2d : 24d;
+        var appliedScrollableHeight = (double)border.GetValue(BottomMarginAppliedScrollableHeightProperty);
+        if (appliedScrollableHeight <= tolerance
+            && viewer.ScrollableHeight > tolerance
+            && distanceToBottom > tolerance)
+        {
+            return false;
+        }
+
         return viewer.VerticalOffset >= appliedOffset - releaseOffsetDelta;
     }
 

@@ -231,6 +231,72 @@ public static class PosterCachedShadowBehavior
         target.SetValue(ShadowDepthProperty, value);
     }
 
+    internal static BitmapSource GetOrCreateShadowImage(
+        double cardWidth,
+        double cardHeight,
+        double padding,
+        Thickness innerMargin,
+        CornerRadius cornerRadius,
+        double blurRadius,
+        double direction,
+        double opacity,
+        double shadowDepth,
+        Color color,
+        bool quantizeColor)
+    {
+        if (quantizeColor)
+        {
+            color = QuantizeColor(color);
+        }
+
+        return GetOrCreateShadowImage(
+            new ShadowSpec(
+                cardWidth,
+                cardHeight,
+                padding,
+                innerMargin,
+                cornerRadius,
+                blurRadius,
+                direction,
+                opacity,
+                shadowDepth,
+                color));
+    }
+
+    internal static bool TryGetCachedShadowImage(
+        double cardWidth,
+        double cardHeight,
+        double padding,
+        Thickness innerMargin,
+        CornerRadius cornerRadius,
+        double blurRadius,
+        double direction,
+        double opacity,
+        double shadowDepth,
+        Color color,
+        bool quantizeColor,
+        out BitmapSource image)
+    {
+        if (quantizeColor)
+        {
+            color = QuantizeColor(color);
+        }
+
+        return TryGetCachedShadowImage(
+            new ShadowSpec(
+                cardWidth,
+                cardHeight,
+                padding,
+                innerMargin,
+                cornerRadius,
+                blurRadius,
+                direction,
+                opacity,
+                shadowDepth,
+                color),
+            out image);
+    }
+
     private static void OnShadowPropertyChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
         if (target is Image image)

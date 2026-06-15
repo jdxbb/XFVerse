@@ -87,11 +87,11 @@
 
         <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource ScanModernScrollBarStyle}" />
 
-        <Style x:Key="ScanOuterCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
+        <Style x:Key="ScanOuterCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassPageCardStyle}">
             <Setter Property="Padding" Value="18" />
         </Style>
 
-        <Style x:Key="ScanInnerCardStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+        <Style x:Key="ScanInnerCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassInlinePanelStyle}">
             <Setter Property="Padding" Value="16" />
             <Setter Property="CornerRadius" Value="12" />
         </Style>
@@ -130,7 +130,7 @@
             <Setter Property="FontSize" Value="12" />
         </Style>
 
-        <Style x:Key="ScanEmptyStateStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+        <Style x:Key="ScanEmptyStateStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassInlinePanelStyle}">
             <Setter Property="Padding" Value="14" />
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="MinHeight" Value="86" />
@@ -191,7 +191,7 @@
             <Setter Property="ToolTip" Value="移除路径" />
         </Style>
 
-        <Style x:Key="ScanMetricCardStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+        <Style x:Key="ScanMetricCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassInlinePanelStyle}">
             <Setter Property="Width" Value="150" />
             <Setter Property="MinHeight" Value="58" />
             <Setter Property="Margin" Value="0" />
@@ -199,7 +199,7 @@
             <Setter Property="CornerRadius" Value="12" />
         </Style>
 
-        <Style x:Key="ScanMetricStartCardStyle" TargetType="Border" BasedOn="{StaticResource ScanMetricCardStyle}">
+        <Style x:Key="ScanMetricStartCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource ScanMetricCardStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                              Value="True">
@@ -208,7 +208,7 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="ScanMetricMiddleCardStyle" TargetType="Border" BasedOn="{StaticResource ScanMetricCardStyle}">
+        <Style x:Key="ScanMetricMiddleCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource ScanMetricCardStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                              Value="True">
@@ -217,7 +217,7 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="ScanMetricEndCardStyle" TargetType="Border" BasedOn="{StaticResource ScanMetricCardStyle}">
+        <Style x:Key="ScanMetricEndCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource ScanMetricCardStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                              Value="True">
@@ -279,7 +279,7 @@
                             <Border Margin="1"
                                     ClipToBounds="True"
                                     CornerRadius="5">
-                                <Border x:Name="AnimatedIndicator"
+                                <helpers:CachedShadowBorder x:Name="AnimatedIndicator"
                                         Width="230"
                                         HorizontalAlignment="Left"
                                         Background="{TemplateBinding Foreground}"
@@ -287,12 +287,17 @@
                                         BorderThickness="1"
                                         CacheMode="BitmapCache"
                                         CornerRadius="5"
-                                        Effect="{StaticResource ShadowStaticScanProgressIndicator}"
+                                        Effect="{x:Null}"
+                                              ShadowPadding="24"
+                                              ShadowBlurRadius="{DynamicResource CachedShadowScanProgressBlurRadius}"
+                                              ShadowOpacity="{DynamicResource CachedShadowScanProgressOpacity}"
+                                              ShadowColor="{DynamicResource ColorCachedShadowScanProgress}"
+                                              ShadowDepth="{DynamicResource CachedShadowScanProgressDepth}"
                                         Opacity="0">
                                     <Border.RenderTransform>
                                         <TranslateTransform X="-250" />
                                     </Border.RenderTransform>
-                                </Border>
+                                </helpers:CachedShadowBorder>
                             </Border>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -350,7 +355,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel x:Name="LeftColumn">
-                    <Border Style="{StaticResource ScanOuterCardStyle}">
+                    <helpers:CachedShadowBorder Style="{StaticResource ScanOuterCardStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -367,7 +372,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <Border Grid.Column="0"
+                                <helpers:CachedShadowBorder Grid.Column="0"
                                         Height="280"
                                         VerticalAlignment="Top"
                                         Style="{StaticResource ScanInnerCardStyle}">
@@ -458,9 +463,9 @@
                                             </ScrollViewer>
                                         </Grid>
                                     </Grid>
-                                </Border>
+                                </helpers:CachedShadowBorder>
 
-                                <Border Grid.Column="2"
+                                <helpers:CachedShadowBorder Grid.Column="2"
                                         Height="280"
                                         VerticalAlignment="Top"
                                         Style="{StaticResource ScanInnerCardStyle}">
@@ -580,12 +585,12 @@
                                                     Style="{StaticResource ScanCompactSecondaryButtonStyle}" />
                                         </Grid>
                                     </Grid>
-                                </Border>
+                                </helpers:CachedShadowBorder>
                             </Grid>
                         </Grid>
-                    </Border>
+                    </helpers:CachedShadowBorder>
 
-                    <Border Margin="0,18,0,0"
+                    <helpers:CachedShadowBorder Margin="0,18,0,0"
                             MinHeight="262"
                             Style="{StaticResource ScanOuterCardStyle}">
                         <Grid>
@@ -696,9 +701,9 @@
                                 </Border>
                             </Grid>
                         </Grid>
-                    </Border>
+                    </helpers:CachedShadowBorder>
 
-                    <Border Margin="0,18,0,0" Style="{StaticResource ScanOuterCardStyle}">
+                    <helpers:CachedShadowBorder Margin="0,18,0,0" Style="{StaticResource ScanOuterCardStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -746,7 +751,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
-                                    <Border Grid.Row="0"
+                                    <helpers:CachedShadowBorder Grid.Row="0"
                                             Grid.Column="0"
                                             HorizontalAlignment="Left"
                                             Style="{StaticResource ScanMetricStartCardStyle}">
@@ -766,8 +771,8 @@
                                                 <TextBlock Text="{Binding ScannedCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
-                                    <Border Grid.Row="0"
+                                    </helpers:CachedShadowBorder>
+                                    <helpers:CachedShadowBorder Grid.Row="0"
                                             Grid.Column="2"
                                             HorizontalAlignment="Left"
                                             Style="{StaticResource ScanMetricMiddleCardStyle}">
@@ -787,8 +792,8 @@
                                                 <TextBlock Text="{Binding NewFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
-                                    <Border Grid.Row="0"
+                                    </helpers:CachedShadowBorder>
+                                    <helpers:CachedShadowBorder Grid.Row="0"
                                             Grid.Column="4"
                                             HorizontalAlignment="Left"
                                             Style="{StaticResource ScanMetricEndCardStyle}">
@@ -808,8 +813,8 @@
                                                 <TextBlock Text="{Binding UpdatedFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
-                                    <Border Grid.Row="2"
+                                    </helpers:CachedShadowBorder>
+                                    <helpers:CachedShadowBorder Grid.Row="2"
                                             Grid.Column="0"
                                             HorizontalAlignment="Left"
                                             Style="{StaticResource ScanMetricStartCardStyle}">
@@ -829,8 +834,8 @@
                                                 <TextBlock Text="{Binding IgnoredFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
-                                    <Border Grid.Row="2"
+                                    </helpers:CachedShadowBorder>
+                                    <helpers:CachedShadowBorder Grid.Row="2"
                                             Grid.Column="2"
                                             HorizontalAlignment="Left"
                                             Style="{StaticResource ScanMetricMiddleCardStyle}">
@@ -850,8 +855,8 @@
                                                 <TextBlock Text="{Binding ErrorCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
-                                    <Border Grid.Row="2"
+                                    </helpers:CachedShadowBorder>
+                                    <helpers:CachedShadowBorder Grid.Row="2"
                                             Grid.Column="4"
                                             HorizontalAlignment="Left"
                                             Style="{StaticResource ScanMetricEndCardStyle}">
@@ -871,7 +876,7 @@
                                                 <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource ScanMetricValueTextStyle}" />
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
+                                    </helpers:CachedShadowBorder>
                                 </Grid>
 
                                 <StackPanel Grid.Column="2"
@@ -892,10 +897,10 @@
                                 </StackPanel>
                             </Grid>
                         </Grid>
-                    </Border>
+                    </helpers:CachedShadowBorder>
                 </StackPanel>
 
-                <Border Grid.Column="2"
+                <helpers:CachedShadowBorder Grid.Column="2"
                         Height="{Binding ActualHeight, ElementName=LeftColumn}"
                         MinHeight="620"
                         Style="{StaticResource ScanOuterCardStyle}">
@@ -914,9 +919,9 @@
                                    Style="{StaticResource BodyMutedTextStyle}" />
 
                         <Grid Grid.Row="4">
-                            <Border>
+                            <helpers:CachedShadowBorder>
                                 <Border.Style>
-                                    <Style TargetType="Border" BasedOn="{StaticResource ScanEmptyStateStyle}">
+                                    <Style TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource ScanEmptyStateStyle}">
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding HasRecentLogs}" Value="False">
                                                 <Setter Property="Visibility" Value="Visible" />
@@ -926,7 +931,7 @@
                                 </Border.Style>
                                 <TextBlock Text="还没有扫描记录。"
                                            Style="{StaticResource ScanEmptyStateTextStyle}" />
-                            </Border>
+                            </helpers:CachedShadowBorder>
 
                             <ScrollViewer ClipToBounds="False"
                                           PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
@@ -952,7 +957,7 @@
                             </ScrollViewer>
                         </Grid>
                     </Grid>
-                </Border>
+                </helpers:CachedShadowBorder>
             </Grid>
         </Grid>
         </Grid>

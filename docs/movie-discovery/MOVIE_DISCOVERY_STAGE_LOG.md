@@ -2000,6 +2000,29 @@ Known Issues:
 - Deferred: Manual acceptance is still needed for live TMDB filter latency, no-keyword discovery pagination, season rating display, and rapid recommendation-factor changes against the configured AI provider.
 - Noise: Existing adjacent working-tree changes remain present.
 
+## 2026-06-14 - AI Recommendation Failure Status
+
+Completed:
+
+- Added the shared privacy-safe AI failure mapping to foreground recommendation generation, preview refresh, background candidate-pool refill, and the Home recommendation refresh status.
+- Preserved actionable HTTP failures from the three parallel AI recommendation routes instead of collapsing every route failure into a generic parse-error message.
+- Recommendation error cache and UI status now distinguish billing/quota, authentication, permission, model/endpoint, rate-limit, timeout, and temporary service failures.
+- Existing recommendations remain visible when an update fails; retry mode continues to use the existing recommendation workflow.
+
+Not done:
+
+- No recommendation ranking, candidate selection, profile fingerprint, custom preference, Movie-only scope, AI provider configuration, database update, migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: recommendation generation still requires the configured AI provider to accept requests and have available quota.
+- Deferred: manual WPF acceptance of long status text and tooltip behavior for foreground and background recommendation failures.
+- Noise: cached recommendations staying visible after a failed update is intentional.
+
 ## 2026-06-13 - Season Rating And Search Page-Cap Correction
 
 Completed:
@@ -2074,3 +2097,192 @@ Known Issues:
 - Blocker: None found in code inspection.
 - Deferred: The product still needs a separate UX decision on whether information cards should expose complete credit lists, for example through an expanded view or complete tooltip.
 - Noise: Existing adjacent working-tree changes remain present.
+
+## 2026-06-14 - Cached Shadow Theme Parity
+
+Completed:
+
+- Updated Movie Discovery ranking score badges to use the shared cached-shadow theme tokens for color, opacity, and depth.
+- Light theme now receives a non-zero score-badge shadow depth while dark theme keeps the existing glow-style behavior.
+
+Not done:
+
+- No ranking, search, TMDB request, rating persistence, recommendation, database update, or migration behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None confirmed by build.
+- Deferred: Manual WPF validation should compare the ranking badge shadow in light and dark themes.
+- Noise: This is part of the shared cached-shadow visual migration and does not change discovery data.
+
+## 2026-06-14 - Ranking Shadow And Bottom Corner Follow-up
+
+Completed:
+
+- Disabled inherited cached shadows on the transparent ranking hero/item wrappers, so the right-side title/meta/overview area no longer appears to have a full-card shadow.
+- Routed the ranking score-badge blur radius through the shared theme token so it matches the old theme-specific shadow density more closely.
+- Fixed the shared scroll-driven bottom-corner behavior used by Movie Discovery search and ranking cards so non-empty views do not enter with a stale rounded-bottom state.
+
+Not done:
+
+- No ranking data source, sorting, paging, search request, TMDB request, rating persistence, recommendation, database update, or migration behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None confirmed by build.
+- Deferred: Manual WPF validation should confirm ranking info areas have no full-card shadow, badge shadows are less diffuse, and bottom corners initialize correctly in search and ranking non-empty states.
+- Noise: Poster palette shadows remain poster-specific and image-color driven.
+
+## 2026-06-14 - Ranking Shadow Tightening And Empty-State Corner Fix
+
+Completed:
+
+- Reduced the cached-shadow blur-radius tokens again, affecting Movie Discovery ranking score badges through shared theme resources.
+- Fixed shared bottom-corner behavior so empty/non-scrollable Movie Discovery search and ranking surfaces remain in the bottom state.
+- Added bottom-state scrollable-height tracking so a stale initial bottom state can be released without causing a true-bottom round/flat loop.
+
+Not done:
+
+- No ranking data source, sorting, paging, search request, TMDB request, rating persistence, recommendation, database update, or migration behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- Normal output build was blocked by a running `MediaLibrary.App` process holding the app exe.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation should confirm empty-state bottom corners, true-bottom stability, and the tighter score-badge shadow density.
+- Noise: The fix is visual/interaction-state only and does not affect discovery data, paging, ranking, search, or rating persistence.
+
+## 2026-06-14 - Search Poster And Ranking Badge Shadow Edge Fix
+
+Completed:
+
+- Restored Movie Discovery poster base shadows from the generic cached compact token back to the original explicit black poster shadow color.
+- Added effective left/right/top safe padding for movie and TV search poster virtualized grids so first-row and edge poster glows are not clipped by the scroll viewport.
+- Added right-side layout space for ranking score badges and the ranking content surface so cached badge glow is not clipped at the right edge.
+- Kept ranking wrapper shadows disabled, so overview/info areas stay free of full-card shadows.
+
+Not done:
+
+- No ranking data source, sorting, paging, search request, TMDB request, rating persistence, recommendation, database update, or migration behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation should confirm search poster edge glows and ranking score-badge right glows are visible in both light and dark themes.
+- Noise: This pass is visual/layout-only and does not affect discovery data, paging, ranking, search, or rating persistence.
+
+## 2026-06-14 - Phase 7 Viewport Compensation Restoration
+
+Completed:
+
+- Reverted the previous direct virtualized width/padding approach that could change search poster layout.
+- Expanded Movie/TV search ListBox viewports by 34px on left, top, and right, then used the existing paint-padding behavior to preserve the original poster coordinates and column count.
+- Expanded Movie/TV ranking ScrollViewer right edges by 24px and applied matching 24px inner Grid compensation, following the existing Phase 7 left-side `-84/+84` model.
+- Removed the temporary rating-badge right margin because the viewport now provides real shadow paint room without moving the badge.
+- Increased Movie Discovery search/ranking poster palette opacity from `0.40/0.42` to `0.50/0.52` and base shadow opacity from `0.24/0.28` to `0.30/0.34`; poster size, blur, padding, and data behavior are unchanged.
+
+Not done:
+
+- No detail-page poster styling, ranking data source, sorting, paging, search request, TMDB request, rating persistence, recommendation logic, database update, or migration behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation should confirm search poster columns do not shift and ranking score-badge glow is fully visible on the right.
+- Noise: This is a visual viewport correction only.
+
+## 2026-06-14 - Search Scroll Boundary And Ranking Top Glow Correction
+
+Completed:
+
+- Removed the Movie/TV search ListBox negative top margin that allowed scrolled poster bodies to paint above the result-content boundary.
+- Retained the horizontal `-34` viewport expansion and the virtualized panel's right paint-width compensation, so columns and horizontal card coordinates remain unchanged.
+- Kept the 44px top viewport padding as real in-scroll paint room. The first row now owns its top shadow gutter without moving the ScrollViewer into the toolbar area.
+- Added 36px top content gutter inside Movie/TV ranking ScrollViewers to expose the hero poster's top glow.
+- Increased ranking and search poster palette/base opacity to `0.58/0.36` and `0.60/0.40` respectively; detail pages remain unchanged.
+
+Not done:
+
+- No search request, filtering, ranking source, sorting, paging, rating persistence, recommendation, TMDB, database update, migration, commit, or push behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation should confirm the first ranking poster glow is complete and search content no longer crosses above its viewport while scrolling.
+- Noise: The first search/ranking row now includes real top paint gutter by design.
+
+## 2026-06-14 - Search First-row Spacing Restoration
+
+Completed:
+
+- Restored Movie/TV search `ViewportPadding.Top` from 44px to the original 10px, removing the added first-row whitespace.
+- Kept both ListBoxes at their normal top boundary so scrolling content cannot cross into the toolbar area.
+- Reduced search poster opacity from `0.60/0.40` to `0.56/0.37` and ranking poster opacity from `0.58/0.36` to `0.54/0.33`, exactly halving the latest increase.
+- Kept horizontal edge compensation and the ranking hero 36px top gutter unchanged.
+
+Not done:
+
+- No search/ranking data, filtering, paging, TMDB, rating, recommendation, database, migration, commit, or push behavior changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual validation should confirm original search first-row spacing and ranking top-glow visibility.
+- Noise: Ranking top spacing is independent from the restored search first-row spacing.
+
+## 2026-06-14 - Discovery Scrollbar And Ranking Gap Follow-up
+
+Completed:
+
+- Shifted Movie/TV poster-search scrollbars 34px left to compensate for the poster shadow-safe viewport expansion.
+- Changed the ranking scrollbar transform from `X=4` to `X=-20`, a smaller left shift matching the ranking viewport's narrower right expansion.
+- Reduced Movie/TV ranking hero top gutter from 36px to 18px.
+- Used render-only scrollbar transforms, so search poster columns and ranking content width remain unchanged.
+
+Not done:
+
+- No search, ranking, filtering, paging, rating, TMDB, recommendation, database, migration, commit, or push behavior changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors after removing verified stale Codex temp build outputs that had exhausted temporary disk space.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- `VirtualizingWrapPanel` remained unchanged.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual validation should confirm both search scrollbar positions, ranking scrollbar position, and the reduced first-row gap.
+- Noise: The first build attempt failed only because the temporary volume was full; scoped temp-output cleanup resolved it.

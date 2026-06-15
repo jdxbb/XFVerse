@@ -17,7 +17,7 @@
         Style="{StaticResource DialogWindowStyle}"
         Loaded="Window_Loaded">
     <Window.Resources>
-        <Style x:Key="WebDavPathPickerDialogPanelStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
+        <Style x:Key="WebDavPathPickerDialogPanelStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassPageCardStyle}">
             <Setter Property="Padding" Value="20" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="ClipToBounds" Value="True" />
@@ -183,7 +183,7 @@
         </Style>
     </Window.Resources>
 
-    <Border Style="{StaticResource WebDavPathPickerDialogPanelStyle}">
+    <helpers:CachedShadowBorder Style="{StaticResource WebDavPathPickerDialogPanelStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -395,5 +395,5 @@
                         Style="{StaticResource PrimaryButtonStyle}" />
             </Grid>
         </Grid>
-    </Border>
+    </helpers:CachedShadowBorder>
 </Window>

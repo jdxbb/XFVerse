@@ -170,7 +170,7 @@
                                helpers:PosterCachedShadowBehavior.IsEnabled="True"
                                helpers:PosterCachedShadowBehavior.Opacity="0.24"
                                helpers:PosterCachedShadowBehavior.Padding="60"
-                               helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
+                           helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                                helpers:PosterCachedShadowBehavior.ShadowDepth="4"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                Stretch="Fill" />
@@ -192,7 +192,7 @@
                 </Grid>
             </Grid>
 
-            <Border Grid.Column="2"
+            <helpers:CachedShadowBorder Grid.Column="2"
                     Height="360"
                     Margin="0,14,0,0"
                     Style="{StaticResource HeroCardStyle}">
@@ -260,7 +260,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Margin="8,0"
+                                    <helpers:CachedShadowBorder Margin="8,0"
                                             Padding="10"
                                             CornerRadius="12"
                                             Style="{StaticResource GlassInlinePanelStyle}">
@@ -312,7 +312,7 @@
                                                 </StackPanel>
                                             </Grid>
                                         </Grid>
-                                    </Border>
+                                    </helpers:CachedShadowBorder>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -338,7 +338,7 @@
                         </Grid>
                     </Grid>
 
-                    <Border Grid.Column="2" Padding="10" Style="{StaticResource GlassPageCardStyle}">
+                    <helpers:CachedShadowBorder Grid.Column="2" Padding="10" Style="{StaticResource GlassPageCardStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -397,12 +397,12 @@
                             </Grid>
                             </ScrollViewer>
                         </Grid>
-                    </Border>
+                    </helpers:CachedShadowBorder>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Grid>
 
-        <Border Grid.Row="2" Style="{StaticResource GlassPageCardStyle}">
+        <helpers:CachedShadowBorder Grid.Row="2" Style="{StaticResource GlassPageCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -513,9 +513,14 @@
                                                helpers:PosterCachedShadowBehavior.ShadowDepth="5"
                                                Stretch="Fill" />
                                     </Canvas>
-                                    <Border Background="{DynamicResource BrushGlassSurface}"
-                                            CornerRadius="10"
-                                            Effect="{StaticResource ShadowCard}" />
+                                    <helpers:CachedShadowBorder Background="{DynamicResource BrushGlassSurface}"
+                                                                CornerRadius="10"
+                                                                Effect="{x:Null}"
+                                                                ShadowBlurRadius="16"
+                                                                ShadowColor="{DynamicResource ColorCachedShadowCompact}"
+                                                                ShadowDepth="4"
+                                                                ShadowOpacity="0.12"
+                                                                ShadowPadding="24" />
                                     <Border x:Name="SeasonRowPosterClipMask"
                                             Background="White"
                                             CornerRadius="10"
@@ -603,7 +608,7 @@
                                TextWrapping="Wrap" />
                 </Border>
             </Grid>
-        </Border>
+        </helpers:CachedShadowBorder>
         </Grid>
 
         <Border Grid.RowSpan="3"

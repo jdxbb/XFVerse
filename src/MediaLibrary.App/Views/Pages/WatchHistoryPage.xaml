@@ -183,9 +183,14 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="WatchHistoryDateFilterBarCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource GlassCompactCardStyle}">
-            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+        <Style x:Key="WatchHistoryDateFilterBarCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassCompactCardStyle}">
+            <Setter Property="Effect" Value="{x:Null}" />
             <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="ShadowPadding" Value="34" />
+            <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowInlineBlurRadius}" />
+            <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowInlineOpacity}" />
+            <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowInline}" />
+            <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowInlineDepth}" />
         </Style>
 
         <Style x:Key="WatchHistoryEmptyStateStyle"
@@ -289,7 +294,7 @@
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.InnerMargin="0,3,0,0"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.42"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.56"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -309,7 +314,7 @@
                            helpers:PosterCachedShadowBehavior.CornerRadius="12"
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.28"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.37"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                            helpers:PosterCachedShadowBehavior.ShadowDepth="3"
@@ -516,7 +521,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
+        <helpers:CachedShadowBorder Grid.Row="0"
                 Margin="32,24,32,18"
                 Padding="12,10"
                 Style="{StaticResource WatchHistoryDateFilterBarCardStyle}">
@@ -571,7 +576,7 @@
                                TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </Grid>
-        </Border>
+        </helpers:CachedShadowBorder>
 
         <Grid Grid.Row="1" Margin="32,0,32,0">
             <StackPanel Width="320"

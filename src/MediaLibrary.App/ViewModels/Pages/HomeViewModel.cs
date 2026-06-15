@@ -5,6 +5,7 @@ using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -319,7 +320,7 @@ public sealed class HomeViewModel : PageViewModelBase
         {
             if (refreshVersion == _recommendationRefreshVersion)
             {
-                StatusMessage = $"AI 推荐刷新失败：{exception.Message}";
+                StatusMessage = $"AI 推荐刷新失败：{AiFailureMessageFormatter.Build(exception)}";
             }
         }
     }

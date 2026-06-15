@@ -285,7 +285,7 @@
     <Style x:Key="CorrectionDialogPlaybackSourceComboBoxStyle"
            TargetType="ComboBox"
            BasedOn="{StaticResource CorrectionDialogComboBoxStyle}">
-        <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+        <Setter Property="Effect" Value="{x:Null}" />
     </Style>
 
     <Style x:Key="CheckBoxStyle" TargetType="CheckBox">

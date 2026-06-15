@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using MediaLibrary.Core.Diagnostics;
+using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Models.Settings;
 using MediaLibrary.Core.Services.Interfaces;
@@ -14,9 +15,10 @@ public sealed class WatchProfileService : IWatchProfileService
     private const string ProfileKind = "profile";
     private const string GlobalScopeKey = "global";
     private const int CurrentProfileSchemaVersion = 2;
-    private const string CurrentPromptVersion = "wi-profile-persona-23-parallel-v9-dna-copy";
+    private const string CurrentPromptVersion = "wi-profile-persona-23-parallel-v14-quadrant-description";
     private const string FallbackPersonaType = "类型探索家";
     private const string FallbackPersonaTitle = "类型探索家";
+    private const string FallbackPersonaLead = "你在熟悉与探索之间，形成了鲜明而开放的观影轨迹。";
     private const string FallbackPersonaDescription = "你的观影口味覆盖多个方向，更愿意主动尝试不同类型与风格，而不是被单一标签固定。";
     private const int MaxParallelProfileCardRequests = 5;
 
@@ -124,7 +126,7 @@ public sealed class WatchProfileService : IWatchProfileService
         "悬念推进",
         "章节叙事",
         "回忆叙事",
-        "非线性叙事",
+        "非线结构",
         "命运交织",
         "日常切片",
         "史诗叙事",
@@ -132,7 +134,7 @@ public sealed class WatchProfileService : IWatchProfileService
         "黑色幽默",
         "现实观察",
         "情绪流动",
-        "高概念设定"
+        "高概念"
     ];
 
     private readonly IWatchProfileInputService _inputService;
@@ -296,22 +298,22 @@ public sealed class WatchProfileService : IWatchProfileService
         }
         catch (Exception exception)
         {
-            var sanitizedError = AiPerfDiagnostics.SanitizeMessage(exception.Message);
-            await _cacheService.SetErrorAsync(ProfileKind, GlobalScopeKey, sanitizedError, cancellationToken);
+            var failureMessage = AiFailureMessageFormatter.Build(exception);
+            await _cacheService.SetErrorAsync(ProfileKind, GlobalScopeKey, failureMessage, cancellationToken);
             Log($"watch-profile-ai-failed errorType={exception.GetType().Name}");
 
             if (cachedProfile is not null)
             {
                 NormalizeProfile(cachedProfile, input, loadedFromCache: true, preserveSourceFingerprint: true);
                 cachedProfile.WasAiCalled = true;
-                cachedProfile.StatusMessage = "画像刷新失败，已显示上一次画像缓存。";
-                cachedProfile.WarningMessages.Add("画像刷新失败，已保留上一次画像缓存。");
-                cachedProfile.WarningMessages.Add($"错误类型：{exception.GetType().Name}");
-                cachedProfile.Meta.WarningMessages.Add("画像刷新失败，已保留上一次画像缓存。");
+                cachedProfile.ErrorMessage = failureMessage;
+                cachedProfile.StatusMessage = $"画像刷新失败：{failureMessage}已显示上一次画像缓存。";
+                AddUnique(cachedProfile.WarningMessages, cachedProfile.StatusMessage);
+                AddUnique(cachedProfile.Meta.WarningMessages, cachedProfile.StatusMessage);
                 return cachedProfile;
             }
 
-            return CreateErrorSnapshot(input, $"画像生成失败：{exception.GetType().Name}");
+            return CreateErrorSnapshot(input, $"画像生成失败：{failureMessage}");
         }
     }
 
@@ -773,6 +775,7 @@ public sealed class WatchProfileService : IWatchProfileService
         profile.Caveats ??= [];
         profile.WarningMessages ??= [];
         profile.Meta.WarningMessages ??= [];
+        profile.Summary.KeywordScores ??= [];
 
         if (!loadedFromCache || profile.Meta.GeneratedAtUtc == default)
         {
@@ -815,6 +818,11 @@ public sealed class WatchProfileService : IWatchProfileService
         if (string.IsNullOrWhiteSpace(profile.Persona.Title))
         {
             profile.Persona.Title = profile.Persona.Type;
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.Persona.Lead))
+        {
+            profile.Persona.Lead = FallbackPersonaLead;
         }
 
         profile.Persona.Confidence = Clamp(profile.Persona.Confidence == 0 ? profile.Meta.Confidence : profile.Persona.Confidence, 0, 100);
@@ -896,16 +904,97 @@ public sealed class WatchProfileService : IWatchProfileService
 
     private static void NormalizeProfileText(WatchProfileSnapshot profile)
     {
-        var originalKeywordCount = profile.Summary.Keywords.Count;
-        profile.Summary.Keywords = NormalizeSummaryKeywords(profile.Summary.Keywords);
-        if (originalKeywordCount != profile.Summary.Keywords.Count)
+        var originalKeywordCount = Math.Max(profile.Summary.Keywords.Count, profile.Summary.KeywordScores.Count);
+        profile.Summary.KeywordScores = NormalizeSummaryKeywordScores(
+            profile.Summary.KeywordScores,
+            profile.Summary.Keywords);
+        profile.Summary.Keywords = profile.Summary.KeywordScores.Select(x => x.Label).ToList();
+        if (originalKeywordCount != profile.Summary.KeywordScores.Count)
         {
-            Log($"watch-profile-text-dedup-applied field=summary.keywords before={originalKeywordCount} after={profile.Summary.Keywords.Count}");
+            Log($"watch-profile-text-dedup-applied field=summary.keywords before={originalKeywordCount} after={profile.Summary.KeywordScores.Count}");
         }
 
         profile.Summary.Text = NormalizeProfileSummaryText(profile.Summary.Text, maxLength: 560);
-        profile.Persona.Description = NormalizeProfileSentence(profile.Persona.Description);
+        profile.Persona.Lead = NormalizePersonaLead(profile.Persona.Lead);
+        profile.Persona.Description = NormalizeProfileParagraph(profile.Persona.Description);
         profile.WatchVsLike.Conclusion = NormalizeProfileSentence(profile.WatchVsLike.Conclusion, maxLength: 180);
+    }
+
+    private static List<WatchProfileKeyword> NormalizeSummaryKeywordScores(
+        IEnumerable<WatchProfileKeyword> scoredKeywords,
+        IEnumerable<string> legacyKeywords)
+    {
+        var candidates = scoredKeywords
+            .Where(x => x is not null && !string.IsNullOrWhiteSpace(x.Label))
+            .Select((x, index) => new { Label = NormalizeSummaryKeywordLabel(x.Label), Score = Clamp(x.Score, 1, 3), Index = index })
+            .Where(x => !string.IsNullOrWhiteSpace(x.Label))
+            .ToList();
+
+        foreach (var keyword in NormalizeSummaryKeywords(legacyKeywords))
+        {
+            var label = NormalizeSummaryKeywordLabel(keyword);
+            if (string.IsNullOrWhiteSpace(label)
+                || candidates.Any(x => AreNearDuplicateKeywords(x.Label, label)))
+            {
+                continue;
+            }
+
+            candidates.Add(new { Label = label, Score = 1, Index = candidates.Count });
+        }
+
+        var unique = new List<(string Label, int Score, int Index)>();
+        foreach (var candidate in candidates)
+        {
+            if (unique.Any(x => AreNearDuplicateKeywords(x.Label, candidate.Label)))
+            {
+                continue;
+            }
+
+            unique.Add((candidate.Label, candidate.Score, candidate.Index));
+            if (unique.Count >= 6)
+            {
+                break;
+            }
+        }
+
+        if (unique.Count == 0)
+        {
+            return [];
+        }
+
+        var hasBalancedScores = unique.Count == 6
+                                && unique.Count(x => x.Score == 1) == 2
+                                && unique.Count(x => x.Score == 2) == 2
+                                && unique.Count(x => x.Score == 3) == 2;
+        if (hasBalancedScores)
+        {
+            return unique
+                .Select(x => new WatchProfileKeyword { Label = x.Label, Score = x.Score })
+                .ToList();
+        }
+
+        var ranked = unique
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.Index)
+            .ToList();
+        return ranked
+            .Select((x, index) => new WatchProfileKeyword
+            {
+                Label = x.Label,
+                Score = index < 2 ? 3 : index < 4 ? 2 : 1
+            })
+            .ToList();
+    }
+
+    private static string NormalizeSummaryKeywordLabel(string value)
+    {
+        var normalized = new string(value.Trim().Where(x => !char.IsWhiteSpace(x)).ToArray());
+        if (normalized.Length < 2)
+        {
+            return string.Empty;
+        }
+
+        return normalized.Length <= 6 ? normalized : normalized[..6];
     }
 
     private static List<string> NormalizeSummaryKeywords(IEnumerable<string> keywords)
@@ -1059,15 +1148,49 @@ public sealed class WatchProfileService : IWatchProfileService
 
     private static string NormalizeProfileSentence(string text, int maxLength = 240)
     {
+        var normalized = NormalizeProfileParagraph(text);
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength].TrimEnd() + "…";
+    }
+
+    private static string NormalizeProfileParagraph(string text)
+    {
         if (string.IsNullOrWhiteSpace(text))
         {
             return string.Empty;
         }
 
-        var normalized = string.Join(
+        return string.Join(
             " ",
             text.Split(['\r', '\n', '\t'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
-        return normalized.Length <= maxLength ? normalized : normalized[..maxLength].TrimEnd() + "…";
+    }
+
+    private static string NormalizePersonaLead(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return FallbackPersonaLead;
+        }
+
+        var normalized = string.Join(
+                string.Empty,
+                text.Split(['\r', '\n', '\t'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Trim(' ', '“', '”', '"', '‘', '’');
+        normalized = normalized.Replace(',', '，').Replace('；', '，').Replace(';', '，');
+        var clauses = normalized
+            .Split('，', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(clause => clause.TrimEnd('。', '！', '？', '!', '?', '，'))
+            .Where(clause => clause.Length > 0)
+            .ToList();
+        if (clauses.Count != 2)
+        {
+            return FallbackPersonaLead;
+        }
+
+        const int maxLength = 33;
+        var firstClause = clauses[0];
+        var secondClause = clauses[1];
+        var result = $"{firstClause}，{secondClause}。";
+        return result.Length <= maxLength ? result : FallbackPersonaLead;
     }
 
     private static string NormalizeDnaDescription(WatchProfileDnaGene gene)
@@ -1253,9 +1376,10 @@ public sealed class WatchProfileService : IWatchProfileService
 
             profile.Persona.Type = FallbackPersonaType;
             profile.Persona.Title = string.IsNullOrWhiteSpace(persona.Title) ? FallbackPersonaTitle : persona.Title.Trim();
+            profile.Persona.Lead = NormalizePersonaLead(persona.Lead);
             profile.Persona.Description = string.IsNullOrWhiteSpace(persona.Description)
                 ? BuildFixedPersonaFallbackDescription(input)
-                : NormalizeProfileSentence(persona.Description);
+                : NormalizeProfileParagraph(persona.Description);
             profile.Persona.Confidence = Clamp(persona.Confidence, 0, 100);
             Log("watch-profile-persona-fallback-regenerate-complete");
             return true;
@@ -1272,7 +1396,7 @@ public sealed class WatchProfileService : IWatchProfileService
         return """
         你只负责修正观影人格文案。只能输出 JSON 对象，不输出 Markdown 或解释文本。
         persona.type 已固定为“类型探索家”，不要改变类型。
-        title 和 description 必须与“类型探索家”匹配，description 要基于给定摘要解释主动尝试不同类型与风格、不会被单一口味固定，不要编造推荐结果。
+        title、lead 和 description 必须与“类型探索家”匹配。lead 总长度不得超过 33 个字符（包括标点），必须且只能包含一个中文逗号，形成两个语义完整的分句，并以中文句号结尾；description 要基于给定摘要解释主动尝试不同类型与风格、不会被单一口味固定，不要编造推荐结果。
         """;
     }
 
@@ -1298,7 +1422,7 @@ public sealed class WatchProfileService : IWatchProfileService
 
         return $$"""
         请只返回以下 JSON：
-        {"title":"类型探索家","description":"","confidence":0}
+        {"title":"类型探索家","lead":"","description":"","confidence":0}
 
         输入数据：
         {{JsonSerializer.Serialize(payload, JsonOptions)}}
@@ -1309,8 +1433,39 @@ public sealed class WatchProfileService : IWatchProfileService
     {
         var root = ParseCardRoot(text);
         var target = root.TryGetProperty("summary", out var summary) ? summary : root;
-        return JsonSerializer.Deserialize<WatchProfileSummary>(target.GetRawText(), JsonOptions)
-               ?? throw new JsonException("AI profile summary card could not be parsed.");
+        var result = new WatchProfileSummary
+        {
+            Text = TryGetStringProperty(target, out var summaryText, "text", "summary", "description")
+                ? summaryText
+                : string.Empty
+        };
+
+        if (!TryGetObjectProperty(target, out var keywordValue, "keywords", "keywordScores", "keyword_scores")
+            && target.TryGetProperty("keywords", out var directKeywordValue))
+        {
+            keywordValue = directKeywordValue;
+        }
+
+        if (keywordValue.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in keywordValue.EnumerateArray())
+            {
+                var label = ReadStringValue(item);
+                if (string.IsNullOrWhiteSpace(label))
+                {
+                    continue;
+                }
+
+                var score = item.ValueKind == JsonValueKind.Object
+                            && TryGetIntProperty(item, out var parsedScore, "score", "fitScore", "fit_score", "level")
+                    ? parsedScore
+                    : 0;
+                result.Keywords.Add(label);
+                result.KeywordScores.Add(new WatchProfileKeyword { Label = label, Score = score });
+            }
+        }
+
+        return result;
     }
 
     private static WatchProfilePersona ParsePersonaCard(string text)
@@ -1430,6 +1585,36 @@ public sealed class WatchProfileService : IWatchProfileService
         return false;
     }
 
+    private static bool TryGetIntProperty(JsonElement root, out int value, params string[] propertyNames)
+    {
+        value = 0;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        foreach (var property in root.EnumerateObject())
+        {
+            if (!propertyNames.Any(name => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out value))
+            {
+                return true;
+            }
+
+            if (property.Value.ValueKind == JsonValueKind.String
+                && int.TryParse(property.Value.GetString(), out value))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static List<string> ReadStringListProperty(JsonElement root, params string[] propertyNames)
     {
         if (root.ValueKind != JsonValueKind.Object)
@@ -1499,16 +1684,18 @@ public sealed class WatchProfileService : IWatchProfileService
         return $$$"""
         任务：只生成“口味总结”卡片。
         输出 JSON：
-        {"summary":{"text":"","keywords":[]}}
+        {"summary":{"text":"","keywords":[{"label":"情绪沉浸","score":3},{"label":"类型探索","score":2},{"label":"悬疑偏爱","score":1},{"label":"审美稳定","score":3},{"label":"长片耐心","score":2},{"label":"现实关怀","score":1}]}}
 
         要求：
         1. summary.text 写成 2 个自然段，段落之间用换行分隔，整体约 160-260 字；要综合观看、喜爱、想看、不想看和近期观看投入，不要只复述标签。
         2. 拒绝模板化：不要固定使用“你偏向 A，但也 B”“总体来看”“一方面/另一方面”等套话；句式要像真实分析，不要每句都用同一种结构。
         3. 可以指出主线口味、稳定偏好、探索边界、情绪需求或审美取向，但每个判断都必须能从输入数据得到支持。
         4. 如果证据显示口味集中，就明确写集中；如果证据显示分散，再写多元，不要为了显得复杂而强行制造矛盾。
-        5. summary.keywords 最多 6 个，可基于画像总结生成，不要求必须来自影片标签。
-        6. 关键词应覆盖题材、情绪、观看方式、审美倾向、探索倾向等不同维度，不要语义高度重复。
-        7. summary.text 不要使用项目符号、编号、Markdown 或小标题。
+        5. summary.keywords 必须正好返回 6 个对象；每个对象包含 label 和 score，不得返回纯字符串数组。
+        6. 每个 label 必须是 2-6 个汉字，可基于画像总结生成，不要求必须来自影片标签。
+        7. score 只能是 1、2、3，表示关键词与用户画像的符合程度；6 个关键词中必须正好有两个 1 分、两个 2 分、两个 3 分。
+        8. 关键词应覆盖题材、情绪、观看方式、审美倾向、探索倾向等不同维度，不要语义高度重复。
+        9. summary.text 不要使用项目符号、编号、Markdown 或小标题。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
@@ -1527,14 +1714,15 @@ public sealed class WatchProfileService : IWatchProfileService
         return $$$"""
         任务：只生成观影人格卡片。
         输出 JSON：
-        {"persona":{"type":"类型探索家","title":"类型探索家","description":"","confidence":0}}
+        {"persona":{"type":"类型探索家","title":"类型探索家","lead":"","description":"","confidence":0}}
 
         要求：
         1. persona.type 只能是以下集合之一：{{{string.Join("、", PersonaTypes)}}}。
         2. 必须参考 personaTypeDefinitions 和 personaSelectionRules 选择最强差异化人格，不要只按题材表面相似度选择。
-        3. persona.description 要解释为什么归为该人格，必须结合观看、喜爱、想看或不想看等行为信号。
-        4. 不要简单罗列关键词，也不要写成标签堆叠。
-        5. confidence 范围 0-100。
+        3. persona.lead 必须返回一句完整、简洁、有概括力的导语；总长度不得超过 33 个字符（包括逗号和句号），必须且只能包含一个中文逗号，逗号前后是两个语义完整的分句，并以中文句号结尾；不要与 persona.type 或 title 重复。
+        4. persona.description 要作为导语下方的正文，解释为什么归为该人格，必须结合观看、喜爱、想看或不想看等行为信号。
+        5. lead 和 description 不要简单罗列关键词，也不要写成标签堆叠；两者不要重复表达同一句话。
+        6. confidence 范围 0-100。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
@@ -1564,7 +1752,7 @@ public sealed class WatchProfileService : IWatchProfileService
         要求：
         1. DNA 必须包含六个基因：{{{string.Join("、", DnaGenes)}}}。
         2. 类型基因、情绪基因、场景基因、叙事基因的 tags 各输出 3 个标签；tags 用来支撑判断，但 description 不要求逐个点名。
-        3. 叙事基因 tags 只能从 narrativeTags 集合中选择，不要为每部影片生成叙事标签。
+        3. 叙事基因 tags 只能从 narrativeTags 集合中选择，每个标签必须为 2-4 个汉字，不要为每部影片生成叙事标签。
         4. 类型/情绪/场景/叙事基因的 description 写 45-90 字，解释标签组合背后的偏好；可以自然提到关键标签或代表性倾向，但不要机械列标签，也不要为了避免标签而写得空泛。
         5. 节奏基因用 score 表示 0=慢热、100=紧凑；description 写 35-75 字，必须与 score 方向一致：0-35 慢热，36-64 均衡，65-100 紧凑。
         6. 探索基因用 score 表示 0=稳定、100=新鲜；description 写 35-75 字，必须与 score 方向一致：0-35 稳定，36-64 平衡，65-100 新鲜。
@@ -1598,7 +1786,7 @@ public sealed class WatchProfileService : IWatchProfileService
         2. X 轴：-100=熟悉安全，100=新鲜探索。
         3. Y 轴：-100=轻松消遣，100=情绪沉浸。
         4. quadrantName 使用对应象限名称。
-        5. quadrant.description 必须解释分数依据，不要提内部字段名。
+        5. quadrant.description 写 110-170 个汉字，使用 2-3 个完整句子，同时解释横轴与纵轴分数依据，并结合观看、喜爱、想看或不想看等实际行为信号；不要提内部字段名，不要只复述象限名称，也不要堆砌标签。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}
@@ -1667,6 +1855,7 @@ public sealed class WatchProfileService : IWatchProfileService
         profile.Persona ??= new WatchProfilePersona();
         profile.Persona.Type = FallbackPersonaType;
         profile.Persona.Title = FallbackPersonaTitle;
+        profile.Persona.Lead = FallbackPersonaLead;
         profile.Persona.Description = FallbackPersonaDescription;
         profile.Persona.Confidence = Clamp(profile.Persona.Confidence == 0 ? 50 : profile.Persona.Confidence, 0, 100);
     }
@@ -1760,5 +1949,6 @@ public sealed class WatchProfileService : IWatchProfileService
     {
         Debug.WriteLine("[WATCH-PROFILE] " + message);
         AiPerfDiagnostics.WriteEvent("event=" + message);
+        WatchInsightsDiagnostics.Write("layer=profile-service " + message);
     }
 }

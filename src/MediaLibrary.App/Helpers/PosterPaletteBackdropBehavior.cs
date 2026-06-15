@@ -9,6 +9,12 @@ using System.Windows.Threading;
 
 namespace MediaLibrary.App.Helpers;
 
+public enum PosterPaletteMode
+{
+    Standard,
+    Vivid
+}
+
 public static class PosterPaletteBackdropBehavior
 {
     private const int HueBucketCount = 18;
@@ -27,6 +33,13 @@ public static class PosterPaletteBackdropBehavior
             typeof(Border),
             typeof(PosterPaletteBackdropBehavior),
             new PropertyMetadata(null, OnTargetElementChanged));
+
+    public static readonly DependencyProperty PaletteModeProperty =
+        DependencyProperty.RegisterAttached(
+            "PaletteMode",
+            typeof(PosterPaletteMode),
+            typeof(PosterPaletteBackdropBehavior),
+            new PropertyMetadata(PosterPaletteMode.Standard, OnPaletteModeChanged));
 
     private static readonly DependencyProperty IsSubscribedProperty =
         DependencyProperty.RegisterAttached(
@@ -52,6 +65,16 @@ public static class PosterPaletteBackdropBehavior
         target.SetValue(TargetElementProperty, value);
     }
 
+    public static PosterPaletteMode GetPaletteMode(DependencyObject target)
+    {
+        return (PosterPaletteMode)target.GetValue(PaletteModeProperty);
+    }
+
+    public static void SetPaletteMode(DependencyObject target, PosterPaletteMode value)
+    {
+        target.SetValue(PaletteModeProperty, value);
+    }
+
     private static void OnTargetElementChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
         if (target is not Image image)
@@ -61,6 +84,14 @@ public static class PosterPaletteBackdropBehavior
 
         EnsureSubscribed(image);
         BeginApplyPalette(image);
+    }
+
+    private static void OnPaletteModeChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
+    {
+        if (target is Image image)
+        {
+            BeginApplyPalette(image);
+        }
     }
 
     private static void EnsureSubscribed(Image image)
@@ -119,19 +150,19 @@ public static class PosterPaletteBackdropBehavior
         var hasSourceKey = TryGetRequestedSourceKey(image, out var sourceKey);
         if (!hasSourceKey)
         {
-            PosterCachedBackdropBehavior.SetPalette(target, PlaceholderPosterPalette.Value);
+            ApplyPaletteToTarget(image, target, PlaceholderPosterPalette.Value);
             return;
         }
 
         if (PaletteCache.TryGetValue(sourceKey, out var cached))
         {
-            PosterCachedBackdropBehavior.SetPalette(target, cached);
+            ApplyPaletteToTarget(image, target, cached);
             return;
         }
 
         if (image.Source is null)
         {
-            PosterCachedBackdropBehavior.SetPalette(target, PlaceholderPosterPalette.Value);
+            ApplyPaletteToTarget(image, target, PlaceholderPosterPalette.Value);
             return;
         }
 
@@ -155,7 +186,41 @@ public static class PosterPaletteBackdropBehavior
             : FallbackPalette;
         CachePalette(expectedSourceKey, palette);
 
-        PosterCachedBackdropBehavior.SetPalette(target, palette);
+        ApplyPaletteToTarget(image, target, palette);
+    }
+
+    private static void ApplyPaletteToTarget(Image image, Border target, PosterBackdropPalette palette)
+    {
+        var appliedPalette = GetPaletteMode(image) == PosterPaletteMode.Vivid
+            ? CreateVividPalette(palette)
+            : palette;
+        PosterCachedBackdropBehavior.SetPalette(target, appliedPalette);
+    }
+
+    private static PosterBackdropPalette CreateVividPalette(PosterBackdropPalette palette)
+    {
+        return new PosterBackdropPalette(
+            CreateVividColor(palette.Primary),
+            CreateVividColor(palette.Secondary),
+            CreateVividColor(palette.Accent));
+    }
+
+    private static Color CreateVividColor(Color color)
+    {
+        var luminance = (0.2126 * color.R) + (0.7152 * color.G) + (0.0722 * color.B);
+        const double saturationBoost = 1.72;
+        const double brightnessBoost = 1.15;
+        const double brightnessLift = 8;
+
+        return Color.FromRgb(
+            ToVividChannel(((luminance + ((color.R - luminance) * saturationBoost)) * brightnessBoost) + brightnessLift),
+            ToVividChannel(((luminance + ((color.G - luminance) * saturationBoost)) * brightnessBoost) + brightnessLift),
+            ToVividChannel(((luminance + ((color.B - luminance) * saturationBoost)) * brightnessBoost) + brightnessLift));
+    }
+
+    private static byte ToVividChannel(double value)
+    {
+        return (byte)Math.Clamp(Math.Round(value), 40, 246);
     }
 
     private static bool TryExtractPalette(ImageSource? source, out PosterBackdropPalette palette)

@@ -8,7 +8,7 @@ Watch Insights（观影洞察）是播放器主线、Library Batch Ops 和 Recom
 - 做真实数据功能版。
 - 功能完整优先，UI 先够用，不追最终视觉。
 - 页面最终包含两个 Tab：`画像分析`、`观影统计`。
-- 默认打开 `画像分析`。
+- 首次进入默认打开 `画像分析`；同一应用会话内切换页面后，保留上次选中的 Tab 和两个 Tab 各自的滚动位置。
 - 可以显示组件级空状态；有数据时必须正常显示。
 - 当前不接画像驱动推荐，画像驱动推荐后续单独接入。
 - 观影历史页面尚未完成，日历日期点击跳转接口后续预留和接入。
@@ -100,7 +100,7 @@ Scope completed:
 - Added `WatchInsightsPage` and `WatchInsightsViewModel`.
 - Added page title `观影洞察` and subtitle `让你更懂你`.
 - Added two Tabs: `画像分析` and `观影统计`.
-- Default Tab is `画像分析` whenever the page is activated.
+- The initial Tab is `画像分析`; later page activation restores the last selected Tab and each Tab's saved scroll offset.
 - Profile analysis Tab shows component-level empty/deferred states and does not call AI.
 - Statistics Tab binds to real WI-2 `IWatchStatisticsService` data.
 - Added manual statistics refresh, loading state, warning display, and component-level empty states.

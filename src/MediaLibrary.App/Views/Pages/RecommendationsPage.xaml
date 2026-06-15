@@ -522,7 +522,7 @@
             <Setter Property="helpers:PosterCachedShadowBehavior.Direction" Value="270" />
             <Setter Property="helpers:PosterCachedShadowBehavior.InnerMargin" Value="0,4.5,0,0" />
             <Setter Property="helpers:PosterCachedShadowBehavior.IsEnabled" Value="True" />
-            <Setter Property="helpers:PosterCachedShadowBehavior.Opacity" Value="0.40" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Opacity" Value="0.54" />
             <Setter Property="helpers:PosterCachedShadowBehavior.Padding" Value="70.2" />
             <Setter Property="helpers:PosterCachedShadowBehavior.QuantizeColor" Value="True" />
             <Setter Property="helpers:PosterCachedShadowBehavior.ShadowColor" Value="#192230" />
@@ -557,7 +557,7 @@
             <Setter Property="helpers:PosterCachedShadowBehavior.CornerRadius" Value="18" />
             <Setter Property="helpers:PosterCachedShadowBehavior.Direction" Value="270" />
             <Setter Property="helpers:PosterCachedShadowBehavior.IsEnabled" Value="True" />
-            <Setter Property="helpers:PosterCachedShadowBehavior.Opacity" Value="0.24" />
+            <Setter Property="helpers:PosterCachedShadowBehavior.Opacity" Value="0.33" />
             <Setter Property="helpers:PosterCachedShadowBehavior.Padding" Value="70.2" />
             <Setter Property="helpers:PosterCachedShadowBehavior.ShadowColor" Value="#000000" />
             <Setter Property="helpers:PosterCachedShadowBehavior.ShadowDepth" Value="4.5" />
@@ -579,7 +579,7 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="RecommendationPreferenceDialogPanelStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
+        <Style x:Key="RecommendationPreferenceDialogPanelStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassPageCardStyle}">
             <Setter Property="Width" Value="624" />
             <Setter Property="Height" Value="384" />
             <Setter Property="MaxHeight" Value="384" />
@@ -895,7 +895,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Border HorizontalAlignment="Center"
+            <helpers:CachedShadowBorder HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Style="{StaticResource RecommendationPreferenceDialogPanelStyle}">
                 <Grid>
@@ -966,7 +966,7 @@
                         </UniformGrid>
                     </Grid>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Border>
     </Grid>
 </UserControl>

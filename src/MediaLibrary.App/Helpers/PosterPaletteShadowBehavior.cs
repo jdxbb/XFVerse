@@ -305,7 +305,12 @@ public static class PosterPaletteShadowBehavior
         long startedAt)
     {
         var targetKind = "none";
-        if (target is Image shadowImage)
+        if (target is CachedShadowBorder shadowBorder)
+        {
+            targetKind = "cached-border";
+            shadowBorder.SetCurrentValue(CachedShadowBorder.ShadowColorProperty, shadowColor);
+        }
+        else if (target is Image shadowImage)
         {
             targetKind = "cached-image";
             PosterCachedShadowBehavior.SetShadowColor(shadowImage, shadowColor);

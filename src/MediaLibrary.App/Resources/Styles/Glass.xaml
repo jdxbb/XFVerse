@@ -1,39 +1,76 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Style x:Key="GlassPageCardStyle" TargetType="Border" BasedOn="{StaticResource PageCardStyle}">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
+    <Style x:Key="GlassPageCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource PageCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowStaticLargeCard}" />
+        <Setter Property="Effect" Value="{x:Null}" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="ShadowPadding" Value="54" />
+        <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowLargeBlurRadius}" />
+        <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowLargeOpacity}" />
+        <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowLarge}" />
+        <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowLargeDepth}" />
     </Style>
 
-    <Style x:Key="GlassCompactCardStyle" TargetType="Border" BasedOn="{StaticResource CompactCardStyle}">
+    <Style x:Key="GlassCompactCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource CompactCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowCard}" />
+        <Setter Property="Effect" Value="{x:Null}" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="ShadowPadding" Value="24" />
+        <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowCompactBlurRadius}" />
+        <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowCompactOpacity}" />
+        <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowCompact}" />
+        <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowCompactDepth}" />
     </Style>
 
-    <Style x:Key="GlassInlinePanelStyle" TargetType="Border" BasedOn="{StaticResource InlinePanelStyle}">
+    <Style x:Key="GlassInlinePanelStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource InlinePanelStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+        <Setter Property="Effect" Value="{x:Null}" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="ShadowPadding" Value="34" />
+        <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowInlineBlurRadius}" />
+        <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowInlineOpacity}" />
+        <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowInline}" />
+        <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowInlineDepth}" />
     </Style>
 
-    <Style x:Key="GlassHomeMetricCardStyle" TargetType="Border" BasedOn="{StaticResource HomeMetricCardStyle}">
+    <Style x:Key="GlassHomeMetricCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource HomeMetricCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+        <Setter Property="Effect" Value="{x:Null}" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="ShadowPadding" Value="34" />
+        <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowInlineBlurRadius}" />
+        <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowInlineOpacity}" />
+        <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowInline}" />
+        <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowInlineDepth}" />
     </Style>
 
-    <Style x:Key="GlassHomeAiPanelStyle" TargetType="Border" BasedOn="{StaticResource HomeAiPanelStyle}">
+    <Style x:Key="GlassHomeAiPanelStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource HomeAiPanelStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowStaticLargeCard}" />
+        <Setter Property="Effect" Value="{x:Null}" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="ShadowPadding" Value="54" />
+        <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowLargeBlurRadius}" />
+        <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowLargeOpacity}" />
+        <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowLarge}" />
+        <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowLargeDepth}" />
     </Style>
 
-    <Style x:Key="GlassHomeAiCardStyle" TargetType="Border" BasedOn="{StaticResource HomeAiCardStyle}">
+    <Style x:Key="GlassHomeAiCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource HomeAiCardStyle}">
         <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushGlassBorder}" />
-        <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+        <Setter Property="Effect" Value="{x:Null}" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="ShadowPadding" Value="34" />
+        <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowInlineBlurRadius}" />
+        <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowInlineOpacity}" />
+        <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowInline}" />
+        <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowInlineDepth}" />
     </Style>
 
     <Style x:Key="GlassPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">

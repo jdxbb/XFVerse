@@ -276,7 +276,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Height="548"
+    <helpers:CachedShadowBorder Height="548"
             Padding="16"
             ClipToBounds="False"
             Style="{StaticResource GlassInlinePanelStyle}">
@@ -644,15 +644,20 @@
                                                helpers:PosterCachedShadowBehavior.CardWidth="82"
                                                helpers:PosterCachedShadowBehavior.CornerRadius="10"
                                                helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                                               helpers:PosterCachedShadowBehavior.Opacity="0.32"
+                                               helpers:PosterCachedShadowBehavior.Opacity="0.36"
                                                helpers:PosterCachedShadowBehavior.Padding="20"
                                                helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                                                helpers:PosterCachedShadowBehavior.ShadowDepth="5"
                                                Stretch="Fill" />
                                     </Canvas>
-                                    <Border Background="{DynamicResource BrushGlassSurface}"
-                                            CornerRadius="10"
-                                            Effect="{StaticResource ShadowCard}" />
+                                    <helpers:CachedShadowBorder Background="{DynamicResource BrushGlassSurface}"
+                                                                CornerRadius="10"
+                                                                Effect="{x:Null}"
+                                                                ShadowBlurRadius="16"
+                                                                ShadowColor="{DynamicResource ColorCachedShadowCompact}"
+                                                                ShadowDepth="4"
+                                                                ShadowOpacity="0.12"
+                                                                ShadowPadding="24" />
                                     <Border x:Name="MovieCandidatePosterClipMask"
                                             Background="White"
                                             CornerRadius="10"
@@ -1080,5 +1085,5 @@
                         Style="{StaticResource GlassSecondaryButtonStyle}" />
             </StackPanel>
         </Grid>
-    </Border>
+    </helpers:CachedShadowBorder>
 </UserControl>

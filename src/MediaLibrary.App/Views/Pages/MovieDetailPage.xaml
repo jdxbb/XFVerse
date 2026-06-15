@@ -65,14 +65,20 @@
             <Setter Property="Padding" Value="6,7" />
         </Style>
 
-        <Style x:Key="MovieDetailTagChipStyle" TargetType="Border">
+        <Style x:Key="MovieDetailTagChipStyle" TargetType="{x:Type helpers:CachedShadowBorder}">
             <Setter Property="Margin" Value="0,0,6,2" />
             <Setter Property="Padding" Value="8,3" />
             <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushMovieDetailTagBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="7" />
-            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+            <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="ShadowPadding" Value="34" />
+            <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowInlineBlurRadius}" />
+            <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowInlineOpacity}" />
+            <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowInline}" />
+            <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowInlineDepth}" />
         </Style>
 
         <Style x:Key="MovieDetailTagLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource MovieDetailMetaLabelStyle}">
@@ -101,9 +107,9 @@
         </Style>
 
         <DataTemplate x:Key="MovieDetailTagTemplate">
-            <Border>
+            <helpers:CachedShadowBorder>
                 <Border.Style>
-                    <Style TargetType="Border" BasedOn="{StaticResource MovieDetailTagChipStyle}">
+                    <Style TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource MovieDetailTagChipStyle}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding}" Value="-">
                                 <Setter Property="Background" Value="Transparent" />
@@ -116,7 +122,7 @@
                     </Style>
                 </Border.Style>
                 <TextBlock Style="{StaticResource MovieDetailTagChipTextStyle}" Text="{Binding}" />
-            </Border>
+            </helpers:CachedShadowBorder>
         </DataTemplate>
 
         <Style x:Key="MovieDetailModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
@@ -310,7 +316,7 @@
                                helpers:PosterCachedShadowBehavior.IsEnabled="True"
                                helpers:PosterCachedShadowBehavior.Opacity="0.24"
                                helpers:PosterCachedShadowBehavior.Padding="60"
-                               helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
+                           helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                                helpers:PosterCachedShadowBehavior.ShadowDepth="4"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                Stretch="Fill" />
@@ -333,7 +339,7 @@
                 </Grid>
             </Grid>
 
-            <Border Grid.Column="2"
+            <helpers:CachedShadowBorder Grid.Column="2"
                     Height="360"
                     Margin="0,14,0,0"
                     Style="{StaticResource HeroCardStyle}">
@@ -415,7 +421,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Margin="8,0"
+                                        <helpers:CachedShadowBorder Margin="8,0"
                                                 Padding="10"
                                                 CornerRadius="12"
                                                 Style="{StaticResource GlassInlinePanelStyle}">
@@ -490,7 +496,7 @@
                                                     </StackPanel>
                                                 </Grid>
                                             </Grid>
-                                        </Border>
+                                        </helpers:CachedShadowBorder>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -528,7 +534,7 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Border Padding="10" Style="{StaticResource GlassPageCardStyle}">
+                        <helpers:CachedShadowBorder Padding="10" Style="{StaticResource GlassPageCardStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -563,9 +569,9 @@
                                     <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource MovieDetailInfoValueStyle}" Text="{Binding ProductionCompanyText}" helpers:TrimmedTextToolTipBehavior.FullText="{Binding ProductionCompanyText}" />
                                 </Grid>
                             </Grid>
-                        </Border>
+                        </helpers:CachedShadowBorder>
 
-                        <Border Grid.Row="2" Padding="10,8" Style="{StaticResource GlassPageCardStyle}">
+                        <helpers:CachedShadowBorder Grid.Row="2" Padding="10,8" Style="{StaticResource GlassPageCardStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -618,10 +624,10 @@
                                     </ItemsControl>
                                 </Grid>
                             </Grid>
-                        </Border>
+                        </helpers:CachedShadowBorder>
                     </Grid>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Grid>
 
         <Grid Grid.Row="2">
@@ -722,7 +728,7 @@
                         Tag="{Binding AddToLibraryButtonIcon}" />
             </Grid>
 
-            <Border Grid.Column="2" Visibility="Collapsed" Style="{StaticResource GlassCompactCardStyle}">
+            <helpers:CachedShadowBorder Grid.Column="2" Visibility="Collapsed" Style="{StaticResource GlassCompactCardStyle}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding AvailabilityText}" />
                     <TextBlock Margin="0,8,0,0"
@@ -734,11 +740,11 @@
                                Text="{Binding StatusMessage}"
                                TextWrapping="Wrap" />
                 </StackPanel>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Grid>
 
         <Grid Grid.Row="4">
-            <Border Style="{StaticResource GlassPageCardStyle}">
+            <helpers:CachedShadowBorder Style="{StaticResource GlassPageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -934,7 +940,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
 
         </Grid>
 
@@ -1007,20 +1013,32 @@
                                   StrokeThickness="1.4" />
                         </Canvas>
                     </Viewbox>
-                    <ComboBox Grid.Column="2"
-                              IsEnabled="{Binding IsCorrectionInteractionEnabled}"
-                              ItemsSource="{Binding Sources}"
-                              SelectedItem="{Binding SelectedCorrectionSource, Mode=TwoWay}"
-                              Style="{StaticResource CorrectionDialogPlaybackSourceComboBoxStyle}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding CorrectionSourceDisplayText}"
-                                           TextTrimming="CharacterEllipsis"
-                                           TextWrapping="NoWrap"
-                                           helpers:TrimmedTextToolTipBehavior.FullText="{Binding CorrectionSourceDisplayText}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
+                    <helpers:CachedShadowBorder Grid.Column="2"
+                                                Margin="-12,-8"
+                                                Padding="12,8"
+                                                Background="Transparent"
+                                                ClipToBounds="False"
+                                                CornerRadius="12"
+                                                ShadowBlurRadius="{DynamicResource CachedShadowInlineBlurRadius}"
+                                                ShadowColor="{DynamicResource ColorCachedShadowInline}"
+                                                ShadowDepth="{DynamicResource CachedShadowInlineDepth}"
+                                                ShadowInnerMargin="12,8,12,8"
+                                                ShadowOpacity="0.40"
+                                                ShadowPadding="20">
+                        <ComboBox IsEnabled="{Binding IsCorrectionInteractionEnabled}"
+                                  ItemsSource="{Binding Sources}"
+                                  SelectedItem="{Binding SelectedCorrectionSource, Mode=TwoWay}"
+                                  Style="{StaticResource CorrectionDialogPlaybackSourceComboBoxStyle}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding CorrectionSourceDisplayText}"
+                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap"
+                                               helpers:TrimmedTextToolTipBehavior.FullText="{Binding CorrectionSourceDisplayText}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </helpers:CachedShadowBorder>
                 </Grid>
             </controls:CorrectionDialogShell.HeaderContent>
             <controls:CorrectionDialogShell.DialogContent>
@@ -1370,7 +1388,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Border Width="760"
+            <helpers:CachedShadowBorder Width="760"
                     MaxHeight="620"
                     Padding="22"
                     HorizontalAlignment="Center"
@@ -1489,7 +1507,7 @@
                             Content="取消"
                             Style="{StaticResource GlassSecondaryButtonStyle}" />
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Border>
         </Grid>
 

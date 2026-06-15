@@ -3,11 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
-        <Style x:Key="ScanLogCardShellStyle" TargetType="Border" BasedOn="{StaticResource GlassInlinePanelStyle}">
+        <Style x:Key="ScanLogCardShellStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassInlinePanelStyle}">
             <Setter Property="Margin" Value="0,6,0,16" />
             <Setter Property="Padding" Value="12" />
             <Setter Property="CornerRadius" Value="12" />
-            <Setter Property="Effect" Value="{StaticResource ShadowStaticInlineCard}" />
+            <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="ShadowPadding" Value="34" />
+            <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowInlineBlurRadius}" />
+            <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowInlineOpacity}" />
+            <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowInline}" />
+            <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowInlineDepth}" />
         </Style>
 
         <Storyboard x:Key="ScanLogStatusLightStoryboard"
@@ -74,7 +80,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource ScanLogCardShellStyle}">
+    <helpers:CachedShadowBorder Style="{StaticResource ScanLogCardShellStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -147,5 +153,5 @@
                            Style="{StaticResource ScanLogResultTextStyle}" />
             </StackPanel>
         </Grid>
-    </Border>
+    </helpers:CachedShadowBorder>
 </UserControl>

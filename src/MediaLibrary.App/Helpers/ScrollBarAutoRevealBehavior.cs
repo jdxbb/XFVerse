@@ -134,6 +134,8 @@ public static class ScrollBarAutoRevealBehavior
 
         viewer.ScrollChanged += OnViewerScrollChanged;
         viewer.PreviewMouseWheel += OnViewerPreviewMouseWheel;
+        viewer.MouseEnter += OnViewerMouseEnter;
+        viewer.MouseLeave += OnViewerMouseLeave;
         viewer.SetValue(IsViewerSubscribedProperty, true);
     }
 
@@ -143,6 +145,8 @@ public static class ScrollBarAutoRevealBehavior
         {
             viewer.ScrollChanged -= OnViewerScrollChanged;
             viewer.PreviewMouseWheel -= OnViewerPreviewMouseWheel;
+            viewer.MouseEnter -= OnViewerMouseEnter;
+            viewer.MouseLeave -= OnViewerMouseLeave;
             viewer.SetValue(IsViewerSubscribedProperty, false);
             if (viewer.GetValue(RevealTimerProperty) is DispatcherTimer timer)
             {
@@ -179,6 +183,28 @@ public static class ScrollBarAutoRevealBehavior
         }
     }
 
+    private static void OnViewerMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (sender is ScrollViewer viewer && viewer.ScrollableHeight > double.Epsilon)
+        {
+            Reveal(viewer);
+        }
+    }
+
+    private static void OnViewerMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (sender is ScrollViewer viewer)
+        {
+            if (viewer.IsMouseCaptureWithin)
+            {
+                Reveal(viewer);
+                return;
+            }
+
+            Hide(viewer);
+        }
+    }
+
     private static void Reveal(ScrollViewer viewer)
     {
         SetIsRevealed(viewer, true);
@@ -197,6 +223,11 @@ public static class ScrollBarAutoRevealBehavior
             timer.Tick += (_, _) =>
             {
                 timer.Stop();
+                if (viewer.IsMouseOver || viewer.IsMouseCaptureWithin)
+                {
+                    return;
+                }
+
                 SetIsRevealed(viewer, false);
                 foreach (var scrollBar in FindOwnedScrollBars(viewer))
                 {

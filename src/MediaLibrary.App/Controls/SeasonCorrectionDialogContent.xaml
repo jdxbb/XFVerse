@@ -299,7 +299,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Height="548"
+    <helpers:CachedShadowBorder Height="548"
             Padding="16"
             ClipToBounds="False"
             Style="{StaticResource GlassInlinePanelStyle}">
@@ -885,5 +885,5 @@
                 </Border>
             </Border>
         </Grid>
-    </Border>
+    </helpers:CachedShadowBorder>
 </UserControl>

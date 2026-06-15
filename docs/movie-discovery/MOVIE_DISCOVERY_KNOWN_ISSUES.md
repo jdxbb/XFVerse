@@ -764,3 +764,135 @@ Noise:
 
 - Movie Discovery can now refresh existing local movie and TV series ratings from real-time search/ranking enrichment; this intentionally changes rating data, but not media files, playback sources, visibility, watch state or recommendation inputs.
 - TV series rating persistence is series-level only. Season and episode ratings still use the existing on-demand detail query behavior.
+
+## 2026-06-14 AI Recommendation Failure Status
+
+Blocker:
+
+- AI recommendation generation cannot complete while the configured provider rejects requests because of billing/quota, authentication, permission, model, or endpoint state; the UI now identifies these categories explicitly.
+
+Deferred:
+
+- Manually verify recommendation-page and Home status text for HTTP 402, 401/403, 429, timeout, and 5xx responses, including tooltip visibility for long messages.
+
+Noise:
+
+- A failed refresh can continue displaying the previous recommendation batch by design; the status text now makes that fallback explicit instead of implying success.
+
+## 2026-06-14 Cached Shadow Theme Parity
+
+Blocker:
+
+- None confirmed by build after moving Movie Discovery ranking badge shadows to shared cached-shadow theme tokens.
+
+Deferred:
+
+- Manually compare ranking badge shadow visibility in light and dark themes.
+
+Noise:
+
+- The change is visual-only and does not affect discovery search, ranking, or rating data.
+
+## 2026-06-14 Ranking Shadow And Bottom Corner Follow-up
+
+Blocker:
+
+- None confirmed by build after disabling shadows on transparent ranking wrappers and fixing shared bottom-corner initialization.
+
+Deferred:
+
+- Manually verify Movie Discovery ranking info areas no longer show full-card shadows, score badges are less diffuse, and search/ranking non-empty pages initialize with the expected bottom-corner state.
+
+Noise:
+
+- The fix is visual/interaction-state only and does not affect discovery data, paging, ranking, search, or rating persistence.
+
+## 2026-06-14 Ranking Shadow Tightening And Empty-State Corner Fix
+
+Blocker:
+
+- None confirmed by temp-output build after tightening cached-shadow blur radii and restoring empty-state bottom-corner behavior.
+
+Deferred:
+
+- Manually verify empty/non-scrollable search and ranking surfaces are in the bottom state, true bottom does not oscillate between rounded and flat, and score-badge shadows are sufficiently concentrated.
+
+Noise:
+
+- Normal output build was blocked by a running app process; temp-output build passed.
+
+## 2026-06-14 Search Poster And Ranking Badge Shadow Edge Fix
+
+Blocker:
+
+- None confirmed by temp-output build.
+
+Deferred:
+
+- Manually verify that movie/TV search poster glows are not clipped at the top, left edge, or right edge.
+- Manually verify that ranking score-badge glow is not clipped on the right side in both themes.
+
+Noise:
+
+- The fix only changes cached-shadow visual parameters and edge-safe layout space; discovery data, ranking, search requests, paging, and rating persistence are unchanged.
+
+## 2026-06-14 Phase 7 Viewport Compensation Restoration
+
+Blocker:
+
+- None confirmed by temp-output build.
+
+Deferred:
+
+- Manually confirm Movie/TV search poster columns and card coordinates remain unchanged after the shadow-safe viewport expansion.
+- Manually confirm the first row, left edge, and right edge poster glow are visible.
+- Manually confirm ranking score-badge glow is visible on the right without shifting the badge or text area.
+
+Noise:
+
+- The earlier direct panel-width correction is superseded; the current implementation follows the Phase 7 viewport expansion plus equal compensation model.
+
+## 2026-06-14 Search Scroll Boundary And Ranking Top Glow Follow-up
+
+Blocker:
+
+- None confirmed by temp-output build.
+
+Deferred:
+
+- Manually confirm Movie/TV search poster bodies remain below the result-content boundary throughout vertical scrolling.
+- Manually confirm the real top gutter exposes the first search row and ranking hero poster glow without changing poster columns.
+
+Noise:
+
+- Negative top viewport expansion was removed. Horizontal paint-room compensation remains because it does not alter the vertical scroll boundary.
+
+## 2026-06-14 Search First-row Spacing Restoration
+
+Blocker:
+
+- None confirmed by temp-output build.
+
+Deferred:
+
+- Manually confirm Movie/TV search first-row spacing matches the original compact layout.
+- Manually confirm scrolling content remains inside the result viewport and horizontal edge glows remain visible.
+
+Noise:
+
+- Search top padding is back to 10px; the ranking hero top gutter remains a separate correction.
+
+## 2026-06-14 Discovery Scrollbar Alignment Follow-up
+
+Blocker:
+
+- None confirmed by temp-output build.
+
+Deferred:
+
+- Manually verify Movie/TV poster-search scrollbars sit inside the result-content boundary.
+- Manually verify ranking scrollbars use the smaller left correction and the first hero row has an 18px top gutter.
+
+Noise:
+
+- Scrollbar transforms are render-only and do not participate in poster column calculation. The first build attempt was temporary-volume noise; the retry passed after scoped cleanup.

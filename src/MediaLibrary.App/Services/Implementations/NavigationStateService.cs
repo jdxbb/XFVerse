@@ -16,6 +16,9 @@ public sealed class NavigationStateService : INavigationStateService
     private int _favoritesSelectedTabIndex;
     private double _favoritesFavoriteScrollOffset;
     private double _favoritesWantToWatchScrollOffset;
+    private int _watchInsightsSelectedTabIndex;
+    private double _watchInsightsProfileScrollOffset;
+    private double _watchInsightsStatisticsScrollOffset;
 
     public int? SelectedMovieId { get; private set; }
 
@@ -175,6 +178,34 @@ public sealed class NavigationStateService : INavigationStateService
         _favoritesWantToWatchScrollOffset = Math.Max(0d, offset);
     }
 
+    public int GetWatchInsightsSelectedTabIndex()
+    {
+        return _watchInsightsSelectedTabIndex;
+    }
+
+    public void SetWatchInsightsSelectedTabIndex(int selectedTabIndex)
+    {
+        _watchInsightsSelectedTabIndex = NormalizeWatchInsightsTabIndex(selectedTabIndex);
+    }
+
+    public double GetWatchInsightsScrollOffset(int selectedTabIndex)
+    {
+        return NormalizeWatchInsightsTabIndex(selectedTabIndex) == 0
+            ? _watchInsightsProfileScrollOffset
+            : _watchInsightsStatisticsScrollOffset;
+    }
+
+    public void SetWatchInsightsScrollOffset(int selectedTabIndex, double offset)
+    {
+        if (NormalizeWatchInsightsTabIndex(selectedTabIndex) == 0)
+        {
+            _watchInsightsProfileScrollOffset = Math.Max(0d, offset);
+            return;
+        }
+
+        _watchInsightsStatisticsScrollOffset = Math.Max(0d, offset);
+    }
+
     private void RequestDetailBack(NavigationRequest fallbackRequest)
     {
         var request = _detailBackStack.Count > 0
@@ -272,6 +303,11 @@ public sealed class NavigationStateService : INavigationStateService
     }
 
     private static int NormalizeFavoritesTabIndex(int selectedTabIndex)
+    {
+        return Math.Clamp(selectedTabIndex, 0, 1);
+    }
+
+    private static int NormalizeWatchInsightsTabIndex(int selectedTabIndex)
     {
         return Math.Clamp(selectedTabIndex, 0, 1);
     }

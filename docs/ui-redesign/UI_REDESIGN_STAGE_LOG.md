@@ -1732,3 +1732,298 @@ Known Issues:
 - Blocker: None found in code inspection.
 - Deferred: Manual visual acceptance is still needed for the sidebar logo outline, signature caret position, and higher save toast position.
 - Noise: Existing adjacent UI and feature follow-up changes remain in the working tree.
+
+## 2026-06-14 - Cached Shadow And Scroll Corner Follow-up
+
+Completed:
+
+- Disabled cached shadows on transparent Movie Discovery ranking item wrappers, so the overview/info area no longer receives a full-card shadow behind the text.
+- Added theme-level cached-shadow blur-radius tokens and routed shared glass-card, Watch Insights, scan, profile, movie-detail, watch-history, discovery score badge, Home poster base, and scan-progress cached shadows through them.
+- Light theme cached card shadows now use blur radii aligned with the old light-theme `DropShadowEffect` values; dark theme keeps the stronger glow-style radii.
+- Fixed `ScrollDrivenBottomCornerBehavior` so it no longer assumes bottom state before an active scroll viewer is available, and releases a stale bottom state when content becomes scrollable after initial layout.
+
+Not done:
+
+- Poster palette shadows remain image-color driven and keep their poster-specific blur values.
+- No database update, migration, ranking/search/recommendation logic, scan behavior, media-library semantics, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: None confirmed by build.
+- Deferred: Manual WPF validation is still needed for Movie Discovery ranking info shadows, light/dark cached-shadow density, and initial bottom-corner state in media-library, movie-search, and ranking non-empty views.
+- Noise: Existing adjacent UI and feature follow-up changes remain in the working tree.
+
+## 2026-06-14 - Cached Shadow Tightening And Empty-State Corner Fix
+
+Completed:
+
+- Reduced cached-shadow blur radii slightly again so large, inline, compact, score-badge and scan-progress shadows look more concentrated in both light and dark themes.
+- Restored empty / non-scrollable surfaces to the bottom state for scroll-driven bottom corners.
+- Added scrollable-height tracking for the bottom-margin state, so a stale initial bottom state can be released after content becomes scrollable without causing a real bottom-state round/flat loop.
+
+Not done:
+
+- No page data, ranking/search/recommendation logic, scan behavior, database update, migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- Normal output build was blocked by a running `MediaLibrary.App` process holding the app exe.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation is still needed for empty-state bottom corners, true bottom-state stability, and the updated shadow density.
+- Noise: Existing adjacent UI and feature follow-up changes remain in the working tree.
+
+## 2026-06-14 - Stronger Concentrated Cached Shadows
+
+Completed:
+
+- Tightened cached-shadow blur radii again and increased cached-shadow opacity for large, inline, compact, score-badge, and scan-progress surfaces in both light and dark themes.
+- Kept the cached bitmap strategy, theme color split, depth values, poster palette shadows, bottom-corner behavior, and page layouts unchanged.
+
+Not done:
+
+- No database update, migration, ranking/search/recommendation logic, scan behavior, media-library semantics, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation is still needed for the final perceived shadow/glow strength in light and dark themes.
+- Noise: Existing adjacent UI and feature follow-up changes remain in the working tree.
+
+## 2026-06-14 - Poster Shadow Strength And Edge Safe Area Follow-up
+
+Completed:
+
+- Restored poster base shadows that had been routed through generic cached-shadow compact tokens back to the original poster-specific black shadow parameters while keeping the cached bitmap strategy.
+- Restored the Home poster base shadow to the original `BlurRadius=14`, `Opacity=0.28`, `ShadowDepth=3`, `#000000` visual parameters.
+- Made `VirtualizingWrapPanel.ViewportPadding.Left` participate in width and arrangement calculations, so poster grids can reserve real left-edge shadow space.
+- Added left/right/top safe padding for Media Library and Movie Discovery search poster grids to avoid clipping edge poster glow.
+- Slightly strengthened light-theme cached shadow opacity without widening the blur radii.
+
+Not done:
+
+- No database update, migration, ranking/search/recommendation logic, scan behavior, media-library semantics, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation should confirm Media Library and Movie Discovery search edge posters are no longer clipped, and light-theme cached shadows are strong enough without becoming diffuse.
+- Noise: Normal output build may still be blocked if the app process is running; temp-output build is acceptable for this visual-only pass.
+
+## 2026-06-14 - Phase 7 Poster Viewport Compensation Correction
+
+Completed:
+
+- Superseded the previous direct left/right `ViewportPadding` and `VirtualizingWrapPanel` width-calculation change because it altered available layout width and could change poster columns.
+- Restored `VirtualizingWrapPanel` to the accepted Phase 7 behavior where poster paint padding is not subtracted symmetrically from the virtualized column width.
+- Reapplied the Phase 7 shadow-safe model to Media Library and Movie Discovery search: expand the ListBox viewport by 34px on the clipped sides, then compensate top position and column-count width through the existing panel padding so poster coordinates and column count stay unchanged.
+- Reapplied the existing Movie Discovery ranking `ScrollViewer` compensation model on the right side: expand the viewport by 24px and add the same 24px to the inner root Grid, preserving all content coordinates while exposing score-badge glow.
+- Increased palette/base shadow opacity for non-detail posters on Home, Media Library, Favorites, Watch History, Movie Discovery, AI Recommendations, and Watch Insights. Blur radius, shadow bitmap padding, poster dimensions, and detail-page poster opacity remain unchanged.
+- Increased the expanded-sidebar account avatar from 32px to 38px inside a fixed 32px layout column, so its right edge stays fixed and the extra size grows leftward. Collapsed-sidebar avatar size remains 32px.
+
+Not done:
+
+- No detail-page poster glow strength was changed.
+- No database update, migration, search/ranking/recommendation logic, scan behavior, media-library semantics, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- `git diff -- src/MediaLibrary.App/Controls/VirtualizingWrapPanel.cs` returned empty after restoring the Phase 7 layout baseline.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation should confirm poster coordinates and column counts are unchanged, all non-detail poster glows are stronger, edge glows are visible, and the expanded avatar grows only to the left.
+- Noise: The previous edge-safe log entry is retained as history but its direct panel-width approach is superseded by this correction.
+
+## 2026-06-14 - Poster Top Gutter And Avatar Clipping Correction
+
+Completed:
+
+- Removed negative top margins from Media Library and Movie Discovery poster ListBoxes. Top shadow space is now real scroll-content padding, so poster bodies cannot cross above the content viewport while scrolling.
+- Kept the horizontal viewport expansion and right-side panel compensation, preserving virtualized poster column count and horizontal coordinates.
+- Added 36px of real top content gutter to Movie/TV ranking ScrollViewers so the first hero poster glow is not clipped.
+- Strengthened all non-detail cached poster glows again while leaving Movie, Series, Season, and Episode detail-page values unchanged.
+- Changed the expanded account avatar from overflow inside a 32px column to a 38px layout column plus a 6px left render translation. The right edge and text start remain fixed; collapsed size remains 32px.
+
+Not done:
+
+- No application launch or manual visual verification was performed.
+- No service, navigation, search, ranking, recommendation, media-library, database, migration, commit, or push behavior was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual WPF validation should confirm scroll content stays below the Media Library/Search content boundary, ranking first-row glow is complete, and the expanded avatar is no longer clipped.
+- Noise: The real top gutter intentionally adds paint room before the first poster row instead of moving the ScrollViewer above its content boundary.
+
+## 2026-06-14 - Poster Glow Midpoint And First-row Spacing Restoration
+
+Completed:
+
+- Reduced the latest non-detail poster glow increase by half. Palette/base values now use the midpoint between the previous and latest versions.
+- Restored Media Library and Discovery search top viewport padding to 10px, removing the added gap above the first poster row.
+- Retained normal vertical viewport boundaries, horizontal edge paint room, ranking hero top-gutter correction, and expanded-avatar clipping correction.
+
+Not done:
+
+- No detail-page poster values or application behavior changed.
+- No application launch, database update, migration, commit, or push was performed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual validation should confirm the restored first-row spacing and midpoint glow strength.
+- Noise: Horizontal paint compensation remains intentionally independent of vertical first-row spacing.
+
+## 2026-06-14 - Poster Scrollbar Alignment Follow-up
+
+Completed:
+
+- Moved the Media Library poster-view scrollbar 34px left with a render-only transform, returning it inside the original content boundary without affecting virtualized layout width.
+- Applied the same 34px correction to Discovery Movie/TV poster search scrollbars.
+- Moved ranking scrollbars by the smaller 20px amount and reduced ranking first-row top gutter from 36px to 18px.
+
+Not done:
+
+- No poster grid, shadow resource, search/ranking data, database, migration, commit, or push behavior changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors after removing verified stale Codex temp build outputs that had exhausted temporary disk space.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+- `VirtualizingWrapPanel` remained unchanged.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual validation should confirm scrollbar positions and ranking first-row spacing.
+- Noise: The first build attempt failed only because the temporary volume was full; the retry passed after scoped temp-output cleanup.
+
+## 2026-06-14 - Correction Playback-source Selector Shadow
+
+Completed:
+
+- Added a `CachedShadowBorder` only around the playback-source selector in the Season correction episode-mapping panel.
+- Used cached inline theme tokens, preserving the static local-resource shadow strategy.
+- Left ordinary correction ComboBoxes and detail-page playback-source selectors unchanged.
+
+Not done:
+
+- No other dropdown, correction field, mapping behavior, database, migration, commit, or push behavior changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual validation should confirm the playback-source selector shadow in both themes.
+- Noise: The scope is intentionally one correction-dialog control instance.
+
+## 2026-06-14 - Correction Playback-source Shadow Paint-box Correction
+
+Completed:
+
+- Fixed the invisible cached shadow by moving its card boundary inside a real `10,6` paint gutter within the existing 48px mapping row.
+- Kept row height and surrounding controls unchanged.
+- Raised only the playback-source selector to ensure its cached shadow is not covered by sibling content.
+- Used opacity `0.40` with the existing theme-specific cached inline color/blur/depth resources.
+
+Not done:
+
+- No other dropdown, popup, detail-page selector, correction behavior, database, migration, commit, or push behavior changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual validation should confirm the closed playback-source selector now has visible shadow/glow in both themes.
+- Noise: The paint gutter reduces only the selector's internal usable width by 20px.
+
+## 2026-06-14 - Correction Playback-source Target-instance Correction
+
+Root cause:
+
+- The prior implementation modified the Season episode-mapping source selector, not the actual Movie/Episode correction-dialog header selector reported by the user.
+
+Completed:
+
+- Reverted the incorrect Season mapping wrapper.
+- Added cached shadow hosts only to the Movie and Episode correction HeaderContent playback-source selectors.
+- Preserved the original selector bounds through equal negative-margin and padding compensation.
+- Applied local opacity `0.40` with theme-specific cached inline shadow color, blur and depth.
+
+Not done:
+
+- No ordinary ComboBox, Season mapping selector, normal detail-page playback selector, correction behavior, database, migration, commit, or push behavior changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --check` passed; only LF-to-CRLF working-copy warnings were reported.
+
+Known Issues:
+
+- Blocker: None confirmed by temp-output build.
+- Deferred: Manual validation should confirm Movie and Episode correction-header playback-source selectors in both themes.
+- Noise: The previous Season mapping shadow entries are retained as superseded implementation history.
+
+## 2026-06-15 - Home Library Preview Card Layout Refinement
+
+Completed:
+
+- Reduced the four library-preview metric cards from the bottom by 8px while preserving their top position.
+- Centered each comparison text against its metric card independently of the trailing trend arrow.
+- Replaced the uniform four-column panel with four equal card columns and three explicit gap columns.
+- Preserved the expanded-sidebar 12px gaps; when the sidebar collapses, each gap grows by 26px to 38px. The remaining 78px of the 156px content-width increase is shared equally by the four cards.
+
+Not done:
+
+- No home data, navigation behavior, other home sections, database, migration, commit, or push behavior changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -p:UseAppHost=false -p:OutputPath=<temp>` passed with 0 warnings and 0 errors.
+- Focused XAML inspection confirmed the 12px/38px gap templates, four equal card columns, 8px bottom reduction, and symmetric trend-arrow spacer.
+
+Known Issues:
+
+- Blocker: None identified during implementation.
+- Deferred: Manual validation should confirm the expanded/collapsed spacing and comparison-text centering at the target window size.
+- Noise: None.

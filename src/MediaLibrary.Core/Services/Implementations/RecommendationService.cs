@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using MediaLibrary.Core.Data;
 using MediaLibrary.Core.Diagnostics;
+using MediaLibrary.Core.Helpers;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -731,7 +732,7 @@ public sealed class RecommendationService : IRecommendationService
             }
 
             return CandidatePoolRefillResult.Failed(
-                message: exception.Message,
+                message: AiFailureMessageFormatter.Build(exception),
                 fingerprint: libraryFingerprint);
         }
         finally
@@ -1357,7 +1358,17 @@ public sealed class RecommendationService : IRecommendationService
 
         if (successfulRoutes.Count == 0)
         {
-            throw new InvalidOperationException("AI 推荐生成失败：三路候选均未返回可解析结果。");
+            var failureMessages = routeResults
+                .Select(x => x.Error)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            var failureMessage = failureMessages
+                                     .FirstOrDefault(x => x.Contains("AI 服务", StringComparison.Ordinal))
+                                 ?? failureMessages.FirstOrDefault();
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(failureMessage)
+                    ? "AI 返回内容格式异常，请重试。"
+                    : failureMessage);
         }
 
         var interleaved = InterleaveAiCandidateRoutes(successfulRoutes);
@@ -1405,7 +1416,7 @@ public sealed class RecommendationService : IRecommendationService
             routeStopwatch.Stop();
             AiPerfDiagnostics.WriteEvent(
                 $"event=ai-route route={route.Code} status=failed elapsedMs={(long)Math.Round(routeStopwatch.Elapsed.TotalMilliseconds)} chars=0 candidates=0 errorType={exception.GetType().Name} error=\"{AiPerfDiagnostics.SanitizeMessage(exception.Message)}\"");
-            return AiCandidateRouteResult.Failure(route, exception.Message);
+            return AiCandidateRouteResult.Failure(route, AiFailureMessageFormatter.Build(exception));
         }
     }
 
@@ -4604,15 +4615,10 @@ public sealed class RecommendationService : IRecommendationService
 
     private static string BuildErrorRecommendationMessage(string? errorMessage)
     {
-        if (string.IsNullOrWhiteSpace(errorMessage))
-        {
-            return ErrorRecommendationMessage;
-        }
-
-        return errorMessage.StartsWith("AI 推荐生成失败", StringComparison.Ordinal)
-               || errorMessage.StartsWith("候选补充失败", StringComparison.Ordinal)
-            ? errorMessage
-            : $"AI 推荐生成失败：{errorMessage}";
+        var failureMessage = AiFailureMessageFormatter.Build(errorMessage);
+        return string.IsNullOrWhiteSpace(failureMessage)
+            ? ErrorRecommendationMessage
+            : $"AI 推荐生成失败：{failureMessage}";
     }
 
     private static bool IsRecentlyRecommended(

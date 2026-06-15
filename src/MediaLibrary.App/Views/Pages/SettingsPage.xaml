@@ -4,7 +4,7 @@
              xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
-        <Style x:Key="SettingsDraftSectionCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPageCardStyle}">
+        <Style x:Key="SettingsDraftSectionCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassPageCardStyle}">
             <Setter Property="Padding" Value="10" />
             <Setter Property="Cursor" Value="Arrow" />
         </Style>
@@ -597,7 +597,7 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <Border Grid.Row="0"
+                            <helpers:CachedShadowBorder Grid.Row="0"
                                     Margin="32,24,32,0"
                                     Style="{StaticResource SettingsDraftSectionCardStyle}">
                                 <StackPanel>
@@ -728,9 +728,9 @@
                                     </Border>
 
                                 </StackPanel>
-                            </Border>
+                            </helpers:CachedShadowBorder>
 
-                            <Border Grid.Row="1" Margin="32,36,32,0" Style="{StaticResource SettingsDraftSectionCardStyle}">
+                            <helpers:CachedShadowBorder Grid.Row="1" Margin="32,36,32,0" Style="{StaticResource SettingsDraftSectionCardStyle}">
                                 <StackPanel>
                                     <TextBlock Text="行为设置"
                                                Style="{StaticResource SettingsSectionHeadingTextStyle}" />
@@ -873,7 +873,7 @@
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
-                            </Border>
+                            </helpers:CachedShadowBorder>
                             <Button Grid.Row="3"
                                     Margin="1,0,0,0"
                                     Command="{Binding OpenOfficialWebsiteCommand}"

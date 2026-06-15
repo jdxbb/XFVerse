@@ -6,6 +6,7 @@ using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 
@@ -26,25 +27,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private const double TasteGraphSceneX = 506d;
     private const double TasteGraphFirstNodeY = 74d;
     private const double TasteGraphNodeSpacingY = 88d;
-    private const double PreferenceBubbleCanvasWidth = 760d;
-    private const double PreferenceBubbleCanvasHeight = 520d;
-    private static readonly (double X, double Y)[] PreferenceBubbleSlots =
-    [
-        (116d, 100d),
-        (300d, 78d),
-        (522d, 102d),
-        (654d, 176d),
-        (178d, 232d),
-        (392d, 238d),
-        (582d, 306d),
-        (108d, 364d),
-        (306d, 392d),
-        (504d, 426d),
-        (656d, 402d),
-        (430d, 152d),
-        (244d, 318d),
-        (620d, 66d)
-    ];
+    private const int PreferenceBubblePerKindLimit = 6;
+    private const int PreferenceBubbleTotalLimit = 18;
+    private const double PreferenceBubbleBaseDiameter = 76d;
+    private const double PreferenceBubbleMaxIncreasePercent = 0.8d;
     private const string PersonaPosterDefaultGender = "female";
     private const string PersonaPosterFallbackKey = "genre_explorer";
     private const string PersonaFrameDefaultColor = "gold";
@@ -112,6 +98,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private readonly INavigationStateService _navigationStateService;
     private CancellationTokenSource? _dataChangedRefreshDebounceCts;
     private string _selectedTab = ProfileTabKey;
+    private double _profileScrollOffset;
+    private double _statisticsScrollOffset;
     private bool _isLoadingStatistics;
     private bool _isLoadingProfile;
     private bool _isActive;
@@ -141,6 +129,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         _profileService = profileService;
         _dataRefreshService = dataRefreshService;
         _navigationStateService = navigationStateService;
+        _selectedTab = _navigationStateService.GetWatchInsightsSelectedTabIndex() == StatisticsTabIndex
+            ? StatisticsTabKey
+            : ProfileTabKey;
+        _profileScrollOffset = _navigationStateService.GetWatchInsightsScrollOffset(ProfileTabIndex);
+        _statisticsScrollOffset = _navigationStateService.GetWatchInsightsScrollOffset(StatisticsTabIndex);
         _dataRefreshService.DataChanged += OnDataChanged;
 
         ProfileEmptyCards =
@@ -209,7 +202,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public ObservableCollection<OverviewMetricCard> OverviewCards { get; } = [];
 
-    public ObservableCollection<TagChipItem> MonthlyFrequentTags { get; } = [];
+    public ObservableCollection<StatisticsFrequentTagItem> MonthlyFrequentTags { get; } = [];
 
     public ObservableCollection<CalendarDayCell> CalendarCells { get; } = [];
 
@@ -219,7 +212,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public ObservableCollection<TimeBucketItem> ViewingTimeBuckets { get; } = [];
 
+    public IReadOnlyList<double> ViewingTimeChartValues { get; private set; } = [];
+
     public ObservableCollection<WeekPartItem> WeekPartItems { get; } = [];
+
+    public double WeekdayRatioValue { get; private set; }
 
     public ObservableCollection<DurationBucketItem> DurationBuckets { get; } = [];
 
@@ -231,7 +228,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public ObservableCollection<RankingGroup> WatchLikeGroups { get; } = [];
 
-    public ObservableCollection<TagChipItem> ProfileKeywords { get; } = [];
+    public ObservableCollection<ProfileKeywordItem> ProfileKeywords { get; } = [];
 
     public ObservableCollection<ProfileDnaItem> ProfileDnaItems { get; } = [];
 
@@ -268,6 +265,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         {
             if (SetProperty(ref _selectedTab, value))
             {
+                Log($"event=tab-selected tab={value}");
+                _navigationStateService.SetWatchInsightsSelectedTabIndex(
+                    string.Equals(value, StatisticsTabKey, StringComparison.Ordinal)
+                        ? StatisticsTabIndex
+                        : ProfileTabIndex);
                 OnPropertyChanged(nameof(IsProfileTabSelected));
                 OnPropertyChanged(nameof(IsStatisticsTabSelected));
                 OnPropertyChanged(nameof(SelectedTabIndex));
@@ -295,6 +297,32 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         }
     }
 
+    public double ProfileScrollOffset
+    {
+        get => _profileScrollOffset;
+        set
+        {
+            var normalized = Math.Max(0d, value);
+            if (SetProperty(ref _profileScrollOffset, normalized))
+            {
+                _navigationStateService.SetWatchInsightsScrollOffset(ProfileTabIndex, normalized);
+            }
+        }
+    }
+
+    public double StatisticsScrollOffset
+    {
+        get => _statisticsScrollOffset;
+        set
+        {
+            var normalized = Math.Max(0d, value);
+            if (SetProperty(ref _statisticsScrollOffset, normalized))
+            {
+                _navigationStateService.SetWatchInsightsScrollOffset(StatisticsTabIndex, normalized);
+            }
+        }
+    }
+
     public bool IsLoadingStatistics
     {
         get => _isLoadingStatistics;
@@ -311,6 +339,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(RefreshButtonText));
                 OnPropertyChanged(nameof(IsRefreshing));
                 OnPropertyChanged(nameof(IsStatisticsRefreshAnimating));
+                OnPropertyChanged(nameof(IsStatisticsInitialLoading));
                 OnPropertyChanged(nameof(StatisticsRefreshStatusText));
                 OnPropertyChanged(nameof(StatisticsModuleState));
                 OnPropertyChanged(nameof(ShowStatisticsModuleState));
@@ -334,6 +363,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(CanRefreshProfile));
                 OnPropertyChanged(nameof(IsRefreshing));
                 OnPropertyChanged(nameof(IsProfileRefreshAnimating));
+                OnPropertyChanged(nameof(IsProfileInitialLoading));
                 OnPropertyChanged(nameof(ProfileRefreshStatusText));
                 OnPropertyChanged(nameof(ProfileModuleState));
                 OnPropertyChanged(nameof(ShowProfileModuleState));
@@ -347,6 +377,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public bool CanRefreshProfile => !IsLoadingProfile && !IsProfileInsufficient;
 
+    public bool IsProfileInitialLoading => Profile is null && !IsProfileInsufficient && !HasProfileError;
+
+    public bool IsStatisticsInitialLoading => !_hasLoadedStatistics && !HasStatisticsError;
+
     public string StatisticsErrorMessage
     {
         get => _statisticsErrorMessage;
@@ -358,6 +392,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(StatisticsRefreshStatusText));
                 OnPropertyChanged(nameof(StatisticsModuleState));
                 OnPropertyChanged(nameof(ShowStatisticsModuleState));
+                OnPropertyChanged(nameof(IsStatisticsInitialLoading));
             }
         }
     }
@@ -376,6 +411,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ProfileRefreshStatusText));
                 OnPropertyChanged(nameof(ProfileModuleState));
                 OnPropertyChanged(nameof(ShowProfileModuleState));
+                OnPropertyChanged(nameof(IsProfileInitialLoading));
             }
         }
     }
@@ -395,6 +431,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(ProfileRefreshStatusText));
                 OnPropertyChanged(nameof(ProfileModuleState));
                 OnPropertyChanged(nameof(ShowProfileModuleState));
+                OnPropertyChanged(nameof(IsProfileInitialLoading));
                 RefreshProfileCommand.RaiseCanExecuteChanged();
             }
         }
@@ -531,7 +568,15 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public WatchProfileSnapshot? Profile
     {
         get => _profile;
-        private set => SetProperty(ref _profile, value);
+        private set
+        {
+            if (SetProperty(ref _profile, value))
+            {
+                OnPropertyChanged(nameof(HasProfile));
+                OnPropertyChanged(nameof(ShowProfileEmptyState));
+                OnPropertyChanged(nameof(IsProfileInitialLoading));
+            }
+        }
     }
 
     public bool HasProfile => Profile?.HasProfile == true;
@@ -549,7 +594,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
             if (HasProfile && HasProfileWarnings)
             {
-                return new InsightModuleState("cached-fallback", "使用缓存画像", "当前显示可用缓存；警告信息已在画像概览中列出。", true);
+                var message = HasProfileError
+                    ? $"{BuildSafeStatusMessage(ProfileErrorMessage, "画像刷新失败。")} 当前显示上一次可用画像。"
+                    : "当前显示可用缓存；警告信息已在画像概览中列出。";
+                return new InsightModuleState("cached-fallback", "画像刷新失败，已保留缓存", message, true);
             }
 
             if (IsProfileInsufficient)
@@ -581,13 +629,25 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public string ProfilePersonaType { get; private set; } = "--";
 
+    public string ProfilePersonaDisplayType => AddCharacterSpacing(ProfilePersonaType);
+
     public string ProfilePersonaTitle { get; private set; } = "--";
+
+    public string ProfilePersonaLead { get; private set; } = string.Empty;
+
+    public string ProfilePersonaLeadDisplay => AddCharacterSpacing(ProfilePersonaLead, "\u200A");
+
+    public string ProfilePersonaLeadFirstClauseDisplay => AddCharacterSpacing(SplitPersonaLead(ProfilePersonaLead).FirstClause, "\u200A");
+
+    public string ProfilePersonaLeadSecondClauseDisplay => AddCharacterSpacing(SplitPersonaLead(ProfilePersonaLead).SecondClause, "\u200A");
 
     public string ProfilePersonaDescription { get; private set; } = string.Empty;
 
     public string PersonaPosterGender { get; private set; } = PersonaPosterDefaultGender;
 
-    public string PersonaPosterImageUri { get; private set; } = string.Empty;
+    public string PersonaPosterImageUri { get; private set; } = ResolvePersonaPosterUri(
+        PersonaPosterFallbackKey,
+        PersonaPosterDefaultGender);
 
     public string PersonaPosterFrameUri { get; private set; } = ResolvePersonaFrameUri(PersonaPosterFallbackKey);
 
@@ -601,13 +661,19 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public string ProfileQuadrantName { get; private set; } = "--";
 
+    public string ProfileQuadrantAxisTitle { get; private set; } = "熟悉安全 x 情绪沉浸";
+
+    public string ProfileQuadrantAxisTitleDisplay => AddCharacterSpacing(ProfileQuadrantAxisTitle, "\u200A");
+
+    public string ProfileQuadrantToolTipText { get; private set; } = "熟悉安全：0\n情绪沉浸：0";
+
     public string ProfileQuadrantDescription { get; private set; } = string.Empty;
 
     public string ProfileXAxisText { get; private set; } = "0";
 
     public string ProfileYAxisText { get; private set; } = "0";
 
-    public double ProfileQuadrantPointX { get; private set; } = 190d;
+    public double ProfileQuadrantPointX { get; private set; } = 287d;
 
     public double ProfileQuadrantPointY { get; private set; } = 110d;
 
@@ -629,11 +695,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         ? "显示当前全部已标记状态，按 TMDB 去重；全部范围不显示月度对比。"
         : "显示本月新增状态；较上月变化来自状态变更历史。";
 
-    public string TotalWatchTimeTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "累计观影时长" : "本月观影时长";
+    public string TotalWatchTimeTitle => "观影时长";
 
-    public string WatchCountTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "累计看过" : "本月看过";
+    public string WatchDaysTitle => "观影天数";
 
-    public string FrequentTagsTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "累计高频标签" : "本月高频标签";
+    public string FrequentTagsTitle => "高频标签";
 
     public string PreferenceGraphTitle => _statisticsTimeRange == WatchStatisticsTimeRange.All ? "累计偏好图谱" : "本月偏好图谱";
 
@@ -649,13 +715,25 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public string DominantDurationText { get; private set; } = "常看片长暂无数据";
 
-    public string PreferenceBubbleLegendText { get; private set; } = "气泡大小代表标签出现次数，颜色区分类型与情绪标签。";
+    public string PreferenceBubbleLegendText { get; private set; } = "气泡大小代表标签出现次数，颜色区分类型、情绪与场景标签。";
 
     public string TasteGraphLegendText { get; private set; } = "连线越粗代表组合共现越频繁，节点代表参与组合的标签。";
 
     public string TotalWatchTimeText { get; private set; } = "0分钟";
 
-    public string MonthlyWatchCountText { get; private set; } = "0部";
+    public string TotalWatchTimeDeltaText { get; private set; } = string.Empty;
+
+    public bool HasTotalWatchTimeDelta => !string.IsNullOrWhiteSpace(TotalWatchTimeDeltaText);
+
+    public string WatchDaysText { get; private set; } = "0";
+
+    public string WatchDaysDeltaText { get; private set; } = string.Empty;
+
+    public bool HasWatchDaysDelta => !string.IsNullOrWhiteSpace(WatchDaysDeltaText);
+
+    public string OverviewRangePrefixText => IsAllRangeSelected ? "共" : string.Empty;
+
+    public double OverviewSecondaryMetricCardHeight => IsAllRangeSelected ? 140d : 164d;
 
     public string MonthlyWatchDaysTitle { get; private set; } = "本月观影天数";
 
@@ -666,6 +744,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public string MonthlyWatchDaysText { get; private set; } = "0天";
 
     public string ContinuousWatchDaysText { get; private set; } = "0天";
+
+    public string ContinuousWatchDateRangeText { get; private set; } = "--.-- - --.--";
 
     public string MostActiveDateText { get; private set; } = "--";
 
@@ -770,15 +850,26 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         _isActive = true;
-        SelectedTab = ProfileTabKey;
+        SelectedTabIndex = _navigationStateService.GetWatchInsightsSelectedTabIndex();
         var shouldForceRefresh = _statisticsRefreshPendingOnActivate;
-        _statisticsRefreshPendingOnActivate = false;
-        _ = LoadProfileAsync(ProfileLoadSource.Activate, forceRefresh: false, cancellationToken);
-        await RefreshStatisticsAsync(
-            StatisticsRefreshSource.Activate,
-            forceRefresh: shouldForceRefresh,
-            cancellationToken);
+        Log($"event=activate-start tab={SelectedTab} statisticsPending={shouldForceRefresh.ToString().ToLowerInvariant()}");
+        if (IsStatisticsTabSelected)
+        {
+            _statisticsRefreshPendingOnActivate = false;
+            await RefreshStatisticsAsync(
+                StatisticsRefreshSource.Activate,
+                forceRefresh: shouldForceRefresh,
+                cancellationToken);
+        }
+        else
+        {
+            await LoadProfileAsync(ProfileLoadSource.Activate, forceRefresh: false, cancellationToken);
+        }
+
+        stopwatch.Stop();
+        Log($"event=activate-complete tab={SelectedTab} elapsedMs={stopwatch.ElapsedMilliseconds}");
     }
 
     public override void Deactivate()
@@ -801,6 +892,12 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private void SelectStatisticsTab()
     {
         SelectedTab = StatisticsTabKey;
+        if ((!_hasLoadedStatistics || _statisticsRefreshPendingOnActivate) && !IsLoadingStatistics)
+        {
+            var forceRefresh = _statisticsRefreshPendingOnActivate;
+            _statisticsRefreshPendingOnActivate = false;
+            _ = RefreshStatisticsAsync(StatisticsRefreshSource.Tab, forceRefresh);
+        }
     }
 
     private async Task LoadProfileAsync(
@@ -821,8 +918,19 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
         try
         {
+            var serviceStopwatch = Stopwatch.StartNew();
             var profile = await _profileService.GetProfileAsync(forceRefresh, cancellationToken);
-            ApplyProfile(profile);
+            serviceStopwatch.Stop();
+            var projectionStopwatch = Stopwatch.StartNew();
+            if (CanReuseProfileProjection(profile))
+            {
+                ApplyProfileMetadata(profile);
+            }
+            else
+            {
+                ApplyProfile(profile);
+            }
+            projectionStopwatch.Stop();
             stopwatch.Stop();
             Log(
                 "watch-insights-profile-load-complete "
@@ -830,6 +938,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 + $"hasProfile={profile.HasProfile} "
                 + $"insufficient={!profile.CanGenerateProfile} "
                 + $"warning={profile.WarningMessages.Count > 0} "
+                + $"serviceMs={serviceStopwatch.ElapsedMilliseconds} "
+                + $"projectionMs={projectionStopwatch.ElapsedMilliseconds} "
                 + $"elapsedMs={stopwatch.ElapsedMilliseconds}");
         }
         catch (Exception exception)
@@ -977,15 +1087,31 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
         try
         {
+            var serviceStopwatch = Stopwatch.StartNew();
             var snapshot = await _statisticsService.GetStatisticsAsync(
                 _statisticsTimeRange,
                 _calendarMonth,
                 forceRefresh,
                 cancellationToken);
-            ApplyStatistics(snapshot);
+            serviceStopwatch.Stop();
+            var projectionStopwatch = Stopwatch.StartNew();
+            if (CanReuseStatisticsProjection(snapshot))
+            {
+                ApplyStatisticsMetadata(snapshot);
+            }
+            else
+            {
+                ApplyStatistics(snapshot);
+            }
+            projectionStopwatch.Stop();
             _hasLoadedStatistics = true;
             stopwatch.Stop();
-            Log($"watch-insights-statistics-refresh-complete source={FormatRefreshSource(source)} elapsedMs={stopwatch.ElapsedMilliseconds}");
+            Log(
+                "watch-insights-statistics-refresh-complete "
+                + $"source={FormatRefreshSource(source)} "
+                + $"serviceMs={serviceStopwatch.ElapsedMilliseconds} "
+                + $"projectionMs={projectionStopwatch.ElapsedMilliseconds} "
+                + $"elapsedMs={stopwatch.ElapsedMilliseconds}");
         }
         catch (Exception exception)
         {
@@ -1012,6 +1138,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     private void ApplyStatistics(WatchStatisticsSnapshot snapshot)
     {
+        var totalStopwatch = Stopwatch.StartNew();
         Statistics = snapshot;
         _statisticsTimeRange = snapshot.TimeRange;
         if (snapshot.CalendarMonth != default)
@@ -1024,27 +1151,63 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ? "尚未加载"
             : $"上次刷新 {snapshot.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}";
 
-        BuildWarningMessages(snapshot);
-        BuildOverview(snapshot);
-        BuildMonthlyTags(snapshot);
-        BuildCalendar(snapshot);
-        BuildPreferenceBubbles(snapshot);
-        BuildMonthlyRankings(snapshot);
-        BuildRhythm(snapshot);
-        BuildTasteCombinationGraph(snapshot);
-        BuildWatchLikeComparison(snapshot);
+        MeasureProjectionStage("statistics", "warnings", () => BuildWarningMessages(snapshot));
+        MeasureProjectionStage("statistics", "overview", () => BuildOverview(snapshot));
+        MeasureProjectionStage("statistics", "monthly-tags", () => BuildMonthlyTags(snapshot));
+        MeasureProjectionStage("statistics", "calendar", () => BuildCalendar(snapshot));
+        MeasureProjectionStage("statistics", "preference-bubbles", () => BuildPreferenceBubbles(snapshot));
+        MeasureProjectionStage("statistics", "rhythm", () => BuildRhythm(snapshot));
+        MeasureProjectionStage("statistics", "taste-graph", () => BuildTasteCombinationGraph(snapshot));
+        MeasureProjectionStage("statistics", "watch-like", () => BuildWatchLikeComparison(snapshot));
         if (Profile is not null)
         {
-            BuildProfileWatchLikeComparison(Profile);
+            MeasureProjectionStage("statistics", "profile-watch-like", () => BuildProfileWatchLikeComparison(Profile));
         }
 
+        var notificationStopwatch = Stopwatch.StartNew();
         RaiseDisplayStateChanged();
         RaiseStatisticsRangeChanged();
         RaiseCalendarNavigationChanged();
+        notificationStopwatch.Stop();
+        totalStopwatch.Stop();
+        Log(
+            "event=projection-complete projection=statistics "
+            + $"elapsedMs={totalStopwatch.ElapsedMilliseconds} notificationMs={notificationStopwatch.ElapsedMilliseconds} "
+            + $"calendarItems={CalendarCells.Count} bubbles={PreferenceBubbles.Count} graphNodes={TasteGraphNodes.Count} "
+            + $"graphLinks={TasteGraphLinks.Count}");
+    }
+
+    private bool CanReuseStatisticsProjection(WatchStatisticsSnapshot snapshot)
+    {
+        return _hasLoadedStatistics
+               && !string.IsNullOrWhiteSpace(snapshot.SourceFingerprint)
+               && string.Equals(Statistics.SourceFingerprint, snapshot.SourceFingerprint, StringComparison.Ordinal)
+               && Statistics.TimeRange == snapshot.TimeRange
+               && Statistics.CalendarMonth == snapshot.CalendarMonth;
+    }
+
+    private void ApplyStatisticsMetadata(WatchStatisticsSnapshot snapshot)
+    {
+        Statistics = snapshot;
+        _statisticsTimeRange = snapshot.TimeRange;
+        if (snapshot.CalendarMonth != default)
+        {
+            _calendarMonth = snapshot.CalendarMonth;
+        }
+
+        CalendarNoticeMessage = string.Empty;
+        LastStatisticsRefreshedAtText = snapshot.GeneratedAtUtc == default
+            ? "尚未加载"
+            : $"上次刷新 {snapshot.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}";
+        RaiseStatisticsRangeChanged();
+        RaiseCalendarNavigationChanged();
+        Log("event=projection-reused projection=statistics reason=fingerprint-unchanged");
     }
 
     private void ApplyProfile(WatchProfileSnapshot snapshot)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        var scalarStopwatch = Stopwatch.StartNew();
         Profile = snapshot;
         ProfileErrorMessage = BuildSafeStatusMessage(snapshot.ErrorMessage, string.Empty);
         ProfileInsufficientReason = snapshot.CanGenerateProfile ? string.Empty : snapshot.InsufficientReason;
@@ -1056,18 +1219,23 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         ProfileSummaryText = FormatProfileSummaryText(snapshot.Summary.Text);
         ProfilePersonaType = string.IsNullOrWhiteSpace(snapshot.Persona.Type) ? "--" : snapshot.Persona.Type;
         ProfilePersonaTitle = string.IsNullOrWhiteSpace(snapshot.Persona.Title) ? ProfilePersonaType : snapshot.Persona.Title;
-        ProfilePersonaDescription = snapshot.Persona.Description;
+        ProfilePersonaLead = snapshot.Persona.Lead;
+        ProfilePersonaDescription = FormatPersonaDescription(snapshot.Persona.Description);
         ApplyPersonaPoster(ProfilePersonaType);
         ProfilePersonaConfidenceValue = Math.Clamp(snapshot.Persona.Confidence, 0, 100);
         ProfilePersonaConfidenceText = $"{ProfilePersonaConfidenceValue:0}%";
         ProfileQuadrantName = string.IsNullOrWhiteSpace(snapshot.Quadrant.QuadrantName) ? "--" : snapshot.Quadrant.QuadrantName;
-        ProfileQuadrantDescription = snapshot.Quadrant.Description;
+        ProfileQuadrantDescription = FormatPersonaDescription(snapshot.Quadrant.Description);
         var xAxis = Math.Clamp(snapshot.Quadrant.XAxisScore, -100, 100);
         var yAxis = Math.Clamp(snapshot.Quadrant.YAxisScore, -100, 100);
+        var xAxisLabel = xAxis < 0 ? "熟悉安全" : "新鲜探索";
+        var yAxisLabel = yAxis < 0 ? "轻松消遣" : "情绪沉浸";
+        ProfileQuadrantAxisTitle = $"{xAxisLabel} x {yAxisLabel}";
+        ProfileQuadrantToolTipText = $"{xAxisLabel}：{Math.Abs(xAxis):0}分\n{yAxisLabel}：{Math.Abs(yAxis):0}分";
         ProfileXAxisText = xAxis.ToString();
         ProfileYAxisText = yAxis.ToString();
-        ProfileQuadrantPointX = 24d + (xAxis + 100d) / 200d * 244d;
-        ProfileQuadrantPointY = 28d + (100d - yAxis) / 200d * 188d;
+        ProfileQuadrantPointX = 93d + (xAxis + 100d) / 200d * 388d;
+        ProfileQuadrantPointY = 19d + (100d - yAxis) / 200d * 334d;
         ProfileHeroTitle = snapshot.HasProfile
             ? $"你更像：{ProfilePersonaType}"
             : "画像正在学习你的口味";
@@ -1077,8 +1245,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         NegativeSummaryText = string.IsNullOrWhiteSpace(snapshot.Dislikes.NegativeSummary)
             ? "负反馈样本较少。"
             : snapshot.Dislikes.NegativeSummary;
+        scalarStopwatch.Stop();
 
-        ReplaceChips(ProfileKeywords, snapshot.Summary.Keywords.Take(6));
+        var collectionStopwatch = Stopwatch.StartNew();
+        ReplaceProfileKeywords(snapshot.Summary);
         ReplaceDna(snapshot.DNA);
         ReplaceWarnings(snapshot.WarningMessages.Concat(snapshot.Meta.WarningMessages));
         ReplaceMessages(ProfileCaveats, snapshot.Caveats);
@@ -1093,7 +1263,65 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         ReplaceChips(LikelyToEnjoy, snapshot.FuturePreference.LikelyToEnjoy);
         ReplaceChips(LessLikelyToEnjoy, snapshot.FuturePreference.LessLikelyToEnjoy);
         BuildProfileWatchLikeComparison(snapshot);
+        collectionStopwatch.Stop();
+        var notificationStopwatch = Stopwatch.StartNew();
         RaiseProfileDisplayStateChanged();
+        notificationStopwatch.Stop();
+        totalStopwatch.Stop();
+        Log(
+            "event=projection-complete projection=profile "
+            + $"elapsedMs={totalStopwatch.ElapsedMilliseconds} scalarMs={scalarStopwatch.ElapsedMilliseconds} "
+            + $"collectionsMs={collectionStopwatch.ElapsedMilliseconds} notificationMs={notificationStopwatch.ElapsedMilliseconds} "
+            + $"keywords={ProfileKeywords.Count} dna={ProfileDnaItems.Count} chips={CountProfileChips()} watchLikeGroups={ProfileWatchLikeGroups.Count}");
+    }
+
+    private bool CanReuseProfileProjection(WatchProfileSnapshot snapshot)
+    {
+        if (Profile is not { } current
+            || current.HasProfile != snapshot.HasProfile
+            || string.IsNullOrWhiteSpace(current.Meta.SourceFingerprint)
+            || !string.Equals(current.Meta.SourceFingerprint, snapshot.Meta.SourceFingerprint, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return snapshot.IsUnchanged
+               || snapshot.LoadedFromCache
+               && current.Meta.GeneratedAtUtc == snapshot.Meta.GeneratedAtUtc;
+    }
+
+    private void ApplyProfileMetadata(WatchProfileSnapshot snapshot)
+    {
+        Profile = snapshot;
+        ProfileErrorMessage = BuildSafeStatusMessage(snapshot.ErrorMessage, string.Empty);
+        ProfileInsufficientReason = snapshot.CanGenerateProfile ? string.Empty : snapshot.InsufficientReason;
+        ProfileStatusText = BuildProfileStatusText(snapshot);
+        LastProfileRefreshedAtText = snapshot.Meta.GeneratedAtUtc == default
+            ? "尚未生成"
+            : $"上次生成 {snapshot.Meta.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}";
+        Log("event=projection-reused projection=profile reason=cache-or-fingerprint-unchanged");
+    }
+
+    private static void MeasureProjectionStage(string projection, string stage, Action action)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        action();
+        stopwatch.Stop();
+        Log($"event=projection-stage projection={projection} stage={stage} elapsedMs={stopwatch.ElapsedMilliseconds}");
+    }
+
+    private int CountProfileChips()
+    {
+        return PreferredGenres.Count
+               + PreferredEmotions.Count
+               + PreferredScenes.Count
+               + PreferredCountries.Count
+               + PreferredLanguages.Count
+               + AvoidGenres.Count
+               + AvoidEmotions.Count
+               + AvoidScenes.Count
+               + LikelyToEnjoy.Count
+               + LessLikelyToEnjoy.Count;
     }
 
     private void ApplyPersonaPoster(string personaType)
@@ -1267,7 +1495,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
         if (!string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
         {
-            return snapshot.HasProfile ? "使用缓存" : "生成失败";
+            var failureMessage = BuildSafeStatusMessage(snapshot.ErrorMessage, "AI 请求失败，请稍后重试。");
+            return snapshot.HasProfile
+                ? $"刷新失败：{failureMessage} 已保留缓存"
+                : $"生成失败：{failureMessage}";
         }
 
         if (snapshot.IsUnchanged)
@@ -1291,6 +1522,43 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             target.Add(new TagChipItem(item.Trim(), string.Empty));
+        }
+    }
+
+    private void ReplaceProfileKeywords(WatchProfileSummary summary)
+    {
+        ProfileKeywords.Clear();
+        var scored = summary.KeywordScores
+            .Where(x => !string.IsNullOrWhiteSpace(x.Label))
+            .Take(6)
+            .Select(x => new ProfileKeywordItem(x.Label.Trim(), Math.Clamp(x.Score, 1, 3)))
+            .ToList();
+        if (scored.Count == 0)
+        {
+            scored = summary.Keywords
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Take(6)
+                .Select((x, index) => new ProfileKeywordItem(x.Trim(), index < 2 ? 3 : index < 4 ? 2 : 1))
+                .ToList();
+        }
+
+        int[] scoreSlots = [1, 3, 2, 2, 3, 1];
+        var queues = scored
+            .GroupBy(x => x.Score)
+            .ToDictionary(x => x.Key, x => new Queue<ProfileKeywordItem>(x));
+        foreach (var score in scoreSlots)
+        {
+            if (queues.TryGetValue(score, out var queue) && queue.Count > 0)
+            {
+                var item = queue.Dequeue();
+                ProfileKeywords.Add(item with { SlotIndex = ProfileKeywords.Count });
+            }
+        }
+
+        foreach (var item in scored.Where(x => ProfileKeywords.All(existing =>
+                     !string.Equals(existing.Label, x.Label, StringComparison.OrdinalIgnoreCase))))
+        {
+            ProfileKeywords.Add(item with { SlotIndex = ProfileKeywords.Count });
         }
     }
 
@@ -1346,14 +1614,14 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             var isProgressGene = isPace || isExploration;
             IReadOnlyList<TagChipItem> tags = isProgressGene
                 ? []
-                : BuildDnaTags(gene).Take(3).Select(x => new TagChipItem(x, string.Empty)).ToList();
+                : BuildDnaTags(gene).Take(3).Select(x => new TagChipItem(x, gene.Gene)).ToList();
             ProfileDnaItems.Add(new ProfileDnaItem(
                 gene.Gene,
                 BuildDnaIconText(gene.Gene),
                 BuildDnaSubtitle(gene.Gene),
                 tags,
                 Math.Clamp(gene.Score, 0, 100),
-                gene.Description ?? string.Empty,
+                FormatDnaDescription(gene.Description),
                 isProgressGene,
                 isPace ? "慢热" : isExploration ? "稳定" : string.Empty,
                 isPace ? "紧凑" : isExploration ? "新鲜" : string.Empty));
@@ -1365,6 +1633,33 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             + $"hasNarrative={ProfileDnaItems.Any(x => string.Equals(x.Gene, "叙事基因", StringComparison.Ordinal) && x.HasTags)} "
             + $"keywordCount={ProfileKeywords.Count} "
             + $"dnaCount={ProfileDnaItems.Count}");
+    }
+
+    private static string FormatDnaDescription(string? description)
+    {
+        return string.IsNullOrWhiteSpace(description)
+            ? string.Empty
+            : $"\u3000\u3000{description.TrimStart()}";
+    }
+
+    private static string FormatPersonaDescription(string? description)
+    {
+        return string.IsNullOrWhiteSpace(description)
+            ? string.Empty
+            : $"\u3000\u3000{description.TrimStart()}";
+    }
+
+    private static (string FirstClause, string SecondClause) SplitPersonaLead(string? lead)
+    {
+        if (string.IsNullOrWhiteSpace(lead))
+        {
+            return (string.Empty, string.Empty);
+        }
+
+        var separatorIndex = lead.IndexOf('，');
+        return separatorIndex < 0
+            ? (lead, string.Empty)
+            : (lead[..(separatorIndex + 1)], lead[(separatorIndex + 1)..]);
     }
 
     private static IEnumerable<string> BuildDnaTags(WatchProfileDnaGene gene)
@@ -1425,9 +1720,9 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ? profile.WatchVsLike.OftenWantedTypes
             : Statistics.OftenWantedTop3.Select(x => x.Label).ToList();
 
-        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常观看", "你最常看的类型", BuildProfileListItems(watched)));
-        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常喜爱", "你真正喜欢的类型", BuildProfileListItems(liked)));
-        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常想看", "你最想探索的类型", BuildProfileListItems(wanted)));
+        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常观看", "你最常看的类型", BuildProfileListItems(watched, "circle")));
+        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常喜爱", "你真正喜欢的类型", BuildProfileListItems(liked, "heart")));
+        ProfileWatchLikeGroups.Add(new ProfileListGroup("经常想看", "你最想探索的类型", BuildProfileListItems(wanted, "star")));
         ProfileWatchVsLikeConclusion = string.IsNullOrWhiteSpace(profile.WatchVsLike.Conclusion)
             ? "基于本地统计展示。"
             : profile.WatchVsLike.Conclusion;
@@ -1435,13 +1730,17 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(HasProfileWatchLikeData));
     }
 
-    private static IReadOnlyList<ProfileListItem> BuildProfileListItems(IEnumerable<string> labels)
+    private static IReadOnlyList<ProfileListItem> BuildProfileListItems(IEnumerable<string> labels, string rankBadgeKind)
     {
         return labels
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(3)
-            .Select((label, index) => new ProfileListItem(index + 1, label.Trim(), Math.Max(44d, 100d - index * 24d)))
+            .Select((label, index) => new ProfileListItem(
+                (index + 1).ToString(),
+                label.Trim(),
+                Math.Max(44d, 100d - index * 24d),
+                rankBadgeKind))
             .ToList();
     }
 
@@ -1454,45 +1753,72 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             snapshot.WatchedCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek),
-            "已",
-            "watched"));
+            "\uE8FB",
+            "watched",
+            snapshot.TimeRange == WatchStatisticsTimeRange.All));
         OverviewCards.Add(new(
             "喜爱",
             "主动标记喜欢的影片",
             snapshot.FavoriteCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek),
-            "喜",
-            "favorite"));
+            "\uEB51",
+            "favorite",
+            snapshot.TimeRange == WatchStatisticsTimeRange.All));
         OverviewCards.Add(new(
             "想看",
             "计划稍后观看的影片",
             snapshot.WantToWatchCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek),
-            "想",
-            "want"));
+            "\uE734",
+            "want",
+            snapshot.TimeRange == WatchStatisticsTimeRange.All));
         OverviewCards.Add(new(
             "不想看",
             "明确排除的影片",
             snapshot.NotInterestedCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek),
-            "避",
-            "negative"));
+            string.Empty,
+            "negative",
+            snapshot.TimeRange == WatchStatisticsTimeRange.All));
 
         TotalWatchTimeText = FormatSeconds(snapshot.TotalWatchSeconds);
-        MonthlyWatchCountText = $"{snapshot.MonthlyWatchCount}部";
+        TotalWatchTimeDeltaText = FormatDurationDelta(
+            snapshot.TimeRange,
+            snapshot.TotalWatchSecondsDeltaFromLastMonth);
+        WatchDaysText = snapshot.WatchDays.ToString();
+        WatchDaysDeltaText = FormatDelta(snapshot.TimeRange, snapshot.WatchDaysDeltaFromLastMonth);
         OnPropertyChanged(nameof(TotalWatchTimeText));
-        OnPropertyChanged(nameof(MonthlyWatchCountText));
+        OnPropertyChanged(nameof(TotalWatchTimeDeltaText));
+        OnPropertyChanged(nameof(HasTotalWatchTimeDelta));
+        OnPropertyChanged(nameof(WatchDaysText));
+        OnPropertyChanged(nameof(WatchDaysDeltaText));
+        OnPropertyChanged(nameof(HasWatchDaysDelta));
     }
 
     private void BuildMonthlyTags(WatchStatisticsSnapshot snapshot)
     {
         MonthlyFrequentTags.Clear();
-        foreach (var tag in snapshot.MonthlyFrequentTags.Take(10))
+        var tags = snapshot.MonthlyFrequentTags.Take(6).ToList();
+        var maximumCount = tags.Count == 0 ? 0 : tags.Max(x => x.Count);
+        var minimumCount = tags.Count == 0 ? 0 : tags.Min(x => x.Count);
+        for (var index = 0; index < tags.Count; index++)
         {
-            MonthlyFrequentTags.Add(new TagChipItem(tag.Label, $"{tag.Count}部"));
+            var tag = tags[index];
+            var scale = maximumCount == minimumCount
+                ? 1d
+                : tag.Count == maximumCount
+                    ? 1.2d
+                    : tag.Count == minimumCount
+                        ? 1d
+                        : 1d + tag.Count / (double)maximumCount * 0.2d;
+            MonthlyFrequentTags.Add(new StatisticsFrequentTagItem(
+                tag.Label,
+                tag.Count,
+                index + 1,
+                scale));
         }
     }
 
@@ -1503,15 +1829,6 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ? "本月"
             : snapshot.CalendarMonth.ToString("yyyy年MM月");
 
-        var firstDay = snapshot.CalendarMonth == default
-            ? new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1)
-            : snapshot.CalendarMonth;
-        var leadingPlaceholderCount = ((int)firstDay.DayOfWeek + 6) % 7;
-        for (var i = 0; i < leadingPlaceholderCount; i++)
-        {
-            CalendarCells.Add(CalendarDayCell.Placeholder());
-        }
-
         foreach (var day in snapshot.CalendarDays)
         {
             CalendarCells.Add(new CalendarDayCell(
@@ -1521,15 +1838,22 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 day.WatchCount,
                 day.HeatLevel,
                 day.HasValidWatch,
-                IsPlaceholder: false));
+                day.IsCurrentMonth,
+                BuildCalendarToolTip(day)));
         }
 
         MonthlyWatchDaysText = $"{snapshot.MonthlyWatchDays}天";
         ContinuousWatchDaysText = $"{snapshot.ContinuousWatchDays}天";
+        ContinuousWatchDateRangeText = snapshot.ContinuousWatchStartDate.HasValue
+            && snapshot.ContinuousWatchEndDate.HasValue
+                ? $"{snapshot.ContinuousWatchStartDate.Value:MM.dd}-{snapshot.ContinuousWatchEndDate.Value:MM.dd}"
+                : "--.-- - --.--";
         MostActiveDateText = snapshot.MostActiveDate.HasValue
-            ? snapshot.MostActiveDate.Value.ToString("MM月dd日")
+            ? snapshot.MostActiveDate.Value.ToString("M月d日")
             : "--";
-        MostActiveDateWatchText = FormatSeconds(snapshot.MostActiveDateWatchSeconds);
+        MostActiveDateWatchText = snapshot.MostActiveDate.HasValue
+            ? $"{snapshot.MostActiveDateWatchCount}部 · {FormatSeconds(snapshot.MostActiveDateWatchSeconds)}"
+            : "0部 · 0分钟";
         var monthLabel = snapshot.CalendarMonth == default ? "本月" : $"{snapshot.CalendarMonth.Month}月";
         MonthlyWatchDaysTitle = $"{monthLabel}观影天数";
         ContinuousWatchDaysTitle = $"{monthLabel}最长连续";
@@ -1540,6 +1864,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(MostActiveDateTitle));
         OnPropertyChanged(nameof(MonthlyWatchDaysText));
         OnPropertyChanged(nameof(ContinuousWatchDaysText));
+        OnPropertyChanged(nameof(ContinuousWatchDateRangeText));
         OnPropertyChanged(nameof(MostActiveDateText));
         OnPropertyChanged(nameof(MostActiveDateWatchText));
     }
@@ -1548,29 +1873,28 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     {
         PreferenceBubbles.Clear();
         var rawItems = snapshot.TypeDistribution
-            .Take(7)
+            .Take(PreferenceBubblePerKindLimit)
             .Select(x => (x.Label, Kind: "类型", x.Count))
             .Concat(snapshot.EmotionDistribution
-                .Take(7)
+                .Take(PreferenceBubblePerKindLimit)
                 .Select(x => (x.Label, Kind: "情绪", x.Count)))
+            .Concat(snapshot.SceneDistribution
+                .Take(PreferenceBubblePerKindLimit)
+                .Select(x => (x.Label, Kind: "场景", x.Count)))
             .OrderByDescending(x => x.Count)
             .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase)
-            .Take(PreferenceBubbleSlots.Length)
+            .Take(PreferenceBubbleTotalLimit)
             .ToList();
         var maxCount = rawItems.Count == 0 ? 0 : rawItems.Max(x => x.Count);
 
-        for (var index = 0; index < rawItems.Count; index++)
+        foreach (var item in rawItems)
         {
-            var item = rawItems[index];
             var size = CalculateBubbleSize(item.Count, maxCount);
-            var slot = PreferenceBubbleSlots[index];
             PreferenceBubbles.Add(new BubbleTagItem(
                 item.Label,
                 item.Kind,
                 item.Count,
-                size,
-                CalculateBubbleCoordinate(slot.X, size, PreferenceBubbleCanvasWidth),
-                CalculateBubbleCoordinate(slot.Y, size, PreferenceBubbleCanvasHeight)));
+                size));
         }
     }
 
@@ -1596,6 +1920,9 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 bucket.WatchCount,
                 CalculateProgress(bucket.WatchSeconds, maxWatchSeconds)));
         }
+        ViewingTimeChartValues = snapshot.ViewingTimeDistribution
+            .Select(x => (double)x.WatchSeconds)
+            .ToArray();
 
         var peakBucket = snapshot.ViewingTimeDistribution
             .Where(x => x.WatchSeconds > 0)
@@ -1609,36 +1936,41 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         WeekPartItems.Clear();
         WeekPartItems.Add(new(
             "周内",
+            "Workday",
             FormatSeconds(snapshot.WeekdayWeekendStats.WeekdayWatchSeconds),
-            $"日均 {FormatSeconds(snapshot.WeekdayWeekendStats.WeekdayAverageSeconds)}",
+            FormatSeconds(snapshot.WeekdayWeekendStats.WeekdayAverageSeconds),
             FormatPercent(snapshot.WeekdayWeekendStats.WeekdayRatio),
             snapshot.WeekdayWeekendStats.WeekdayRatio * 100d));
         WeekPartItems.Add(new(
             "周末",
+            "Weekend",
             FormatSeconds(snapshot.WeekdayWeekendStats.WeekendWatchSeconds),
-            $"日均 {FormatSeconds(snapshot.WeekdayWeekendStats.WeekendAverageSeconds)}",
+            FormatSeconds(snapshot.WeekdayWeekendStats.WeekendAverageSeconds),
             FormatPercent(snapshot.WeekdayWeekendStats.WeekendRatio),
             snapshot.WeekdayWeekendStats.WeekendRatio * 100d));
+        WeekdayRatioValue = snapshot.WeekdayWeekendStats.WeekdayRatio;
 
         DurationBuckets.Clear();
         foreach (var item in snapshot.DurationDistribution)
         {
             DurationBuckets.Add(new DurationBucketItem(
                 FormatDurationBucketName(item.Label),
-                $"{item.Count}部",
+                FormatSeconds(item.WatchSeconds),
                 FormatPercent(item.Percent),
                 item.Percent * 100d));
         }
 
         var dominantDuration = snapshot.DurationDistribution
-            .Where(x => x.Count > 0)
-            .OrderByDescending(x => x.Count)
+            .Where(x => x.WatchSeconds > 0)
+            .OrderByDescending(x => x.WatchSeconds)
             .ThenBy(x => x.MinMinutes)
             .FirstOrDefault();
         DominantDurationText = dominantDuration is null
             ? "常看片长暂无数据"
-            : $"最多：{FormatDurationBucketName(dominantDuration.Label)}";
+            : $"最多：{FormatDurationBucketName(dominantDuration.Label)} · {FormatSeconds(dominantDuration.WatchSeconds)}";
 
+        OnPropertyChanged(nameof(ViewingTimeChartValues));
+        OnPropertyChanged(nameof(WeekdayRatioValue));
         OnPropertyChanged(nameof(PeakViewingTimeText));
         OnPropertyChanged(nameof(DominantDurationText));
     }
@@ -1890,7 +2222,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     private void OpenWatchHistoryByDate(object? parameter)
     {
-        if (parameter is not CalendarDayCell day || day.IsPlaceholder)
+        if (parameter is not CalendarDayCell day || !day.IsCurrentMonth)
         {
             return;
         }
@@ -1909,6 +2241,21 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 item.Count > 0 ? $"{item.Count}次" : FormatSeconds(item.WatchSeconds),
                 CalculateProgress(item.Score, maxScore)))
             .ToList();
+    }
+
+    private static string BuildCalendarToolTip(WatchCalendarDay day)
+    {
+        var weekday = day.Date.DayOfWeek switch
+        {
+            DayOfWeek.Monday => "周一",
+            DayOfWeek.Tuesday => "周二",
+            DayOfWeek.Wednesday => "周三",
+            DayOfWeek.Thursday => "周四",
+            DayOfWeek.Friday => "周五",
+            DayOfWeek.Saturday => "周六",
+            _ => "周日"
+        };
+        return $"{day.Date:M月d日} {weekday}\n累计观影：{day.WatchCount}部（{FormatSeconds(day.WatchSeconds)}）";
     }
 
     private static string FormatDelta(WatchStatisticsTimeRange timeRange, int? delta)
@@ -1949,6 +2296,27 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         return minutes == 0 ? $"{hours}小时" : $"{hours}小时{minutes}分钟";
     }
 
+    private static string FormatDurationDelta(WatchStatisticsTimeRange timeRange, long? deltaSeconds)
+    {
+        if (timeRange == WatchStatisticsTimeRange.All)
+        {
+            return string.Empty;
+        }
+
+        if (!deltaSeconds.HasValue)
+        {
+            return "暂无上月记录";
+        }
+
+        if (deltaSeconds.Value == 0)
+        {
+            return "与上月持平";
+        }
+
+        var prefix = deltaSeconds.Value > 0 ? "较上月 +" : "较上月 -";
+        return prefix + FormatSeconds(Math.Abs((double)deltaSeconds.Value));
+    }
+
     private static string FormatPercent(double ratio)
     {
         return $"{Math.Round(ratio * 100d)}%";
@@ -1968,15 +2336,13 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     {
         if (count <= 0 || maxCount <= 0)
         {
-            return 72d;
+            return PreferenceBubbleBaseDiameter;
         }
 
-        return Math.Clamp(76d + count / (double)maxCount * 72d, 82d, 148d);
-    }
-
-    private static double CalculateBubbleCoordinate(double centerCoordinate, double size, double canvasLength)
-    {
-        return Math.Clamp(centerCoordinate - size / 2d, 16d, Math.Max(16d, canvasLength - size - 16d));
+        var baseRadius = PreferenceBubbleBaseDiameter / 2d;
+        var ratio = Math.Clamp(count / (double)maxCount, 0d, 1d);
+        var radiusAdded = baseRadius * Math.Sqrt(ratio) * PreferenceBubbleMaxIncreasePercent;
+        return (baseRadius + radiusAdded) * 2d;
     }
 
     private static string FormatDurationBucketName(string label)
@@ -2012,10 +2378,12 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(StatisticsRangeText));
         OnPropertyChanged(nameof(IsMonthRangeSelected));
         OnPropertyChanged(nameof(IsAllRangeSelected));
+        OnPropertyChanged(nameof(OverviewRangePrefixText));
+        OnPropertyChanged(nameof(OverviewSecondaryMetricCardHeight));
         OnPropertyChanged(nameof(OverviewTitle));
         OnPropertyChanged(nameof(OverviewSubtitle));
         OnPropertyChanged(nameof(TotalWatchTimeTitle));
-        OnPropertyChanged(nameof(WatchCountTitle));
+        OnPropertyChanged(nameof(WatchDaysTitle));
         OnPropertyChanged(nameof(FrequentTagsTitle));
         OnPropertyChanged(nameof(PreferenceGraphTitle));
         OnPropertyChanged(nameof(TagRankingTitle));
@@ -2048,7 +2416,12 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(ProfileHeroTitle));
         OnPropertyChanged(nameof(ProfileHeroSubtitle));
         OnPropertyChanged(nameof(ProfilePersonaType));
+        OnPropertyChanged(nameof(ProfilePersonaDisplayType));
         OnPropertyChanged(nameof(ProfilePersonaTitle));
+        OnPropertyChanged(nameof(ProfilePersonaLead));
+        OnPropertyChanged(nameof(ProfilePersonaLeadDisplay));
+        OnPropertyChanged(nameof(ProfilePersonaLeadFirstClauseDisplay));
+        OnPropertyChanged(nameof(ProfilePersonaLeadSecondClauseDisplay));
         OnPropertyChanged(nameof(ProfilePersonaDescription));
         OnPropertyChanged(nameof(PersonaPosterGender));
         OnPropertyChanged(nameof(PersonaPosterImageUri));
@@ -2058,6 +2431,9 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(ProfilePersonaConfidenceText));
         OnPropertyChanged(nameof(ProfilePersonaConfidenceValue));
         OnPropertyChanged(nameof(ProfileQuadrantName));
+        OnPropertyChanged(nameof(ProfileQuadrantAxisTitle));
+        OnPropertyChanged(nameof(ProfileQuadrantAxisTitleDisplay));
+        OnPropertyChanged(nameof(ProfileQuadrantToolTipText));
         OnPropertyChanged(nameof(ProfileQuadrantDescription));
         OnPropertyChanged(nameof(ProfileXAxisText));
         OnPropertyChanged(nameof(ProfileYAxisText));
@@ -2095,6 +2471,13 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         };
 
         SelectedTabIndex = nextIndex;
+    }
+
+    private static string AddCharacterSpacing(string value, string spacing = "\u2009")
+    {
+        return string.IsNullOrWhiteSpace(value) || value.Length <= 1
+            ? value
+            : string.Join(spacing, value.ToCharArray());
     }
 
     private static string BuildSafeStatusMessage(string? message, string fallback)
@@ -2143,6 +2526,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private static void Log(string message)
     {
         Debug.WriteLine("[WATCH-INSIGHTS] " + message);
+        WatchInsightsDiagnostics.Write("layer=view-model " + message);
     }
 
     private static string FormatRefreshSource(StatisticsRefreshSource source)
@@ -2150,6 +2534,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         return source switch
         {
             StatisticsRefreshSource.Manual => "manual",
+            StatisticsRefreshSource.Tab => "tab",
             StatisticsRefreshSource.DataChanged => "data-changed",
             _ => "activate"
         };
@@ -2179,6 +2564,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private enum StatisticsRefreshSource
     {
         Activate,
+        Tab,
         Manual,
         DataChanged
     }
@@ -2204,12 +2590,91 @@ public sealed record OverviewMetricCard(
     string UnitText,
     string DeltaText,
     string IconText,
-    string Kind)
+    string Kind,
+    bool IsCompact)
 {
     public bool HasDelta => !string.IsNullOrWhiteSpace(DeltaText);
+
+    public string PrefixText => IsCompact ? "共" : string.Empty;
+
+    public double CardHeight => IsCompact ? 140d : 164d;
 }
 
 public sealed record TagChipItem(string Label, string DetailText);
+
+public sealed record StatisticsFrequentTagItem(
+    string Label,
+    int Count,
+    int Rank,
+    double Scale)
+{
+    public string DetailText => $"{Count}次";
+
+    public int Score => Rank <= 2 ? 3 : Rank <= 4 ? 2 : 1;
+
+    public double Width => Math.Clamp(40d + Label.Length * 13d, 66d, 112d) * Scale;
+
+    public double Height => 42d * Scale;
+
+    public double CanvasLeft
+    {
+        get
+        {
+            var center = Rank switch
+            {
+                1 or 2 => 193d,
+                3 or 5 => 64d,
+                _ => 322d
+            };
+            return Math.Max(0d, center - Width / 2d);
+        }
+    }
+
+    public double CanvasTop
+    {
+        get
+        {
+            var center = Rank switch
+            {
+                1 or 4 or 5 => 38d,
+                _ => 108d
+            };
+            return Math.Max(0d, center - Height / 2d);
+        }
+    }
+}
+
+public sealed record ProfileKeywordItem(string Label, int Score, int SlotIndex = 0)
+{
+    private double Scale => Score switch
+    {
+        3 => 1.2d,
+        2 => 1.1d,
+        _ => 1d
+    };
+
+    public double Width => Math.Clamp(40d + Label.Length * 13d, 66d, 112d) * Scale;
+
+    public double Height => 42d * Scale;
+
+    public double CanvasLeft
+    {
+        get
+        {
+            double[] centers = [64d, 193d, 322d];
+            return Math.Max(0d, centers[SlotIndex % 3] - Width / 2d);
+        }
+    }
+
+    public double CanvasTop
+    {
+        get
+        {
+            var center = SlotIndex < 3 ? 34d : 108d;
+            return Math.Max(0d, center - Height / 2d);
+        }
+    }
+}
 
 public sealed record CalendarDayCell(
     DateTime Date,
@@ -2218,30 +2683,15 @@ public sealed record CalendarDayCell(
     int WatchCount,
     int HeatLevel,
     bool HasValidWatch,
-    bool IsPlaceholder)
+    bool IsCurrentMonth,
+    string ToolTipText)
 {
-    public bool IsClickable => !IsPlaceholder;
-
-    public string WatchCountText => WatchCount > 0 ? $"{WatchCount}部" : string.Empty;
-
-    public static CalendarDayCell Placeholder()
-    {
-        return new CalendarDayCell(default, string.Empty, string.Empty, 0, 0, false, true);
-    }
+    public bool IsClickable => IsCurrentMonth;
 }
 
-public sealed record BubbleTagItem(string Label, string Kind, int Count, double Size, double X, double Y)
+public sealed record BubbleTagItem(string Label, string Kind, int Count, double Size)
 {
     public string CountText => $"{Count}次";
-
-    public string KindIcon => Kind switch
-    {
-        "类型" => "类",
-        "情绪" => "情",
-        _ => "签"
-    };
-
-    public double LabelMaxWidth => Math.Max(44d, Size - 18d);
 }
 
 public sealed record RankingGroup(string Title, IReadOnlyList<RankedTagItem> Items)
@@ -2270,7 +2720,7 @@ public sealed record ProfileListGroup(string Title, string Subtitle, IReadOnlyLi
     public bool HasItems => Items.Count > 0;
 }
 
-public sealed record ProfileListItem(int Rank, string Label, double ProgressValue);
+public sealed record ProfileListItem(string RankText, string Label, double ProgressValue, string RankBadgeKind);
 
 public sealed record TimeBucketItem(string Label, string WatchText, int WatchCount, double ProgressValue)
 {
@@ -2281,14 +2731,18 @@ public sealed record TimeBucketItem(string Label, string WatchText, int WatchCou
 
 public sealed record WeekPartItem(
     string Title,
+    string IconKind,
     string TotalText,
     string AverageText,
     string RatioText,
-    double ProgressValue);
+    double ProgressValue)
+{
+    public string ToolTipText => $"{Title}\n总时长：{TotalText}\n日均时长：{AverageText}";
+}
 
 public sealed record DurationBucketItem(
     string Label,
-    string CountText,
+    string TimeText,
     string PercentText,
     double ProgressValue);
 

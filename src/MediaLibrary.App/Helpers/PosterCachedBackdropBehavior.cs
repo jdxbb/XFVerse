@@ -8,10 +8,18 @@ namespace MediaLibrary.App.Helpers;
 
 public readonly record struct PosterBackdropPalette(Color Primary, Color Secondary, Color Accent);
 
+public enum PosterBackdropVariant
+{
+    Page,
+    Glass
+}
+
 public static class PosterCachedBackdropBehavior
 {
     private const int BackdropWidth = 320;
     private const int BackdropHeight = 200;
+    private const int GlassBackdropWidth = 96;
+    private const int GlassBackdropHeight = 60;
     private const int MaxBackdropCacheEntries = 64;
     private static readonly PosterBackdropPalette DefaultPalette = new(
         Color.FromRgb(42, 65, 92),
@@ -33,6 +41,13 @@ public static class PosterCachedBackdropBehavior
             typeof(PosterBackdropPalette),
             typeof(PosterCachedBackdropBehavior),
             new PropertyMetadata(DefaultPalette, OnBackdropPropertyChanged));
+
+    public static readonly DependencyProperty VariantProperty =
+        DependencyProperty.RegisterAttached(
+            "Variant",
+            typeof(PosterBackdropVariant),
+            typeof(PosterCachedBackdropBehavior),
+            new PropertyMetadata(PosterBackdropVariant.Page, OnBackdropPropertyChanged));
 
     private static readonly DependencyProperty ApplyVersionProperty =
         DependencyProperty.RegisterAttached(
@@ -61,6 +76,16 @@ public static class PosterCachedBackdropBehavior
         target.SetValue(PaletteProperty, value);
     }
 
+    public static PosterBackdropVariant GetVariant(DependencyObject target)
+    {
+        return (PosterBackdropVariant)target.GetValue(VariantProperty);
+    }
+
+    public static void SetVariant(DependencyObject target, PosterBackdropVariant value)
+    {
+        target.SetValue(VariantProperty, value);
+    }
+
     private static void OnBackdropPropertyChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
         if (target is Border border && GetIsEnabled(border))
@@ -72,7 +97,8 @@ public static class PosterCachedBackdropBehavior
     private static void ApplyBackdropWhenReady(Border border)
     {
         var palette = GetPalette(border);
-        if (TryGetCachedBackdrop(palette, out var cached))
+        var variant = GetVariant(border);
+        if (TryGetCachedBackdrop(palette, variant, out var cached))
         {
             border.SetCurrentValue(Border.BackgroundProperty, cached);
             return;
@@ -80,18 +106,23 @@ public static class PosterCachedBackdropBehavior
 
         var applyVersion = (int)border.GetValue(ApplyVersionProperty) + 1;
         border.SetValue(ApplyVersionProperty, applyVersion);
-        _ = ApplyBackdropAsync(border, palette, applyVersion);
+        _ = ApplyBackdropAsync(border, palette, variant, applyVersion);
     }
 
-    private static async Task ApplyBackdropAsync(Border border, PosterBackdropPalette palette, int applyVersion)
+    private static async Task ApplyBackdropAsync(
+        Border border,
+        PosterBackdropPalette palette,
+        PosterBackdropVariant variant,
+        int applyVersion)
     {
-        var brush = await Task.Run(() => GetOrCreateBackdrop(palette)).ConfigureAwait(false);
+        var brush = await Task.Run(() => GetOrCreateBackdrop(palette, variant)).ConfigureAwait(false);
         await border.Dispatcher.InvokeAsync(
             () =>
             {
                 if (!GetIsEnabled(border)
                     || (int)border.GetValue(ApplyVersionProperty) != applyVersion
-                    || GetPalette(border) != palette)
+                    || GetPalette(border) != palette
+                    || GetVariant(border) != variant)
                 {
                     return;
                 }
@@ -100,21 +131,24 @@ public static class PosterCachedBackdropBehavior
             });
     }
 
-    private static bool TryGetCachedBackdrop(PosterBackdropPalette palette, out ImageBrush brush)
+    private static bool TryGetCachedBackdrop(
+        PosterBackdropPalette palette,
+        PosterBackdropVariant variant,
+        out ImageBrush brush)
     {
-        return BackdropCache.TryGetValue(BuildCacheKey(QuantizePalette(palette)), out brush!);
+        return BackdropCache.TryGetValue(BuildCacheKey(QuantizePalette(palette), variant), out brush!);
     }
 
-    private static ImageBrush GetOrCreateBackdrop(PosterBackdropPalette palette)
+    private static ImageBrush GetOrCreateBackdrop(PosterBackdropPalette palette, PosterBackdropVariant variant)
     {
         var quantized = QuantizePalette(palette);
-        var cacheKey = BuildCacheKey(quantized);
+        var cacheKey = BuildCacheKey(quantized, variant);
         if (BackdropCache.TryGetValue(cacheKey, out var cached))
         {
             return cached;
         }
 
-        var bitmap = CreateBackdropBitmap(quantized);
+        var bitmap = CreateBackdropBitmap(quantized, variant);
         var brush = new ImageBrush(bitmap)
         {
             Stretch = Stretch.Fill,
@@ -144,44 +178,54 @@ public static class PosterCachedBackdropBehavior
             QuantizeColor(palette.Accent));
     }
 
-    private static string BuildCacheKey(PosterBackdropPalette palette)
+    private static string BuildCacheKey(PosterBackdropPalette palette, PosterBackdropVariant variant)
     {
-        return $"{ToCachePart(palette.Primary)}:{ToCachePart(palette.Secondary)}:{ToCachePart(palette.Accent)}";
+        return $"{variant}:{ToCachePart(palette.Primary)}:{ToCachePart(palette.Secondary)}:{ToCachePart(palette.Accent)}";
     }
 
-    private static BitmapSource CreateBackdropBitmap(PosterBackdropPalette palette)
+    private static BitmapSource CreateBackdropBitmap(PosterBackdropPalette palette, PosterBackdropVariant variant)
     {
-        var pixels = new byte[BackdropWidth * BackdropHeight * 4];
-        var deepNeutral = Color.FromRgb(30, 38, 52);
-        var baseColor = Mix(deepNeutral, palette.Primary, 0.42);
-        var primary = Mix(palette.Primary, Colors.White, 0.12);
-        var secondary = Mix(palette.Secondary, Colors.White, 0.16);
-        var accent = Mix(palette.Accent, Colors.White, 0.11);
+        var width = variant == PosterBackdropVariant.Glass ? GlassBackdropWidth : BackdropWidth;
+        var height = variant == PosterBackdropVariant.Glass ? GlassBackdropHeight : BackdropHeight;
+        var pixels = new byte[width * height * 4];
+        var isGlass = variant == PosterBackdropVariant.Glass;
+        var deepNeutral = isGlass ? Color.FromRgb(40, 46, 58) : Color.FromRgb(30, 38, 52);
+        var baseColor = Mix(deepNeutral, palette.Primary, isGlass ? 0.58 : 0.42);
+        var primary = Mix(palette.Primary, Colors.White, isGlass ? 0.22 : 0.12);
+        var secondary = Mix(palette.Secondary, Colors.White, isGlass ? 0.25 : 0.16);
+        var accent = Mix(palette.Accent, Colors.White, isGlass ? 0.20 : 0.11);
 
-        for (var y = 0; y < BackdropHeight; y++)
+        for (var y = 0; y < height; y++)
         {
-            var normalizedY = y / (double)(BackdropHeight - 1);
-            for (var x = 0; x < BackdropWidth; x++)
+            var normalizedY = y / (double)(height - 1);
+            for (var x = 0; x < width; x++)
             {
-                var normalizedX = x / (double)(BackdropWidth - 1);
-                var waveX = normalizedX + (Math.Sin((normalizedY * 5.2) + 0.8) * 0.055);
-                var waveY = normalizedY + (Math.Sin((normalizedX * 4.5) + 1.7) * 0.045);
-                var leftFlow = Diffuse(waveX, waveY, 0.10, 0.14, 0.74, 0.66);
-                var rightFlow = Diffuse(waveX, waveY, 0.91, 0.23, 0.69, 0.62);
-                var lowerFlow = Diffuse(waveX, waveY, 0.54, 1.05, 0.93, 0.76);
-                var glassBand = Diffuse(waveX, waveY, 0.46, 0.36, 0.82, 0.15);
-                var glassEdge = Diffuse(waveX, waveY, 0.16, 0.76, 0.28, 0.56);
+                var normalizedX = x / (double)(width - 1);
+                var waveX = normalizedX + (Math.Sin((normalizedY * (isGlass ? 2.1 : 5.2)) + 0.8) * (isGlass ? 0.025 : 0.055));
+                var waveY = normalizedY + (Math.Sin((normalizedX * (isGlass ? 1.9 : 4.5)) + 1.7) * (isGlass ? 0.020 : 0.045));
+                var leftFlow = Diffuse(waveX, waveY, 0.10, 0.14, isGlass ? 0.94 : 0.74, isGlass ? 0.90 : 0.66);
+                var rightFlow = Diffuse(waveX, waveY, 0.91, 0.23, isGlass ? 0.90 : 0.69, isGlass ? 0.86 : 0.62);
+                var lowerFlow = Diffuse(waveX, waveY, 0.54, 1.05, isGlass ? 1.10 : 0.93, isGlass ? 0.98 : 0.76);
+                var glassBand = Diffuse(waveX, waveY, 0.46, 0.36, isGlass ? 1.06 : 0.82, isGlass ? 0.34 : 0.15);
+                var glassEdge = Diffuse(waveX, waveY, 0.16, 0.76, isGlass ? 0.52 : 0.28, isGlass ? 0.84 : 0.56);
 
-                var blended = Mix(baseColor, primary, leftFlow * 0.66);
-                blended = Mix(blended, secondary, rightFlow * 0.72);
-                blended = Mix(blended, accent, lowerFlow * 0.62);
-                blended = Mix(blended, Colors.White, (glassBand * 0.105) + (glassEdge * 0.055));
+                var blended = Mix(baseColor, primary, leftFlow * (isGlass ? 0.72 : 0.66));
+                blended = Mix(blended, secondary, rightFlow * (isGlass ? 0.76 : 0.72));
+                blended = Mix(blended, accent, lowerFlow * (isGlass ? 0.68 : 0.62));
+                blended = Mix(
+                    blended,
+                    Colors.White,
+                    (glassBand * (isGlass ? 0.18 : 0.105)) + (glassEdge * (isGlass ? 0.09 : 0.055)));
 
                 var alpha = (byte)Math.Clamp(
-                    138 + (leftFlow * 32) + (rightFlow * 26) + (lowerFlow * 18) + (glassBand * 10),
+                    (isGlass ? 176 : 138)
+                    + (leftFlow * (isGlass ? 22 : 32))
+                    + (rightFlow * (isGlass ? 20 : 26))
+                    + (lowerFlow * (isGlass ? 14 : 18))
+                    + (glassBand * (isGlass ? 8 : 10)),
                     0,
-                    220);
-                var index = ((y * BackdropWidth) + x) * 4;
+                    isGlass ? 224 : 220);
+                var index = ((y * width) + x) * 4;
                 pixels[index] = Premultiply(blended.B, alpha);
                 pixels[index + 1] = Premultiply(blended.G, alpha);
                 pixels[index + 2] = Premultiply(blended.R, alpha);
@@ -190,14 +234,14 @@ public static class PosterCachedBackdropBehavior
         }
 
         var bitmap = BitmapSource.Create(
-            BackdropWidth,
-            BackdropHeight,
+            width,
+            height,
             96,
             96,
             PixelFormats.Pbgra32,
             null,
             pixels,
-            BackdropWidth * 4);
+            width * 4);
         bitmap.Freeze();
         return bitmap;
     }

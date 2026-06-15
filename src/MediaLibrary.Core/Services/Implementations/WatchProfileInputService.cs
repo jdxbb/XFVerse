@@ -872,6 +872,7 @@ public sealed class WatchProfileInputService : IWatchProfileInputService
     {
         Debug.WriteLine("[WATCH-PROFILE] " + message);
         AiPerfDiagnostics.WriteEvent("event=" + message);
+        WatchInsightsDiagnostics.Write("layer=profile-input " + message);
     }
 
     private sealed class ProfileMovieRow

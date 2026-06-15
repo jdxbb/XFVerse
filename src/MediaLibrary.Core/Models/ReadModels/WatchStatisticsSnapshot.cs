@@ -54,7 +54,11 @@ public sealed class WatchStatisticsSnapshot
 
     public long TotalWatchSeconds { get; set; }
 
-    public int MonthlyWatchCount { get; set; }
+    public long? TotalWatchSecondsDeltaFromLastMonth { get; set; }
+
+    public int WatchDays { get; set; }
+
+    public int? WatchDaysDeltaFromLastMonth { get; set; }
 
     public List<WatchStatisticsTagItem> MonthlyFrequentTags { get; set; } = [];
 
@@ -70,9 +74,15 @@ public sealed class WatchStatisticsSnapshot
 
     public int ContinuousWatchDays { get; set; }
 
+    public DateTime? ContinuousWatchStartDate { get; set; }
+
+    public DateTime? ContinuousWatchEndDate { get; set; }
+
     public DateTime? MostActiveDate { get; set; }
 
     public long MostActiveDateWatchSeconds { get; set; }
+
+    public int MostActiveDateWatchCount { get; set; }
 
     public List<WatchDistributionItem> TypeDistribution { get; set; } = [];
 
@@ -137,6 +147,8 @@ public sealed class WatchCalendarDay
     public int HeatLevel { get; set; }
 
     public bool HasValidWatch { get; set; }
+
+    public bool IsCurrentMonth { get; set; }
 }
 
 public sealed class WatchDistributionItem
@@ -185,6 +197,8 @@ public sealed class DurationDistributionItem
     public string Label { get; set; } = string.Empty;
 
     public int Count { get; set; }
+
+    public long WatchSeconds { get; set; }
 
     public double Percent { get; set; }
 

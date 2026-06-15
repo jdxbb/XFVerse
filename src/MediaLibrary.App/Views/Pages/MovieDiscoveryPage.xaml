@@ -459,7 +459,7 @@
         <Style x:Key="DiscoveryRankingOuterScrollBarStyle" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource DiscoveryModernScrollBarStyle}">
             <Setter Property="RenderTransform">
                 <Setter.Value>
-                    <TranslateTransform X="4" />
+                    <TranslateTransform X="-20" />
                 </Setter.Value>
             </Setter>
         </Style>
@@ -959,7 +959,7 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <Style x:Key="DiscoveryPosterCardStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
+        <Style x:Key="DiscoveryPosterCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassCompactCardStyle}">
             <Setter Property="Width" Value="180" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0,0,14,18" />
@@ -968,14 +968,14 @@
             <Setter Property="Cursor" Value="Hand" />
         </Style>
 
-        <Style x:Key="DiscoveryListItemStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
+        <Style x:Key="DiscoveryListItemStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassCompactCardStyle}">
             <Setter Property="Padding" Value="12" />
             <Setter Property="Margin" Value="0,0,0,12" />
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingHeroCardStyle" TargetType="Border" BasedOn="{StaticResource GlassCompactCardStyle}">
+        <Style x:Key="DiscoveryRankingHeroCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource GlassCompactCardStyle}">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0,0,0,16" />
             <Setter Property="CornerRadius" Value="0" />
@@ -984,10 +984,11 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ShadowOpacity" Value="0" />
             <Setter Property="Cursor" Value="Arrow" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingItemCardStyle" TargetType="Border" BasedOn="{StaticResource DiscoveryListItemStyle}">
+        <Style x:Key="DiscoveryRankingItemCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource DiscoveryListItemStyle}">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="MinHeight" Value="270" />
@@ -997,6 +998,7 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ShadowOpacity" Value="0" />
             <Setter Property="Cursor" Value="Arrow" />
         </Style>
 
@@ -1012,7 +1014,7 @@
             <Setter Property="Margin" Value="8" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingRatingBadgeStyle" TargetType="Border">
+        <Style x:Key="DiscoveryRankingRatingBadgeStyle" TargetType="{x:Type helpers:CachedShadowBorder}">
             <Setter Property="MinWidth" Value="54" />
             <Setter Property="Height" Value="34" />
             <Setter Property="Padding" Value="10,2" />
@@ -1020,11 +1022,17 @@
             <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
             <Setter Property="BorderThickness" Value="1.2" />
-            <Setter Property="Effect" Value="{StaticResource ShadowStaticScoreBadge}" />
+            <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="ShadowPadding" Value="24" />
+            <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowScoreBadgeBlurRadius}" />
+            <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowScoreBadgeOpacity}" />
+            <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowScoreBadge}" />
+            <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowScoreBadgeDepth}" />
             <Setter Property="HorizontalAlignment" Value="Left" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingHeroRatingBadgeStyle" TargetType="Border" BasedOn="{StaticResource DiscoveryRankingRatingBadgeStyle}">
+        <Style x:Key="DiscoveryRankingHeroRatingBadgeStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource DiscoveryRankingRatingBadgeStyle}">
             <Setter Property="MinWidth" Value="68" />
             <Setter Property="Height" Value="44" />
             <Setter Property="Padding" Value="12,3" />
@@ -1145,7 +1153,7 @@
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.40"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.54"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -1162,7 +1170,7 @@
                            helpers:PosterCachedShadowBehavior.CornerRadius="16"
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.24"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.33"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                            helpers:PosterCachedShadowBehavior.ShadowDepth="4"
@@ -1222,7 +1230,7 @@
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.40"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.54"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -1239,7 +1247,7 @@
                            helpers:PosterCachedShadowBehavior.CornerRadius="16"
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.24"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.33"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                            helpers:PosterCachedShadowBehavior.ShadowDepth="4"
@@ -1299,7 +1307,7 @@
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.40"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.54"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -1316,7 +1324,7 @@
                            helpers:PosterCachedShadowBehavior.CornerRadius="19"
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.24"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.33"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                            helpers:PosterCachedShadowBehavior.ShadowDepth="4"
@@ -1376,7 +1384,7 @@
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.InnerMargin="0,4,0,0"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.40"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.54"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -1393,7 +1401,7 @@
                            helpers:PosterCachedShadowBehavior.CornerRadius="19"
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.24"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.33"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                            helpers:PosterCachedShadowBehavior.ShadowDepth="4"
@@ -1467,12 +1475,12 @@
                                    helpers:TrimmedTextToolTipBehavior.FullText="{Binding OriginalTitleText}"
                                    Style="{StaticResource DiscoveryRankingHeroOriginalTitleTextStyle}" />
                     </Grid>
-                    <Border Grid.Column="2"
+                    <helpers:CachedShadowBorder Grid.Column="2"
                             VerticalAlignment="Center"
                             Style="{StaticResource DiscoveryRankingHeroRatingBadgeStyle}">
                         <TextBlock Text="{Binding RatingBadgeText}"
                                    Style="{StaticResource DiscoveryRankingHeroRatingTextStyle}" />
-                    </Border>
+                    </helpers:CachedShadowBorder>
                 </Grid>
                 <Border Grid.Row="1"
                         Margin="0,13,0,0"
@@ -1570,12 +1578,12 @@
                                    helpers:TrimmedTextToolTipBehavior.FullText="{Binding OriginalTitleText}"
                                    Style="{StaticResource DiscoveryRankingOriginalTitleTextStyle}" />
                     </Grid>
-                    <Border Grid.Column="2"
+                    <helpers:CachedShadowBorder Grid.Column="2"
                             VerticalAlignment="Center"
                             Style="{StaticResource DiscoveryRankingRatingBadgeStyle}">
                         <TextBlock Text="{Binding RatingBadgeText}"
                                    Style="{StaticResource DiscoveryRankingRatingTextStyle}" />
-                    </Border>
+                    </helpers:CachedShadowBorder>
                 </Grid>
                 <Border Grid.Row="1"
                         Margin="0,12,0,0"
@@ -1684,7 +1692,7 @@
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.InnerMargin="0,3,0,0"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.42"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.56"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -1702,7 +1710,7 @@
                            helpers:PosterCachedShadowBehavior.CornerRadius="12"
                            helpers:PosterCachedShadowBehavior.Direction="270"
                            helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                           helpers:PosterCachedShadowBehavior.Opacity="0.28"
+                           helpers:PosterCachedShadowBehavior.Opacity="0.37"
                            helpers:PosterCachedShadowBehavior.Padding="84"
                            helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                            helpers:PosterCachedShadowBehavior.ShadowDepth="3"
@@ -1857,7 +1865,7 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Border Margin="32,24,32,0"
+                        <helpers:CachedShadowBorder Margin="32,24,32,0"
                                 Padding="14"
                                 Cursor="Arrow"
                                 Style="{StaticResource GlassPageCardStyle}">
@@ -2356,9 +2364,9 @@
                                     </Button>
                                 </Grid>
                         </Grid>
-                        </Border>
+                        </helpers:CachedShadowBorder>
 
-                        <Border x:Name="SearchScrollCornerCard"
+                        <helpers:CachedShadowBorder x:Name="SearchScrollCornerCard"
                                 Grid.Row="2"
                                 Margin="32,0,32,0"
                                 Cursor="Arrow"
@@ -2484,13 +2492,20 @@
                                         </Grid.Style>
                                         <Grid>
                                             <ListBox x:Name="SearchMoviePosterListBox"
+                                              Margin="-34,0,-34,0"
                                                      ItemsSource="{Binding SearchMovies}"
                                                      Loaded="DiscoveryListBox_Loaded"
                                                      ScrollViewer.ScrollChanged="DiscoveryListBox_ScrollChanged"
                                                      Style="{StaticResource DiscoveryPosterResultListBoxStyle}"
                                                      ItemContainerStyle="{StaticResource DiscoveryPosterResultListBoxItemStyle}">
                                                 <ListBox.Resources>
-                                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource DiscoveryModernScrollBarStyle}" />
+                                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource DiscoveryModernScrollBarStyle}">
+                                                        <Setter Property="RenderTransform">
+                                                            <Setter.Value>
+                                                                <TranslateTransform X="-34" />
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
                                                 </ListBox.Resources>
                                                 <ListBox.ItemsPanel>
                                                     <ItemsPanelTemplate>
@@ -2501,7 +2516,7 @@
                                                                     <Setter Property="ItemContentWidth" Value="180" />
                                                                     <Setter Property="ItemHeight" Value="288" />
                                                                     <Setter Property="OverscanRows" Value="1" />
-                                                                    <Setter Property="ViewportPadding" Value="0,10,0,54" />
+                                                    <Setter Property="ViewportPadding" Value="0,10,68,54" />
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                                                             <Setter Property="ItemWidth" Value="201" />
@@ -2563,7 +2578,7 @@
                                                                        helpers:PosterCachedShadowBehavior.Direction="270"
                                                                        helpers:PosterCachedShadowBehavior.InnerMargin="0,3,0,0"
                                                                        helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                                                                       helpers:PosterCachedShadowBehavior.Opacity="0.42"
+                                                                       helpers:PosterCachedShadowBehavior.Opacity="0.56"
                                                                        helpers:PosterCachedShadowBehavior.Padding="84"
                                                                        helpers:PosterCachedShadowBehavior.QuantizeColor="True"
                                                                        helpers:PosterCachedShadowBehavior.ShadowColor="#192230"
@@ -2581,7 +2596,7 @@
                                                                        helpers:PosterCachedShadowBehavior.CornerRadius="12"
                                                                        helpers:PosterCachedShadowBehavior.Direction="270"
                                                                        helpers:PosterCachedShadowBehavior.IsEnabled="True"
-                                                                       helpers:PosterCachedShadowBehavior.Opacity="0.28"
+                                                                       helpers:PosterCachedShadowBehavior.Opacity="0.37"
                                                                        helpers:PosterCachedShadowBehavior.Padding="84"
                                                                        helpers:PosterCachedShadowBehavior.ShadowColor="#000000"
                                                                        helpers:PosterCachedShadowBehavior.ShadowDepth="3"
@@ -3028,13 +3043,20 @@
                                         </Grid.Style>
                                         <Grid>
                                             <ListBox x:Name="SearchTvPosterListBox"
+                                              Margin="-34,0,-34,0"
                                                      ItemsSource="{Binding SearchTvSeries}"
                                                      Loaded="DiscoveryListBox_Loaded"
                                                      ScrollViewer.ScrollChanged="DiscoveryListBox_ScrollChanged"
                                                      Style="{StaticResource DiscoveryPosterResultListBoxStyle}"
                                                      ItemContainerStyle="{StaticResource DiscoveryPosterResultListBoxItemStyle}">
                                                 <ListBox.Resources>
-                                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource DiscoveryModernScrollBarStyle}" />
+                                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource DiscoveryModernScrollBarStyle}">
+                                                        <Setter Property="RenderTransform">
+                                                            <Setter.Value>
+                                                                <TranslateTransform X="-34" />
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
                                                 </ListBox.Resources>
                                                 <ListBox.ItemsPanel>
                                                     <ItemsPanelTemplate>
@@ -3045,7 +3067,7 @@
                                                                     <Setter Property="ItemContentWidth" Value="180" />
                                                                     <Setter Property="ItemHeight" Value="288" />
                                                                     <Setter Property="OverscanRows" Value="1" />
-                                                                    <Setter Property="ViewportPadding" Value="0,10,0,54" />
+                                                    <Setter Property="ViewportPadding" Value="0,10,68,54" />
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                                                             <Setter Property="ItemWidth" Value="201" />
@@ -3353,12 +3375,12 @@
                                     </ScrollViewer>
                                 </Grid>
                             </Grid>
-                        </Border>
+                        </helpers:CachedShadowBorder>
                     </Grid>
                 </TabItem>
                 <TabItem Header="姒滃崟" Style="{StaticResource DiscoveryTabItemStyle}">
                     <Grid Margin="-32,-24,-32,-32">
-                        <Border x:Name="RankingScrollCornerCard"
+                        <helpers:CachedShadowBorder x:Name="RankingScrollCornerCard"
                                 Margin="32,24,32,0"
                                 Cursor="Arrow"
                                 Style="{StaticResource GlassPageCardStyle}"
@@ -3423,7 +3445,7 @@
 
                                 <ScrollViewer x:Name="RankingMovieScrollViewer"
                                               Grid.Row="0"
-                                              Margin="-84,0,0,0"
+                                              Margin="-84,0,-24,0"
                                               Loaded="DiscoveryScrollViewer_Loaded"
                                               ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
                                               helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
@@ -3448,7 +3470,7 @@
                                             </Style.Triggers>
                                         </Style>
                                     </ScrollViewer.Style>
-                                    <Grid Margin="84,0,0,0"
+                                    <Grid Margin="84,18,24,0"
                                           MinHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*" />
@@ -3466,9 +3488,9 @@
                                             </Style>
                                         </StackPanel.Style>
 
-                                        <Border DataContext="{Binding TopRankingMovie}">
+                                        <helpers:CachedShadowBorder DataContext="{Binding TopRankingMovie}">
                                             <Border.Style>
-                                                <Style TargetType="Border" BasedOn="{StaticResource DiscoveryRankingHeroCardStyle}">
+                                                <Style TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource DiscoveryRankingHeroCardStyle}">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding DataContext.ShowTopRankingMovie, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
@@ -3491,7 +3513,7 @@
                                                                 Content="{Binding}"
                                                                 ContentTemplate="{StaticResource DiscoveryRankingHeroInfoTemplate}" />
                                             </Grid>
-                                        </Border>
+                                        </helpers:CachedShadowBorder>
 
                                         <Border Height="1"
                                                 Margin="0,18,0,16"
@@ -3528,7 +3550,7 @@
                                                             <ColumnDefinition Width="*" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Border DataContext="{Binding LeftItem}"
+                                                        <helpers:CachedShadowBorder DataContext="{Binding LeftItem}"
                                                                 Margin="0,0,14,0"
                                                                 Style="{StaticResource DiscoveryRankingItemCardStyle}">
                                                             <Grid>
@@ -3543,12 +3565,12 @@
                                                                             Content="{Binding}"
                                                                             ContentTemplate="{StaticResource DiscoveryRankingItemInfoTemplate}" />
                                                             </Grid>
-                                                        </Border>
-                                                        <Border Grid.Column="2"
+                                                        </helpers:CachedShadowBorder>
+                                                        <helpers:CachedShadowBorder Grid.Column="2"
                                                                 DataContext="{Binding RightItem}"
                                                                 Margin="14,0,0,0">
                                                             <Border.Style>
-                                                                <Style TargetType="Border" BasedOn="{StaticResource DiscoveryRankingItemCardStyle}">
+                                                                <Style TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource DiscoveryRankingItemCardStyle}">
                                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding DataContext.HasRightItem, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
@@ -3569,7 +3591,7 @@
                                                                             Content="{Binding}"
                                                                             ContentTemplate="{StaticResource DiscoveryRankingItemInfoTemplate}" />
                                                             </Grid>
-                                                        </Border>
+                                                        </helpers:CachedShadowBorder>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -3633,7 +3655,7 @@
                                 </ScrollViewer>
                                 <ScrollViewer x:Name="RankingTvScrollViewer"
                                               Grid.Row="0"
-                                              Margin="-84,0,0,0"
+                                              Margin="-84,0,-24,0"
                                               Loaded="DiscoveryScrollViewer_Loaded"
                                               ScrollChanged="DiscoveryScrollViewer_ScrollChanged"
                                               helpers:ScrollBarAutoRevealBehavior.IsEnabled="True"
@@ -3658,17 +3680,17 @@
                                             </Style.Triggers>
                                         </Style>
                                     </ScrollViewer.Style>
-                                    <Grid Margin="84,0,0,0"
+                                    <Grid Margin="84,18,24,0"
                                           MinHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                     <StackPanel Grid.Row="0">
-                                        <Border DataContext="{Binding TopRankingTvSeries}"
+                                        <helpers:CachedShadowBorder DataContext="{Binding TopRankingTvSeries}"
                                                 IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                             <Border.Style>
-                                                <Style TargetType="Border" BasedOn="{StaticResource DiscoveryRankingHeroCardStyle}">
+                                                <Style TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource DiscoveryRankingHeroCardStyle}">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding DataContext.ShowTopRankingTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
@@ -3690,7 +3712,7 @@
                                                                 Content="{Binding}"
                                                                 ContentTemplate="{StaticResource DiscoveryRankingHeroInfoTemplate}" />
                                             </Grid>
-                                        </Border>
+                                        </helpers:CachedShadowBorder>
 
                                         <Border Height="1"
                                                 Margin="0,18,0,16"
@@ -3727,7 +3749,7 @@
                                                             <ColumnDefinition Width="*" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Border DataContext="{Binding LeftItem}"
+                                                        <helpers:CachedShadowBorder DataContext="{Binding LeftItem}"
                                                                 Margin="0,0,14,0"
                                                                 IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 Style="{StaticResource DiscoveryRankingItemCardStyle}">
@@ -3743,13 +3765,13 @@
                                                                             Content="{Binding}"
                                                                             ContentTemplate="{StaticResource DiscoveryRankingItemInfoTemplate}" />
                                                             </Grid>
-                                                        </Border>
-                                                        <Border Grid.Column="2"
+                                                        </helpers:CachedShadowBorder>
+                                                        <helpers:CachedShadowBorder Grid.Column="2"
                                                                 DataContext="{Binding RightItem}"
                                                                 Margin="14,0,0,0"
                                                                 IsEnabled="{Binding DataContext.CanOpenTvSeries, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                                             <Border.Style>
-                                                                <Style TargetType="Border" BasedOn="{StaticResource DiscoveryRankingItemCardStyle}">
+                                                                <Style TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource DiscoveryRankingItemCardStyle}">
                                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding DataContext.HasRightItem, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
@@ -3770,7 +3792,7 @@
                                                                             Content="{Binding}"
                                                                             ContentTemplate="{StaticResource DiscoveryRankingItemInfoTemplate}" />
                                                             </Grid>
-                                                        </Border>
+                                                        </helpers:CachedShadowBorder>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -3833,7 +3855,7 @@
                                     </Grid>
                                 </ScrollViewer>
                             </Grid>
-                        </Border>
+                        </helpers:CachedShadowBorder>
                     </Grid>
                 </TabItem>
                 <TabItem Header="AI推荐" Style="{StaticResource DiscoveryTabItemStyle}">

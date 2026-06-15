@@ -17,6 +17,7 @@
         ResizeMode="CanResize"
         AllowsTransparency="False"
         Background="{DynamicResource BrushBackground}"
+        helpers:PosterCachedBackdropBehavior.Palette="{Binding Path=(helpers:PosterCachedBackdropBehavior.Palette), ElementName=PosterBackdrop}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
     <shell:WindowChrome.WindowChrome>
@@ -37,12 +38,12 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border x:Name="DetailBackdrop"
+        <Border x:Name="PosterBackdrop"
                 Grid.ColumnSpan="2"
                 IsHitTestVisible="False"
                 helpers:PosterCachedBackdropBehavior.IsEnabled="True">
             <Border.Visibility>
-                <Binding Path="IsDetailRouteActive" Converter="{StaticResource BooleanToVisibilityConverter}" />
+                <Binding Path="IsPosterBackdropActive" Converter="{StaticResource BooleanToVisibilityConverter}" />
             </Border.Visibility>
         </Border>
         <Border Grid.ColumnSpan="2"
@@ -60,7 +61,7 @@
                         </Setter.Value>
                     </Setter>
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                        <DataTrigger Binding="{Binding IsPosterBackdropActive}" Value="True">
                             <Setter Property="Visibility" Value="Visible" />
                         </DataTrigger>
                     </Style.Triggers>
@@ -75,8 +76,21 @@
                Opacity="0"
                helpers:PosterCacheImageBehavior.DecodePixelWidth="128"
                helpers:PosterCacheImageBehavior.PropagateLoadState="False"
-               helpers:PosterCacheImageBehavior.Source="{Binding DetailBackdropSource}"
-               helpers:PosterPaletteBackdropBehavior.TargetElement="{Binding ElementName=DetailBackdrop}" />
+               helpers:PosterCacheImageBehavior.Source="{Binding PosterBackdropSource}"
+               helpers:PosterPaletteBackdropBehavior.TargetElement="{Binding ElementName=PosterBackdrop}">
+            <Image.Style>
+                <Style TargetType="Image">
+                    <Setter Property="helpers:PosterPaletteBackdropBehavior.PaletteMode"
+                            Value="{x:Static helpers:PosterPaletteMode.Standard}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsWatchInsightsRouteActive}" Value="True">
+                            <Setter Property="helpers:PosterPaletteBackdropBehavior.PaletteMode"
+                                    Value="{x:Static helpers:PosterPaletteMode.Vivid}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Image.Style>
+        </Image>
 
         <Border Grid.Column="0"
                 Style="{StaticResource SidebarBorderStyle}">
@@ -341,16 +355,50 @@
                                 </Style>
                             </Grid.Style>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition>
+                                    <ColumnDefinition.Style>
+                                        <Style TargetType="ColumnDefinition">
+                                            <Setter Property="Width" Value="38" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                                    <Setter Property="Width" Value="32" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ColumnDefinition.Style>
+                                </ColumnDefinition>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Border Width="32"
-                                    Height="32"
-                                    CornerRadius="16"
+                            <Border HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
                                     Background="{DynamicResource BrushAccent}"
                                     BorderBrush="#F7F7F5"
                                     BorderThickness="1.2">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Width" Value="38" />
+                                        <Setter Property="Height" Value="38" />
+                                        <Setter Property="CornerRadius" Value="19" />
+                                        <Setter Property="RenderTransform">
+                                            <Setter.Value>
+                                                <TranslateTransform X="-6" />
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                                <Setter Property="Width" Value="32" />
+                                                <Setter Property="Height" Value="32" />
+                                                <Setter Property="CornerRadius" Value="16" />
+                                                <Setter Property="RenderTransform">
+                                                    <Setter.Value>
+                                                        <TranslateTransform X="0" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid ClipToBounds="False">
                                     <Ellipse>
                                         <Ellipse.Style>
@@ -371,15 +419,18 @@
                                     <TextBlock HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
                                                Text="{Binding UserAvatarInitial}"
-                                               FontSize="13"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource BrushOnAccent}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
+                                                <Setter Property="FontSize" Value="15" />
                                                 <Setter Property="Visibility" Value="Visible" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding HasUserAvatar}" Value="True">
                                                         <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                                        <Setter Property="FontSize" Value="13" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -388,7 +439,7 @@
                                 </Grid>
                             </Border>
                             <StackPanel Grid.Column="1"
-                                        Margin="10,0,0,0"
+                                        Margin="4,0,0,0"
                                         VerticalAlignment="Center">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
@@ -572,14 +623,38 @@
                 <Border.Style>
                     <Style TargetType="Border" BasedOn="{StaticResource TopBarBorderStyle}">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
+                            <DataTrigger Binding="{Binding IsPosterBackdropActive}" Value="True">
                                 <Setter Property="Background" Value="#28FFFFFF" />
                                 <Setter Property="BorderBrush" Value="#34FFFFFF" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsWatchInsightsRouteActive}" Value="True">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BrushWatchInsightsChromeGlassBorder}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <Grid>
+                    <Grid IsHitTestVisible="False">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsWatchInsightsRouteActive}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <Border Opacity="0.46"
+                                helpers:PosterCachedBackdropBehavior.IsEnabled="True"
+                                helpers:PosterCachedBackdropBehavior.Palette="{Binding Path=(helpers:PosterCachedBackdropBehavior.Palette), RelativeSource={RelativeSource AncestorType=Window}}"
+                                helpers:PosterCachedBackdropBehavior.Variant="Glass" />
+                        <Border Background="{DynamicResource BrushWatchInsightsChromeGlassTint}" />
+                        <Border Background="{DynamicResource BrushWatchInsightsChromeGlassSheen}" />
+                    </Grid>
+
+                    <Grid>
                     <Grid.Style>
                         <Style TargetType="Grid">
                             <Setter Property="Height" Value="44" />
@@ -698,6 +773,7 @@
                                 Click="CloseButton_Click"
                                 Style="{StaticResource WindowCaptionCloseButtonStyle}" />
                     </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
 
@@ -709,6 +785,9 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsDetailRouteActive}" Value="True">
                                 <Setter Property="Margin" Value="30,8,30,24" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsWatchInsightsRouteActive}" Value="True">
+                                <Setter Property="Margin" Value="30,0,30,30" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

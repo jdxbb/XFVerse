@@ -153,6 +153,34 @@
             <Setter Property="TextAlignment" Value="Center" />
         </Style>
 
+        <ItemsPanelTemplate x:Key="HomeLibraryStatusExpandedPanel">
+            <Grid ClipToBounds="False">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+            </Grid>
+        </ItemsPanelTemplate>
+
+        <ItemsPanelTemplate x:Key="HomeLibraryStatusCollapsedPanel">
+            <Grid ClipToBounds="False">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="38" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="38" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="38" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+            </Grid>
+        </ItemsPanelTemplate>
+
         <Style x:Key="HomeSectionArrowButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
             <Setter Property="Width" Value="32" />
             <Setter Property="Height" Value="54" />
@@ -253,35 +281,32 @@
             <Setter Property="IsHitTestVisible" Value="False" />
         </Style>
 
-        <Style x:Key="HomePosterPaletteShadowStyle" TargetType="Border">
+        <Style x:Key="HomePosterPaletteShadowStyle" TargetType="{x:Type helpers:CachedShadowBorder}">
             <Setter Property="Margin" Value="0,3,0,0" />
             <Setter Property="Background" Value="{StaticResource HomePosterCardBackgroundBrush}" />
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="28"
-                                      Direction="270"
-                                      Opacity="0.42"
-                                      ShadowDepth="7"
-                                      Color="#192230" />
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="QuantizeShadowColor" Value="True" />
+            <Setter Property="ShadowBlurRadius" Value="28" />
+            <Setter Property="ShadowColor" Value="#192230" />
+            <Setter Property="ShadowDepth" Value="7" />
+            <Setter Property="ShadowOpacity" Value="0.56" />
+            <Setter Property="ShadowPadding" Value="34" />
         </Style>
 
-        <Style x:Key="HomePosterBaseShadowStyle" TargetType="Border">
+        <Style x:Key="HomePosterBaseShadowStyle" TargetType="{x:Type helpers:CachedShadowBorder}">
             <Setter Property="Background" Value="{StaticResource HomePosterCardBackgroundBrush}" />
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="14"
-                                      Direction="270"
-                                      Opacity="0.28"
-                                      ShadowDepth="3"
-                                      Color="#000000" />
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="ShadowBlurRadius" Value="14" />
+            <Setter Property="ShadowColor" Value="#000000" />
+            <Setter Property="ShadowDepth" Value="3" />
+            <Setter Property="ShadowOpacity" Value="0.37" />
+            <Setter Property="ShadowPadding" Value="24" />
         </Style>
 
         <Style x:Key="HomePosterLiftGridStyle" TargetType="Grid">
@@ -324,9 +349,9 @@
                           Style="{StaticResource HomePosterLiftGridStyle}">
                         <Border x:Name="HomeRecentPosterClipMask"
                                 Style="{StaticResource HomePosterClipMaskStyle}" />
-                        <Border x:Name="HomeRecentPosterPaletteShadowHost"
-                                Style="{StaticResource HomePosterPaletteShadowStyle}" />
-                        <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
+                        <helpers:CachedShadowBorder x:Name="HomeRecentPosterPaletteShadowHost"
+                                                    Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                        <helpers:CachedShadowBorder Style="{StaticResource HomePosterBaseShadowStyle}" />
                         <Grid>
                             <Grid.OpacityMask>
                                 <VisualBrush Visual="{Binding ElementName=HomeRecentPosterClipMask}" />
@@ -413,7 +438,7 @@
                 <RowDefinition Height="1.90*" MinHeight="197" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0"
+            <helpers:CachedShadowBorder Grid.Row="0"
                     Margin="0,0,0,14"
                     Padding="22,16,22,11"
                     Style="{StaticResource GlassPageCardStyle}">
@@ -430,18 +455,44 @@
                     </DockPanel>
 
                     <ItemsControl Grid.Row="2"
-                                  Margin="0,0,-12,0"
+                                  Margin="0,0,0,8"
+                                  AlternationCount="4"
                                   ClipToBounds="False"
                                   ItemsSource="{Binding LibraryStatusOverview}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Columns="4" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="ItemsPanel" Value="{StaticResource HomeLibraryStatusExpandedPanel}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 Value="True">
+                                        <Setter Property="ItemsPanel" Value="{StaticResource HomeLibraryStatusCollapsedPanel}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Grid.Column" Value="0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex)}"
+                                                 Value="1">
+                                        <Setter Property="Grid.Column" Value="2" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex)}"
+                                                 Value="2">
+                                        <Setter Property="Grid.Column" Value="4" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex)}"
+                                                 Value="3">
+                                        <Setter Property="Grid.Column" Value="6" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,0,12,0" Style="{StaticResource HomePosterLiftGridStyle}">
-                                    <Border Style="{StaticResource GlassHomeMetricCardStyle}">
+                                <Grid Style="{StaticResource HomePosterLiftGridStyle}">
+                                    <helpers:CachedShadowBorder Style="{StaticResource GlassHomeMetricCardStyle}">
                                         <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
@@ -484,31 +535,44 @@
                                                        Text="{Binding UnitText}"
                                                        Style="{StaticResource BodyMutedTextStyle}" />
                                         </Grid>
-                                        <StackPanel Grid.Row="1"
-                                                    Grid.ColumnSpan="2"
-                                                    Margin="0,8,0,0"
-                                                    HorizontalAlignment="Center"
-                                                    Orientation="Horizontal">
-                                            <TextBlock VerticalAlignment="Center"
+                                        <Grid Grid.Row="1"
+                                              Grid.ColumnSpan="2"
+                                              Margin="0,8,0,0"
+                                              HorizontalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Margin="0,-2,9,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource BrushForegroundMuted}"
+                                                       Text="{Binding TrendArrowText}"
+                                                       Visibility="Hidden" />
+                                            <TextBlock Grid.Column="1"
+                                                       VerticalAlignment="Center"
                                                        Text="{Binding TrendText}"
                                                        Style="{StaticResource CaptionTextStyle}" />
-                                            <TextBlock Margin="9,-2,0,0"
+                                            <TextBlock Grid.Column="2"
+                                                       Margin="9,-2,0,0"
                                                        VerticalAlignment="Center"
                                                        FontSize="18"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource BrushForegroundMuted}"
                                                        Text="{Binding TrendArrowText}" />
-                                        </StackPanel>
                                         </Grid>
-                                    </Border>
+                                        </Grid>
+                                    </helpers:CachedShadowBorder>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
 
-            <Border Grid.Row="1"
+            <helpers:CachedShadowBorder Grid.Row="1"
                     Margin="0,0,0,14"
                     Padding="22,16,22,6"
                     Style="{StaticResource GlassPageCardStyle}">
@@ -568,9 +632,9 @@
                                           Style="{StaticResource HomePosterLiftGridStyle}">
                                         <Border x:Name="HomeContinuePosterClipMask"
                                                 Style="{StaticResource HomePosterClipMaskStyle}" />
-                                        <Border x:Name="HomeContinuePosterPaletteShadowHost"
-                                                Style="{StaticResource HomePosterPaletteShadowStyle}" />
-                                        <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
+                                        <helpers:CachedShadowBorder x:Name="HomeContinuePosterPaletteShadowHost"
+                                                                    Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                                        <helpers:CachedShadowBorder Style="{StaticResource HomePosterBaseShadowStyle}" />
                                         <Grid>
                                             <Grid.OpacityMask>
                                                 <VisualBrush Visual="{Binding ElementName=HomeContinuePosterClipMask}" />
@@ -663,9 +727,9 @@
                         </Viewbox>
                     </Button>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
 
-            <Border Grid.Row="2" Padding="22,16,22,22" Style="{StaticResource GlassPageCardStyle}">
+            <helpers:CachedShadowBorder Grid.Row="2" Padding="22,16,22,22" Style="{StaticResource GlassPageCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -752,10 +816,10 @@
                         </Viewbox>
                     </Button>
                 </Grid>
-            </Border>
+            </helpers:CachedShadowBorder>
         </Grid>
 
-        <Border Grid.Column="2" Style="{StaticResource GlassHomeAiPanelStyle}">
+        <helpers:CachedShadowBorder Grid.Column="2" Style="{StaticResource GlassHomeAiPanelStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -871,9 +935,9 @@
                                                   Style="{StaticResource HomePosterLiftGridStyle}">
                                                 <Border x:Name="HomeAiPosterClipMask"
                                                         Style="{StaticResource HomePosterClipMaskStyle}" />
-                                                <Border x:Name="HomeAiPosterPaletteShadowHost"
-                                                        Style="{StaticResource HomePosterPaletteShadowStyle}" />
-                                                <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
+                                                <helpers:CachedShadowBorder x:Name="HomeAiPosterPaletteShadowHost"
+                                                                            Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                                                <helpers:CachedShadowBorder Style="{StaticResource HomePosterBaseShadowStyle}" />
                                                 <Grid>
                                                     <Grid.OpacityMask>
                                                         <VisualBrush Visual="{Binding ElementName=HomeAiPosterClipMask}" />
@@ -1034,9 +1098,9 @@
                                                   Style="{StaticResource HomePosterLiftGridStyle}">
                                                 <Border x:Name="HomeAiCollapsedPosterClipMask"
                                                         Style="{StaticResource HomePosterClipMaskStyle}" />
-                                                <Border x:Name="HomeAiCollapsedPosterPaletteShadowHost"
-                                                        Style="{StaticResource HomePosterPaletteShadowStyle}" />
-                                                <Border Style="{StaticResource HomePosterBaseShadowStyle}" />
+                                                <helpers:CachedShadowBorder x:Name="HomeAiCollapsedPosterPaletteShadowHost"
+                                                                            Style="{StaticResource HomePosterPaletteShadowStyle}" />
+                                                <helpers:CachedShadowBorder Style="{StaticResource HomePosterBaseShadowStyle}" />
                                                 <Grid>
                                                     <Grid.OpacityMask>
                                                         <VisualBrush Visual="{Binding ElementName=HomeAiCollapsedPosterClipMask}" />
@@ -1189,7 +1253,7 @@
                         Command="{Binding NavigateToMovieDiscoveryCommand}"
                         Style="{StaticResource GlassPrimaryButtonStyle}" />
             </Grid>
-        </Border>
+        </helpers:CachedShadowBorder>
         </Grid>
 
         <Border Grid.ColumnSpan="3"

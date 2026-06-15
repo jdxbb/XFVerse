@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <Color x:Key="ColorBackground">#FAFAFC</Color>
     <Color x:Key="ColorBackgroundAccent">#F2F4F7</Color>
     <Color x:Key="ColorSidebar">#2F333A</Color>
@@ -78,6 +79,25 @@
     <Color x:Key="ColorInfoForeground">#5D7A9D</Color>
     <Color x:Key="ColorInfoBackground">#F0F5FB</Color>
     <Color x:Key="ColorInfoBorder">#BAC9DD</Color>
+    <Color x:Key="ColorWatchInsightsProgressTrack">#1A000000</Color>
+    <Color x:Key="ColorWatchInsightsDnaIndicator">#FAFCFF</Color>
+    <Color x:Key="ColorWatchInsightsDnaIndicatorGlow">#5487AFE8</Color>
+    <Color x:Key="ColorWatchInsightsKeywordLowBackground">#F4F5F8</Color>
+    <Color x:Key="ColorWatchInsightsKeywordLowBorder">#C2C8D2</Color>
+    <Color x:Key="ColorWatchInsightsKeywordMediumBackground">#EAF2FA</Color>
+    <Color x:Key="ColorWatchInsightsKeywordMediumBorder">#A8BED5</Color>
+    <Color x:Key="ColorWatchInsightsKeywordHighBackground">#F2EAF7</Color>
+    <Color x:Key="ColorWatchInsightsKeywordHighBorder">#C7B1D5</Color>
+    <Color x:Key="ColorWatchInsightsDnaTypeBackground">#FBECEF</Color>
+    <Color x:Key="ColorWatchInsightsDnaTypeBorder">#E3B8C3</Color>
+    <Color x:Key="ColorWatchInsightsDnaEmotionBackground">#FFF6D8</Color>
+    <Color x:Key="ColorWatchInsightsDnaEmotionBorder">#E5D08F</Color>
+    <Color x:Key="ColorWatchInsightsDnaSceneBackground">#EAF7EE</Color>
+    <Color x:Key="ColorWatchInsightsDnaSceneBorder">#AED2BA</Color>
+    <Color x:Key="ColorWatchInsightsQuadrantFamiliar">#5F7FD6</Color>
+    <Color x:Key="ColorWatchInsightsQuadrantExplore">#3A9F91</Color>
+    <Color x:Key="ColorWatchInsightsQuadrantRelax">#C58A32</Color>
+    <Color x:Key="ColorWatchInsightsQuadrantEmotion">#C45F91</Color>
     <Color x:Key="ColorConfigMissingForeground">#916633</Color>
     <Color x:Key="ColorConfigMissingBackground">#FFF8ED</Color>
     <Color x:Key="ColorConfigMissingBorder">#E8CFA7</Color>
@@ -95,6 +115,26 @@
     <Color x:Key="ColorScanRunningBorder">#BAC9DD</Color>
     <Color x:Key="ColorScoreBadgeGlow">#7AC07A91</Color>
     <Color x:Key="ColorScanProgressGlow">#806B89AD</Color>
+    <Color x:Key="ColorCachedShadowLarge">#000000</Color>
+    <Color x:Key="ColorCachedShadowInline">#000000</Color>
+    <Color x:Key="ColorCachedShadowCompact">#000000</Color>
+    <Color x:Key="ColorCachedShadowScoreBadge">#7AC07A91</Color>
+    <Color x:Key="ColorCachedShadowScanProgress">#806B89AD</Color>
+    <sys:Double x:Key="CachedShadowLargeOpacity">0.27</sys:Double>
+    <sys:Double x:Key="CachedShadowInlineOpacity">0.23</sys:Double>
+    <sys:Double x:Key="CachedShadowCompactOpacity">0.19</sys:Double>
+    <sys:Double x:Key="CachedShadowScoreBadgeOpacity">0.40</sys:Double>
+    <sys:Double x:Key="CachedShadowScanProgressOpacity">0.54</sys:Double>
+    <sys:Double x:Key="CachedShadowLargeBlurRadius">18</sys:Double>
+    <sys:Double x:Key="CachedShadowInlineBlurRadius">12</sys:Double>
+    <sys:Double x:Key="CachedShadowCompactBlurRadius">10</sys:Double>
+    <sys:Double x:Key="CachedShadowScoreBadgeBlurRadius">8</sys:Double>
+    <sys:Double x:Key="CachedShadowScanProgressBlurRadius">8</sys:Double>
+    <sys:Double x:Key="CachedShadowLargeDepth">5</sys:Double>
+    <sys:Double x:Key="CachedShadowInlineDepth">3</sys:Double>
+    <sys:Double x:Key="CachedShadowCompactDepth">4</sys:Double>
+    <sys:Double x:Key="CachedShadowScoreBadgeDepth">1</sys:Double>
+    <sys:Double x:Key="CachedShadowScanProgressDepth">1</sys:Double>
 
     <SolidColorBrush x:Key="BrushBackground" Color="{StaticResource ColorBackground}" />
     <SolidColorBrush x:Key="BrushBackgroundAccent" Color="{StaticResource ColorBackgroundAccent}" />
@@ -176,6 +216,24 @@
     <SolidColorBrush x:Key="BrushInfoForeground" Color="{StaticResource ColorInfoForeground}" />
     <SolidColorBrush x:Key="BrushInfoBackground" Color="{StaticResource ColorInfoBackground}" />
     <SolidColorBrush x:Key="BrushInfoBorder" Color="{StaticResource ColorInfoBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsProgressTrack" Color="{StaticResource ColorWatchInsightsProgressTrack}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaIndicator" Color="{StaticResource ColorWatchInsightsDnaIndicator}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsKeywordLowBackground" Color="{StaticResource ColorWatchInsightsKeywordLowBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsKeywordLowBorder" Color="{StaticResource ColorWatchInsightsKeywordLowBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsKeywordMediumBackground" Color="{StaticResource ColorWatchInsightsKeywordMediumBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsKeywordMediumBorder" Color="{StaticResource ColorWatchInsightsKeywordMediumBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsKeywordHighBackground" Color="{StaticResource ColorWatchInsightsKeywordHighBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsKeywordHighBorder" Color="{StaticResource ColorWatchInsightsKeywordHighBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaTypeBackground" Color="{StaticResource ColorWatchInsightsDnaTypeBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaTypeBorder" Color="{StaticResource ColorWatchInsightsDnaTypeBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaEmotionBackground" Color="{StaticResource ColorWatchInsightsDnaEmotionBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaEmotionBorder" Color="{StaticResource ColorWatchInsightsDnaEmotionBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaSceneBackground" Color="{StaticResource ColorWatchInsightsDnaSceneBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaSceneBorder" Color="{StaticResource ColorWatchInsightsDnaSceneBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsQuadrantFamiliar" Color="{StaticResource ColorWatchInsightsQuadrantFamiliar}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsQuadrantExplore" Color="{StaticResource ColorWatchInsightsQuadrantExplore}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsQuadrantRelax" Color="{StaticResource ColorWatchInsightsQuadrantRelax}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsQuadrantEmotion" Color="{StaticResource ColorWatchInsightsQuadrantEmotion}" />
     <SolidColorBrush x:Key="BrushConfigMissingForeground" Color="{StaticResource ColorConfigMissingForeground}" />
     <SolidColorBrush x:Key="BrushConfigMissingBackground" Color="{StaticResource ColorConfigMissingBackground}" />
     <SolidColorBrush x:Key="BrushConfigMissingBorder" Color="{StaticResource ColorConfigMissingBorder}" />
@@ -210,6 +268,17 @@
         <GradientStop Color="#DAF5F0F4" Offset="0.62" />
         <GradientStop Color="#CBE8EEF5" Offset="1" />
     </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushWatchInsightsChromeGlassTint" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#64FFFFFF" Offset="0" />
+        <GradientStop Color="#50F8FBFF" Offset="0.52" />
+        <GradientStop Color="#40ECF3FA" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BrushWatchInsightsChromeGlassSheen" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#66FFFFFF" Offset="0" />
+        <GradientStop Color="#2EFFFFFF" Offset="0.44" />
+        <GradientStop Color="#0C91A4BC" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="BrushWatchInsightsChromeGlassBorder" Color="#72FFFFFF" />
     <SolidColorBrush x:Key="BrushGlassBorder" Color="#BFC7CED8" />
     <LinearGradientBrush x:Key="BrushGlassButton" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#F0FFFFFF" Offset="0" />
