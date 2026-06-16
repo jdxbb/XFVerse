@@ -394,7 +394,7 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
         HasFavoriteSeason = status.HasFavoriteSeason;
         HasNotInterestedSeason = status.HasNotInterestedSeason;
 
-        if (status.IsInLibrary)
+        if (status.TvSeriesId is > 0)
         {
             Name = string.IsNullOrWhiteSpace(status.Name) ? Name : status.Name;
             OriginalName = string.IsNullOrWhiteSpace(status.OriginalName) ? OriginalName : status.OriginalName;
@@ -404,8 +404,38 @@ public sealed class DiscoveryTvSeriesCardViewModel : ObservableObject
             FirstAirYear = status.FirstAirYear ?? FirstAirYear;
             _directorText = string.IsNullOrWhiteSpace(status.DirectorText) ? _directorText : status.DirectorText;
             _actorsText = string.IsNullOrWhiteSpace(status.ActorsText) ? _actorsText : status.ActorsText;
+            if (status.TmdbRating.HasValue)
+            {
+                TmdbRating = status.TmdbRating;
+            }
+
+            if (status.TmdbVoteCount.HasValue)
+            {
+                TmdbVoteCount = status.TmdbVoteCount;
+            }
+
+            if (status.OmdbScoreValue.HasValue)
+            {
+                SetOmdbRating(
+                    new MovieRatingItem
+                    {
+                        SourceName = "OMDb",
+                        ScoreValue = status.OmdbScoreScale is > 0
+                            ? Math.Clamp(status.OmdbScoreValue.Value / status.OmdbScoreScale.Value * 10d, 0d, 10d)
+                            : status.OmdbScoreValue.Value,
+                        ScoreScale = 10d,
+                        VoteCount = status.OmdbVoteCount,
+                        SourceUrl = status.OmdbSourceUrl,
+                        LastUpdatedAt = status.OmdbLastUpdatedAt
+                    });
+            }
+            else
+            {
+                SetOmdbRating(null);
+            }
         }
 
+        RefreshRating();
         OnPropertyChanged(nameof(TvSeriesId));
         OnPropertyChanged(nameof(Name));
         OnPropertyChanged(nameof(Title));

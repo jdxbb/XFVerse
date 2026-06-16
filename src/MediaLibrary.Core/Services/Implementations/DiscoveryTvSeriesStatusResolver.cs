@@ -41,6 +41,34 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                     Language = series.Language ?? string.Empty,
                     DirectorText = series.DirectorText ?? string.Empty,
                     ActorsText = series.ActorsText ?? string.Empty,
+                    TmdbRating = series.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    TmdbVoteCount = series.RatingSources
+                        .Where(rating => rating.SourceName == "TMDB")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbScoreValue = series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreValue)
+                        .FirstOrDefault(),
+                    OmdbScoreScale = series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => (double?)rating.ScoreScale)
+                        .FirstOrDefault(),
+                    OmdbVoteCount = series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.VoteCount)
+                        .FirstOrDefault(),
+                    OmdbSourceUrl = series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.SourceUrl ?? string.Empty)
+                        .FirstOrDefault() ?? string.Empty,
+                    OmdbLastUpdatedAt = series.RatingSources
+                        .Where(rating => rating.SourceName == "OMDb")
+                        .Select(rating => rating.LastUpdatedAt ?? rating.CreatedAt)
+                        .FirstOrDefault(),
                     EpisodeCount = series.Seasons.Sum(season => season.Episodes.Count),
                     WatchedEpisodeCount = series.Seasons.Sum(season => season.Episodes.Count(episode => episode.IsWatched)),
                     PlayableSeasonCount = series.Seasons.Count(
@@ -92,7 +120,14 @@ public sealed class DiscoveryTvSeriesStatusResolver : IDiscoveryTvSeriesStatusRe
                 Country = series.Country,
                 Language = series.Language,
                 DirectorText = series.DirectorText,
-                ActorsText = series.ActorsText
+                ActorsText = series.ActorsText,
+                TmdbRating = series.TmdbRating,
+                TmdbVoteCount = series.TmdbVoteCount,
+                OmdbScoreValue = series.OmdbScoreValue,
+                OmdbScoreScale = series.OmdbScoreScale,
+                OmdbVoteCount = series.OmdbVoteCount,
+                OmdbSourceUrl = series.OmdbSourceUrl,
+                OmdbLastUpdatedAt = series.OmdbLastUpdatedAt
             };
         }
 

@@ -42,6 +42,13 @@ public static class PosterCachedBackdropBehavior
             typeof(PosterCachedBackdropBehavior),
             new PropertyMetadata(DefaultPalette, OnBackdropPropertyChanged));
 
+    public static readonly DependencyProperty PaletteOverrideProperty =
+        DependencyProperty.RegisterAttached(
+            "PaletteOverride",
+            typeof(PosterBackdropPalette?),
+            typeof(PosterCachedBackdropBehavior),
+            new PropertyMetadata(null, OnBackdropPropertyChanged));
+
     public static readonly DependencyProperty VariantProperty =
         DependencyProperty.RegisterAttached(
             "Variant",
@@ -76,6 +83,16 @@ public static class PosterCachedBackdropBehavior
         target.SetValue(PaletteProperty, value);
     }
 
+    public static PosterBackdropPalette? GetPaletteOverride(DependencyObject target)
+    {
+        return (PosterBackdropPalette?)target.GetValue(PaletteOverrideProperty);
+    }
+
+    public static void SetPaletteOverride(DependencyObject target, PosterBackdropPalette? value)
+    {
+        target.SetValue(PaletteOverrideProperty, value);
+    }
+
     public static PosterBackdropVariant GetVariant(DependencyObject target)
     {
         return (PosterBackdropVariant)target.GetValue(VariantProperty);
@@ -96,7 +113,7 @@ public static class PosterCachedBackdropBehavior
 
     private static void ApplyBackdropWhenReady(Border border)
     {
-        var palette = GetPalette(border);
+        var palette = GetEffectivePalette(border);
         var variant = GetVariant(border);
         if (TryGetCachedBackdrop(palette, variant, out var cached))
         {
@@ -104,6 +121,7 @@ public static class PosterCachedBackdropBehavior
             return;
         }
 
+        border.SetCurrentValue(Border.BackgroundProperty, CreateImmediateBackdropBrush(palette, variant));
         var applyVersion = (int)border.GetValue(ApplyVersionProperty) + 1;
         border.SetValue(ApplyVersionProperty, applyVersion);
         _ = ApplyBackdropAsync(border, palette, variant, applyVersion);
@@ -121,7 +139,7 @@ public static class PosterCachedBackdropBehavior
             {
                 if (!GetIsEnabled(border)
                     || (int)border.GetValue(ApplyVersionProperty) != applyVersion
-                    || GetPalette(border) != palette
+                    || GetEffectivePalette(border) != palette
                     || GetVariant(border) != variant)
                 {
                     return;
@@ -129,6 +147,32 @@ public static class PosterCachedBackdropBehavior
 
                 border.SetCurrentValue(Border.BackgroundProperty, brush);
             });
+    }
+
+    private static PosterBackdropPalette GetEffectivePalette(DependencyObject target)
+    {
+        return GetPaletteOverride(target) ?? GetPalette(target);
+    }
+
+    private static Brush CreateImmediateBackdropBrush(PosterBackdropPalette palette, PosterBackdropVariant variant)
+    {
+        var isGlass = variant == PosterBackdropVariant.Glass;
+        var deepNeutral = isGlass ? Color.FromRgb(40, 46, 58) : Color.FromRgb(30, 38, 52);
+        var baseColor = Mix(deepNeutral, palette.Primary, isGlass ? 0.58 : 0.42);
+        var secondary = Mix(palette.Secondary, Colors.White, isGlass ? 0.25 : 0.16);
+        var accent = Mix(palette.Accent, Colors.White, isGlass ? 0.20 : 0.11);
+        var alpha = (byte)(isGlass ? 196 : 168);
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0d, 0d),
+            EndPoint = new Point(1d, 1d),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox
+        };
+        brush.GradientStops.Add(new GradientStop(WithAlpha(baseColor, alpha), 0d));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(secondary, (byte)Math.Min(220, alpha + 20)), 0.48d));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(accent, (byte)Math.Min(220, alpha + 12)), 1d));
+        brush.Freeze();
+        return brush;
     }
 
     private static bool TryGetCachedBackdrop(
@@ -262,6 +306,11 @@ public static class PosterCachedBackdropBehavior
             (byte)Math.Round(left.R + ((right.R - left.R) * clamped)),
             (byte)Math.Round(left.G + ((right.G - left.G) * clamped)),
             (byte)Math.Round(left.B + ((right.B - left.B) * clamped)));
+    }
+
+    private static Color WithAlpha(Color color, byte alpha)
+    {
+        return Color.FromArgb(alpha, color.R, color.G, color.B);
     }
 
     private static byte Premultiply(byte value, byte alpha)

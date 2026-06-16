@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -18,6 +19,8 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
     private const double MatchedConfidence = 0.80d;
     private const double NeutralYearScore = 0.70d;
     private const int MovieTitleMaxLength = 300;
+    private static readonly ConcurrentDictionary<int, byte> BackgroundMovieListMetadataHydrationIds = new();
+    private static readonly SemaphoreSlim BackgroundMovieListMetadataHydrationGate = new(2, 2);
     private const string UnidentifiedTvSeriesCandidateTitle = "未识别剧集候选";
     private const string UnidentifiedTvSeasonCandidateTitle = "未识别电视剧季";
 
@@ -299,6 +302,11 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             {
                 ScanIdentificationDiagnostics.Write(
                     $"event=movie-skip mediaFileId={mediaFileId} reason=already-stable-movie movieId={mediaFile.MovieId.Value} tmdbId={mediaFile.Movie.TmdbId.Value}");
+                if (NeedsMovieListMetadataHydration(mediaFile.Movie))
+                {
+                    QueueMovieListMetadataHydration(mediaFile.MovieId.Value, "scan-stable-skip");
+                }
+
                 continue;
             }
 
@@ -414,9 +422,10 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
 
             try
             {
-                await ApplyCandidateAsync(dbContext, mediaFile, effectiveCandidate, status, result, cancellationToken);
+                var targetMovieId = await ApplyCandidateAsync(dbContext, mediaFile, effectiveCandidate, status, result, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 result.BoundCount++;
+                QueueMovieListMetadataHydration(targetMovieId, "scan-apply");
                 ScanIdentificationDiagnostics.Write(
                     $"event=movie-apply-complete mediaFileId={mediaFileId} tmdbId={effectiveCandidate.TmdbId} title={ScanIdentificationDiagnostics.FormatValue(effectiveCandidate.Title)} status={status} movieResultStatus={status} movieAutoApply=true movieAutoApplyBlockedReason=(none)");
             }
@@ -1534,6 +1543,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
             applyStopwatch.Stop();
             WriteBatch2Event(
                 $"event=batch2-ai-identify-apply-complete movieId={movieId} elapsedMs={applyStopwatch.ElapsedMilliseconds} status=success");
+            QueueMovieListMetadataHydration(targetMovieId, "batch2-ai-identify");
             return BuildAutoIdentifyResult(
                 movieId,
                 AutoIdentifyStatus.Success,
@@ -1622,7 +1632,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         var previousEpisodeId = mediaFile.EpisodeId;
         mediaFile.EpisodeId = null;
         mediaFile.Episode = null;
-        await ApplyCandidateAsync(
+        var targetMovieId = await ApplyCandidateAsync(
             dbContext,
             mediaFile,
             details,
@@ -1633,7 +1643,6 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         ScanIdentificationDiagnostics.Write(
             $"event=correction-movie-db-applied mediaFileId={mediaFileId} tmdbId={tmdbId}");
 
-        var targetMovieId = mediaFile.MovieId ?? mediaFile.Movie?.Id ?? throw new InvalidOperationException("影片修正结果无效。");
         if (previousMovieId.HasValue && previousMovieId.Value != targetMovieId)
         {
             await ReconcileMovieAfterSourceMoveAsync(dbContext, previousMovieId.Value, mediaFile.Id, cancellationToken);
@@ -1649,6 +1658,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         await transaction.CommitAsync(cancellationToken);
         ScanIdentificationDiagnostics.Write(
             $"event=correction-movie-db-committed mediaFileId={mediaFileId} targetMovieId={targetMovieId}");
+        QueueMovieListMetadataHydration(targetMovieId, "correction-movie");
         return targetMovieId;
     }
 
@@ -1804,7 +1814,7 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         return targetMovie.Id;
     }
 
-    private async Task ApplyCandidateAsync(
+    private async Task<int> ApplyCandidateAsync(
         AppDbContext dbContext,
         MediaFile mediaFile,
         MetadataSearchCandidate candidate,
@@ -1951,6 +1961,8 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         {
             await CleanupMovieIfOrphanedAsync(dbContext, currentMovie.Id, cancellationToken);
         }
+
+        return targetMovie.Id;
     }
 
     private static bool IsStableIdentifiedMovie(Movie movie)
@@ -1958,6 +1970,68 @@ public sealed partial class MovieIdentificationService : IMovieIdentificationSer
         return movie.TmdbId is > 0
                && (movie.IdentificationStatus == IdentificationStatus.Matched
                    || movie.IdentificationStatus == IdentificationStatus.ManualConfirmed);
+    }
+
+    private static bool NeedsMovieListMetadataHydration(Movie movie)
+    {
+        if (movie.TmdbId is not > 0 || !IsStableIdentifiedMovie(movie))
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(movie.DirectorText)
+               || string.IsNullOrWhiteSpace(movie.ActorsText)
+               || string.IsNullOrWhiteSpace(movie.GenresText)
+               || string.IsNullOrWhiteSpace(movie.Overview)
+               || string.IsNullOrWhiteSpace(movie.PosterRemoteUrl)
+               || string.IsNullOrWhiteSpace(movie.ImdbId)
+               || !movie.RuntimeMinutes.HasValue
+               || !HasUsefulRating(movie, "TMDB")
+               || !HasUsefulRating(movie, "OMDb");
+    }
+
+    private void QueueMovieListMetadataHydration(int movieId, string source)
+    {
+        if (movieId <= 0 || !BackgroundMovieListMetadataHydrationIds.TryAdd(movieId, 0))
+        {
+            return;
+        }
+
+        ScanIdentificationDiagnostics.Write(
+            $"event=movie-list-metadata-hydration-queued source={ScanIdentificationDiagnostics.FormatValue(source)} movieId={movieId} mode=background reason=post-identification-omdb-backfill");
+
+        _ = Task.Run(async () =>
+        {
+            var queuedAtUtc = DateTime.UtcNow;
+            var acquired = false;
+            try
+            {
+                await BackgroundMovieListMetadataHydrationGate.WaitAsync(CancellationToken.None);
+                acquired = true;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-list-metadata-hydration-start source={ScanIdentificationDiagnostics.FormatValue(source)} movieId={movieId}");
+
+                var changed = await EnsureMovieListMetadataAsync(movieId, CancellationToken.None);
+                var durationMs = (long)(DateTime.UtcNow - queuedAtUtc).TotalMilliseconds;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-list-metadata-hydration-complete source={ScanIdentificationDiagnostics.FormatValue(source)} movieId={movieId} changed={changed.ToString().ToLowerInvariant()} durationMs={durationMs}");
+            }
+            catch (Exception exception)
+            {
+                var durationMs = (long)(DateTime.UtcNow - queuedAtUtc).TotalMilliseconds;
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-list-metadata-hydration-error source={ScanIdentificationDiagnostics.FormatValue(source)} movieId={movieId} durationMs={durationMs} error={ScanIdentificationDiagnostics.FormatValue(TrimMessage(exception.Message), 220)}");
+            }
+            finally
+            {
+                if (acquired)
+                {
+                    BackgroundMovieListMetadataHydrationGate.Release();
+                }
+
+                BackgroundMovieListMetadataHydrationIds.TryRemove(movieId, out _);
+            }
+        });
     }
 
     private static void ClearUnidentifiedMovieState(Movie movie, DateTime updatedAtUtc)

@@ -110,11 +110,6 @@ public sealed class PersonaPaletteText : FrameworkElement
         var outline = isDarkTheme
             ? Mix(SelectDarkest(palette), Colors.Black, 0.32d)
             : Mix(SelectLightest(palette), Colors.White, 0.46d);
-        var shadow = isDarkTheme
-            ? Mix(SelectLightest(palette), Colors.White, 0.48d)
-            : Mix(palette.Accent, SelectDarkest(palette), 0.18d);
-
-        DrawProjectedShadow(drawingContext, geometry, shadow, isDarkTheme);
 
         var fill = new LinearGradientBrush(inkTop, inkBottom, new Point(0.5d, 0d), new Point(0.5d, 1d));
         fill.Freeze();
@@ -125,6 +120,32 @@ public sealed class PersonaPaletteText : FrameworkElement
             LineJoin = PenLineJoin.Round
         };
         outlinePen.Freeze();
+        var shadowSource = isDarkTheme
+            ? SelectLightest(palette)
+            : SelectDarkest(palette);
+        var shadowCore = isDarkTheme
+            ? Mix(shadowSource, Colors.White, 0.22d)
+            : Mix(shadowSource, Colors.Black, 0.42d);
+        var shadowAuraBrush = CreateFrozenBrush(Color.FromArgb(
+            isDarkTheme ? (byte)92 : (byte)54,
+            shadowCore.R,
+            shadowCore.G,
+            shadowCore.B));
+        var shadowSoftBrush = CreateFrozenBrush(Color.FromArgb(
+            isDarkTheme ? (byte)132 : (byte)82,
+            shadowCore.R,
+            shadowCore.G,
+            shadowCore.B));
+        var shadowCoreBrush = CreateFrozenBrush(Color.FromArgb(
+            isDarkTheme ? (byte)174 : (byte)108,
+            shadowCore.R,
+            shadowCore.G,
+            shadowCore.B));
+        DrawTranslatedGeometry(drawingContext, geometry, shadowAuraBrush, -2.2d, 8d);
+        DrawTranslatedGeometry(drawingContext, geometry, shadowAuraBrush, 2.2d, 8d);
+        DrawTranslatedGeometry(drawingContext, geometry, shadowSoftBrush, -1.1d, 6d);
+        DrawTranslatedGeometry(drawingContext, geometry, shadowSoftBrush, 1.1d, 6d);
+        DrawTranslatedGeometry(drawingContext, geometry, shadowCoreBrush, 0d, 3d);
         drawingContext.DrawGeometry(fill, outlinePen, geometry);
     }
 
@@ -138,43 +159,6 @@ public sealed class PersonaPaletteText : FrameworkElement
             FontSize,
             Brushes.Black,
             VisualTreeHelper.GetDpi(this).PixelsPerDip);
-    }
-
-    private static void DrawProjectedShadow(
-        DrawingContext drawingContext,
-        Geometry geometry,
-        Color color,
-        bool isDarkTheme)
-    {
-        var glowBrush = new SolidColorBrush(Color.FromArgb(
-            isDarkTheme ? (byte)82 : (byte)62,
-            color.R,
-            color.G,
-            color.B));
-        glowBrush.Freeze();
-        var glowPen = new Pen(glowBrush, isDarkTheme ? 6.5d : 5.5d)
-        {
-            LineJoin = PenLineJoin.Round
-        };
-        glowPen.Freeze();
-        drawingContext.DrawGeometry(null, glowPen, geometry);
-
-        foreach (var (offsetX, offsetY, opacity) in new[]
-                 {
-                     (-3d, 5d, isDarkTheme ? 0.28d : 0.22d),
-                     (3d, 5d, isDarkTheme ? 0.30d : 0.24d),
-                     (-2d, 8d, isDarkTheme ? 0.24d : 0.19d),
-                     (2d, 8d, isDarkTheme ? 0.24d : 0.19d),
-                     (0d, 11d, isDarkTheme ? 0.18d : 0.14d)
-                 })
-        {
-            var shadowGeometry = geometry.Clone();
-            shadowGeometry.Transform = new TranslateTransform(offsetX, offsetY);
-            shadowGeometry.Freeze();
-            var brush = new SolidColorBrush(Color.FromArgb((byte)Math.Round(255d * opacity), color.R, color.G, color.B));
-            brush.Freeze();
-            drawingContext.DrawGeometry(brush, null, shadowGeometry);
-        }
     }
 
     private static Color SelectLightest(PosterBackdropPalette palette)
@@ -204,4 +188,24 @@ public sealed class PersonaPaletteText : FrameworkElement
             (byte)Math.Round((left.G * (1d - weight)) + (right.G * weight)),
             (byte)Math.Round((left.B * (1d - weight)) + (right.B * weight)));
     }
+
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
+    private static void DrawTranslatedGeometry(
+        DrawingContext drawingContext,
+        Geometry geometry,
+        Brush brush,
+        double offsetX,
+        double offsetY)
+    {
+        drawingContext.PushTransform(new TranslateTransform(offsetX, offsetY));
+        drawingContext.DrawGeometry(brush, null, geometry);
+        drawingContext.Pop();
+    }
+
 }

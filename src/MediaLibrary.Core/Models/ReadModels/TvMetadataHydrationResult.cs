@@ -18,6 +18,8 @@ public sealed class TvMetadataHydrationResult
 
     public int UpdatedEpisodeCount { get; set; }
 
+    public bool SeriesChanged { get; set; }
+
     public IReadOnlyList<string> Errors => _errors;
 
     public bool HasErrors => _errors.Count > 0;
@@ -27,6 +29,12 @@ public sealed class TvMetadataHydrationResult
     public bool Success => HasMetadata && !HasErrors;
 
     public bool PartialSuccess => HasMetadata && HasErrors;
+
+    public bool HasChanges => SeriesChanged
+                              || AddedSeasonCount > 0
+                              || UpdatedSeasonCount > 0
+                              || AddedEpisodeCount > 0
+                              || UpdatedEpisodeCount > 0;
 
     public void AddError(string message)
     {

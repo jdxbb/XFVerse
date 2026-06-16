@@ -3921,74 +3921,111 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         _pendingLocalMovieCardRefresh = false;
         var refreshVersion = ++_localMovieCardRefreshVersion;
         var items = GetCachedMovieCards();
-        if (items.Count == 0)
+        var tvItems = GetCachedTvSeriesCards();
+        if (items.Count == 0 && tvItems.Count == 0)
         {
             return;
         }
 
-        IReadOnlyDictionary<int, DiscoveryMovieStatus> statuses;
-        try
+        if (items.Count > 0)
         {
-            statuses = await _statusResolver.ResolveAsync(
-                items.Select(item => item.TmdbId).Where(tmdbId => tmdbId > 0).Distinct(),
-                CancellationToken.None);
-        }
-        catch
-        {
-            _pendingLocalMovieCardRefresh = true;
-            return;
-        }
-
-        if (refreshVersion != _localMovieCardRefreshVersion)
-        {
-            return;
-        }
-
-        await DispatchAsync(
-            () =>
-            {
-                foreach (var item in items)
-                {
-                    if (statuses.TryGetValue(item.TmdbId, out var status))
-                    {
-                        item.ApplyStatus(status);
-                    }
-                    else
-                    {
-                        item.ApplyMissingStatus();
-                    }
-                }
-
-                ApplyExternalTagCacheSnapshots(items);
-            });
-
-        var itemsByMovieId = items
-            .Where(item => item.MovieId is > 0)
-            .GroupBy(item => item.MovieId!.Value)
-            .ToArray();
-        foreach (var group in itemsByMovieId)
-        {
-            MovieDetailModel? detail;
+            IReadOnlyDictionary<int, DiscoveryMovieStatus> statuses;
             try
             {
-                detail = await _movieDetailQueryService.GetMovieDetailAsync(group.Key, CancellationToken.None);
+                statuses = await _statusResolver.ResolveAsync(
+                    items.Select(item => item.TmdbId).Where(tmdbId => tmdbId > 0).Distinct(),
+                    CancellationToken.None);
             }
             catch
             {
-                continue;
+                _pendingLocalMovieCardRefresh = true;
+                return;
             }
 
-            if (detail is null || refreshVersion != _localMovieCardRefreshVersion)
+            if (refreshVersion != _localMovieCardRefreshVersion)
             {
-                continue;
+                return;
             }
 
             await DispatchAsync(
                 () =>
                 {
-                    foreach (var item in group)
+                    foreach (var item in items)
                     {
-                        item.ApplyLocalTagSnapshot(detail);
+                        if (statuses.TryGetValue(item.TmdbId, out var status))
+                        {
+                            item.ApplyStatus(status);
+                        }
+                        else
+                        {
+                            item.ApplyMissingStatus();
+                        }
+                    }
+
+                    ApplyExternalTagCacheSnapshots(items);
+                });
+
+            var itemsByMovieId = items
+                .Where(item => item.MovieId is > 0)
+                .GroupBy(item => item.MovieId!.Value)
+                .ToArray();
+            foreach (var group in itemsByMovieId)
+            {
+                MovieDetailModel? detail;
+                try
+                {
+                    detail = await _movieDetailQueryService.GetMovieDetailAsync(group.Key, CancellationToken.None);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (detail is null || refreshVersion != _localMovieCardRefreshVersion)
+                {
+                    continue;
+                }
+
+                await DispatchAsync(
+                    () =>
+                    {
+                        foreach (var item in group)
+                        {
+                            item.ApplyLocalTagSnapshot(detail);
+                        }
+                    });
+            }
+        }
+
+        if (tvItems.Count > 0)
+        {
+            IReadOnlyDictionary<int, DiscoveryTvSeriesStatus> statuses;
+            try
+            {
+                statuses = await _tvStatusResolver.ResolveAsync(
+                    tvItems.Select(item => item.TmdbSeriesId).Where(tmdbId => tmdbId > 0).Distinct(),
+                    CancellationToken.None);
+            }
+            catch
+            {
+                _pendingLocalMovieCardRefresh = true;
+                return;
+            }
+
+            if (refreshVersion != _localMovieCardRefreshVersion)
+            {
+                return;
+            }
+
+            await DispatchAsync(
+                () =>
+                {
+                    foreach (var item in tvItems)
+                    {
+                        if (statuses.TryGetValue(item.TmdbSeriesId, out var status))
+                        {
+                            item.ApplyStatus(status);
+                        }
                     }
                 });
         }
@@ -3999,6 +4036,14 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
         return _searchResultPool
             .Concat(_rankingMovies)
             .Where(item => item.TmdbId > 0)
+            .ToList();
+    }
+
+    private IReadOnlyList<DiscoveryTvSeriesCardViewModel> GetCachedTvSeriesCards()
+    {
+        return _tvSearchResultPool
+            .Concat(_rankingTvSeries)
+            .Where(item => item.TmdbSeriesId > 0)
             .ToList();
     }
 

@@ -15,7 +15,7 @@
         <SolidColorBrush x:Key="FavoriteMediaCardAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="FavoriteMediaCardAccentTextBrush" Color="#111827" />
         <SolidColorBrush x:Key="FavoriteTagDividerBrush" Color="#7DD3FC" />
-        <SolidColorBrush x:Key="FavoriteRatingGoldBrush" Color="{DynamicResource ColorWarning}" />
+        <SolidColorBrush x:Key="FavoriteRatingGoldBrush" Color="{DynamicResource ColorRatingGold}" />
         <SolidColorBrush x:Key="FavoriteIconOutlineBrush" Color="#F8FAFC" />
 
         <Style x:Key="FavoriteModernScrollBarThumbStyle" TargetType="{x:Type Thumb}">
@@ -603,14 +603,10 @@
         <DataTemplate x:Key="FavoriteLoadingStateTemplate">
             <Border MinHeight="320"
                     Style="{StaticResource LoadingStateStyle}">
-                <StackPanel HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                    <Control Width="34"
-                             Height="34"
-                             Template="{StaticResource LoadingSpinnerTemplate}" />
-                    <TextBlock Margin="0,14,0,0"
-                               Text="正在加载收藏夹"
-                               Style="{StaticResource InlineLoadingStyle}" />
+                <StackPanel Style="{StaticResource PageLoadingHostStyle}">
+                    <Control Style="{StaticResource PageLoadingSpinnerStyle}" />
+                    <TextBlock Text="正在加载收藏夹"
+                               Style="{StaticResource PageLoadingTextStyle}" />
                 </StackPanel>
             </Border>
         </DataTemplate>

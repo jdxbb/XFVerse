@@ -92,13 +92,15 @@ public interface ITmdbService
     Task<TmdbTvSeriesDetailResult?> GetTvSeriesDetailsAsync(
         int seriesId,
         string language = "zh-CN",
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool forceRefresh = false);
 
     Task<TmdbTvSeasonDetailResult?> GetTvSeasonDetailsAsync(
         int seriesId,
         int seasonNumber,
         string language = "zh-CN",
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool forceRefresh = false);
 
     Task<TmdbTvSeriesExternalIdsResult?> GetTvSeriesExternalIdsAsync(
         int seriesId,
@@ -122,5 +124,6 @@ public interface ITmdbService
 
     Task<MetadataSearchCandidate?> GetMovieDetailsAsync(
         int tmdbId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool forceRefresh = false);
 }

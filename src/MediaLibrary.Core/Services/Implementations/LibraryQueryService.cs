@@ -293,7 +293,7 @@ public sealed class LibraryQueryService : ILibraryQueryService
                         HasUserState = hasUserState,
                         HasWatchHistory = x.HasWatchHistory,
                         ProgressPercent = progressPercent,
-                        UpdatedAt = MaxDate(collectionUpdatedAt, x.LatestSourceUpdatedAt, x.CreatedAt)
+                        UpdatedAt = MaxDate(collectionUpdatedAt, x.UpdatedAt, x.LatestSourceUpdatedAt, x.CreatedAt)
                     };
             })
             .Where(x => x.IsVisibleInLibrary)

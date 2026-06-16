@@ -18,8 +18,10 @@ namespace MediaLibrary.App.Views.Pages;
 public partial class WatchInsightsPage : UserControl
 {
     private const int ScrollRestoreMaxAttempts = 16;
-    private const double BubbleRippleDistanceThreshold = 25d;
-    private const double BubbleFlowWaveLifetimeSeconds = 1.85d;
+    private const double BubbleRippleDistanceThreshold = 32d;
+    private const double BubbleSweepIntervalSeconds = 9.4d;
+    private const double BubbleSweepDurationSeconds = 8.6d;
+    private const string InitialLoadingNone = "none";
     private static readonly Dictionary<string, Dictionary<string, PreferenceBubbleState>> PreferenceBubbleStateCache = new(StringComparer.Ordinal);
     private INotifyPropertyChanged? _propertyChangedSource;
     private bool _isRestoringScrollOffset;
@@ -34,9 +36,13 @@ public partial class WatchInsightsPage : UserControl
     private double _slowFrameTotalMs;
     private double _slowFrameMaxMs;
     private bool _isFrameDiagnosticsActive;
+    private string _activeInitialLoadingTab = InitialLoadingNone;
+    private long _initialLoadingStartedAt;
+    private int _initialLoadingSlowFrameCount;
+    private double _initialLoadingSlowFrameTotalMs;
+    private double _initialLoadingSlowFrameMaxMs;
     private INotifyCollectionChanged? _bubbleCollectionChangedSource;
     private readonly List<PreferenceBubbleParticle> _preferenceBubbleParticles = [];
-    private readonly List<BubbleFlowWave> _bubbleFlowWaves = [];
     private int _bubbleRebuildVersion;
     private long _lastBubblePhysicsTimestamp;
     private bool _isBubbleCanvasInViewport;
@@ -51,7 +57,40 @@ public partial class WatchInsightsPage : UserControl
     private Point _lastBubbleRipplePosition;
     private long _lastBubbleRippleTimestamp;
     private bool _hasBubbleRippleAnchor;
-    private int _bubbleRippleSequence;
+    private long _nextBubbleSweepTimestamp;
+    private long _activeBubbleSweepStartedAt;
+    private Point _activeBubbleSweepOrigin;
+    private Vector _activeBubbleSweepDirection = new(1d, 0d);
+    private double _activeBubbleSweepReach;
+    private double _activeBubbleSweepInfluenceRadius;
+    private double _activeBubbleSweepLength;
+    private double _activeBubbleSweepAmplitude;
+    private readonly Canvas _unrealizedBubbleCanvas = new();
+    private Canvas? _bubbleCanvas;
+    private ContentControl? _watchLikeLeftCard;
+    private ContentControl? _watchLikeCenterCard;
+    private ContentControl? _watchLikeRightCard;
+    private string? _hoveredTasteGraphNodeId;
+    private string? _selectedTasteGraphNodeId;
+    private bool _isProfileDnaScrollableStateUpdateQueued;
+
+    private Canvas BubbleCanvas
+    {
+        get
+        {
+            _bubbleCanvas = FindNamedVisual<Canvas>(this, "BubbleCanvas") ?? _bubbleCanvas;
+            return _bubbleCanvas ?? _unrealizedBubbleCanvas;
+        }
+    }
+
+    private ContentControl WatchLikeLeftCard =>
+        _watchLikeLeftCard ??= FindRequiredNamedVisual<ContentControl>("WatchLikeLeftCard");
+
+    private ContentControl WatchLikeCenterCard =>
+        _watchLikeCenterCard ??= FindRequiredNamedVisual<ContentControl>("WatchLikeCenterCard");
+
+    private ContentControl WatchLikeRightCard =>
+        _watchLikeRightCard ??= FindRequiredNamedVisual<ContentControl>("WatchLikeRightCard");
 
     public WatchInsightsPage()
     {
@@ -67,6 +106,7 @@ public partial class WatchInsightsPage : UserControl
         WatchInsightsDiagnostics.Write("layer=view event=loaded");
         AttachState();
         StartFrameDiagnostics();
+        UpdateInitialLoadingDiagnostics("loaded");
         QueueApplyScrollOffset("loaded");
         QueueLayoutDiagnostics("loaded");
         QueuePreferenceBubbleRebuild();
@@ -75,8 +115,11 @@ public partial class WatchInsightsPage : UserControl
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         StoreCurrentScrollOffset();
+        _hoveredTasteGraphNodeId = null;
+        _selectedTasteGraphNodeId = null;
         DetachState();
         AttachState();
+        UpdateInitialLoadingDiagnostics("data-context-changed");
         QueueApplyScrollOffset("data-context-changed");
         QueueLayoutDiagnostics("data-context-changed");
     }
@@ -84,6 +127,9 @@ public partial class WatchInsightsPage : UserControl
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         StoreCurrentScrollOffset();
+        _hoveredTasteGraphNodeId = null;
+        _selectedTasteGraphNodeId = null;
+        SetInitialLoadingDiagnosticsState(InitialLoadingNone, "unloaded");
         StopFrameDiagnostics("unloaded");
         DetachState();
         ClearPreferenceBubbles();
@@ -95,13 +141,16 @@ public partial class WatchInsightsPage : UserControl
         if (e.NewValue is false)
         {
             StoreCurrentScrollOffset();
+            SetInitialLoadingDiagnosticsState(InitialLoadingNone, "hidden");
             StopFrameDiagnostics("hidden");
             _lastBubblePhysicsTimestamp = 0;
             _isBubbleCanvasInViewport = false;
+            ResetBubbleSweepSchedule();
             return;
         }
 
         StartFrameDiagnostics();
+        UpdateInitialLoadingDiagnostics("visible");
         QueueApplyScrollOffset("visible");
         QueueLayoutDiagnostics("visible");
         QueuePreferenceBubbleRebuild();
@@ -174,6 +223,7 @@ public partial class WatchInsightsPage : UserControl
 
         if (e.PropertyName is nameof(WatchInsightsViewModel.SelectedTabIndex))
         {
+            UpdateInitialLoadingDiagnostics("tab-changed");
             QueueApplyScrollOffset("tab-changed");
             QueueLayoutDiagnostics("tab-changed");
             QueuePreferenceBubbleRebuild();
@@ -190,6 +240,14 @@ public partial class WatchInsightsPage : UserControl
             QueueApplyScrollOffset("statistics-load-complete");
             QueueLayoutDiagnostics("statistics-load-complete");
             QueuePreferenceBubbleRebuild();
+        }
+
+        if (e.PropertyName is nameof(WatchInsightsViewModel.IsLoadingProfile)
+            or nameof(WatchInsightsViewModel.IsLoadingStatistics)
+            or nameof(WatchInsightsViewModel.IsProfileInitialLoading)
+            or nameof(WatchInsightsViewModel.IsStatisticsInitialLoading))
+        {
+            UpdateInitialLoadingDiagnostics(e.PropertyName);
         }
     }
 
@@ -242,9 +300,9 @@ public partial class WatchInsightsPage : UserControl
 
         var rippleDistance = (position - _lastBubbleRipplePosition).Length;
         var rippleElapsed = Stopwatch.GetElapsedTime(_lastBubbleRippleTimestamp, now);
-        if (rippleDistance >= BubbleRippleDistanceThreshold && rippleElapsed >= TimeSpan.FromMilliseconds(70))
+        if (rippleDistance >= BubbleRippleDistanceThreshold && rippleElapsed >= TimeSpan.FromMilliseconds(90))
         {
-            CreateBubbleRipple(position, _bubblePointerVelocity, now);
+            CreateBubbleRipple(position, _bubblePointerVelocity);
             _lastBubbleRipplePosition = position;
             _lastBubbleRippleTimestamp = now;
         }
@@ -258,7 +316,7 @@ public partial class WatchInsightsPage : UserControl
         _hasBubbleRippleAnchor = false;
     }
 
-    private void CreateBubbleRipple(Point position, Vector pointerVelocity, long createdAt)
+    private void CreateBubbleRipple(Point position, Vector pointerVelocity)
     {
         var speed = pointerVelocity.Length;
         var direction = speed > 1d
@@ -272,30 +330,231 @@ public partial class WatchInsightsPage : UserControl
             origin,
             angle,
             accentColor,
-            width: 34d,
-            height: 22d,
-            maximumScaleX: 13.5d + speedRatio * 3d,
-            maximumScaleY: 7.2d + speedRatio * 1.8d,
-            initialOpacity: 0.58d,
-            duration: TimeSpan.FromMilliseconds(1200d + speedRatio * 220d),
+            width: 28d,
+            height: 19d,
+            maximumScaleX: 9d + speedRatio * 1.6d,
+            maximumScaleY: 5.9d + speedRatio * 0.9d,
+            initialOpacity: 0.62d,
+            duration: TimeSpan.FromMilliseconds(1040d + speedRatio * 180d),
             beginTime: TimeSpan.Zero,
             strokeThickness: 1.5d);
-        if (++_bubbleRippleSequence % 2 == 0 || speedRatio >= 0.72d)
+    }
+
+    private BubbleSweepSample? UpdateBubbleSweep(long now)
+    {
+        if (_activeBubbleSweepStartedAt > 0)
         {
-            CreateBubbleRippleVisual(
-                origin - (direction * 8d),
-                angle,
-                accentColor,
-                width: 38d,
-                height: 25d,
-                maximumScaleX: 21d + speedRatio * 4d,
-                maximumScaleY: 11.5d + speedRatio * 2d,
-                initialOpacity: 0.34d,
-                duration: TimeSpan.FromMilliseconds(1650d + speedRatio * 260d),
-                beginTime: TimeSpan.FromMilliseconds(120d),
-                strokeThickness: 1.1d);
+            var activeElapsed = Stopwatch.GetElapsedTime(_activeBubbleSweepStartedAt, now).TotalSeconds;
+            if (activeElapsed < BubbleSweepDurationSeconds)
+            {
+                return CreateBubbleSweepSample(activeElapsed / BubbleSweepDurationSeconds);
+            }
+
+            _activeBubbleSweepStartedAt = 0;
         }
-        _bubbleFlowWaves.Add(new BubbleFlowWave(position, direction, speed, createdAt));
+
+        if (_nextBubbleSweepTimestamp == 0)
+        {
+            _nextBubbleSweepTimestamp = now + (long)((BubbleSweepIntervalSeconds * 0.72d) * Stopwatch.Frequency);
+            return null;
+        }
+
+        if (now < _nextBubbleSweepTimestamp)
+        {
+            return null;
+        }
+
+        StartBubbleSweep(now);
+        if (_activeBubbleSweepStartedAt == 0)
+        {
+            return null;
+        }
+
+        return CreateBubbleSweepSample(0d);
+    }
+
+    private void StartBubbleSweep(long now)
+    {
+        var canvasWidth = BubbleCanvas.ActualWidth;
+        var canvasHeight = BubbleCanvas.ActualHeight;
+        if (canvasWidth <= 0d || canvasHeight <= 0d)
+        {
+            return;
+        }
+
+        var placement = CreateBubbleSweepPlacement(canvasWidth, canvasHeight, Random.Shared.Next(8));
+        var diagonal = Math.Sqrt((canvasWidth * canvasWidth) + (canvasHeight * canvasHeight));
+
+        _activeBubbleSweepStartedAt = now;
+        _activeBubbleSweepOrigin = placement.Origin;
+        _activeBubbleSweepDirection = placement.Direction;
+        _activeBubbleSweepReach = placement.TravelDistance;
+        _activeBubbleSweepLength = placement.Length;
+        _activeBubbleSweepInfluenceRadius = Math.Clamp(diagonal * 0.16d, 120d, 190d);
+        _activeBubbleSweepAmplitude = Math.Clamp(diagonal * 0.018d, 10d, 18d);
+        _nextBubbleSweepTimestamp = now + (long)(RandomBetween(Random.Shared, BubbleSweepIntervalSeconds * 0.9d, BubbleSweepIntervalSeconds * 1.25d) * Stopwatch.Frequency);
+        CreateBubbleSweepVisual();
+    }
+
+    private BubbleSweepSample CreateBubbleSweepSample(double progress)
+    {
+        var normalizedProgress = Math.Clamp(progress, 0d, 1d);
+        var travel = _activeBubbleSweepReach * normalizedProgress;
+        var strength = 980d * Math.Pow(1d - normalizedProgress, 1.32d);
+        return new BubbleSweepSample(
+            _activeBubbleSweepOrigin,
+            _activeBubbleSweepDirection,
+            travel,
+            _activeBubbleSweepReach,
+            _activeBubbleSweepInfluenceRadius,
+            normalizedProgress,
+            strength,
+            _activeBubbleSweepLength);
+    }
+
+    private void CreateBubbleSweepVisual()
+    {
+        if (_activeBubbleSweepReach <= 0d || _activeBubbleSweepLength <= 0d)
+        {
+            return;
+        }
+
+        var accent = ResolveBubbleRippleColor();
+        var host = new Canvas
+        {
+            Width = BubbleCanvas.ActualWidth,
+            Height = BubbleCanvas.ActualHeight,
+            Opacity = 0d,
+            IsHitTestVisible = false
+        };
+        var normal = NormalizeOrDefault(_activeBubbleSweepDirection, new Vector(1d, 0d));
+        var tangent = new Vector(-normal.Y, normal.X);
+        foreach (var (normalOffset, amplitudeScale, phase, thickness, alpha) in new[]
+                 {
+                     (-8d, 0.62d, 0.65d, 1.1d, (byte)62),
+                     (0d, 1d, 0d, 2.05d, (byte)148),
+                     (9d, 0.72d, 1.35d, 1.25d, (byte)84)
+                 })
+        {
+            var stroke = new SolidColorBrush(Color.FromArgb(alpha, accent.R, accent.G, accent.B));
+            stroke.Freeze();
+            host.Children.Add(new System.Windows.Shapes.Path
+            {
+                Data = CreateBubbleSweepGeometry(
+                    _activeBubbleSweepOrigin + (normal * normalOffset),
+                    normal,
+                    tangent,
+                    _activeBubbleSweepLength,
+                    _activeBubbleSweepAmplitude * amplitudeScale,
+                    phase),
+                Stroke = stroke,
+                StrokeThickness = thickness,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round,
+                IsHitTestVisible = false
+            });
+        }
+
+        Panel.SetZIndex(host, 3);
+        BubbleCanvas.Children.Add(host);
+
+        var translation = new TranslateTransform();
+        host.RenderTransform = translation;
+        var duration = TimeSpan.FromSeconds(BubbleSweepDurationSeconds);
+        translation.BeginAnimation(
+            TranslateTransform.XProperty,
+            new DoubleAnimation(0d, normal.X * _activeBubbleSweepReach, duration));
+        translation.BeginAnimation(
+            TranslateTransform.YProperty,
+            new DoubleAnimation(0d, normal.Y * _activeBubbleSweepReach, duration));
+
+        var opacity = new DoubleAnimationUsingKeyFrames();
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame(0d, KeyTime.FromPercent(0d)));
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame(0.64d, KeyTime.FromPercent(0.10d)));
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame(0.38d, KeyTime.FromPercent(0.54d)));
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame(0.16d, KeyTime.FromPercent(0.82d)));
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame(0d, KeyTime.FromPercent(1d)));
+        opacity.Duration = duration;
+        opacity.Completed += (_, _) => BubbleCanvas.Children.Remove(host);
+        host.BeginAnimation(OpacityProperty, opacity);
+    }
+
+    private static BubbleSweepPlacement CreateBubbleSweepPlacement(double width, double height, int index)
+    {
+        var diagonal = Math.Sqrt((width * width) + (height * height));
+        const double padding = 96d;
+        return index switch
+        {
+            0 => new BubbleSweepPlacement(new Point(width / 2d, -padding), new Vector(0d, 1d), height + (padding * 2d), width + (padding * 2.4d)),
+            1 => new BubbleSweepPlacement(new Point(width + padding, -padding), NormalizeOrDefault(new Vector(-1d, 1d), new Vector(-1d, 1d)), diagonal + (padding * 2.6d), diagonal + (padding * 2.8d)),
+            2 => new BubbleSweepPlacement(new Point(width + padding, height / 2d), new Vector(-1d, 0d), width + (padding * 2d), height + (padding * 2.4d)),
+            3 => new BubbleSweepPlacement(new Point(width + padding, height + padding), NormalizeOrDefault(new Vector(-1d, -1d), new Vector(-1d, -1d)), diagonal + (padding * 2.6d), diagonal + (padding * 2.8d)),
+            4 => new BubbleSweepPlacement(new Point(width / 2d, height + padding), new Vector(0d, -1d), height + (padding * 2d), width + (padding * 2.4d)),
+            5 => new BubbleSweepPlacement(new Point(-padding, height + padding), NormalizeOrDefault(new Vector(1d, -1d), new Vector(1d, -1d)), diagonal + (padding * 2.6d), diagonal + (padding * 2.8d)),
+            6 => new BubbleSweepPlacement(new Point(-padding, height / 2d), new Vector(1d, 0d), width + (padding * 2d), height + (padding * 2.4d)),
+            _ => new BubbleSweepPlacement(new Point(-padding, -padding), NormalizeOrDefault(new Vector(1d, 1d), new Vector(1d, 1d)), diagonal + (padding * 2.6d), diagonal + (padding * 2.8d))
+        };
+    }
+
+    private static Geometry CreateBubbleSweepGeometry(
+        Point center,
+        Vector normal,
+        Vector tangent,
+        double length,
+        double amplitude,
+        double phase)
+    {
+        const int segmentCount = 72;
+        var geometry = new StreamGeometry();
+        using (var context = geometry.Open())
+        {
+            for (var index = 0; index <= segmentCount; index++)
+            {
+                var progress = index / (double)segmentCount;
+                var local = (progress - 0.5d) * length;
+                var wave = Math.Sin((progress * Math.PI * 9d) + phase) * amplitude;
+                var point = center + (tangent * local) + (normal * wave);
+                if (index == 0)
+                {
+                    context.BeginFigure(point, false, false);
+                }
+                else
+                {
+                    context.LineTo(point, true, false);
+                }
+            }
+        }
+
+        geometry.Freeze();
+        return geometry;
+    }
+
+    private static Vector NormalizeOrDefault(Vector vector, Vector fallback)
+    {
+        if (vector.Length <= 0.0001d)
+        {
+            vector = fallback;
+        }
+
+        if (vector.Length <= 0.0001d)
+        {
+            return new Vector(1d, 0d);
+        }
+
+        vector.Normalize();
+        return vector;
+    }
+
+    private static double RandomBetween(Random random, double minimum, double maximum)
+    {
+        return minimum + ((maximum - minimum) * random.NextDouble());
+    }
+
+    private void ResetBubbleSweepSchedule()
+    {
+        _nextBubbleSweepTimestamp = 0;
+        _activeBubbleSweepStartedAt = 0;
     }
 
     private void CreateBubbleRippleVisual(
@@ -321,10 +580,10 @@ public partial class WatchInsightsPage : UserControl
             EndPoint = new Point(1d, 0.5d),
             MappingMode = BrushMappingMode.RelativeToBoundingBox
         };
-        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(28, accentColor.R, accentColor.G, accentColor.B), 0d));
-        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(70, accentColor.R, accentColor.G, accentColor.B), 0.36d));
-        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(205, accentColor.R, accentColor.G, accentColor.B), 0.76d));
-        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(104, accentColor.R, accentColor.G, accentColor.B), 1d));
+        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(10, accentColor.R, accentColor.G, accentColor.B), 0d));
+        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(34, accentColor.R, accentColor.G, accentColor.B), 0.34d));
+        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(232, accentColor.R, accentColor.G, accentColor.B), 0.78d));
+        directionalStroke.GradientStops.Add(new GradientStop(Color.FromArgb(166, accentColor.R, accentColor.G, accentColor.B), 1d));
         directionalStroke.Freeze();
         var ripple = new Ellipse
         {
@@ -340,7 +599,7 @@ public partial class WatchInsightsPage : UserControl
         };
         Canvas.SetLeft(ripple, origin.X - width / 2d);
         Canvas.SetTop(ripple, origin.Y - height / 2d);
-        Panel.SetZIndex(ripple, 0);
+        Panel.SetZIndex(ripple, 3);
         BubbleCanvas.Children.Add(ripple);
 
         var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
@@ -486,34 +745,6 @@ public partial class WatchInsightsPage : UserControl
         ApplyPreferenceBubbleColors(bubble, item.Kind);
 
         var bubbleSurface = new Grid();
-        var lowerShade = new Ellipse
-        {
-            Margin = new Thickness(-3d),
-            Fill = CreateBubbleLowerShadeBrush(),
-            IsHitTestVisible = false,
-            Opacity = 0.72d
-        };
-        var innerRim = new Ellipse
-        {
-            Margin = new Thickness(2.5d),
-            Stroke = CreateBubbleRimBrush(),
-            StrokeThickness = 1.4d,
-            IsHitTestVisible = false,
-            Opacity = 0.82d
-        };
-        var highlight = new Ellipse
-        {
-            Width = Math.Max(18d, item.Size * 0.34d),
-            Height = Math.Max(11d, item.Size * 0.2d),
-            Margin = new Thickness(item.Size * 0.16d, item.Size * 0.12d, 0d, 0d),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-            Fill = CreateBubbleHighlightBrush(),
-            IsHitTestVisible = false,
-            Opacity = 0.64d,
-            RenderTransform = new RotateTransform(-18d),
-            RenderTransformOrigin = new Point(0.5d, 0.5d)
-        };
         var content = new StackPanel
         {
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -542,9 +773,6 @@ public partial class WatchInsightsPage : UserControl
         countText.SetResourceReference(TextBlock.ForegroundProperty, "BrushForegroundMuted");
         content.Children.Add(label);
         content.Children.Add(countText);
-        bubbleSurface.Children.Add(lowerShade);
-        bubbleSurface.Children.Add(innerRim);
-        bubbleSurface.Children.Add(highlight);
         bubbleSurface.Children.Add(content);
         bubble.Child = bubbleSurface;
         host.Children.Add(depthShadow);
@@ -554,7 +782,6 @@ public partial class WatchInsightsPage : UserControl
             host,
             bubble,
             depthShadow,
-            highlight,
             scale,
             position.X,
             position.Y,
@@ -570,6 +797,7 @@ public partial class WatchInsightsPage : UserControl
                 : Math.Clamp(baseRadius * restoredState.RadiusRatio, baseRadius, hoverRadius)
         };
         particle.TargetRadius = particle.BaseRadius;
+        Panel.SetZIndex(host, 1);
         bubble.MouseEnter += (_, _) => SetPreferenceBubbleHover(particle, true);
         bubble.MouseLeave += (_, _) => SetPreferenceBubbleHover(particle, false);
         return particle;
@@ -619,8 +847,7 @@ public partial class WatchInsightsPage : UserControl
         particle.Bubble.Opacity = isHovered ? 1d : 0.96d;
         particle.Bubble.BorderThickness = new Thickness(isHovered ? 2d : 1.25d);
         particle.DepthShadow.Opacity = isHovered ? 0.42d : 0.3d;
-        particle.Highlight.Opacity = isHovered ? 0.82d : 0.64d;
-        Panel.SetZIndex(particle.Host, isHovered ? 2 : 1);
+        Panel.SetZIndex(particle.Host, isHovered ? 4 : 1);
     }
 
     private static Brush CreateBubbleDepthBrush()
@@ -639,59 +866,12 @@ public partial class WatchInsightsPage : UserControl
         return brush;
     }
 
-    private static Brush CreateBubbleLowerShadeBrush()
-    {
-        var brush = new LinearGradientBrush
-        {
-            StartPoint = new Point(0.5d, 0d),
-            EndPoint = new Point(0.5d, 1d)
-        };
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0d));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.5d));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(20, 8, 12, 20), 0.72d));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(58, 8, 12, 20), 1d));
-        brush.Freeze();
-        return brush;
-    }
-
-    private static Brush CreateBubbleRimBrush()
-    {
-        var brush = new LinearGradientBrush
-        {
-            StartPoint = new Point(0.3d, 0d),
-            EndPoint = new Point(0.7d, 1d)
-        };
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(220, 255, 255, 255), 0d));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(88, 255, 255, 255), 0.42d));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(24, 255, 255, 255), 0.68d));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(62, 12, 18, 28), 1d));
-        brush.Freeze();
-        return brush;
-    }
-
-    private static Brush CreateBubbleHighlightBrush()
-    {
-        var brush = new RadialGradientBrush
-        {
-            Center = new Point(0.35d, 0.35d),
-            GradientOrigin = new Point(0.28d, 0.28d),
-            RadiusX = 0.68d,
-            RadiusY = 0.68d
-        };
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(236, 255, 255, 255), 0d));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(112, 255, 255, 255), 0.46d));
-        brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1d));
-        brush.Freeze();
-        return brush;
-    }
-
     private void ClearPreferenceBubbles()
     {
         SavePreferenceBubbleState();
         _lastBubblePhysicsTimestamp = 0;
         _isBubbleCanvasInViewport = false;
         _preferenceBubbleParticles.Clear();
-        _bubbleFlowWaves.Clear();
         BubbleCanvas.Children.Clear();
         _preferenceBubbleStateKey = string.Empty;
         _bubbleStateCanvasWidth = 0d;
@@ -700,6 +880,7 @@ public partial class WatchInsightsPage : UserControl
         _bubblePointerVelocity = default;
         _lastBubblePointerTimestamp = 0;
         _hasBubbleRippleAnchor = false;
+        ResetBubbleSweepSchedule();
     }
 
     private void SavePreferenceBubbleState()
@@ -914,11 +1095,37 @@ public partial class WatchInsightsPage : UserControl
 
     private void QueueLayoutDiagnostics(string reason)
     {
+        if (IsInitialLoadingActive(out var activeTab))
+        {
+            WatchInsightsDiagnostics.Write(
+                "layer=view event=layout-idle-skipped "
+                + $"reason={reason} tab={activeTab} initialLoading=true");
+            return;
+        }
+
         var version = ++_layoutDiagnosticsVersion;
         var startedAt = Stopwatch.GetTimestamp();
         _ = Dispatcher.InvokeAsync(
             () => CaptureLayoutDiagnostics(version, reason, startedAt),
             DispatcherPriority.ContextIdle);
+    }
+
+    private bool IsInitialLoadingActive(out string activeTab)
+    {
+        activeTab = InitialLoadingNone;
+        if (DataContext is not WatchInsightsViewModel viewModel)
+        {
+            return false;
+        }
+
+        if (viewModel.SelectedTabIndex == 1)
+        {
+            activeTab = "statistics";
+            return viewModel.IsStatisticsInitialLoading;
+        }
+
+        activeTab = "profile";
+        return viewModel.IsProfileInitialLoading;
     }
 
     private void CaptureLayoutDiagnostics(int version, string reason, long startedAt)
@@ -1000,6 +1207,59 @@ public partial class WatchInsightsPage : UserControl
         _lastFrameTimestamp = 0;
     }
 
+    private void UpdateInitialLoadingDiagnostics(string reason)
+    {
+        if (!IsVisible || DataContext is not WatchInsightsViewModel viewModel)
+        {
+            SetInitialLoadingDiagnosticsState(InitialLoadingNone, reason);
+            return;
+        }
+
+        var activeTab = viewModel.SelectedTabIndex == 1
+            ? viewModel.IsStatisticsInitialLoading ? "statistics" : InitialLoadingNone
+            : viewModel.IsProfileInitialLoading ? "profile" : InitialLoadingNone;
+        SetInitialLoadingDiagnosticsState(activeTab, reason);
+    }
+
+    private void SetInitialLoadingDiagnosticsState(string activeTab, string reason)
+    {
+        if (string.Equals(_activeInitialLoadingTab, activeTab, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (!string.Equals(_activeInitialLoadingTab, InitialLoadingNone, StringComparison.Ordinal))
+        {
+            var elapsed = _initialLoadingStartedAt == 0
+                ? TimeSpan.Zero
+                : Stopwatch.GetElapsedTime(_initialLoadingStartedAt);
+            var averageSlowMs = _initialLoadingSlowFrameCount == 0
+                ? 0d
+                : _initialLoadingSlowFrameTotalMs / _initialLoadingSlowFrameCount;
+            WatchInsightsDiagnostics.Write(
+                "layer=view event=initial-loading-hidden "
+                + $"tab={_activeInitialLoadingTab} reason={reason} elapsedMs={elapsed.TotalMilliseconds:0} "
+                + $"slowFrames={_initialLoadingSlowFrameCount} averageSlowMs={averageSlowMs:0} "
+                + $"maxSlowMs={_initialLoadingSlowFrameMaxMs:0} renderTier={RenderCapability.Tier >> 16}");
+            _initialLoadingSlowFrameCount = 0;
+            _initialLoadingSlowFrameTotalMs = 0d;
+            _initialLoadingSlowFrameMaxMs = 0d;
+            _initialLoadingStartedAt = 0;
+        }
+
+        _activeInitialLoadingTab = activeTab;
+        if (!string.Equals(_activeInitialLoadingTab, InitialLoadingNone, StringComparison.Ordinal))
+        {
+            _initialLoadingStartedAt = Stopwatch.GetTimestamp();
+            _initialLoadingSlowFrameCount = 0;
+            _initialLoadingSlowFrameTotalMs = 0d;
+            _initialLoadingSlowFrameMaxMs = 0d;
+            WatchInsightsDiagnostics.Write(
+                "layer=view event=initial-loading-visible "
+                + $"tab={_activeInitialLoadingTab} reason={reason} renderTier={RenderCapability.Tier >> 16}");
+        }
+    }
+
     private void OnCompositionTargetRendering(object? sender, EventArgs e)
     {
         var now = Stopwatch.GetTimestamp();
@@ -1012,12 +1272,20 @@ public partial class WatchInsightsPage : UserControl
                 _slowFrameCount++;
                 _slowFrameTotalMs += frameMs;
                 _slowFrameMaxMs = Math.Max(_slowFrameMaxMs, frameMs);
+                if (!string.Equals(_activeInitialLoadingTab, InitialLoadingNone, StringComparison.Ordinal))
+                {
+                    _initialLoadingSlowFrameCount++;
+                    _initialLoadingSlowFrameTotalMs += frameMs;
+                    _initialLoadingSlowFrameMaxMs = Math.Max(_initialLoadingSlowFrameMaxMs, frameMs);
+                }
+
                 if (frameMs >= 100d)
                 {
                     var viewModel = DataContext as WatchInsightsViewModel;
                     WatchInsightsDiagnostics.Write(
                         "layer=view event=slow-frame "
-                        + $"tab={(viewModel?.SelectedTabIndex == 1 ? "statistics" : "profile")} frameMs={frameMs:0}");
+                        + $"tab={(viewModel?.SelectedTabIndex == 1 ? "statistics" : "profile")} "
+                        + $"initialLoading={_activeInitialLoadingTab} frameMs={frameMs:0}");
                 }
             }
         }
@@ -1060,6 +1328,8 @@ public partial class WatchInsightsPage : UserControl
             _bubblePointerVelocity *= pointerDamping;
         }
 
+        var sweepWave = UpdateBubbleSweep(now);
+
         foreach (var particle in _preferenceBubbleParticles)
         {
             var radiusEase = 1d - Math.Exp(-10d * deltaSeconds);
@@ -1076,20 +1346,20 @@ public partial class WatchInsightsPage : UserControl
             var edgeInset = particle.Radius + 34d;
             if (particle.X < edgeInset)
             {
-                particle.AccelerationX += (edgeInset - particle.X) * 0.48d;
+                particle.AccelerationX += (edgeInset - particle.X) * 0.62d;
             }
             else if (particle.X > BubbleCanvas.ActualWidth - edgeInset)
             {
-                particle.AccelerationX -= (particle.X - (BubbleCanvas.ActualWidth - edgeInset)) * 0.48d;
+                particle.AccelerationX -= (particle.X - (BubbleCanvas.ActualWidth - edgeInset)) * 0.62d;
             }
 
             if (particle.Y < edgeInset)
             {
-                particle.AccelerationY += (edgeInset - particle.Y) * 0.48d;
+                particle.AccelerationY += (edgeInset - particle.Y) * 0.62d;
             }
             else if (particle.Y > BubbleCanvas.ActualHeight - edgeInset)
             {
-                particle.AccelerationY -= (particle.Y - (BubbleCanvas.ActualHeight - edgeInset)) * 0.48d;
+                particle.AccelerationY -= (particle.Y - (BubbleCanvas.ActualHeight - edgeInset)) * 0.62d;
             }
 
             ApplyBubbleCornerEscape(particle, BubbleCanvas.ActualWidth, BubbleCanvas.ActualHeight, elapsedSeconds);
@@ -1100,6 +1370,41 @@ public partial class WatchInsightsPage : UserControl
             particle.AccelerationY += Math.Sin(flowAngle * Math.PI) * 17d;
             particle.AccelerationX += Math.Sin((elapsedSeconds * 0.17d) + (particle.Phase * 2.17d)) * 6d;
             particle.AccelerationY += Math.Cos((elapsedSeconds * 0.15d) + (particle.Phase * 2.63d)) * 6d;
+
+            if (sweepWave is { } wave)
+            {
+                var normal = NormalizeOrDefault(wave.Direction, new Vector(1d, 0d));
+                var tangent = new Vector(-normal.Y, normal.X);
+                var frontCenter = wave.Origin + (normal * wave.Travel);
+                var delta = new Vector(particle.X - frontCenter.X, particle.Y - frontCenter.Y);
+                var normalDistance = (delta.X * normal.X) + (delta.Y * normal.Y);
+                var tangentDistance = (delta.X * tangent.X) + (delta.Y * tangent.Y);
+                var halfLength = wave.Length / 2d;
+
+                if (Math.Abs(tangentDistance) <= halfLength + wave.InfluenceRadius)
+                {
+                    var normalInfluence = Math.Exp(
+                        -(normalDistance * normalDistance)
+                        / (2d * wave.InfluenceRadius * wave.InfluenceRadius));
+                    var overflow = Math.Max(0d, Math.Abs(tangentDistance) - halfLength);
+                    var lengthInfluence = Math.Exp(
+                        -(overflow * overflow)
+                        / (2d * wave.InfluenceRadius * wave.InfluenceRadius));
+                    var fade = Math.Pow(1d - wave.Progress, 1.22d);
+                    var wavePhase = (tangentDistance / Math.Max(42d, wave.Length / 9d))
+                                    + (wave.Progress * Math.PI * 2.2d);
+                    var pulse = 0.82d + (0.18d * Math.Sin(wavePhase));
+                    var push = wave.Strength * normalInfluence * lengthInfluence * fade * pulse;
+                    var side = wave.Strength
+                               * 0.07d
+                               * normalInfluence
+                               * lengthInfluence
+                               * fade
+                               * Math.Cos(wavePhase);
+                    particle.AccelerationX += (normal.X * push) + (tangent.X * side);
+                    particle.AccelerationY += (normal.Y * push) + (tangent.Y * side);
+                }
+            }
 
             if (_isBubblePointerActive)
             {
@@ -1120,13 +1425,13 @@ public partial class WatchInsightsPage : UserControl
                 var canvasDiagonal = Math.Sqrt(
                     (BubbleCanvas.ActualWidth * BubbleCanvas.ActualWidth)
                     + (BubbleCanvas.ActualHeight * BubbleCanvas.ActualHeight));
-                var alongRadius = Math.Max(360d, Math.Min(680d, canvasDiagonal * 0.72d));
-                var sideRadius = Math.Max(220d, Math.Min(420d, canvasDiagonal * 0.42d));
+                var alongRadius = Math.Max(320d, Math.Min(590d, canvasDiagonal * 0.62d));
+                var sideRadius = Math.Max(185d, Math.Min(350d, canvasDiagonal * 0.37d));
                 var directionalDistance = Math.Sqrt(
                     (along * along) / (alongRadius * alongRadius)
                     + (side * side) / (sideRadius * sideRadius));
                 var directionalInfluence = Math.Exp(-2.1d * directionalDistance * directionalDistance);
-                var nearInfluence = Math.Exp(-pointerDistanceSquared / (2d * 155d * 155d));
+                var nearInfluence = Math.Exp(-pointerDistanceSquared / (2d * 164d * 164d));
                 var radialForce = nearInfluence * (88d + pointerSpeedRatio * 450d)
                                   + directionalInfluence * pointerSpeedRatio * 44d;
                 particle.AccelerationX += pointerNormalX * radialForce;
@@ -1140,8 +1445,6 @@ public partial class WatchInsightsPage : UserControl
             }
         }
 
-        ApplyBubbleFlowWaves(now);
-
         for (var leftIndex = 0; leftIndex < _preferenceBubbleParticles.Count; leftIndex++)
         {
             var left = _preferenceBubbleParticles[leftIndex];
@@ -1151,8 +1454,8 @@ public partial class WatchInsightsPage : UserControl
                 var deltaX = right.X - left.X;
                 var deltaY = right.Y - left.Y;
                 var distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
-                var minimumDistance = left.Radius + right.Radius + 5d;
-                var comfortDistance = minimumDistance + 34d;
+                var minimumDistance = left.Radius + right.Radius + 6d;
+                var comfortDistance = minimumDistance + 38d;
                 if (distanceSquared >= comfortDistance * comfortDistance)
                 {
                     continue;
@@ -1162,7 +1465,7 @@ public partial class WatchInsightsPage : UserControl
                 var normalX = distance > 0.01d ? deltaX / distance : Math.Cos(left.Phase + right.Phase);
                 var normalY = distance > 0.01d ? deltaY / distance : Math.Sin(left.Phase + right.Phase);
                 var comfortOverlap = comfortDistance - distance;
-                var separationForce = comfortOverlap * comfortOverlap / Math.Max(comfortDistance, 1d) * 2.2d;
+                var separationForce = comfortOverlap * comfortOverlap / Math.Max(comfortDistance, 1d) * 2.75d;
                 left.AccelerationX -= normalX * separationForce;
                 left.AccelerationY -= normalY * separationForce;
                 right.AccelerationX += normalX * separationForce;
@@ -1174,7 +1477,7 @@ public partial class WatchInsightsPage : UserControl
 
                 var overlap = minimumDistance - distance;
                 var mobilityTotal = left.Mobility + right.Mobility;
-                var correction = overlap * 0.94d;
+                var correction = overlap * 0.98d;
                 var leftCorrection = correction * left.Mobility / mobilityTotal;
                 var rightCorrection = correction * right.Mobility / mobilityTotal;
                 left.X -= normalX * leftCorrection;
@@ -1182,7 +1485,7 @@ public partial class WatchInsightsPage : UserControl
                 right.X += normalX * rightCorrection;
                 right.Y += normalY * rightCorrection;
 
-                var collisionForce = overlap * 58d;
+                var collisionForce = overlap * 74d;
                 left.AccelerationX -= normalX * collisionForce;
                 left.AccelerationY -= normalY * collisionForce;
                 right.AccelerationX += normalX * collisionForce;
@@ -1192,7 +1495,7 @@ public partial class WatchInsightsPage : UserControl
                                              + ((right.VelocityY - left.VelocityY) * normalY);
                 if (relativeNormalVelocity < 0d)
                 {
-                    var impulse = -relativeNormalVelocity * 0.58d;
+                    var impulse = -relativeNormalVelocity * 0.72d;
                     left.VelocityX -= normalX * impulse * left.Mobility;
                     left.VelocityY -= normalY * impulse * left.Mobility;
                     right.VelocityX += normalX * impulse * right.Mobility;
@@ -1250,62 +1553,6 @@ public partial class WatchInsightsPage : UserControl
         particle.AccelerationY += inwardX * Math.Cos(particle.Phase * 1.3d) * escapeForce * 0.28d;
     }
 
-    private void ApplyBubbleFlowWaves(long now)
-    {
-        if (_bubbleFlowWaves.Count == 0)
-        {
-            return;
-        }
-
-        var canvasDiagonal = Math.Sqrt(
-            (BubbleCanvas.ActualWidth * BubbleCanvas.ActualWidth)
-            + (BubbleCanvas.ActualHeight * BubbleCanvas.ActualHeight));
-        var maximumTravel = Math.Max(520d, Math.Min(960d, canvasDiagonal * 1.08d));
-        for (var waveIndex = _bubbleFlowWaves.Count - 1; waveIndex >= 0; waveIndex--)
-        {
-            var wave = _bubbleFlowWaves[waveIndex];
-            var ageSeconds = Stopwatch.GetElapsedTime(wave.CreatedAt, now).TotalSeconds;
-            if (ageSeconds >= BubbleFlowWaveLifetimeSeconds)
-            {
-                _bubbleFlowWaves.RemoveAt(waveIndex);
-                continue;
-            }
-
-            var progress = Math.Clamp(ageSeconds / BubbleFlowWaveLifetimeSeconds, 0d, 1d);
-            var waveRadius = 24d + maximumTravel * progress;
-            var waveThickness = 72d + progress * 118d;
-            var decay = Math.Pow(1d - progress, 0.92d);
-            var speedRatio = Math.Clamp(wave.Speed / 1200d, 0.18d, 1d);
-            var sideDirection = new Vector(-wave.Direction.Y, wave.Direction.X);
-            foreach (var particle in _preferenceBubbleParticles)
-            {
-                var delta = new Vector(particle.X - wave.Origin.X, particle.Y - wave.Origin.Y);
-                var distance = Math.Max(delta.Length, 0.001d);
-                var along = Vector.Multiply(delta, wave.Direction);
-                var side = Vector.Multiply(delta, sideDirection);
-                var directionalDistance = Math.Sqrt((along * along * 0.62d) + (side * side * 1.28d));
-                var shellOffset = (directionalDistance - waveRadius) / waveThickness;
-                var frontRatio = Math.Clamp(along / Math.Max(waveRadius, 1d), -1d, 1d);
-                var directionalDepth = 0.58d + ((frontRatio + 1d) * 0.21d);
-                var shellInfluence = Math.Exp(-shellOffset * shellOffset * 1.7d) * decay * directionalDepth;
-                if (shellInfluence < 0.008d)
-                {
-                    continue;
-                }
-
-                var radialDirection = delta / distance;
-                var waveForce = shellInfluence * (115d + speedRatio * 245d);
-                particle.AccelerationX += radialDirection.X * waveForce;
-                particle.AccelerationY += radialDirection.Y * waveForce;
-                particle.AccelerationX += wave.Direction.X * waveForce * 0.48d;
-                particle.AccelerationY += wave.Direction.Y * waveForce * 0.48d;
-                var sideSign = side >= 0d ? 1d : -1d;
-                particle.AccelerationX += sideDirection.X * waveForce * sideSign * 0.24d;
-                particle.AccelerationY += sideDirection.Y * waveForce * sideSign * 0.24d;
-            }
-        }
-    }
-
     private static void ConstrainPreferenceBubble(PreferenceBubbleParticle particle, double width, double height)
     {
         var inset = particle.Radius + 8d;
@@ -1345,7 +1592,7 @@ public partial class WatchInsightsPage : UserControl
             return;
         }
 
-        const double restitution = 0.52d;
+        const double restitution = 0.68d;
         var impulseMagnitude = -(1d + restitution) * normalVelocity * particle.Mass;
         particle.VelocityX += impulseMagnitude * normalX / particle.Mass;
         particle.VelocityY += impulseMagnitude * normalY / particle.Mass;
@@ -1366,6 +1613,74 @@ public partial class WatchInsightsPage : UserControl
         particle.Scale.ScaleY = scale;
     }
 
+    private void TasteGraphNode_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (sender is Border { DataContext: TasteGraphNodeItem node })
+        {
+            _hoveredTasteGraphNodeId = node.Id;
+            UpdateTasteGraphFocus();
+        }
+    }
+
+    private void TasteGraphNode_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _hoveredTasteGraphNodeId = null;
+        UpdateTasteGraphFocus();
+    }
+
+    private void TasteGraphNode_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Border { DataContext: TasteGraphNodeItem node })
+        {
+            return;
+        }
+
+        _selectedTasteGraphNodeId = string.Equals(
+            _selectedTasteGraphNodeId,
+            node.Id,
+            StringComparison.OrdinalIgnoreCase)
+            ? null
+            : node.Id;
+        UpdateTasteGraphFocus();
+        e.Handled = true;
+    }
+
+    private void UpdateTasteGraphFocus()
+    {
+        var activeNodeId = _hoveredTasteGraphNodeId ?? _selectedTasteGraphNodeId;
+        foreach (var path in FindVisualChildren<Path>(this))
+        {
+            if ((!Equals(path.Tag, "TasteGraphLink") && !Equals(path.Tag, "TasteGraphLinkGlow"))
+                || path.DataContext is not TasteGraphLinkItem link)
+            {
+                continue;
+            }
+
+            var isConnected = !string.IsNullOrEmpty(activeNodeId) && link.IsRelatedTo(activeNodeId);
+            if (Equals(path.Tag, "TasteGraphLinkGlow"))
+            {
+                path.Opacity = isConnected ? 0.16d : 0d;
+                continue;
+            }
+
+            path.Opacity = isConnected ? 1d : link.BaseOpacity;
+            path.StrokeThickness = isConnected ? link.StrokeThickness + 0.5d : link.StrokeThickness;
+        }
+
+        foreach (var border in FindVisualChildren<Border>(this))
+        {
+            if (!Equals(border.Tag, "TasteGraphNode")
+                || border.DataContext is not TasteGraphNodeItem node)
+            {
+                continue;
+            }
+
+            var isActive = !string.IsNullOrEmpty(activeNodeId)
+                           && string.Equals(node.Id, activeNodeId, StringComparison.OrdinalIgnoreCase);
+            border.BorderThickness = new Thickness(isActive ? 2d : 1.2d);
+        }
+    }
+
     private void WriteFrameSummary(string reason)
     {
         var viewModel = DataContext as WatchInsightsViewModel;
@@ -1373,6 +1688,7 @@ public partial class WatchInsightsPage : UserControl
         WatchInsightsDiagnostics.Write(
             "layer=view event=frame-summary "
             + $"reason={reason} tab={(viewModel?.SelectedTabIndex == 1 ? "statistics" : "profile")} "
+            + $"initialLoading={_activeInitialLoadingTab} "
             + $"slowFrames={_slowFrameCount} averageSlowMs={averageMs:0} maxSlowMs={_slowFrameMaxMs:0}");
         _slowFrameCount = 0;
         _slowFrameTotalMs = 0d;
@@ -1439,6 +1755,51 @@ public partial class WatchInsightsPage : UserControl
             CachedShadowBorder.ShadowVisualOpacityProperty,
             CreateDnaWaveAnimation(duration, phase, angle => 0.82d + (Math.Cos(angle) * 0.12d)),
             HandoffBehavior.SnapshotAndReplace);
+        QueueProfileDnaScrollableStateUpdate();
+    }
+
+    private void ProfileDnaDescriptionScrollViewer_Loaded(object sender, RoutedEventArgs e)
+    {
+        QueueProfileDnaScrollableStateUpdate();
+    }
+
+    private void ProfileDnaDescriptionScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        QueueProfileDnaScrollableStateUpdate();
+    }
+
+    private void QueueProfileDnaScrollableStateUpdate()
+    {
+        if (_isProfileDnaScrollableStateUpdateQueued)
+        {
+            return;
+        }
+
+        _isProfileDnaScrollableStateUpdateQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _isProfileDnaScrollableStateUpdateQueued = false;
+                UpdateProfileDnaScrollableState();
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    private void UpdateProfileDnaScrollableState()
+    {
+        if (DataContext is not WatchInsightsViewModel viewModel)
+        {
+            return;
+        }
+
+        var descriptionScrollViewers = FindVisualChildren<ScrollViewer>(this)
+            .Where(static scrollViewer => string.Equals(scrollViewer.Tag as string, "ProfileDnaDescription", StringComparison.Ordinal))
+            .ToList();
+        var hasScrollableDescription = descriptionScrollViewers.Any(NeedsInternalScroll);
+        if (viewModel.IsProfileDnaTextScrollable != hasScrollableDescription)
+        {
+            viewModel.IsProfileDnaTextScrollable = hasScrollableDescription;
+        }
     }
 
     private static DoubleAnimationUsingKeyFrames CreateDnaWaveAnimation(
@@ -1490,75 +1851,54 @@ public partial class WatchInsightsPage : UserControl
             return;
         }
 
-        foreach (var card in GetWatchLikeCards())
-        {
-            var isActive = ReferenceEquals(card, activeCard);
-            Panel.SetZIndex(card, isActive ? 3 : ReferenceEquals(card, WatchLikeCenterCard) ? 2 : 1);
-            AnimateWatchLikeCard(
-                card,
-                isActive ? 0d : GetWatchLikeFoldAngle(card, activeCard),
-                isActive ? 1.02d : 0.9d,
-                isActive ? 1.02d : 0.94d,
-                isActive ? GetWatchLikeActiveX(card) : 0d,
-                isActive ? -4d : 5d,
-                isActive ? 1d : 0.72d,
-                isActive ? 1d : 0.48d,
-                isActive ? 0d : 1d);
-        }
+        ApplyWatchLikeFocus(activeCard);
     }
 
     private void WatchLikeTriptych_MouseLeave(object sender, MouseEventArgs e)
     {
-        Panel.SetZIndex(WatchLikeLeftCard, 1);
-        Panel.SetZIndex(WatchLikeCenterCard, 2);
-        Panel.SetZIndex(WatchLikeRightCard, 1);
-        AnimateWatchLikeCard(WatchLikeLeftCard, -5d, 0.9d, 0.94d, 0d, 4d, 0.92d, 0.72d, 1d);
-        AnimateWatchLikeCard(WatchLikeCenterCard, 0d, 1d, 1d, 0d, -2d, 1d, 1d, 0d);
-        AnimateWatchLikeCard(WatchLikeRightCard, 5d, 0.9d, 0.94d, 0d, 4d, 0.92d, 0.72d, 1d);
+        ApplyWatchLikeFocus(WatchLikeCenterCard);
     }
 
-    private IEnumerable<ContentControl> GetWatchLikeCards()
+    private void ApplyWatchLikeFocus(ContentControl activeCard)
     {
-        yield return WatchLikeLeftCard;
-        yield return WatchLikeCenterCard;
-        yield return WatchLikeRightCard;
+        if (ReferenceEquals(activeCard, WatchLikeLeftCard))
+        {
+            SetWatchLikeZOrder(left: 3, center: 2, right: 1);
+            AnimateWatchLikeCard(WatchLikeLeftCard, 1.04d, 8d, -8d, 1d, 1d);
+            AnimateWatchLikeCard(WatchLikeCenterCard, 0.98d, 3d, 8d, 0.74d, 0.66d);
+            AnimateWatchLikeCard(WatchLikeRightCard, 0.95d, -1d, 13d, 0.62d, 0.34d);
+            return;
+        }
+
+        if (ReferenceEquals(activeCard, WatchLikeRightCard))
+        {
+            SetWatchLikeZOrder(left: 1, center: 2, right: 3);
+            AnimateWatchLikeCard(WatchLikeLeftCard, 0.95d, 1d, 13d, 0.62d, 0.34d);
+            AnimateWatchLikeCard(WatchLikeCenterCard, 0.98d, -3d, 8d, 0.74d, 0.66d);
+            AnimateWatchLikeCard(WatchLikeRightCard, 1.04d, -8d, -8d, 1d, 1d);
+            return;
+        }
+
+        SetWatchLikeZOrder(left: 1, center: 3, right: 1);
+        AnimateWatchLikeCard(WatchLikeLeftCard, 0.96d, -4d, 12d, 0.68d, 0.48d);
+        AnimateWatchLikeCard(WatchLikeCenterCard, 1.04d, 0d, -6d, 1d, 1d);
+        AnimateWatchLikeCard(WatchLikeRightCard, 0.96d, 4d, 12d, 0.68d, 0.48d);
     }
 
-    private double GetWatchLikeActiveX(ContentControl card)
+    private void SetWatchLikeZOrder(int left, int center, int right)
     {
-        if (ReferenceEquals(card, WatchLikeLeftCard))
-        {
-            return 8d;
-        }
-
-        return ReferenceEquals(card, WatchLikeRightCard) ? -8d : 0d;
-    }
-
-    private double GetWatchLikeFoldAngle(ContentControl card, ContentControl activeCard)
-    {
-        if (ReferenceEquals(card, WatchLikeLeftCard))
-        {
-            return -6d;
-        }
-
-        if (ReferenceEquals(card, WatchLikeRightCard))
-        {
-            return 6d;
-        }
-
-        return ReferenceEquals(activeCard, WatchLikeLeftCard) ? 4d : -4d;
+        Panel.SetZIndex(WatchLikeLeftCard, left);
+        Panel.SetZIndex(WatchLikeCenterCard, center);
+        Panel.SetZIndex(WatchLikeRightCard, right);
     }
 
     private void AnimateWatchLikeCard(
         ContentControl card,
-        double skewAngleY,
-        double scaleX,
-        double scaleY,
+        double scale,
         double translateX,
         double translateY,
         double opacity,
-        double shadowOpacity,
-        double shadeOpacity)
+        double shadowOpacity)
     {
         var targets = GetWatchLikeTransformTargets(card);
         if (targets is null)
@@ -1566,20 +1906,16 @@ public partial class WatchInsightsPage : UserControl
             return;
         }
 
-        var (skewTransform, scaleTransform, translateTransform) = targets.Value;
-        var duration = TimeSpan.FromMilliseconds(260);
+        var (scaleTransform, translateTransform) = targets.Value;
+        var duration = TimeSpan.FromMilliseconds(220);
         var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
-        skewTransform.BeginAnimation(
-            SkewTransform.AngleYProperty,
-            new DoubleAnimation(skewAngleY, duration) { EasingFunction = easing },
-            HandoffBehavior.SnapshotAndReplace);
         scaleTransform.BeginAnimation(
             ScaleTransform.ScaleXProperty,
-            new DoubleAnimation(scaleX, duration) { EasingFunction = easing },
+            new DoubleAnimation(scale, duration) { EasingFunction = easing },
             HandoffBehavior.SnapshotAndReplace);
         scaleTransform.BeginAnimation(
             ScaleTransform.ScaleYProperty,
-            new DoubleAnimation(scaleY, duration) { EasingFunction = easing },
+            new DoubleAnimation(scale, duration) { EasingFunction = easing },
             HandoffBehavior.SnapshotAndReplace);
         translateTransform.BeginAnimation(
             TranslateTransform.XProperty,
@@ -1599,33 +1935,49 @@ public partial class WatchInsightsPage : UserControl
             CachedShadowBorder.ShadowVisualOpacityProperty,
             new DoubleAnimation(shadowOpacity, duration) { EasingFunction = easing },
             HandoffBehavior.SnapshotAndReplace);
-
-        card.ApplyTemplate();
-        if (card.Template.FindName("PART_FoldShade", card) is Border foldShade)
-        {
-            foldShade.BeginAnimation(
-                OpacityProperty,
-                new DoubleAnimation(shadeOpacity, duration) { EasingFunction = easing },
-                HandoffBehavior.SnapshotAndReplace);
-        }
     }
 
-    private (SkewTransform Skew, ScaleTransform Scale, TranslateTransform Translation)?
+    private (ScaleTransform Scale, TranslateTransform Translation)?
         GetWatchLikeTransformTargets(ContentControl card)
     {
-        if (ReferenceEquals(card, WatchLikeLeftCard))
+        if (card.RenderTransform is not TransformGroup transforms)
         {
-            return (WatchLikeLeftSkew, WatchLikeLeftScale, WatchLikeLeftTranslation);
+            return null;
         }
 
-        if (ReferenceEquals(card, WatchLikeCenterCard))
-        {
-            return (WatchLikeCenterSkew, WatchLikeCenterScale, WatchLikeCenterTranslation);
-        }
-
-        return ReferenceEquals(card, WatchLikeRightCard)
-            ? (WatchLikeRightSkew, WatchLikeRightScale, WatchLikeRightTranslation)
+        var scale = transforms.Children.OfType<ScaleTransform>().FirstOrDefault();
+        var translation = transforms.Children.OfType<TranslateTransform>().FirstOrDefault();
+        return scale is not null && translation is not null
+            ? (scale, translation)
             : null;
+    }
+
+    private T FindRequiredNamedVisual<T>(string name)
+        where T : FrameworkElement
+    {
+        return FindNamedVisual<T>(this, name)
+               ?? throw new InvalidOperationException($"Deferred Watch Insights element '{name}' is not materialized.");
+    }
+
+    private static T? FindNamedVisual<T>(DependencyObject root, string name)
+        where T : FrameworkElement
+    {
+        if (root is T candidate && string.Equals(candidate.Name, name, StringComparison.Ordinal))
+        {
+            return candidate;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < childCount; index++)
+        {
+            var match = FindNamedVisual<T>(VisualTreeHelper.GetChild(root, index), name);
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private static bool NeedsInternalScroll(ScrollViewer scrollViewer)
@@ -1700,11 +2052,45 @@ public partial class WatchInsightsPage : UserControl
         return null;
     }
 
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject element)
+        where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+        {
+            var child = VisualTreeHelper.GetChild(element, index);
+            if (child is T typedChild)
+            {
+                yield return typedChild;
+            }
+
+            foreach (var descendant in FindVisualChildren<T>(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
     private readonly record struct VisualMetrics(
         int VisualCount,
         int EffectCount,
         int DropShadowCount,
         int AnimatedCount);
+
+    private readonly record struct BubbleSweepSample(
+        Point Origin,
+        Vector Direction,
+        double Travel,
+        double Reach,
+        double InfluenceRadius,
+        double Progress,
+        double Strength,
+        double Length);
+
+    private readonly record struct BubbleSweepPlacement(
+        Point Origin,
+        Vector Direction,
+        double TravelDistance,
+        double Length);
 
     private sealed record PreferenceBubbleState(
         double XRatio,
@@ -1713,17 +2099,10 @@ public partial class WatchInsightsPage : UserControl
         double VelocityY,
         double RadiusRatio);
 
-    private sealed record BubbleFlowWave(
-        Point Origin,
-        Vector Direction,
-        double Speed,
-        long CreatedAt);
-
     private sealed class PreferenceBubbleParticle(
         Grid host,
         Border bubble,
         Ellipse depthShadow,
-        Ellipse highlight,
         ScaleTransform scale,
         double x,
         double y,
@@ -1737,8 +2116,6 @@ public partial class WatchInsightsPage : UserControl
         public Border Bubble { get; } = bubble;
 
         public Ellipse DepthShadow { get; } = depthShadow;
-
-        public Ellipse Highlight { get; } = highlight;
 
         public ScaleTransform Scale { get; } = scale;
 

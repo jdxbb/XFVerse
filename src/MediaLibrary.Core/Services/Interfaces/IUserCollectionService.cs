@@ -20,6 +20,8 @@ public interface IUserCollectionService
 
     Task SetNotInterestedAsync(int movieId, bool isNotInterested, CancellationToken cancellationToken = default, string changeSource = "Manual");
 
+    Task<bool> TouchCollectionItemUpdatedAtAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default);
+
     Task HideFromLibraryAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default, string changeSource = "Manual");
 
     Task AddToLibraryAsync(AiRecommendationItem recommendation, CancellationToken cancellationToken = default, string changeSource = "Manual");

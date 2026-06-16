@@ -13,7 +13,7 @@
         <SolidColorBrush x:Key="DiscoveryLibraryMediaCardAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="DiscoveryLibraryMediaCardAccentTextBrush" Color="#111827" />
         <SolidColorBrush x:Key="DiscoveryLibraryTagDividerBrush" Color="#7DD3FC" />
-        <SolidColorBrush x:Key="DiscoveryLibraryRatingGoldBrush" Color="{DynamicResource ColorWarning}" />
+        <SolidColorBrush x:Key="DiscoveryLibraryRatingGoldBrush" Color="{DynamicResource ColorRatingGold}" />
         <SolidColorBrush x:Key="DiscoveryWantAddBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="DiscoveryWantRemoveBrush" Color="{DynamicResource ColorAccent}" />
         <SolidColorBrush x:Key="DiscoveryWantEmptyStarFillBrush" Color="#4DFFFFFF" />
@@ -1008,54 +1008,43 @@
             <Setter Property="ClipToBounds" Value="True" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingRankBadgeStyle" TargetType="Border" BasedOn="{StaticResource DiscoveryAccentBadgeStyle}">
+        <Style x:Key="DiscoveryRankingMedalBadgeStyle" TargetType="{x:Type controls:RankMedalBadge}">
+            <Setter Property="Width" Value="39" />
+            <Setter Property="Height" Value="39" />
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="VerticalAlignment" Value="Top" />
-            <Setter Property="Margin" Value="8" />
+            <Setter Property="Margin" Value="3,3,0,0" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingRatingBadgeStyle" TargetType="{x:Type helpers:CachedShadowBorder}">
-            <Setter Property="MinWidth" Value="54" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Padding" Value="10,2" />
-            <Setter Property="CornerRadius" Value="9" />
-            <Setter Property="Background" Value="{DynamicResource BrushGlassSurfaceAlt}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-            <Setter Property="BorderThickness" Value="1.2" />
-            <Setter Property="Effect" Value="{x:Null}" />
-            <Setter Property="ClipToBounds" Value="False" />
-            <Setter Property="ShadowPadding" Value="24" />
-            <Setter Property="ShadowBlurRadius" Value="{DynamicResource CachedShadowScoreBadgeBlurRadius}" />
-            <Setter Property="ShadowOpacity" Value="{DynamicResource CachedShadowScoreBadgeOpacity}" />
-            <Setter Property="ShadowColor" Value="{DynamicResource ColorCachedShadowScoreBadge}" />
-            <Setter Property="ShadowDepth" Value="{DynamicResource CachedShadowScoreBadgeDepth}" />
+        <Style x:Key="DiscoveryRankingHeroMedalBadgeStyle"
+               TargetType="{x:Type controls:RankMedalBadge}"
+               BasedOn="{StaticResource DiscoveryRankingMedalBadgeStyle}">
+            <Setter Property="Width" Value="47" />
+            <Setter Property="Height" Value="47" />
+            <Setter Property="Margin" Value="3.5,3.5,0,0" />
+        </Style>
+
+        <Style x:Key="DiscoveryRankingRatingBadgeStyle"
+               TargetType="{x:Type helpers:CachedShadowBorder}"
+               BasedOn="{StaticResource RankingRatingBadgeStyle}">
             <Setter Property="HorizontalAlignment" Value="Left" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingHeroRatingBadgeStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource DiscoveryRankingRatingBadgeStyle}">
-            <Setter Property="MinWidth" Value="68" />
-            <Setter Property="Height" Value="44" />
-            <Setter Property="Padding" Value="12,3" />
-            <Setter Property="CornerRadius" Value="11" />
+        <Style x:Key="DiscoveryRankingHeroRatingBadgeStyle"
+               TargetType="{x:Type helpers:CachedShadowBorder}"
+               BasedOn="{StaticResource RankingHeroRatingBadgeStyle}">
+            <Setter Property="HorizontalAlignment" Value="Left" />
         </Style>
 
-        <Style x:Key="DiscoveryRankingRatingTextStyle" TargetType="TextBlock">
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="FontSize" Value="14.4" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource DiscoveryLibraryRatingGoldBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+        <Style x:Key="DiscoveryRankingRatingTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource RankingRatingTextStyle}" />
 
-        <Style x:Key="DiscoveryRankingHeroRatingTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DiscoveryRankingRatingTextStyle}">
-            <Setter Property="FontSize" Value="20" />
-            <Setter Property="FontWeight" Value="Bold" />
-        </Style>
+        <Style x:Key="DiscoveryRankingHeroRatingTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource RankingHeroRatingTextStyle}" />
 
         <Style x:Key="DiscoveryRankingTitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
             <Setter Property="FontSize" Value="16.2" />
@@ -1192,11 +1181,8 @@
                            RenderOptions.BitmapScalingMode="HighQuality"
                            Stretch="UniformToFill" />
                 </Grid>
-                <Border Style="{StaticResource DiscoveryRankingRankBadgeStyle}">
-                    <TextBlock Text="{Binding RankText}"
-                               Foreground="{DynamicResource BrushOnAccent}"
-                               Style="{StaticResource DiscoveryBadgeTextStyle}" />
-                </Border>
+                <controls:RankMedalBadge Rank="{Binding SearchOrder}"
+                                         Style="{StaticResource DiscoveryRankingMedalBadgeStyle}" />
             </Grid>
         </DataTemplate>
 
@@ -1269,11 +1255,8 @@
                            RenderOptions.BitmapScalingMode="HighQuality"
                            Stretch="UniformToFill" />
                 </Grid>
-                <Border Style="{StaticResource DiscoveryRankingRankBadgeStyle}">
-                    <TextBlock Text="{Binding RankText}"
-                               Foreground="{DynamicResource BrushOnAccent}"
-                               Style="{StaticResource DiscoveryBadgeTextStyle}" />
-                </Border>
+                <controls:RankMedalBadge Rank="{Binding SearchOrder}"
+                                         Style="{StaticResource DiscoveryRankingMedalBadgeStyle}" />
             </Grid>
         </DataTemplate>
 
@@ -1346,11 +1329,8 @@
                            RenderOptions.BitmapScalingMode="HighQuality"
                            Stretch="UniformToFill" />
                 </Grid>
-                <Border Style="{StaticResource DiscoveryRankingRankBadgeStyle}">
-                    <TextBlock Text="{Binding RankText}"
-                               Foreground="{DynamicResource BrushOnAccent}"
-                               Style="{StaticResource DiscoveryBadgeTextStyle}" />
-                </Border>
+                <controls:RankMedalBadge Rank="{Binding SearchOrder}"
+                                         Style="{StaticResource DiscoveryRankingHeroMedalBadgeStyle}" />
             </Grid>
         </DataTemplate>
 
@@ -1423,11 +1403,8 @@
                            RenderOptions.BitmapScalingMode="HighQuality"
                            Stretch="UniformToFill" />
                 </Grid>
-                <Border Style="{StaticResource DiscoveryRankingRankBadgeStyle}">
-                    <TextBlock Text="{Binding RankText}"
-                               Foreground="{DynamicResource BrushOnAccent}"
-                               Style="{StaticResource DiscoveryBadgeTextStyle}" />
-                </Border>
+                <controls:RankMedalBadge Rank="{Binding SearchOrder}"
+                                         Style="{StaticResource DiscoveryRankingHeroMedalBadgeStyle}" />
             </Grid>
         </DataTemplate>
 
@@ -1484,20 +1461,20 @@
                 </Grid>
                 <Border Grid.Row="1"
                         Margin="0,13,0,0"
-                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListTagToolTipText}"
+                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
                         helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True"
-                        helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding ListTagLine}"
+                        helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
                         Style="{StaticResource DiscoveryLibraryTagLineContainerStyle}">
                     <TextBlock Style="{StaticResource DiscoveryRankingHeroTagTextStyle}">
                         <Run Text="{Binding ReleaseDateText, Mode=OneWay}" />
                         <Run Text="   " />
-                        <Run Text="{Binding ListTagGroupOneText, Mode=OneWay}" />
-                        <Run Text="{Binding ListTagSeparatorAfterOneText, Mode=OneWay}"
-                             Foreground="{DynamicResource BrushForegroundSecondary}" />
-                        <Run Text="{Binding ListTagGroupTwoText, Mode=OneWay}" />
-                        <Run Text="{Binding ListTagSeparatorAfterTwoText, Mode=OneWay}"
-                             Foreground="{DynamicResource BrushForegroundSecondary}" />
-                        <Run Text="{Binding ListTagGroupThreeText, Mode=OneWay}" />
+                        <Run Text="{Binding PosterTagGroupOneText, Mode=OneWay}" />
+                        <Run Text="{Binding PosterTagSeparatorAfterOneText, Mode=OneWay}"
+                             Foreground="{StaticResource DiscoveryLibraryTagDividerBrush}" />
+                        <Run Text="{Binding PosterTagGroupTwoText, Mode=OneWay}" />
+                        <Run Text="{Binding PosterTagSeparatorAfterTwoText, Mode=OneWay}"
+                             Foreground="{StaticResource DiscoveryLibraryTagDividerBrush}" />
+                        <Run Text="{Binding PosterTagGroupThreeText, Mode=OneWay}" />
                     </TextBlock>
                 </Border>
                 <Grid Grid.Row="2"
@@ -1587,20 +1564,20 @@
                 </Grid>
                 <Border Grid.Row="1"
                         Margin="0,12,0,0"
-                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding ListTagToolTipText}"
+                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding PosterTagToolTipText}"
                         helpers:TrimmedTextToolTipBehavior.OnlyWhenVisibleTextTruncated="True"
-                        helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding ListTagLine}"
+                        helpers:TrimmedTextToolTipBehavior.VisibleText="{Binding PosterTagLine}"
                         Style="{StaticResource DiscoveryLibraryTagLineContainerStyle}">
                     <TextBlock Style="{StaticResource DiscoveryRankingTagTextStyle}">
                         <Run Text="{Binding ReleaseDateText, Mode=OneWay}" />
                         <Run Text="   " />
-                        <Run Text="{Binding ListTagGroupOneText, Mode=OneWay}" />
-                        <Run Text="{Binding ListTagSeparatorAfterOneText, Mode=OneWay}"
-                             Foreground="{DynamicResource BrushForegroundSecondary}" />
-                        <Run Text="{Binding ListTagGroupTwoText, Mode=OneWay}" />
-                        <Run Text="{Binding ListTagSeparatorAfterTwoText, Mode=OneWay}"
-                             Foreground="{DynamicResource BrushForegroundSecondary}" />
-                        <Run Text="{Binding ListTagGroupThreeText, Mode=OneWay}" />
+                        <Run Text="{Binding PosterTagGroupOneText, Mode=OneWay}" />
+                        <Run Text="{Binding PosterTagSeparatorAfterOneText, Mode=OneWay}"
+                             Foreground="{StaticResource DiscoveryLibraryTagDividerBrush}" />
+                        <Run Text="{Binding PosterTagGroupTwoText, Mode=OneWay}" />
+                        <Run Text="{Binding PosterTagSeparatorAfterTwoText, Mode=OneWay}"
+                             Foreground="{StaticResource DiscoveryLibraryTagDividerBrush}" />
+                        <Run Text="{Binding PosterTagGroupThreeText, Mode=OneWay}" />
                     </TextBlock>
                 </Border>
                 <Grid Grid.Row="2"
@@ -2434,13 +2411,9 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </StackPanel.Style>
-                                        <Control Width="34"
-                                                 Height="34"
-                                                 Margin="0,0,0,10"
-                                                 HorizontalAlignment="Center"
-                                                 Template="{StaticResource LoadingSpinnerTemplate}">
+                                        <Control>
                                             <Control.Style>
-                                                <Style TargetType="Control">
+                                                <Style TargetType="Control" BasedOn="{StaticResource WidgetLoadingSpinnerStyle}">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsActiveSearchLoading}" Value="True">
@@ -2451,9 +2424,7 @@
                                             </Control.Style>
                                         </Control>
                                         <TextBlock Text="{Binding ActiveSearchStatusOverlayText}"
-                                                   TextAlignment="Center"
-                                                   TextWrapping="Wrap"
-                                                   Style="{StaticResource BodyMutedTextStyle}" />
+                                                   Style="{StaticResource WidgetLoadingTextStyle}" />
                                         <Button Margin="0,12,0,0"
                                                 Content="重试"
                                                 Command="{Binding RetrySearchCommand}">
@@ -3407,13 +3378,9 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <Control Width="34"
-                                             Height="34"
-                                             Margin="0,0,0,10"
-                                             HorizontalAlignment="Center"
-                                             Template="{StaticResource LoadingSpinnerTemplate}">
+                                    <Control>
                                         <Control.Style>
-                                            <Style TargetType="Control">
+                                            <Style TargetType="Control" BasedOn="{StaticResource WidgetLoadingSpinnerStyle}">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsActiveRankingLoading}" Value="True">
@@ -3424,9 +3391,7 @@
                                         </Control.Style>
                                     </Control>
                                     <TextBlock Text="{Binding ActiveRankingStatusOverlayText}"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource BodyMutedTextStyle}" />
+                                               Style="{StaticResource WidgetLoadingTextStyle}" />
                                     <Button Margin="0,12,0,0"
                                             Content="重试"
                                             Command="{Binding RetryRankingCommand}">

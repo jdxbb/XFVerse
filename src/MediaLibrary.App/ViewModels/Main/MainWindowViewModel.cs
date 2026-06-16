@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
 using MediaLibrary.App.Models.Profile;
 using MediaLibrary.App.Services.Implementations;
@@ -29,6 +30,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private NavigationItemViewModel? _selectedNavigationItem;
     private PageViewModelBase? _currentPageViewModel;
     private CancellationTokenSource? _pageActivationCancellation;
+    private int _navigationVersion;
     private int _pageActivationVersion;
     private string _currentPageTitle = string.Empty;
     private string _currentPageSubtitle = string.Empty;
@@ -245,6 +247,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             OnPropertyChanged(nameof(IsPosterBackdropActive));
             OnPropertyChanged(nameof(IsWatchInsightsRouteActive));
             OnPropertyChanged(nameof(PosterBackdropSource));
+            OnPropertyChanged(nameof(PosterBackdropPaletteOverride));
         }
     }
 
@@ -305,9 +308,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         SeriesOverviewViewModel seriesOverview => seriesOverview.PosterDisplayUrl,
         TvSeasonDetailViewModel seasonDetail => seasonDetail.PosterDisplayUrl,
         EpisodeDetailViewModel episodeDetail => episodeDetail.StillDisplayUrl,
-        WatchInsightsViewModel watchInsights => watchInsights.PersonaPosterImageUri,
+        WatchInsightsViewModel => string.Empty,
         _ => string.Empty
     };
+
+    public PosterBackdropPalette? PosterBackdropPaletteOverride => CurrentPageViewModel is WatchInsightsViewModel watchInsights
+        ? watchInsights.PersonaPosterBackdropPalette
+        : null;
 
     public string ShellPageTitle => IsHomePageActive && IsSidebarExpanded
         ? $"欢迎回来，{UserDisplayName} 👋"
@@ -323,6 +330,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             OnPropertyChanged(nameof(PosterBackdropSource));
         }
+
+        if (e.PropertyName is nameof(WatchInsightsViewModel.PersonaPosterBackdropPalette))
+        {
+            OnPropertyChanged(nameof(PosterBackdropSource));
+            OnPropertyChanged(nameof(PosterBackdropPaletteOverride));
+        }
     }
 
     private async void OnNavigationRequested(object? sender, NavigationRequest request)
@@ -330,12 +343,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         await NavigateToAsync(request, syncVisibleSelection: true);
     }
 
-    private Task NavigateToAsync(NavigationRequest request, bool syncVisibleSelection)
+    private async Task NavigateToAsync(NavigationRequest request, bool syncVisibleSelection)
     {
+        var navigationVersion = ++_navigationVersion;
         var pageKey = request.PageKey;
         if (!_routeMap.TryGetValue(pageKey, out var navigationItem))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         if (syncVisibleSelection)
@@ -345,11 +359,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         NavigationStateService.NotifyPageActivated(request);
-        ActivatePage(navigationItem.PageViewModel);
-        return Task.CompletedTask;
+        await ActivatePageAsync(navigationItem.PageViewModel, navigationVersion);
     }
 
-    private void ActivatePage(PageViewModelBase pageViewModel)
+    private async Task ActivatePageAsync(PageViewModelBase pageViewModel, int navigationVersion)
     {
         if (!ReferenceEquals(CurrentPageViewModel, pageViewModel))
         {
@@ -377,6 +390,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         _pageActivationCancellation = new CancellationTokenSource();
         var activationToken = _pageActivationCancellation.Token;
         var activationVersion = ++_pageActivationVersion;
+
+        if (pageViewModel is WatchInsightsViewModel watchInsights)
+        {
+            await watchInsights.PrepareBackdropPaletteAsync(activationToken);
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            if (activationToken.IsCancellationRequested || navigationVersion != _navigationVersion)
+            {
+                return;
+            }
+        }
 
         CurrentPageViewModel = pageViewModel;
         IsHomePageActive = pageViewModel is HomeViewModel;

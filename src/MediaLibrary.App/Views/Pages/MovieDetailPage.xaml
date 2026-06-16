@@ -1524,16 +1524,10 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <StackPanel HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
-                <Control Width="34"
-                         Height="34"
-                         HorizontalAlignment="Center"
-                         Template="{StaticResource LoadingSpinnerTemplate}" />
-                <TextBlock Margin="0,12,0,0"
-                           HorizontalAlignment="Center"
-                           Style="{StaticResource InlineLoadingStyle}"
-                           Text="{Binding StatusMessage}" />
+            <StackPanel Style="{StaticResource PageLoadingHostStyle}">
+                <Control Style="{StaticResource PageLoadingSpinnerStyle}" />
+                <TextBlock Text="{Binding StatusMessage}"
+                           Style="{StaticResource PageLoadingTextStyle}" />
             </StackPanel>
         </Border>
     </Grid>

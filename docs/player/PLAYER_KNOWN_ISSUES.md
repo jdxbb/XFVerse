@@ -81,3 +81,42 @@
 - Do not record temporary guesses as facts.
 - Move resolved issues into the stage log or mark their resolved stage here.
 - Stage-out-of-scope issues are recorded here and are not fixed opportunistically.
+
+## 2026-06-16 Playback History Refresh And Percent Follow-up
+
+Blocker:
+- None confirmed by build.
+
+Deferred:
+- Manually verify that a short valid playback session, for example about 7 seconds followed by pause and close, appears in Home continue-watching immediately after close.
+- Manually verify Home continue-watching, Playback History, and media-library poster-card progress text all show `0%` for exact zero and one decimal place for non-zero progress values.
+
+Noise:
+- Player close still emits an early playback refresh for shell responsiveness; the player now emits a second refresh after meaningful progress save completion to cover stale Home queries.
+
+## 2026-06-16 Watch Duration Progress-accounting Follow-up
+
+Blocker:
+
+- None confirmed by build.
+
+Deferred:
+
+- Existing inflated `WatchHistory.DurationWatchedSeconds` rows are not rewritten automatically. A separate explicit database cleanup is needed if current historical totals should be corrected in place.
+- Manually verify pause, buffering, background idle time, and forward seek no longer increase saved watched duration beyond actual playback-position advance.
+
+Noise:
+
+- The reported movie's existing rows remain useful diagnostic evidence: statistic-eligible saved duration was much larger than the maximum recorded playback position.
+
+## 2026-06-16 Resume Message Playback-start Timing Follow-up
+
+Blocker:
+- None confirmed by build.
+
+Deferred:
+- Manually verify that `已从 xx 继续播放` does not start its disappearance countdown during black-screen startup or while the player is paused before real playback position advances.
+- Manually verify the message disappears after the configured short delay once playback is actually running and the position has advanced beyond the resume point.
+
+Noise:
+- The guard uses a small playback-position advance threshold to avoid starting the timer from an initial time-position echo.

@@ -543,7 +543,7 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
             CategoryTagText = MediaKindText;
             SourceBadgeText = item.SourceSummary;
             ReleaseDateText = BuildReleaseDateText(item);
-            ProgressLabel = item.ProgressPercent.HasValue ? $"{item.ProgressPercent.Value:0}%" : "--";
+            ProgressLabel = item.ProgressPercent.HasValue ? FormatProgressPercent(item.ProgressPercent.Value) : "--";
 
             if (item.IsEpisode)
             {
@@ -921,12 +921,17 @@ public sealed class WatchHistoryViewModel : PageViewModelBase
 
         if (item.ProgressPercent.HasValue && item.LastPlayPositionSeconds > 0)
         {
-            return $"进度 {item.ProgressPercent.Value:0}% · 看到 {FormatDurationText(item.LastPlayPositionSeconds)}";
+            return $"进度 {FormatProgressPercent(item.ProgressPercent.Value)} · 看到 {FormatDurationText(item.LastPlayPositionSeconds)}";
         }
 
         return item.LastPlayPositionSeconds > 0
             ? $"看到 {FormatDurationText(item.LastPlayPositionSeconds)}"
             : "暂无可靠进度";
+    }
+
+    private static string FormatProgressPercent(double value)
+    {
+        return value == 0d ? "0%" : $"{value:0.0}%";
     }
 
     private static string FormatDurationText(int seconds)

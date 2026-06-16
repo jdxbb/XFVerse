@@ -1,5 +1,221 @@
 # Watch Insights Known Issues
 
+## 2026-06-16 Watch Insights Micro Layout Polish
+
+Blocker:
+- None identified by static patch review.
+
+Deferred:
+- Verify exploration DNA reads as a compass and all DNA icons remain aligned.
+- Verify DNA progress labels are no longer clipped and scrollable DNA analysis text shows complete lines.
+- Verify preference waves travel farther, curve less, move slowly, and fade away naturally.
+- Verify the watch-vs-like conclusion sits slightly higher without colliding with the triptych.
+- Verify selected taste-combination links are fully opaque and the Top5 right card/count placement matches the requested offset.
+- Verify the rhythm chart low/middle/high grid lines remain equally spaced with larger separation.
+- Verify calendar previous/next month controls align farther left with the calendar grid.
+- Verify light-theme selected/hovered tab text has a dark-gray outline.
+
+Noise:
+- These are visual-only offsets and animation constants; final acceptability depends on the running WPF window size and active theme.
+
+## 2026-06-16 Profile Gender Validation And Prompt Export
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify the profile gender combo box opens on click, closes on the next click, and opens again on another click.
+- Verify the default gender is female for new or previously empty profiles.
+- Verify phone, age, and email validation keeps the profile dialog in edit mode and marks only invalid fields.
+- Verify red validation text/background/border adapt correctly in light and dark themes.
+- Verify editing an invalid phone, age, or email field immediately clears the red validation state.
+- Verify Watch Persona poster and palette switch to male/female assets after profile gender changes.
+
+Noise:
+- Phone, age, and email remain optional; validation applies only when a value is entered.
+- Prompt template exports are local files outside the repository and do not change runtime prompt behavior.
+
+## 2026-06-16 Taste Combination Top5 And Triple-Only Graph Polish
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify the right Top5 card is left-shifted and slightly lower without colliding with the graph.
+- Verify Top5 rows show rank, combination, and occurrence count only, with no progress bar and all three aligned vertically.
+- Verify rank badge borders are darker than their fill in both themes.
+- Verify occurrence counts sit closer to the combination content.
+- Verify graph columns show at most four labels and only labels that appear in complete type x emotion x scene combinations.
+- Verify columns with fewer than four labels remain evenly distributed across the four-slot height.
+- Verify graph links are only generated from visible complete three-category combinations.
+- Verify selected-link glow looks soft and not like a hard outline.
+
+Noise:
+- The graph visual source is now Top10 complete combinations; the core statistics snapshot still keeps aggregate pair-edge data for other potential consumers.
+
+## 2026-06-16 Tab Gray Outline And Delta Arrow Placement Correction
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify selected and hovered tab labels use light-gray outline in light theme and dark-gray outline in dark theme.
+- Verify the status subtitle and tab-right status text outline treatment is unchanged.
+- Verify non-zero overview arrows appear immediately after the `compared with last month` delta number for status cards, total watch time, and watch-day count.
+- Verify zero and missing previous-month delta rows still hide arrows.
+
+Noise:
+- This entry supersedes the earlier black/white tab-outline validation item from the previous chrome-outline pass.
+
+## 2026-06-16 Quadrant Rhythm Calendar Waves And Watch-Like Polish
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify the taste-quadrant `A x B` heading colors match the visible X/Y axis labels, with the `x` separator readable but secondary.
+- Verify the coordinate canvas is slightly left-shifted without clipping the right-side axis label or point halo.
+- Verify expanded-sidebar layout raises the quadrant heading/body group enough without colliding with the module header.
+- Verify the viewing-time curve and fill follow the blue/purple/pink-orange/red height ramp in both themes.
+- Verify `<30min` calendar days use the deeper blue and the month navigation is centered on the calendar grid.
+- Verify preference waves originate from the content-area edges, travel far enough, and remain visible long enough to read as water waves from multiple directions.
+- Verify the Watch-vs-Like cards and conclusion sit slightly higher and the wanted star badge is only subtly raised.
+
+Noise:
+- The rhythm chart value colors are local to `SplineAreaChart`; theme resources still control the rest of the module chrome.
+
+## 2026-06-16 Watch DNA Icon And Overflow Height Polish
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify the six Watch DNA icons render as no-background pure icons at the same slot size and position as the previous placeholders.
+- Verify type, emotion, scene, and narrative icons match their corresponding chip color family; rhythm is cyan-blue and exploration is purple.
+- Verify a long description in any one DNA card makes all six cards slightly taller.
+- Verify non-progress DNA cards move their chip row and description down together when the shared overflow state is active.
+- Verify rhythm/exploration progress cards keep the progress bar and labels fixed while only the analysis text moves down.
+
+Noise:
+- The icons are vector paths embedded in the Watch Insights XAML; no new image assets were added.
+
+## 2026-06-16 Persona Lead Brackets And Acrylic Paint Label
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify persona lead brackets are inline with the lead copy and read as one sentence in both expanded and collapsed sidebar layouts.
+- Verify the brackets inherit the lead font while matching the muted taste-summary quotation-mark color/opacity in light and dark themes.
+- Verify the persona label text itself has not gained extra projection shadows after the paint backdrop change.
+- Verify the acrylic paint backdrop is opaque, connected from top to bottom, visibly textured, and angled right-up to left-down by roughly 30 degrees.
+- Verify the paint top/bottom edges are not clipped and no old thin edge-stroke line remains inside the backdrop.
+
+Noise:
+- The acrylic paint is rendered with vector paths and palette-derived colors; no new bitmap paint texture asset was added.
+
+## 2026-06-16 Chrome Outline And Overview Delta Arrows
+
+Blocker:
+- None confirmed by temp-output build.
+
+Deferred:
+- Verify selected and hovered tab labels use black outline in light theme and white outline in dark theme.
+- Verify the collapsed status subtitle and tab-right status text have visibly thicker outlines, with white in light theme and black in dark theme.
+- Verify zero month-over-month overview metrics show `较上月无变化`.
+- Verify non-zero overview metrics show an up/down arrow immediately to the right of the current value without pushing the unit text awkwardly.
+- Verify the same delta treatment works for overview status cards, total watch time, and watch-day count.
+
+Noise:
+- Default output build remains blocked while the running app executable is open; temp-output build is the validation path for this pass.
+
+## 2026-06-16 Taste Combination Graph Layout And Bezier Links
+
+Blocker:
+- None confirmed by solution build.
+
+Deferred:
+- Verify left graph node spacing and the taller module remain balanced at supported window widths.
+- Verify the right Top5 card sizes to content, centers vertically against the graph, and has no excessive lower blank area.
+- Verify Top5 row spacing, rank-to-content spacing, and `x次` progress-row alignment match the requested visual rhythm.
+- Verify selecting a type, emotion, or scene node highlights every pair link belonging to Top10 combinations that include that node.
+- Verify node tooltips appear faster and show `标签：次数` plus up to three `组合：次数` lines.
+- Verify Bezier links are restrained, do not pass through node interiors, and keep their endpoints on node edges.
+- Verify inactive-link opacity, selected-link glow, and source-to-target gradients remain readable in both light and dark themes.
+
+Noise:
+- The selected-link glow is implemented as a second thicker low-opacity path rather than a blur effect.
+
+## 2026-06-16 Watch-vs-Like Triptych Size And Shadow Safe Area
+
+Blocker:
+- None identified by static inspection.
+
+Deferred:
+- Verify the default middle card covers the right card less while still reading as the primary card.
+- Verify the `经常想看` star badge is larger but remains centered in the same badge position.
+- Verify all three larger cards expand visually downward and keep stable hover hit targets.
+- Verify the top and bottom cached shadows are no longer clipped in the running WPF window.
+- Verify the conclusion panel sits slightly higher and does not collide with the triptych stage at supported widths.
+
+Noise:
+- The triptych stage and Viewbox intentionally allow overflow so cached bitmap shadows can render outside card bounds.
+
+## 2026-06-16 Quadrant Calendar And Local Preference Waves
+
+Blocker:
+- None confirmed by solution build.
+
+Deferred:
+- Verify the taste-quadrant title/body group is high enough in both expanded and collapsed sidebar layouts, and the `A 标签 x B 标签` line is centered against the body text.
+- Verify the coordinate view is raised without clipping the top axis label.
+- Verify the calendar month navigation is centered on the calendar, the lower legend is centered below the calendar, and the three metric cards sit higher.
+- Verify local preference waves emit from varied random zones, curve more strongly near corners/edges, and apply a visible but not edge-pinning force.
+
+Noise:
+- Prompt version `wi-profile-persona-23-parallel-v17-quadrant-brief` intentionally leaves existing cached quadrant text unchanged until manual profile refresh.
+
+## 2026-06-16 Persona Lead And Tag Paint Polish
+
+Blocker:
+- None confirmed by solution build.
+
+Deferred:
+- Verify entering Watch Insights no longer crashes after the inline lead `Run.Text` bindings were changed to explicit one-way bindings.
+- Verify the persona lead inline corner brackets use the intended separate bracket font and stay correctly placed in expanded and collapsed sidebar layouts.
+- Verify the persona type paint reads as a thicker right-up to left-down diagonal graffiti stroke in both light and dark themes.
+
+Noise:
+- Exact brush thickness and bracket color are visual-review sensitive and may need one more tuning pass after looking at the running WPF page.
+
+## 2026-06-16 Stage4 Visual Tree Split
+
+Blocker:
+- None confirmed by temp-output build.
+
+Deferred:
+- Verify first entry logs now show profile stages 4/5/6/7 separately instead of one large stage-4 burst.
+- Verify `initial-loading-hidden` is recorded only after `visual-tree-ready` for Profile and Statistics.
+- Verify the watch-vs-like module looks unchanged after loading completes, including default center focus, hover focus, overlap, opacity, scale, and shadow.
+
+Noise:
+- The loading overlay may remain visible slightly longer because it now waits for the final render-commit gate instead of hiding as soon as the final stage flag is set.
+
+## 2026-06-16 Chrome Contrast, Shadow Safe Area, And Loading Diagnostics
+
+Blocker:
+- None confirmed after temp-output build validation.
+
+Deferred:
+- Verify selected and hovered tab text has a white outline in light theme and a black outline in dark theme, without changing inactive tab text.
+- Verify the collapsed titlebar subtitle and tab right status text read as ink black with white outline in light theme and fog white with black outline in dark theme.
+- Verify the titlebar-tab separator and tab-bottom separator are still visible after the added transparency.
+- Verify Profile Analysis and Watch Statistics module-card right-side glow is no longer clipped at the scroll viewport edge.
+- The first-entry spinner hitch remains a performance issue by request: current logs point to late profile stage-4 visual materialization after the loading overlay is hidden, with a 931ms max slow frame in the latest first-entry trace.
+
+Noise:
+- The normal output build is blocked while the running app executable is open; existing `watch-insights-perf.log` lines include pre-fix crash and previous staged-loading runs, so compare by timestamp.
+
 ## Blocker
 
 - 当前无确认 blocker。
@@ -29,6 +245,7 @@
 - DeepSeek endpoint 下画像默认使用 `deepseek-v4-pro` + thinking high；如果设置页将画像模型改为 `deepseek-v4-flash`，运行时会自动关闭 thinking 并继续请求。推荐使用 `deepseek-v4-flash`；非 DeepSeek endpoint 不强制覆盖模型。
 - 叙事标签只存在于画像结果中，不写入 `Movie`，也不新增 DB 字段。
 - 画像人格类型限定为最终版 23 个；非法类型会回退为“类型探索家”，必要时追加一次 AI 请求生成匹配描述。
+- Persona poster resources are limited to 23 official persona folders / 46 gendered poster PNGs; `eclectic_omnivore` is a redundant legacy folder and root placeholders / `Frames` are not formal personas.
 - 旧画像缓存可能仍显示已废弃人格（如“多元杂食者”或“童心奇想家”）；页面应保持可显示并提示手动刷新画像，不会自动改写缓存或调用 AI。
 - 口味象限 X/Y 来自 AI 输出，服务层只做 -100~100 clamp；新画像缺失或非数字 X/Y 会被视为生成错误。
 - 旧 WatchHistory 不做 backfill；自动完成只在后续播放进度保存时评估。
@@ -87,6 +304,19 @@ Deferred:
 
 Noise:
 - `ShadowStatic*` resources still exist as unused compatibility tokens; remove them only in a broader style-token cleanup.
+
+## 2026-06-15 Spinner Alignment and First-Entry Loading Pacing
+
+Blocker:
+- None confirmed by build after aligning the shared spinner template and removing Watch Insights title/tab glass overlays.
+
+Deferred:
+- Reproduce the first Watch Insights entry in the WPF window and inspect new `initial-loading-render-yield`, `initial-loading-hidden`, `slow-frame`, and `frame-summary` entries in `logs/watch-insights-perf.log`.
+- Watch Insights still uses a 38x38 loading spinner host while several full-page loading states use 34x34; if the spinner must exactly match those pages, align the host size in a separate spinner-only pass.
+- If first-entry stutter remains, split Watch Insights content creation so the loading overlay is hosted by a lightweight shell before the heavy profile/statistics visual tree is materialized.
+
+Noise:
+- Older log entries still reflect the previous spinner/layout behavior; restart the running app before comparing the new diagnostics.
 
 ## 2026-06-14 Light Theme Cached Shadow Parity
 
@@ -287,7 +517,7 @@ Deferred:
 - Verify the shortened triptych bars and added space below the conclusion panel at the minimum supported window width.
 
 Noise:
-- `SkewTransform` provides a WPF-compatible perspective approximation; it does not introduce a true 3D camera or `Viewport3D` rendering path.
+- Historical note: this stage used `SkewTransform` as a perspective approximation; the current implementation no longer uses it.
 - The running application must be restarted before it can load these changes.
 
 ## 2026-06-14 Statistics Overview and Calendar Polish
@@ -407,5 +637,167 @@ Deferred:
 - Verify the increased outer-card height and bottom padding remain visually balanced.
 
 Noise:
-- The triptych now uses `Viewport2DVisual3D`, so text is rendered onto interactive 3D surfaces rather than transformed as ordinary two-dimensional controls.
+- Historical note: this stage used `Viewport2DVisual3D`; that rendering path was removed by later revisions.
 - The running application must be restarted before the updated XAML and animation logic can be observed.
+
+## 2026-06-15 Watch Insights Chrome Scope and Loading Preflight
+
+Blocker:
+- None identified by solution build or static inspection.
+
+Deferred:
+- Verify the collapsed titlebar subtitle is the only shell title text receiving the edge treatment, and the shell titlebar itself has no visible glow/shadow overlay.
+- Verify tab selected text and tab hover text use the same subtle edge treatment, while unhovered inactive tabs remain plain.
+- Verify the tab right status text remains readable without a directional projection in both themes.
+- Verify the titlebar-tab separator and tab-bottom separator read as direct line colors only: whiter in light theme and blacker in dark theme.
+- Verify first entry into Watch Insights applies the current cached persona palette during loading rather than showing a previous page/poster color.
+- If first-entry spinner still visibly hitches, split the heavy Watch Insights content into deferred templates so the lightweight loading overlay can render and animate before profile/statistics visuals are materialized.
+
+Noise:
+- The new backdrop preflight reads cached Watch Profile recommendation context only; if no valid cache exists, loading still starts from the fixed fallback persona palette until the profile load completes.
+
+## 2026-06-16 Staged Visual Tree and Chrome Tone
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify the `观影洞察` page title has no outline in expanded and collapsed sidebar states.
+- Verify the subtitle and tab right status text remain close to their original muted color, with only a small white blend in light theme and black blend in dark theme.
+- Verify selected and hovered tab text use the lightly adjusted accent foreground and the slightly thicker edge.
+- Verify the reduced light/dark separator contrast remains visible against every current persona backdrop.
+- Verify the spinner rotates continuously while the four profile stages are materialized.
+- Verify the statistics tab first activation rotates continuously while its five stages are materialized.
+- Compare new `visual-tree-stage-ready`, `visual-tree-ready`, and slow-frame log entries against the previous monolithic construction run.
+- Verify bubble interaction and watch-vs-like hover animation after their deferred templates are materialized.
+
+Noise:
+- Deferred templates intentionally appear only after their stage flag is raised; this is expected while the loading overlay remains visible.
+
+## 2026-06-16 Persona Lead And Painted Label
+
+Blocker:
+- None identified by solution build or static inspection.
+
+Deferred:
+- Verify persona leads up to 40 characters preserve the intended two-clause structure and do not overflow the two-line layout.
+- Verify the larger opening bracket sits slightly above the first visible character and the larger closing bracket sits slightly below the final visible character.
+- Verify bracket placement remains correct when the sidebar switches between expanded and collapsed layouts.
+- Verify the painted background tracks short and long persona labels with visible side padding and no rectangular or capsule silhouette.
+- Verify the most vivid fixed poster palette color remains restrained in light theme and sufficiently deep in dark theme.
+- Verify the persona label text remains clearer than the paint layer and its existing projection is not visually muddied.
+
+Noise:
+- The paint texture is vector-rendered from five cached-palette strokes; no poster decode or new bitmap resource is involved.
+
+## 2026-06-16 Quadrant, Calendar, And Preference Wave
+
+Blocker:
+- None identified by solution build or static inspection.
+
+Deferred:
+- Verify the quadrant body expands only toward the center and its left edge remains aligned with the previous layout.
+- Verify the raised coordinate view does not collide with the card subtitle or clip its top axis caption.
+- Verify refreshed quadrant descriptions are visibly longer while remaining readable in the internal scroll area.
+- Verify calendar navigation, legend, and metric cards move in the requested directions without reducing calendar-grid space.
+- Verify the periodic wave alternates left and right and begins roughly every eight seconds while the graph is visible.
+- Verify its full-height visual reads as one travelling wave rather than several distant ripples.
+- Verify the wave pushes bubbles more strongly than pointer movement but does not pin them against the boundary.
+- Verify mouse-generated ripples are moderately rounder without losing directionality.
+
+Noise:
+- Periodic wave timing pauses while the preference graph is outside the active statistics viewport; this avoids hidden animation and physics work.
+
+## 2026-06-16 Flat Watch-vs-Like Focus Cards
+
+Blocker:
+- None identified by solution build or static inspection.
+
+Deferred:
+- Verify the middle `经常喜爱` card is primary before any pointer interaction.
+- Verify the default center card overlaps both side cards by a restrained amount without clipping their important content.
+- Verify hovering the left card creates the exact layer order left, center, right from front to back.
+- Verify hovering the right card creates the exact layer order right, center, left from front to back.
+- Verify primary, intermediate, and far cards have clearly distinct but restrained opacity and shadow levels.
+- Verify transitions remain stable when moving directly across overlapping card boundaries.
+- Verify leaving the complete card region restores the middle-primary state.
+- Verify no rotation, skew, trapezoid, perspective distortion, or folded dark overlay remains in either theme.
+
+Noise:
+- WPF ZIndex is discrete, so the new layer order is applied at animation start while scale, opacity, shadow, and translation animate over 220 milliseconds.
+
+## 2026-06-16 Taste Combination Graph And Top5
+
+Blocker:
+- None identified by solution build or static inspection.
+
+Deferred:
+- Verify all graph nodes are circular, shadow-free, and show only the tag text.
+- Verify node tooltips use the exact `标签：次数` format.
+- Verify the larger vertical spacing keeps all four possible nodes per column inside the graph canvas.
+- Verify inactive line opacity and thickness visibly follow occurrence count without making low-frequency links disappear.
+- Verify hovered and selected nodes raise only their connected links to 90% opacity.
+- Verify clicking an already selected node clears selection and mouse leave restores the prior selected-node focus.
+- Verify mist blue, rose pink, and mint green remain restrained and readable in both themes.
+- Verify the right panel displays no more than five combinations and each row uses `标签 x 标签 x 标签` with rounded rectangles.
+- Verify the occurrence label reads `x次` without the previous `出现` prefix or spacing.
+
+Noise:
+- When all visible links have the same count, normalization intentionally assigns all of them the maximum normalized value.
+
+## 2026-06-16 Watch Insights Entry Crash Fix
+
+Blocker:
+- None identified after removing staged `ContentTemplate` Style setters, switching the profile stage 3/4 forward template references to `DynamicResource`, and rebuilding the solution.
+
+Deferred:
+- Verify clicking into Watch Insights no longer exits the application.
+- Verify profile and statistics staged modules still appear after their visual-stage flags turn true.
+- Verify no new `.NET Runtime` event 1026 is produced during Watch Insights entry.
+- If a new crash still appears, inspect the latest Windows Application event first; the original `MS.Internal.NamedObject` and `StaticResourceHolder` failures should no longer recur.
+
+Noise:
+- Existing Event Viewer and performance-log records from before this fix remain on disk until aged out or cleared.
+
+## 2026-06-16 Watch Insights Loading Prelayout Smoothness
+
+Blocker:
+- None identified by static inspection.
+
+Deferred:
+- Verify first-entry spinner animation remains visually continuous while profile content is staged behind the loading overlay.
+- Verify the nearly transparent prelayout body is not noticeable behind the loading spinner in both light and dark themes.
+- Verify fresh `watch-insights-perf.log` entries no longer show the largest first-entry slow frames immediately after `initial-loading-hidden`.
+- If one stage still creates a visible hitch, split that stage's template content deeper rather than relying only on longer stage delays.
+
+Noise:
+- Loading can remain visible slightly longer because stage pacing now intentionally gives WPF extra render turns between heavy visual-tree additions.
+
+## 2026-06-16 Watch Duration Overcount Diagnosis Follow-up
+
+Blocker:
+
+- None identified by build.
+
+Deferred:
+
+- Existing inflated watch-history rows are not automatically corrected; approve a separate database cleanup if current historical Watch Insights totals should be rewritten.
+- Manually verify future player sessions no longer count pause, buffering, or idle window time as watched duration.
+
+Noise:
+
+- The fix prevents future overcount at the player persistence layer; Watch Insights still reads stored history values as its source of truth.
+
+## 2026-06-16 Watch Insights Profile Stage2 Persona Split
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify Profile stage 2 no longer carries the persona poster/card work and the previous 1265-1478 ms stage-2 spike is gone.
+- Verify the persona module appears unchanged after it is materialized as stage 3.
+- Verify the quadrant module, watch-vs-like shell, and three watch-vs-like cards still appear in the correct order after being shifted to stages 4-8.
+- If the persona-only stage remains visibly heavy, split poster/shadow image creation from persona text/card content in a follow-up.
+
+Noise:
+- Profile initial loading now uses eight visual stages; this is intentional pacing to trade a little wall-clock time for smoother spinner motion.

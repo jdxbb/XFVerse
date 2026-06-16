@@ -15,7 +15,7 @@ public sealed class WatchProfileService : IWatchProfileService
     private const string ProfileKind = "profile";
     private const string GlobalScopeKey = "global";
     private const int CurrentProfileSchemaVersion = 2;
-    private const string CurrentPromptVersion = "wi-profile-persona-23-parallel-v14-quadrant-description";
+    private const string CurrentPromptVersion = "wi-profile-persona-23-parallel-v18-persona-description-longer";
     private const string FallbackPersonaType = "类型探索家";
     private const string FallbackPersonaTitle = "类型探索家";
     private const string FallbackPersonaLead = "你在熟悉与探索之间，形成了鲜明而开放的观影轨迹。";
@@ -1186,7 +1186,7 @@ public sealed class WatchProfileService : IWatchProfileService
             return FallbackPersonaLead;
         }
 
-        const int maxLength = 33;
+        const int maxLength = 40;
         var firstClause = clauses[0];
         var secondClause = clauses[1];
         var result = $"{firstClause}，{secondClause}。";
@@ -1396,7 +1396,7 @@ public sealed class WatchProfileService : IWatchProfileService
         return """
         你只负责修正观影人格文案。只能输出 JSON 对象，不输出 Markdown 或解释文本。
         persona.type 已固定为“类型探索家”，不要改变类型。
-        title、lead 和 description 必须与“类型探索家”匹配。lead 总长度不得超过 33 个字符（包括标点），必须且只能包含一个中文逗号，形成两个语义完整的分句，并以中文句号结尾；description 要基于给定摘要解释主动尝试不同类型与风格、不会被单一口味固定，不要编造推荐结果。
+        title、lead 和 description 必须与“类型探索家”匹配。lead 总长度不得超过 40 个字符（包括标点），必须且只能包含一个中文逗号，形成两个语义完整的分句，并以中文句号结尾；description 要基于给定摘要解释主动尝试不同类型与风格、不会被单一口味固定，不要编造推荐结果。
         """;
     }
 
@@ -1719,8 +1719,8 @@ public sealed class WatchProfileService : IWatchProfileService
         要求：
         1. persona.type 只能是以下集合之一：{{{string.Join("、", PersonaTypes)}}}。
         2. 必须参考 personaTypeDefinitions 和 personaSelectionRules 选择最强差异化人格，不要只按题材表面相似度选择。
-        3. persona.lead 必须返回一句完整、简洁、有概括力的导语；总长度不得超过 33 个字符（包括逗号和句号），必须且只能包含一个中文逗号，逗号前后是两个语义完整的分句，并以中文句号结尾；不要与 persona.type 或 title 重复。
-        4. persona.description 要作为导语下方的正文，解释为什么归为该人格，必须结合观看、喜爱、想看或不想看等行为信号。
+        3. persona.lead 必须返回一句完整、简洁、有概括力的导语；总长度不得超过 40 个字符（包括逗号和句号），必须且只能包含一个中文逗号，逗号前后是两个语义完整的分句，并以中文句号结尾；不要与 persona.type 或 title 重复。
+        4. persona.description 要作为导语下方的正文，写 150-220 个汉字，使用 2-3 个完整句子，解释为什么归为该人格，必须结合观看、喜爱、想看或不想看等行为信号，并说明这些行为如何共同形成该人格判断。
         5. lead 和 description 不要简单罗列关键词，也不要写成标签堆叠；两者不要重复表达同一句话。
         6. confidence 范围 0-100。
 
@@ -1786,7 +1786,7 @@ public sealed class WatchProfileService : IWatchProfileService
         2. X 轴：-100=熟悉安全，100=新鲜探索。
         3. Y 轴：-100=轻松消遣，100=情绪沉浸。
         4. quadrantName 使用对应象限名称。
-        5. quadrant.description 写 110-170 个汉字，使用 2-3 个完整句子，同时解释横轴与纵轴分数依据，并结合观看、喜爱、想看或不想看等实际行为信号；不要提内部字段名，不要只复述象限名称，也不要堆砌标签。
+        5. quadrant.description 写 130-190 个汉字，使用 2-3 个完整句子，同时解释横轴与纵轴分数依据，并结合观看、喜爱、想看或不想看等实际行为信号；说明这些信号如何共同形成当前象限位置，不要提内部字段名，不要只复述象限名称，也不要堆砌标签。
 
         输入数据：
         {{{JsonSerializer.Serialize(payload, JsonOptions)}}}

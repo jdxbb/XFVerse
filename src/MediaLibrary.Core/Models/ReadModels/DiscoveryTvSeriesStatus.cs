@@ -45,4 +45,18 @@ public sealed class DiscoveryTvSeriesStatus
     public string DirectorText { get; set; } = string.Empty;
 
     public string ActorsText { get; set; } = string.Empty;
+
+    public double? TmdbRating { get; set; }
+
+    public int? TmdbVoteCount { get; set; }
+
+    public double? OmdbScoreValue { get; set; }
+
+    public double? OmdbScoreScale { get; set; }
+
+    public int? OmdbVoteCount { get; set; }
+
+    public string OmdbSourceUrl { get; set; } = string.Empty;
+
+    public DateTime? OmdbLastUpdatedAt { get; set; }
 }

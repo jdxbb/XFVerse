@@ -50,6 +50,7 @@ public static class AppServiceProvider
         services.AddSingleton<ILocalMediaScanService, LocalMediaScanService>();
         services.AddSingleton<ILibraryQueryService, LibraryQueryService>();
         services.AddSingleton<IMovieDetailQueryService, MovieDetailQueryService>();
+        services.AddSingleton<IMovieMetadataRefreshService, MovieMetadataRefreshService>();
         services.AddSingleton<ITvDetailQueryService, TvDetailQueryService>();
         services.AddSingleton<IMovieManagementService, MovieManagementService>();
         services.AddSingleton<IPlaybackSourceService, PlaybackSourceService>();

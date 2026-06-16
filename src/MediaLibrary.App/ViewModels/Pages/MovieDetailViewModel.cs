@@ -27,6 +27,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private readonly INavigationStateService _navigationStateService;
     private readonly IPlayerWindowService _playerWindowService;
     private readonly IMovieDetailQueryService _movieDetailQueryService;
+    private readonly IMovieMetadataRefreshService _movieMetadataRefreshService;
     private readonly IDiscoveryMovieStatusResolver _discoveryMovieStatusResolver;
     private readonly ITmdbService _tmdbService;
     private readonly IMovieIdentificationService _movieIdentificationService;
@@ -40,6 +41,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
     private readonly HashSet<int> _lazyProbeCheckedMediaFileIds = [];
     private readonly HashSet<int> _probingMediaFileIds = [];
     private readonly ConcurrentDictionary<int, byte> _backgroundClassifyingMovieIds = new();
+    private readonly ConcurrentDictionary<int, byte> _backgroundRefreshingMovieMetadataIds = new();
     private readonly ConcurrentDictionary<string, byte> _backgroundClassifyingExternalKeys = new(StringComparer.OrdinalIgnoreCase);
     private bool _isProbeCompletionRefreshQueued;
     private AiRecommendationItem? _externalRecommendation;
@@ -126,6 +128,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         INavigationStateService navigationStateService,
         IPlayerWindowService playerWindowService,
         IMovieDetailQueryService movieDetailQueryService,
+        IMovieMetadataRefreshService movieMetadataRefreshService,
         IDiscoveryMovieStatusResolver discoveryMovieStatusResolver,
         ITmdbService tmdbService,
         IMovieIdentificationService movieIdentificationService,
@@ -141,6 +144,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         _navigationStateService = navigationStateService;
         _playerWindowService = playerWindowService;
         _movieDetailQueryService = movieDetailQueryService;
+        _movieMetadataRefreshService = movieMetadataRefreshService;
         _discoveryMovieStatusResolver = discoveryMovieStatusResolver;
         _tmdbService = tmdbService;
         _movieIdentificationService = movieIdentificationService;
@@ -1054,6 +1058,10 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             };
             IsDetailLoading = false;
             ScheduleDetailLazyProbe(detail.MovieId, detail.Sources, cancellationToken);
+            if (detail.TmdbId.HasValue)
+            {
+                StartMovieMetadataRefresh(detail.MovieId, detail.TmdbId.Value);
+            }
 
             if (NeedsAutoClassification(detail))
             {
@@ -1066,6 +1074,55 @@ public sealed class MovieDetailViewModel : PageViewModelBase
         catch (Exception exception)
         {
             ClearMovieState($"加载影片详情失败：{DescribeException(exception)}");
+        }
+    }
+
+    private void StartMovieMetadataRefresh(int movieId, int tmdbId)
+    {
+        if (movieId <= 0 || tmdbId <= 0 || !_backgroundRefreshingMovieMetadataIds.TryAdd(movieId, 0))
+        {
+            return;
+        }
+
+        _ = RefreshMovieMetadataInBackgroundAsync(movieId, tmdbId);
+    }
+
+    private async Task RefreshMovieMetadataInBackgroundAsync(
+        int movieId,
+        int tmdbId)
+    {
+        try
+        {
+            var refreshResult = await _movieMetadataRefreshService.RefreshMovieMetadataAsync(
+                movieId,
+                forceRefresh: true,
+                CancellationToken.None);
+            if (!refreshResult.Success || !refreshResult.HasChanges)
+            {
+                return;
+            }
+
+            _dataRefreshService.NotifyMetadataChanged();
+            if (_navigationStateService.SelectedMovieId != movieId || _movieId != movieId || _tmdbId != tmdbId)
+            {
+                return;
+            }
+
+            await LoadMovieAsync(movieId, CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-tmdb-metadata-refresh-cancelled movieId={movieId} tmdbId={tmdbId}");
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-tmdb-metadata-refresh-failed movieId={movieId} tmdbId={tmdbId} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+        finally
+        {
+            _backgroundRefreshingMovieMetadataIds.TryRemove(movieId, out _);
         }
     }
 
@@ -1112,6 +1169,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
                 return;
             }
 
+            await MarkMovieDetailTaskStartedAsync(movieId, "lazy-probe");
             ScanIdentificationDiagnostics.Write(
                 $"event=media-probe-detail-lazy-refresh contentKind=movie queuedCount={result.QueuedCount} refreshStrategy=probe-status-changed-event");
         }
@@ -1424,6 +1482,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
+        _ = MarkMovieDetailTaskStartedAsync(movieId, "ai-classification");
         _ = ClassifyMovieInBackgroundAsync(movieId);
     }
 
@@ -1466,7 +1525,44 @@ public sealed class MovieDetailViewModel : PageViewModelBase
             return;
         }
 
+        _ = MarkExternalDetailTaskStartedAsync(recommendation, "external-ai-classification");
         _ = ClassifyExternalRecommendationInBackgroundAsync(recommendation, key);
+    }
+
+    private async Task MarkMovieDetailTaskStartedAsync(int movieId, string taskKind)
+    {
+        try
+        {
+            if (await _movieManagementService.TouchMovieUpdatedAtAsync(movieId, CancellationToken.None))
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-detail-task-start-touch contentKind=movie movieId={movieId} taskKind={ScanIdentificationDiagnostics.FormatValue(taskKind)}");
+            }
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-task-start-touch-failed contentKind=movie movieId={movieId} taskKind={ScanIdentificationDiagnostics.FormatValue(taskKind)} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+    }
+
+    private async Task MarkExternalDetailTaskStartedAsync(AiRecommendationItem recommendation, string taskKind)
+    {
+        try
+        {
+            if (await _userCollectionService.TouchCollectionItemUpdatedAtAsync(recommendation, CancellationToken.None))
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+                ScanIdentificationDiagnostics.Write(
+                    $"event=movie-detail-task-start-touch contentKind=external tmdbId={FormatNullable(recommendation.TmdbId)} taskKind={ScanIdentificationDiagnostics.FormatValue(taskKind)}");
+            }
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=movie-detail-task-start-touch-failed contentKind=external tmdbId={FormatNullable(recommendation.TmdbId)} taskKind={ScanIdentificationDiagnostics.FormatValue(taskKind)} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
     }
 
     private async Task ClassifyExternalRecommendationInBackgroundAsync(

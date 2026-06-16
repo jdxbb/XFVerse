@@ -1810,3 +1810,76 @@ Known Issues:
 
 Next step:
 - Phase 7.5 is closed. Proceed only to a new explicit follow-up phase or to a focused patch for any previously reported audit mismatch.
+
+## 2026-06-16 Watch Duration Progress-accounting Follow-up
+
+Goal:
+- Prevent paused, buffered, background, or idle player wall-clock time from inflating `DurationWatchedSeconds`.
+
+Completed:
+- Replaced watch-duration persistence from wall-clock session age with accumulated playback-position progress.
+- Reset the watch-duration baseline when a watch history starts from a resume position.
+- Reset the baseline when the user seeks, so forward seek jumps are not counted as watched time.
+- Existing progress, resume, completion, auto-watched, and history persistence service contracts remain unchanged.
+
+Not done:
+- No database cleanup was performed for existing historical rows.
+- No database schema, migration, playback engine, subtitle/audio, cache, commit, or push behavior was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- Read-only database inspection of the reported movie showed 28 history rows with raw statistic-eligible duration totaling 4505 seconds while max playback position was only 919 seconds, matching the prior wall-clock overcount failure mode.
+
+Known Issues:
+- Blocker: none confirmed by build.
+- Deferred: existing inflated rows still require an explicit database-cleanup task if the user wants current historical totals rewritten.
+- Noise: future sessions count playback-position advance; seek-heavy validation should be done manually in the WPF player.
+
+## 2026-06-16 Playback History Refresh And Percent Follow-up
+
+Goal:
+- Make a short valid player session appear on Home continue-watching after close, and align Playback History progress text precision with library progress.
+
+Completed:
+- Player progress persistence now emits a playback-history refresh after a meaningful save completes.
+- The refresh is position-deduplicated within the current playback history session to avoid repeated UI refreshes for the same saved position.
+- Playback History progress text and poster label now keep one decimal place, matching small-percent progress display expectations.
+- Home continue-watching progress text and media-library poster-card progress labels now also use the shared display rule: exact zero shows `0%`, otherwise the percentage keeps one decimal place.
+- Home continue-watching no longer formats `ProgressValue` directly in XAML; it binds the preformatted progress text from the read model.
+
+Not done:
+- No database cleanup was performed for existing rows.
+- No database schema, migration, playback engine, subtitle/audio, cache, commit, or push behavior was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed by build.
+- Deferred: manually verify a pause-and-close session after around 7 seconds appears on Home continue-watching immediately after close.
+- Noise: Home may still receive an earlier close-lifecycle refresh before the save completes; the new post-save refresh is intended to resolve the visible stale state.
+
+## 2026-06-16 Resume Message Playback-start Timing Follow-up
+
+Goal:
+- Make the `已从 xx 继续播放` message auto-hide timer start only after real playback progress begins.
+
+Completed:
+- Removed the early auto-hide scheduling from the player `Playing` event.
+- The resume message now records its resume-position baseline when shown.
+- The auto-hide timer is scheduled only when the player is currently playing and the observed playback position has advanced beyond that baseline.
+- Both playback position event updates and timer-poll position updates use the same scheduling guard.
+
+Not done:
+- No database cleanup, schema change, migration, playback engine, subtitle/audio, cache, commit, or push behavior was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+- Blocker: none confirmed by build.
+- Deferred: manually verify WebDAV startup where `Playing` fires before the first real time position; the resume message should remain visible until playback position advances.
+- Noise: extremely small initial position jitter below the guard threshold is intentionally ignored.

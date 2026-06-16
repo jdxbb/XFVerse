@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using MediaLibrary.Core.Data;
+using MediaLibrary.Core.Diagnostics;
 using MediaLibrary.Core.Models.Entities;
 using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
@@ -15,10 +16,12 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
     private static readonly ConcurrentDictionary<int, DateTime> RecentAttempts = new();
     private static readonly ConcurrentDictionary<int, SemaphoreSlim> HydrationLocks = new();
     private readonly ITmdbService _tmdbService;
+    private readonly IOmdbService _omdbService;
 
-    public TvMetadataHydrationService(ITmdbService tmdbService)
+    public TvMetadataHydrationService(ITmdbService tmdbService, IOmdbService omdbService)
     {
         _tmdbService = tmdbService;
+        _omdbService = omdbService;
     }
 
     public async Task<TvMetadataHydrationResult> EnsureSeriesSummaryBySeriesIdAsync(
@@ -97,9 +100,23 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(tmdbSeriesId, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
             var existingSeriesId = await FindSeriesIdAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
+            if (existingSeriesId.HasValue
+                && await MetadataDetailRefreshCooldown.IsTvSeriesSummaryCoolingDownAsync(tmdbSeriesId, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tv-series-detail-tmdb-metadata-refresh-skipped tmdbSeriesId={tmdbSeriesId} refreshKind=\"summary\" skippedReason=\"cooldown\"");
+                result.Skipped = true;
+                result.TvSeriesId = existingSeriesId;
+                return result;
+            }
+
+            var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(
+                    tmdbSeriesId,
+                    cancellationToken: cancellationToken,
+                    forceRefresh: force)
+                .ConfigureAwait(false);
             if (seriesDetails is null)
             {
                 result.AddError("无法读取 TMDB TV Series metadata。");
@@ -108,6 +125,7 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             }
 
             var seasonSummaries = NormalizeSeasonSummaries(seriesDetails.Seasons);
+            var omdbRating = await LoadSeriesOmdbRatingAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
             if (!force
                 && existingSeriesId.HasValue
                 && await HasSeriesSummaryAsync(existingSeriesId.Value, seriesDetails, seasonSummaries, cancellationToken).ConfigureAwait(false))
@@ -121,7 +139,9 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            var tvSeries = await UpsertSeriesAsync(dbContext, seriesDetails, cancellationToken).ConfigureAwait(false);
+            var seriesResult = await UpsertSeriesAsync(dbContext, seriesDetails, omdbRating, cancellationToken).ConfigureAwait(false);
+            var tvSeries = seriesResult.Series;
+            result.SeriesChanged = seriesResult.IsChanged;
             result.TvSeriesId = tvSeries.Id;
 
             foreach (var summary in seasonSummaries)
@@ -138,7 +158,7 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
                 {
                     result.AddedSeasonCount++;
                 }
-                else
+                else if (seasonResult.IsChanged)
                 {
                     result.UpdatedSeasonCount++;
                 }
@@ -146,6 +166,10 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
 
             await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            await MetadataDetailRefreshCooldown.MarkTvSeriesSummarySucceededAsync(tmdbSeriesId, CancellationToken.None)
+                .ConfigureAwait(false);
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-series-detail-tmdb-metadata-refresh-succeeded tmdbSeriesId={tmdbSeriesId} refreshKind=\"summary\" changed={FormatBool(result.HasChanges)} seriesChanged={FormatBool(result.SeriesChanged)} addedSeasonCount={result.AddedSeasonCount} updatedSeasonCount={result.UpdatedSeasonCount} cooldownHours=4");
             return result;
         }
         finally
@@ -170,10 +194,21 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            var existingSeriesId = await FindSeriesIdAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
+            if (existingSeriesId.HasValue
+                && await MetadataDetailRefreshCooldown.IsTvSeriesFullCoolingDownAsync(tmdbSeriesId, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tv-series-detail-tmdb-metadata-refresh-skipped tmdbSeriesId={tmdbSeriesId} refreshKind=\"full\" skippedReason=\"cooldown\"");
+                result.Skipped = true;
+                result.TvSeriesId = existingSeriesId;
+                return result;
+            }
+
             if (!force && RecentAttempts.TryGetValue(tmdbSeriesId, out var lastAttempt)
                 && DateTime.UtcNow - lastAttempt < AttemptCooldown)
             {
-                var existingSeriesId = await FindSeriesIdAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
                 if (existingSeriesId.HasValue)
                 {
                     result.Skipped = true;
@@ -184,7 +219,10 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
                 RecentAttempts.TryRemove(tmdbSeriesId, out _);
             }
 
-            var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(tmdbSeriesId, cancellationToken: cancellationToken)
+            var seriesDetails = await _tmdbService.GetTvSeriesDetailsAsync(
+                    tmdbSeriesId,
+                    cancellationToken: cancellationToken,
+                    forceRefresh: force)
                 .ConfigureAwait(false);
             if (seriesDetails is null)
             {
@@ -194,6 +232,7 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             }
 
             var seasonSummaries = NormalizeSeasonSummaries(seriesDetails.Seasons);
+            var omdbRating = await LoadSeriesOmdbRatingAsync(tmdbSeriesId, cancellationToken).ConfigureAwait(false);
             var seasonDetailsByNumber = new Dictionary<int, TmdbTvSeasonDetailResult?>();
             foreach (var summary in seasonSummaries)
             {
@@ -201,7 +240,8 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
                 var seasonDetail = await _tmdbService.GetTvSeasonDetailsAsync(
                         tmdbSeriesId,
                         summary.SeasonNumber,
-                        cancellationToken: cancellationToken)
+                        cancellationToken: cancellationToken,
+                        forceRefresh: force)
                     .ConfigureAwait(false);
                 if (seasonDetail is null)
                 {
@@ -215,7 +255,9 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            var tvSeries = await UpsertSeriesAsync(dbContext, seriesDetails, cancellationToken).ConfigureAwait(false);
+            var seriesResult = await UpsertSeriesAsync(dbContext, seriesDetails, omdbRating, cancellationToken).ConfigureAwait(false);
+            var tvSeries = seriesResult.Series;
+            result.SeriesChanged = seriesResult.IsChanged;
             result.TvSeriesId = tvSeries.Id;
 
             foreach (var summary in seasonSummaries)
@@ -234,7 +276,7 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
                 {
                     result.AddedSeasonCount++;
                 }
-                else
+                else if (seasonResult.IsChanged)
                 {
                     result.UpdatedSeasonCount++;
                 }
@@ -246,17 +288,17 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
 
                 foreach (var episode in NormalizeEpisodeMetadata(seasonDetail.Episodes))
                 {
-                    var episodeAdded = await UpsertEpisodeAsync(
+                    var episodeResult = await UpsertEpisodeAsync(
                             dbContext,
                             seasonResult.Season,
                             episode,
                             cancellationToken)
                         .ConfigureAwait(false);
-                    if (episodeAdded)
+                    if (episodeResult.IsAdded)
                     {
                         result.AddedEpisodeCount++;
                     }
-                    else
+                    else if (episodeResult.IsChanged)
                     {
                         result.UpdatedEpisodeCount++;
                     }
@@ -266,6 +308,14 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             RecentAttempts[tmdbSeriesId] = DateTime.UtcNow;
+            if (!result.HasErrors)
+            {
+                await MetadataDetailRefreshCooldown.MarkTvSeriesFullSucceededAsync(tmdbSeriesId, CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-series-detail-tmdb-metadata-refresh-succeeded tmdbSeriesId={tmdbSeriesId} refreshKind=\"full\" changed={FormatBool(result.HasChanges)} seriesChanged={FormatBool(result.SeriesChanged)} addedSeasonCount={result.AddedSeasonCount} updatedSeasonCount={result.UpdatedSeasonCount} addedEpisodeCount={result.AddedEpisodeCount} updatedEpisodeCount={result.UpdatedEpisodeCount} hasErrors={FormatBool(result.HasErrors)} cooldownHours=4");
             return result;
         }
         finally
@@ -312,7 +362,8 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             var seasonDetail = await _tmdbService.GetTvSeasonDetailsAsync(
                     seasonKey.TmdbSeriesId,
                     seasonKey.SeasonNumber,
-                    cancellationToken: cancellationToken)
+                    cancellationToken: cancellationToken,
+                    forceRefresh: force)
                 .ConfigureAwait(false);
             if (seasonDetail is null)
             {
@@ -338,24 +389,24 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             {
                 result.AddedSeasonCount++;
             }
-            else
+            else if (seasonResult.IsChanged)
             {
                 result.UpdatedSeasonCount++;
             }
 
             foreach (var episode in NormalizeEpisodeMetadata(seasonDetail.Episodes))
             {
-                var episodeAdded = await UpsertEpisodeAsync(
+                var episodeResult = await UpsertEpisodeAsync(
                         dbContext,
                         seasonResult.Season,
                         episode,
                         cancellationToken)
                     .ConfigureAwait(false);
-                if (episodeAdded)
+                if (episodeResult.IsAdded)
                 {
                     result.AddedEpisodeCount++;
                 }
-                else
+                else if (episodeResult.IsChanged)
                 {
                     result.UpdatedEpisodeCount++;
                 }
@@ -459,14 +510,43 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             .ConfigureAwait(false);
     }
 
-    private static async Task<TvSeries> UpsertSeriesAsync(
+    private async Task<MovieRatingItem?> LoadSeriesOmdbRatingAsync(
+        int tmdbSeriesId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var externalIds = await _tmdbService.GetTvSeriesExternalIdsAsync(tmdbSeriesId, cancellationToken)
+                .ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(externalIds?.ImdbId))
+            {
+                return null;
+            }
+
+            return await _omdbService.GetSeriesRatingAsync(externalIds.ImdbId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static async Task<SeriesUpsertResult> UpsertSeriesAsync(
         AppDbContext dbContext,
         TmdbTvSeriesDetailResult details,
+        MovieRatingItem? omdbRating,
         CancellationToken cancellationToken)
     {
         var tvSeries = await dbContext.TvSeries
+            .Include(x => x.RatingSources)
             .FirstOrDefaultAsync(x => x.TmdbSeriesId == details.TmdbId, cancellationToken)
             .ConfigureAwait(false);
+        var isAdded = tvSeries is null;
         if (tvSeries is null)
         {
             tvSeries = new TvSeries
@@ -478,23 +558,46 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        tvSeries.Name = TruncateRequired(FirstNonEmpty(details.Name, $"TV {details.TmdbId}"), 300);
-        tvSeries.OriginalName = Truncate(FirstNonEmpty(details.OriginalName), 300);
-        tvSeries.Overview = Truncate(details.Overview, 5000);
-        tvSeries.PosterRemoteUrl = EmptyToNull(details.PosterRemoteUrl);
-        tvSeries.Country = Truncate(string.Join(", ", details.OriginCountries), 120);
-        tvSeries.Language = Truncate(details.OriginalLanguage, 120);
-        tvSeries.FirstAirDate = ParseDate(details.FirstAirDate);
-        tvSeries.FirstAirYear = details.FirstAirYear;
-        tvSeries.GenresText = Truncate(details.GenresText, 1000);
-        tvSeries.DirectorText = Truncate(details.DirectorText, 1000);
-        tvSeries.WriterText = Truncate(details.WriterText, 1000);
-        tvSeries.ActorsText = Truncate(details.ActorsText, 1000);
-        tvSeries.ProductionStatus = Truncate(details.ProductionStatus, 120);
-        tvSeries.NetworksText = Truncate(details.NetworksText, 1000);
-        tvSeries.ProductionCompaniesText = Truncate(details.ProductionCompaniesText, 1000);
-        tvSeries.UpdatedAt = DateTime.UtcNow;
-        return tvSeries;
+        var changed = isAdded;
+        changed |= SetIfChanged(tvSeries.Name, TruncateRequired(FirstNonEmpty(details.Name, $"TV {details.TmdbId}"), 300), value => tvSeries.Name = value);
+        changed |= SetIfChanged(tvSeries.OriginalName, Truncate(FirstNonEmpty(details.OriginalName), 300), value => tvSeries.OriginalName = value);
+        changed |= SetIfChanged(tvSeries.Overview, Truncate(details.Overview, 5000), value => tvSeries.Overview = value);
+        changed |= SetIfChanged(tvSeries.PosterRemoteUrl, EmptyToNull(details.PosterRemoteUrl), value => tvSeries.PosterRemoteUrl = value);
+        changed |= SetIfChanged(tvSeries.Country, Truncate(string.Join(", ", details.OriginCountries), 120), value => tvSeries.Country = value);
+        changed |= SetIfChanged(tvSeries.Language, Truncate(details.OriginalLanguage, 120), value => tvSeries.Language = value);
+        changed |= SetIfChanged(tvSeries.FirstAirDate, ParseDate(details.FirstAirDate), value => tvSeries.FirstAirDate = value);
+        changed |= SetIfChanged(tvSeries.FirstAirYear, details.FirstAirYear, value => tvSeries.FirstAirYear = value);
+        changed |= SetIfChanged(tvSeries.GenresText, Truncate(details.GenresText, 1000), value => tvSeries.GenresText = value);
+        changed |= SetIfChanged(tvSeries.DirectorText, Truncate(details.DirectorText, 1000), value => tvSeries.DirectorText = value);
+        changed |= SetIfChanged(tvSeries.WriterText, Truncate(details.WriterText, 1000), value => tvSeries.WriterText = value);
+        changed |= SetIfChanged(tvSeries.ActorsText, Truncate(details.ActorsText, 1000), value => tvSeries.ActorsText = value);
+        changed |= SetIfChanged(tvSeries.ProductionStatus, Truncate(details.ProductionStatus, 120), value => tvSeries.ProductionStatus = value);
+        changed |= SetIfChanged(tvSeries.NetworksText, Truncate(details.NetworksText, 1000), value => tvSeries.NetworksText = value);
+        changed |= SetIfChanged(tvSeries.ProductionCompaniesText, Truncate(details.ProductionCompaniesText, 1000), value => tvSeries.ProductionCompaniesText = value);
+        changed |= UpsertSeriesRating(
+            tvSeries,
+            "TMDB",
+            details.TmdbRating,
+            10d,
+            details.TmdbVoteCount,
+            $"https://www.themoviedb.org/tv/{details.TmdbId}");
+        if (omdbRating is not null)
+        {
+            changed |= UpsertSeriesRating(
+                tvSeries,
+                "OMDb",
+                omdbRating.ScoreValue,
+                omdbRating.ScoreScale,
+                omdbRating.VoteCount,
+                omdbRating.SourceUrl);
+        }
+
+        if (changed)
+        {
+            tvSeries.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return new SeriesUpsertResult(tvSeries, isAdded, changed);
     }
 
     private static async Task<SeasonUpsertResult> UpsertSeasonAsync(
@@ -522,26 +625,31 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        season.TmdbSeasonId = PositiveOrNull(detail?.TmdbId) ?? PositiveOrNull(summary.TmdbId);
-        season.Name = TruncateRequired(
+        var changed = isAdded;
+        changed |= SetIfChanged(season.TmdbSeasonId, PositiveOrNull(detail?.TmdbId) ?? PositiveOrNull(summary.TmdbId), value => season.TmdbSeasonId = value);
+        changed |= SetIfChanged(season.Name, TruncateRequired(
             FirstNonEmpty(
                 detail?.Name,
                 summary.Name,
                 summary.SeasonNumber == 0 ? "Specials / 特别篇" : $"Season {summary.SeasonNumber}"),
-            300);
-        season.Overview = Truncate(FirstNonEmpty(detail?.Overview, summary.Overview), 5000);
-        season.PosterRemoteUrl = EmptyToNull(FirstNonEmpty(detail?.PosterRemoteUrl, summary.PosterRemoteUrl));
-        season.AirDate = ParseDate(FirstNonEmpty(detail?.AirDate, summary.AirDate));
-        season.TmdbEpisodeCount = detail is not null && detail.EpisodeCount > 0
+            300), value => season.Name = value);
+        changed |= SetIfChanged(season.Overview, Truncate(FirstNonEmpty(detail?.Overview, summary.Overview), 5000), value => season.Overview = value);
+        changed |= SetIfChanged(season.PosterRemoteUrl, EmptyToNull(FirstNonEmpty(detail?.PosterRemoteUrl, summary.PosterRemoteUrl)), value => season.PosterRemoteUrl = value);
+        changed |= SetIfChanged(season.AirDate, ParseDate(FirstNonEmpty(detail?.AirDate, summary.AirDate)), value => season.AirDate = value);
+        changed |= SetIfChanged(season.TmdbEpisodeCount, detail is not null && detail.EpisodeCount > 0
             ? detail.EpisodeCount
-            : summary.EpisodeCount;
-        season.IdentifiedConfidence = 1d;
-        season.IdentificationStatus = IdentificationStatus.Matched;
-        season.UpdatedAt = DateTime.UtcNow;
-        return new SeasonUpsertResult(season, isAdded);
+            : summary.EpisodeCount, value => season.TmdbEpisodeCount = value);
+        changed |= SetIfChanged(season.IdentifiedConfidence, 1d, value => season.IdentifiedConfidence = value);
+        changed |= SetIfChanged(season.IdentificationStatus, IdentificationStatus.Matched, value => season.IdentificationStatus = value);
+        if (changed)
+        {
+            season.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return new SeasonUpsertResult(season, isAdded, changed);
     }
 
-    private static async Task<bool> UpsertEpisodeAsync(
+    private static async Task<EpisodeUpsertResult> UpsertEpisodeAsync(
         AppDbContext dbContext,
         TvSeason season,
         TmdbTvEpisodeMetadataItem metadata,
@@ -564,14 +672,19 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             dbContext.TvEpisodes.Add(episode);
         }
 
-        episode.TmdbEpisodeId = PositiveOrNull(metadata.TmdbId);
-        episode.Title = TruncateRequired(FirstNonEmpty(metadata.Name, episode.Title, $"E{metadata.EpisodeNumber:D2}"), 300);
-        episode.Overview = Truncate(metadata.Overview, 5000);
-        episode.StillRemoteUrl = EmptyToNull(metadata.StillRemoteUrl);
-        episode.AirDate = ParseDate(metadata.AirDate);
-        episode.RuntimeMinutes = metadata.RuntimeMinutes;
-        episode.UpdatedAt = DateTime.UtcNow;
-        return isAdded;
+        var changed = isAdded;
+        changed |= SetIfChanged(episode.TmdbEpisodeId, PositiveOrNull(metadata.TmdbId), value => episode.TmdbEpisodeId = value);
+        changed |= SetIfChanged(episode.Title, TruncateRequired(FirstNonEmpty(metadata.Name, episode.Title, $"E{metadata.EpisodeNumber:D2}"), 300), value => episode.Title = value);
+        changed |= SetIfChanged(episode.Overview, Truncate(metadata.Overview, 5000), value => episode.Overview = value);
+        changed |= SetIfChanged(episode.StillRemoteUrl, EmptyToNull(metadata.StillRemoteUrl), value => episode.StillRemoteUrl = value);
+        changed |= SetIfChanged(episode.AirDate, ParseDate(metadata.AirDate), value => episode.AirDate = value);
+        changed |= SetIfChanged(episode.RuntimeMinutes, metadata.RuntimeMinutes, value => episode.RuntimeMinutes = value);
+        if (changed)
+        {
+            episode.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return new EpisodeUpsertResult(isAdded, changed);
     }
 
     private static TmdbTvSeasonSummaryItem BuildSeasonSummaryFromDetail(TmdbTvSeasonDetailResult detail)
@@ -609,6 +722,48 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
             .Select(x => x.OrderByDescending(y => y.TmdbId).First())
             .OrderBy(x => x.EpisodeNumber)
             .ToList();
+    }
+
+    private static bool UpsertSeriesRating(
+        TvSeries series,
+        string sourceName,
+        double? scoreValue,
+        double scoreScale,
+        int? voteCount,
+        string sourceUrl)
+    {
+        if (string.IsNullOrWhiteSpace(sourceName) || scoreValue is not > 0 || scoreScale <= 0)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        var nextSourceUrl = string.IsNullOrWhiteSpace(sourceUrl) ? null : sourceUrl;
+        var rating = series.RatingSources.FirstOrDefault(
+            x => string.Equals(x.SourceName, sourceName, StringComparison.OrdinalIgnoreCase));
+        if (rating is null)
+        {
+            rating = new TvSeriesRatingSource
+            {
+                SourceName = sourceName,
+                CreatedAt = now
+            };
+            series.RatingSources.Add(rating);
+        }
+        else if (rating.ScoreValue.Equals(scoreValue.Value)
+                 && rating.ScoreScale.Equals(scoreScale)
+                 && rating.VoteCount == voteCount
+                 && string.Equals(rating.SourceUrl, nextSourceUrl, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        rating.ScoreValue = scoreValue.Value;
+        rating.ScoreScale = scoreScale;
+        rating.VoteCount = voteCount;
+        rating.SourceUrl = nextSourceUrl;
+        rating.LastUpdatedAt = now;
+        return true;
     }
 
     private static string FormatSeasonLabel(int seasonNumber)
@@ -655,7 +810,27 @@ public sealed class TvMetadataHydrationService : ITvMetadataHydrationService
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
 
-    private sealed record SeasonUpsertResult(TvSeason Season, bool IsAdded);
+    private static bool SetIfChanged<T>(T currentValue, T nextValue, Action<T> apply)
+    {
+        if (EqualityComparer<T>.Default.Equals(currentValue, nextValue))
+        {
+            return false;
+        }
+
+        apply(nextValue);
+        return true;
+    }
+
+    private static string FormatBool(bool value)
+    {
+        return value ? "true" : "false";
+    }
+
+    private sealed record SeriesUpsertResult(TvSeries Series, bool IsAdded, bool IsChanged);
+
+    private sealed record SeasonUpsertResult(TvSeason Season, bool IsAdded, bool IsChanged);
+
+    private sealed record EpisodeUpsertResult(bool IsAdded, bool IsChanged);
 
     private sealed record SeasonHydrationKey(
         int SeasonId,

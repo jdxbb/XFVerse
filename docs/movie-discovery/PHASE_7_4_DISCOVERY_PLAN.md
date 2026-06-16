@@ -1,6 +1,6 @@
 # Phase 7.4 影片发现执行计划
 
-Last updated: 2026-06-06
+Last updated: 2026-06-15
 
 本文件是 Phase 7.4 的唯一详细执行计划。后续进入 7.4 任一小阶段前，必须先阅读本文件，再按小阶段要求读取对应文档、代码和设计草图。
 
@@ -12,6 +12,55 @@ Last updated: 2026-06-06
 - 业务边界：7.4 可以完善搜索方式、卡片状态投影和 UI 偏好，但不能修改推荐算法，也不能让 TV 进入 Movie AI 推荐、观影洞察、画像、人格或推荐 fingerprint 链路。
 
 ## 执行记录
+
+### 2026-06-16 - Ranking Medal Badge Follow-up
+
+Completed:
+
+- Replaced Movie / TV ranking poster corner rank badges with medal artwork from `src/MediaLibrary.App/Assets/medals`.
+- Added a reusable `RankMedalBadge` control that selects gold, silver, bronze, or default medal art from the numeric ranking.
+- Drew the ranking number directly on the medal with rank-specific fill, translucent outline, shadow, and highlight styling.
+- Kept medal placement consistent across normal ranking posters and hero ranking posters by using paired local styles.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` remained empty.
+
+Out of scope:
+
+- No ranking request, ranking order, TMDB service behavior, search behavior, AI recommendation, database schema, migration, database update, commit, or push change.
+- Watch Insights small ranking lists were not changed; this pass is limited to Movie Discovery ranking poster corner badges.
+
+Known Issues:
+
+- Blocker: none identified by solution build.
+- Deferred: manual WPF visual verification is still needed for medal size, number centering, and top-left poster placement on normal and hero ranking posters.
+- Noise: existing unrelated workspace edits remain preserved.
+
+### 2026-06-15 - Home AI Recommendation Empty Loading Follow-up
+
+完成了什么：
+
+- 首页 AI 推荐预览在 `AiRecommendationViewModel.ShowEmptyLoadingSpinner=true` 时显示与 AI 推荐页一致的 `LoadingSpinnerTemplate` 居中转圈。
+- 首页 AI 推荐空状态改为仅在推荐数为 0 且没有正在请求 AI 推荐时显示，避免初次请求或空列表刷新时先露出空状态文本。
+
+验证：
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors。
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` 为空。
+- `git diff --check` 无 whitespace error，仅保留 LF 将被 Git 转 CRLF 的提示。
+
+不属于本次：
+
+- 不改 AI 推荐生成算法、候选排序、推荐 prompt、推荐 fingerprint、TV 推荐、扫描识别、播放器、数据库 schema、migration、database update、commit 或 push。
+- 未启动完整桌面应用做人工截图验收；仍需实际窗口确认首页 AI 推荐在无内容请求中、无内容非请求中和已有推荐三种状态下的切换。
+
+Known Issues：
+
+- Blocker：无。
+- Deferred：仍需人工窗口验收首页 AI 推荐预览 loading / empty / result 三态。
+- Noise：未做推荐服务响应时间或缓存策略调整。
 
 ### 2026-06-06 - 7.4e / Discovery 回归收口
 

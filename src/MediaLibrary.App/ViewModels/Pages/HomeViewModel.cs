@@ -473,7 +473,12 @@ public sealed class HomeViewModel : PageViewModelBase
     {
         if (!delta.HasValue)
         {
-            return "较上月 暂无对比";
+            return "暂无上月记录";
+        }
+
+        if (delta.Value == 0)
+        {
+            return "较上月无变化";
         }
 
         var sign = delta.Value > 0 ? "+" : string.Empty;

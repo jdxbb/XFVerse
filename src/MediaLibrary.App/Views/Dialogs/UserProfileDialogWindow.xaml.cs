@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net.Mail;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -18,6 +20,8 @@ public partial class UserProfileDialogWindow : Window
     private const int AvatarRenderSize = 512;
     private const int ToastDurationMilliseconds = 1600;
     private const double ToastScreenTopRatio = 0.16d;
+    private const string DefaultGender = "\u5973";
+    private const string MaleGender = "\u7537";
 
     private readonly IUserProfileService _userProfileService;
     private readonly List<string> _temporaryAvatarPaths = [];
@@ -38,6 +42,9 @@ public partial class UserProfileDialogWindow : Window
         _profile = initialProfile;
         _draftAvatarPath = _profile.AvatarPath;
         InitializeComponent();
+        PhoneTextBox.TextChanged += ValidatedTextBox_TextChanged;
+        AgeTextBox.TextChanged += ValidatedTextBox_TextChanged;
+        EmailTextBox.TextChanged += ValidatedTextBox_TextChanged;
         DataObject.AddPastingHandler(SignatureTextBox, SignatureTextBox_OnPaste);
         RefreshProfileDisplay();
     }
@@ -123,24 +130,34 @@ public partial class UserProfileDialogWindow : Window
         AccountTextBox.Text = _profile.Account;
         PhoneTextBox.Text = _profile.PhoneNumber;
         SignatureTextBox.Text = _profile.Signature;
-        GenderTextBox.Text = _profile.Gender;
+        GenderComboBox.SelectedValue = NormalizeGender(_profile.Gender);
         AgeTextBox.Text = _profile.Age;
         EmailTextBox.Text = _profile.Email;
+        ClearValidationStates();
         RefreshAvatarDisplay();
     }
 
     private async Task SaveEditorValuesAsync()
     {
         var previousAvatarPath = _profile.AvatarPath;
+        var phoneNumber = TrimToLength(PhoneTextBox.Text, 24);
+        var age = TrimToLength(AgeTextBox.Text, 8);
+        var email = TrimToLength(EmailTextBox.Text, 64);
+        if (!ValidateEditorFields(phoneNumber, age, email))
+        {
+            ShowToast("\u624b\u673a\u53f7\u3001\u5e74\u9f84\u6216\u90ae\u7bb1\u683c\u5f0f\u4e0d\u6b63\u786e\u3002\n\u8bf7\u4fee\u6539\u6807\u7ea2\u5b57\u6bb5\u540e\u518d\u4fdd\u5b58\u3002", ProfileToastKind.Warning);
+            return;
+        }
+
         var updated = new UserProfileModel
         {
             UserName = TrimToLength(UserNameTextBox.Text, 24),
             Account = TrimToLength(AccountTextBox.Text, 32),
-            PhoneNumber = TrimToLength(PhoneTextBox.Text, 24),
+            PhoneNumber = phoneNumber,
             Signature = TrimToLength(SignatureTextBox.Text, SignatureMaxLength),
-            Gender = TrimToLength(GenderTextBox.Text, 16),
-            Age = TrimToLength(AgeTextBox.Text, 8),
-            Email = TrimToLength(EmailTextBox.Text, 64),
+            Gender = NormalizeGender(GenderComboBox.SelectedValue as string),
+            Age = age,
+            Email = email,
             AvatarPath = File.Exists(_draftAvatarPath) ? _draftAvatarPath : string.Empty
         };
         var hasChanges = !AreSameProfile(_profile, updated);
@@ -168,7 +185,7 @@ public partial class UserProfileDialogWindow : Window
         DisplayAccountBlock.Text = _profile.Account;
         DisplayPhoneBlock.Text = _profile.PhoneNumber;
         DisplaySignatureBlock.Text = _profile.Signature;
-        DisplayGenderBlock.Text = _profile.Gender;
+        DisplayGenderBlock.Text = NormalizeGender(_profile.Gender);
         DisplayAgeBlock.Text = _profile.Age;
         DisplayEmailBlock.Text = _profile.Email;
         _draftAvatarPath = _profile.AvatarPath;
@@ -328,6 +345,94 @@ public partial class UserProfileDialogWindow : Window
         return currentLength + input.Length > SignatureMaxLength || input.Contains('\r') || input.Contains('\n');
     }
 
+    private void ValidatedTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            textBox.Tag = null;
+        }
+    }
+
+    private bool ValidateEditorFields(string phoneNumber, string age, string email)
+    {
+        ClearValidationStates();
+        var isValid = true;
+        if (!IsValidPhoneNumber(phoneNumber))
+        {
+            MarkInvalid(PhoneTextBox);
+            isValid = false;
+        }
+
+        if (!IsValidAge(age))
+        {
+            MarkInvalid(AgeTextBox);
+            isValid = false;
+        }
+
+        if (!IsValidEmail(email))
+        {
+            MarkInvalid(EmailTextBox);
+            isValid = false;
+        }
+
+        return isValid;
+    }
+
+    private void ClearValidationStates()
+    {
+        PhoneTextBox.Tag = null;
+        AgeTextBox.Tag = null;
+        EmailTextBox.Tag = null;
+    }
+
+    private static void MarkInvalid(TextBox textBox)
+    {
+        textBox.Tag = "Invalid";
+    }
+
+    private static bool IsValidPhoneNumber(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        var digitCount = trimmed.Count(char.IsDigit);
+        return digitCount is >= 7 and <= 15
+               && PhoneNumberRegex().IsMatch(trimmed);
+    }
+
+    private static bool IsValidAge(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        return int.TryParse(value.Trim(), out var age)
+               && age is >= 1 and <= 120;
+    }
+
+    private static bool IsValidEmail(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        try
+        {
+            var address = new MailAddress(value.Trim());
+            return string.Equals(address.Address, value.Trim(), StringComparison.OrdinalIgnoreCase)
+                   && address.Host.Contains('.', StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is FormatException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
     private void ShowToast(string message, ProfileToastKind kind)
     {
         var version = ++_toastVersion;
@@ -468,6 +573,13 @@ public partial class UserProfileDialogWindow : Window
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
 
+    private static string NormalizeGender(string? gender)
+    {
+        return string.Equals(gender?.Trim(), MaleGender, StringComparison.Ordinal)
+            ? MaleGender
+            : DefaultGender;
+    }
+
     private static bool AreSameProfile(UserProfileModel left, UserProfileModel right)
     {
         return string.Equals(left.UserName, right.UserName, StringComparison.Ordinal)
@@ -493,9 +605,13 @@ public partial class UserProfileDialogWindow : Window
         return new UserProfileModel
         {
             UserName = "James",
-            Account = "local_user"
+            Account = "local_user",
+            Gender = DefaultGender
         };
     }
+
+    [GeneratedRegex(@"^\+?[0-9][0-9\s\-()]{5,22}[0-9]$", RegexOptions.CultureInvariant)]
+    private static partial Regex PhoneNumberRegex();
 
     private enum ProfileToastKind
     {

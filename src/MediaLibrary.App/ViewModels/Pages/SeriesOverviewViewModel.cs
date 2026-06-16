@@ -244,7 +244,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
                 resetSeasonListScrollOffset: false);
             if (model.TmdbSeriesId.HasValue)
             {
-                _ = HydrateAndRefreshAsync(model.SeriesId, cancellationToken);
+                _ = HydrateAndRefreshAsync(model.SeriesId);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -256,7 +256,7 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
         }
     }
 
-    private async Task HydrateAndRefreshAsync(int seriesId, CancellationToken cancellationToken)
+    private async Task HydrateAndRefreshAsync(int seriesId)
     {
         try
         {
@@ -264,27 +264,28 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
             var result = await Task.Run(
                 () => _metadataHydrationService.EnsureHydratedBySeriesIdAsync(
                     seriesId,
-                    cancellationToken: cancellationToken),
-                cancellationToken);
+                    force: true,
+                    cancellationToken: CancellationToken.None));
+            if (result.HasChanges)
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+            }
 
             if (_navigationStateService.SelectedTvSeriesId != seriesId)
             {
                 return;
             }
 
-            var model = await _tvDetailQueryService.GetSeriesOverviewAsync(seriesId, cancellationToken);
+            var model = await _tvDetailQueryService.GetSeriesOverviewAsync(seriesId, CancellationToken.None);
             if (model is null)
             {
                 return;
             }
 
-            ApplyModel(model, cancellationToken, resetSeasonListScrollOffset: false);
+            ApplyModel(model, CancellationToken.None, resetSeasonListScrollOffset: false);
             StatusMessage = result.Skipped
                 ? $"已加载 {Seasons.Count} 个 Season。"
                 : result.BuildStatusMessage();
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
         }
         catch (Exception exception)
         {

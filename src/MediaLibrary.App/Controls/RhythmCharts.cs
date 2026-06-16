@@ -10,6 +10,10 @@ namespace MediaLibrary.App.Controls;
 
 public sealed class SplineAreaChart : FrameworkElement
 {
+    private static readonly Color RhythmAxisBlue = Color.FromRgb(66, 132, 218);
+    private static readonly Color RhythmLowPurple = Color.FromRgb(138, 100, 204);
+    private static readonly Color RhythmMiddlePinkOrange = Color.FromRgb(239, 142, 110);
+    private static readonly Color RhythmHighRed = Color.FromRgb(221, 73, 80);
     private readonly GradientStop _peakGlowCenterStop;
     private readonly GradientStop _peakGlowEdgeStop;
     private readonly RadialGradientBrush _peakGlowBrush;
@@ -128,14 +132,11 @@ public sealed class SplineAreaChart : FrameworkElement
         var segments = BuildSplineSegments(points, topPadding, zeroBaseline);
         var lineGeometry = CreateSplineGeometry(points, segments, closeToBottom: false, zeroBaseline);
         var areaGeometry = CreateSplineGeometry(points, segments, closeToBottom: true, zeroBaseline);
-        var accentColor = AccentBrush is SolidColorBrush solid ? solid.Color : Colors.CornflowerBlue;
-        var areaBrush = new LinearGradientBrush(
-            Color.FromArgb(118, accentColor.R, accentColor.G, accentColor.B),
-            Color.FromArgb(8, accentColor.R, accentColor.G, accentColor.B),
-            new Point(0.5d, 0d),
-            new Point(0.5d, 1d));
+        var areaBrush = CreateRhythmAreaBrush();
         areaBrush.Freeze();
-        var linePen = new Pen(AccentBrush, lineThickness)
+        var lineBrush = CreateRhythmLineBrush();
+        lineBrush.Freeze();
+        var linePen = new Pen(lineBrush, lineThickness)
         {
             LineJoin = PenLineJoin.Round,
             StartLineCap = PenLineCap.Round,
@@ -157,9 +158,79 @@ public sealed class SplineAreaChart : FrameworkElement
         var peak = new Point(
             Math.Clamp(mathematicalPeak.X, horizontalPadding, width - horizontalPadding),
             Math.Clamp(mathematicalPeak.Y, topPadding, zeroBaseline));
-        UpdatePeakBrushes(accentColor);
+        UpdatePeakBrushes(GetRhythmColorForY(peak.Y, topPadding, zeroBaseline));
         drawingContext.DrawEllipse(_peakGlowBrush, null, peak, 17d, 17d);
         drawingContext.DrawEllipse(_peakCoreBrush, new Pen(Brushes.White, 1.5d), peak, 4.5d, 4.5d);
+    }
+
+    private static LinearGradientBrush CreateRhythmLineBrush()
+    {
+        return new LinearGradientBrush
+        {
+            StartPoint = new Point(0.5d, 0d),
+            EndPoint = new Point(0.5d, 1d),
+            GradientStops =
+            {
+                new GradientStop(RhythmHighRed, 0d),
+                new GradientStop(RhythmHighRed, 0.25d),
+                new GradientStop(RhythmMiddlePinkOrange, 0.50d),
+                new GradientStop(RhythmLowPurple, 0.75d),
+                new GradientStop(RhythmAxisBlue, 1d)
+            }
+        };
+    }
+
+    private static LinearGradientBrush CreateRhythmAreaBrush()
+    {
+        return new LinearGradientBrush
+        {
+            StartPoint = new Point(0.5d, 0d),
+            EndPoint = new Point(0.5d, 1d),
+            GradientStops =
+            {
+                CreateAreaGradientStop(RhythmHighRed, 0d),
+                CreateAreaGradientStop(RhythmHighRed, 0.25d),
+                CreateAreaGradientStop(RhythmMiddlePinkOrange, 0.50d),
+                CreateAreaGradientStop(RhythmLowPurple, 0.75d),
+                CreateAreaGradientStop(RhythmAxisBlue, 1d)
+            }
+        };
+    }
+
+    private static GradientStop CreateAreaGradientStop(Color color, double offset)
+    {
+        var alpha = (byte)Math.Round(118d - (110d * Math.Clamp(offset, 0d, 1d)));
+        return new GradientStop(Color.FromArgb(alpha, color.R, color.G, color.B), offset);
+    }
+
+    private static Color GetRhythmColorForY(double y, double top, double bottom)
+    {
+        var offset = Math.Clamp((y - top) / Math.Max(1d, bottom - top), 0d, 1d);
+        if (offset <= 0.25d)
+        {
+            return RhythmHighRed;
+        }
+
+        if (offset <= 0.50d)
+        {
+            return Mix(RhythmHighRed, RhythmMiddlePinkOrange, (offset - 0.25d) / 0.25d);
+        }
+
+        if (offset <= 0.75d)
+        {
+            return Mix(RhythmMiddlePinkOrange, RhythmLowPurple, (offset - 0.50d) / 0.25d);
+        }
+
+        return Mix(RhythmLowPurple, RhythmAxisBlue, (offset - 0.75d) / 0.25d);
+    }
+
+    private static Color Mix(Color left, Color right, double rightWeight)
+    {
+        var weight = Math.Clamp(rightWeight, 0d, 1d);
+        return Color.FromRgb(
+            (byte)Math.Round((left.R * (1d - weight)) + (right.R * weight)),
+            (byte)Math.Round((left.G * (1d - weight)) + (right.G * weight)),
+            (byte)Math.Round((left.B * (1d - weight)) + (right.B * weight)));
     }
 
     private List<double> ReadValues()

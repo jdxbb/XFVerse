@@ -4206,3 +4206,64 @@ Known Issues:
 - Blocker: None confirmed by temp-output build.
 - Deferred: Manual correction-dialog validation remains required.
 - Noise: Visual-only target correction.
+
+### Phase 4 Detail TMDB Refresh And Rating Cache Sync
+
+Goal:
+
+- Let TV overview, season detail and episode detail show cached metadata first, then refresh TMDB series/season/episode metadata in the background with de-duplication and cooldown.
+
+Completed:
+
+- TV detail refresh now bypasses stale TMDB response cache only for the background refresh job, writes successful results back to local series, season and episode records, and preserves existing user state.
+- Added a 4-hour success cooldown through the existing external metadata cache; a full series refresh also satisfies overview refresh cooldown.
+- Overview, season detail and episode detail start refreshes with non-page cancellation tokens, so leaving the page does not cancel the running refresh.
+- Successful TV refresh broadcasts `MetadataChanged`; media library, favorites, discovery search/ranking cards and rating displays re-read local cached data.
+- Series TMDB rating and OMDb/IMDb series rating are persisted to `TvSeriesRatingSources`; season detail IMDb display now prefers persisted ratings before falling back to external lookup.
+
+Not done:
+
+- No TV schema migration, database update, identification rule, correction behavior, commit or push was added.
+- Season/episode TMDB ratings still come from TMDB season detail cache because the current schema has no season/episode rating source table.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+
+Known Issues:
+
+- Blocker: None confirmed by build.
+- Deferred: Manual runtime validation should confirm that exiting a TV detail page does not cancel the refresh and that re-entry within 4 hours does not re-request TMDB.
+- Noise: A full TV refresh can involve one series request plus season-detail requests; it is still one background refresh job and downstream pages read local cache.
+
+### Phase 4 Detail Refresh No-change Sort Guard
+
+Goal:
+
+- Keep a successful TV detail metadata refresh from moving a series, season or episode to the top of recent-update views when TMDB/OMDb returned no substantive data changes.
+
+Completed:
+
+- Checked current logs: `scan-identification-debug.log` shows TV season TMDB request success and cache hits; `ai-perf-debug.log` shows TMDB/OMDb activity, but the previous implementation did not log TV detail refresh success/cooldown/no-change outcomes explicitly.
+- Added TV detail refresh logs for cooldown skips and successful summary/full refreshes with `changed`, `seriesChanged`, added/updated season counts, added/updated episode counts, and `cooldownHours`.
+- TV hydration now distinguishes refresh success from actual data changes, so a no-change refresh still records success and still updates the 4-hour cooldown marker.
+- Series, season, episode and rating-source rows now only update `UpdatedAt` when substantive fields changed; equal TMDB/OMDb values no longer bump recent-update sorting.
+- Overview, season detail and episode detail only broadcast `MetadataChanged` when `HasChanges` is true.
+
+Not done:
+
+- No TV schema migration, database update, identification rule, correction behavior, commit or push was added.
+- Runtime validation of the new success/no-change log event still requires launching the updated app and opening a TV detail page.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Current migrations diff remained empty.
+- `git diff --check` reported only existing LF-to-CRLF working-copy warnings.
+
+Known Issues:
+
+- Blocker: None confirmed by build.
+- Deferred: Manually verify that `tv-series-detail-tmdb-metadata-refresh-succeeded changed=false` appears after a no-change refresh and that the item does not move to the top under recent-update descending sort.
+- Noise: Existing logs before this patch cannot prove the new success/no-change branch because the event did not exist yet.

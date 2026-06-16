@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Services.Interfaces;
@@ -30,6 +31,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
     private readonly IUnknownSeasonCorrectionService _unknownSeasonCorrectionService;
     private readonly ISingleSourceCorrectionService _singleSourceCorrectionService;
     private readonly IAiClassificationService _aiClassificationService;
+    private readonly ConcurrentDictionary<int, byte> _backgroundRefreshingSeasonMetadataIds = new();
     private int? _seasonId;
     private int? _seriesId;
     private string _seriesName = "-";
@@ -861,12 +863,11 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             _ = LoadRatingDisplayAsync(model.SeasonId, cancellationToken);
             if (model.TmdbSeriesId.HasValue)
             {
-                _ = EnsureSeriesMetadataAndRefreshAsync(model.SeriesId, model.SeasonId, cancellationToken);
+                _ = EnsureSeriesMetadataAndRefreshAsync(model.SeriesId, model.SeasonId);
             }
-
-            if (shouldEnsureEpisodeMetadata)
+            else if (shouldEnsureEpisodeMetadata)
             {
-                _ = EnsureSeasonEpisodesAndRefreshAsync(model.SeasonId, cancellationToken);
+                _ = EnsureSeasonEpisodesAndRefreshAsync(model.SeasonId);
             }
 
             IsDetailLoading = false;
@@ -942,7 +943,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
         OnPropertyChanged(nameof(EpisodeListScrollOffset));
     }
 
-    private async Task EnsureSeasonEpisodesAndRefreshAsync(int seasonId, CancellationToken cancellationToken)
+    private async Task EnsureSeasonEpisodesAndRefreshAsync(int seasonId)
     {
         try
         {
@@ -950,15 +951,19 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
             var result = await Task.Run(
                 () => _metadataHydrationService.EnsureSeasonEpisodesAsync(
                     seasonId,
-                    cancellationToken: cancellationToken),
-                cancellationToken);
+                    force: true,
+                    cancellationToken: CancellationToken.None));
+            if (result.HasChanges)
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+            }
 
             if (_navigationStateService.SelectedTvSeasonId != seasonId)
             {
                 return;
             }
 
-            var model = await _tvDetailQueryService.GetSeasonDetailAsync(seasonId, cancellationToken);
+            var model = await _tvDetailQueryService.GetSeasonDetailAsync(seasonId, CancellationToken.None);
             if (model is null)
             {
                 IsEpisodeMetadataLoading = false;
@@ -993,7 +998,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
                     ? $"已加载 {Episodes.Count} 集。"
                     : $"已补齐 {Episodes.Count} 集。";
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
         }
         catch (Exception exception)
@@ -1008,43 +1013,52 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     private async Task EnsureSeriesMetadataAndRefreshAsync(
         int seriesId,
-        int seasonId,
-        CancellationToken cancellationToken)
+        int seasonId)
     {
+        if (!_backgroundRefreshingSeasonMetadataIds.TryAdd(seasonId, 0))
+        {
+            return;
+        }
+
         try
         {
-            await Task.Run(
+            var result = await Task.Run(
                 () => _metadataHydrationService.EnsureHydratedBySeriesIdAsync(
                     seriesId,
-                    cancellationToken: cancellationToken),
-                cancellationToken);
+                    force: true,
+                    cancellationToken: CancellationToken.None));
+            if (result.HasChanges)
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+            }
 
             if (_navigationStateService.SelectedTvSeasonId != seasonId)
             {
                 return;
             }
 
-            var model = await _tvDetailQueryService.GetSeasonDetailAsync(seasonId, cancellationToken);
-            if (model is null)
+            await ActivateAsync(CancellationToken.None);
+            if (_navigationStateService.SelectedTvSeasonId == seasonId && result.HasErrors)
             {
-                return;
+                StatusMessage = result.BuildStatusMessage();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-season-detail-tmdb-metadata-refresh-failed seriesId={seriesId} seasonId={seasonId} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+        finally
+        {
+            if (_navigationStateService.SelectedTvSeasonId == seasonId)
+            {
+                IsEpisodeMetadataLoading = false;
             }
 
-            CountryText = MovieMetadataDisplayText.LocalizeCountries(model.SeriesCountry);
-            LanguageText = MovieMetadataDisplayText.LocalizeLanguages(model.SeriesLanguage);
-            DirectorText = string.IsNullOrWhiteSpace(model.SeriesDirectorText) ? "-" : model.SeriesDirectorText;
-            WriterText = string.IsNullOrWhiteSpace(model.SeriesWriterText) ? "-" : model.SeriesWriterText;
-            ActorsText = string.IsNullOrWhiteSpace(model.SeriesActorsText) ? "-" : model.SeriesActorsText;
-            NetworksText = string.IsNullOrWhiteSpace(model.SeriesNetworksText) ? "未提供" : model.SeriesNetworksText;
-            ProductionCompaniesText = string.IsNullOrWhiteSpace(model.SeriesProductionCompaniesText)
-                ? "未提供"
-                : model.SeriesProductionCompaniesText;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch
-        {
+            _backgroundRefreshingSeasonMetadataIds.TryRemove(seasonId, out _);
         }
     }
 

@@ -494,6 +494,22 @@ public sealed class UserCollectionService : IUserCollectionService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> TouchCollectionItemUpdatedAtAsync(
+        AiRecommendationItem recommendation,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var entity = await FindCollectionEntityAsync(dbContext, recommendation, cancellationToken);
+        if (entity is null)
+        {
+            return false;
+        }
+
+        entity.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task SetWatchedAsync(
         AiRecommendationItem recommendation,
         bool isWatched,

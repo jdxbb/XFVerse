@@ -10,6 +10,8 @@ namespace MediaLibrary.App.Services.Implementations;
 public sealed class UserProfileService : IUserProfileService
 {
     private const string FileName = "user-profile.json";
+    private const string DefaultGender = "\u5973";
+    private const string MaleGender = "\u7537";
     private const int MaxUserNameLength = 24;
     private const int MaxAccountLength = 32;
     private const int MaxPhoneLength = 24;
@@ -106,7 +108,8 @@ public sealed class UserProfileService : IUserProfileService
         return new UserProfileModel
         {
             UserName = "James",
-            Account = "local_user"
+            Account = "local_user",
+            Gender = DefaultGender
         };
     }
 
@@ -119,7 +122,7 @@ public sealed class UserProfileService : IUserProfileService
             Account = TrimToLength(profile.Account, MaxAccountLength),
             PhoneNumber = TrimToLength(profile.PhoneNumber, MaxPhoneLength),
             Email = TrimToLength(profile.Email, MaxEmailLength),
-            Gender = TrimToLength(profile.Gender, MaxGenderLength),
+            Gender = NormalizeGender(profile.Gender),
             Age = TrimToLength(profile.Age, MaxAgeLength),
             Signature = TrimToLength(profile.Signature, MaxSignatureLength),
             AvatarPath = NormalizeAvatarPath(profile.AvatarPath)
@@ -145,6 +148,13 @@ public sealed class UserProfileService : IUserProfileService
     {
         var trimmed = value?.Trim() ?? string.Empty;
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    private static string NormalizeGender(string? gender)
+    {
+        return string.Equals(gender?.Trim(), MaleGender, StringComparison.Ordinal)
+            ? MaleGender
+            : DefaultGender;
     }
 
     private static string NormalizeAvatarPath(string? path)

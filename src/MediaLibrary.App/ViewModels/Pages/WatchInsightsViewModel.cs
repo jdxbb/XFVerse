@@ -2,7 +2,11 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Threading;
+using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
+using MediaLibrary.App.Models.Profile;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
 using MediaLibrary.App.ViewModels.Base;
@@ -20,20 +24,27 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private const int StatisticsTabIndex = 1;
     private const int TasteGraphNodeLimit = 4;
     private const int TasteGraphLinkLimit = 14;
-    private const double TasteGraphNodeWidth = 108d;
-    private const double TasteGraphNodeHeight = 78d;
-    private const double TasteGraphTypeX = 46d;
-    private const double TasteGraphEmotionX = 276d;
-    private const double TasteGraphSceneX = 506d;
-    private const double TasteGraphFirstNodeY = 74d;
-    private const double TasteGraphNodeSpacingY = 88d;
+    private const double TasteGraphNodeWidth = 74d;
+    private const double TasteGraphNodeHeight = 74d;
+    private const double TasteGraphTypeX = 63d;
+    private const double TasteGraphEmotionX = 293d;
+    private const double TasteGraphSceneX = 523d;
+    private const double TasteGraphFirstNodeY = 76d;
+    private const double TasteGraphNodeSpacingY = 108d;
+    private const int PersonaLeadCollapsedTwoLineThreshold = 33;
     private const int PreferenceBubblePerKindLimit = 6;
     private const int PreferenceBubbleTotalLimit = 18;
     private const double PreferenceBubbleBaseDiameter = 76d;
     private const double PreferenceBubbleMaxIncreasePercent = 0.8d;
     private const string PersonaPosterDefaultGender = "female";
+    private const string UserProfileMaleGender = "\u7537";
     private const string PersonaPosterFallbackKey = "genre_explorer";
     private const string PersonaFrameDefaultColor = "gold";
+    private const int ProfileVisualTreeStageCount = 8;
+    private const int StatisticsVisualTreeStageCount = 5;
+    private const int VisualTreeInitialRenderDelayMs = 90;
+    private const int ProfileVisualTreeStageDelayMs = 72;
+    private const int StatisticsVisualTreeStageDelayMs = 56;
     private static readonly string PersonaFrameDefaultUri = BuildPersonaAssetUri("Frames", "persona_card_frame_default.png");
     private static readonly string[] PersonaPosterExtensions = [".png", ".jpg", ".jpeg", ".webp"];
     private static readonly IReadOnlyDictionary<string, string> PersonaTypeKeys =
@@ -94,6 +105,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private static readonly TimeSpan DataChangedRefreshDebounce = TimeSpan.FromMilliseconds(600);
     private readonly IWatchStatisticsService _statisticsService;
     private readonly IWatchProfileService _profileService;
+    private readonly IUserProfileService _userProfileService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly INavigationStateService _navigationStateService;
     private CancellationTokenSource? _dataChangedRefreshDebounceCts;
@@ -103,6 +115,13 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     private bool _isLoadingStatistics;
     private bool _isLoadingProfile;
     private bool _isActive;
+    private int _profileVisualTreeStage;
+    private int _statisticsVisualTreeStage;
+    private bool _isProfileVisualTreeRenderCommitted;
+    private bool _isStatisticsVisualTreeRenderCommitted;
+    private bool _isProfileDnaTextScrollable;
+    private Task? _profileVisualTreeTask;
+    private Task? _statisticsVisualTreeTask;
     private bool _hasLoadedStatistics;
     private bool _statisticsRefreshPendingOnActivate;
     private bool _statisticsRefreshQueuedAfterCurrent;
@@ -121,12 +140,14 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public WatchInsightsViewModel(
         IWatchStatisticsService statisticsService,
         IWatchProfileService profileService,
+        IUserProfileService userProfileService,
         IDataRefreshService dataRefreshService,
         INavigationStateService navigationStateService)
         : base("观影洞察", "让你更懂你")
     {
         _statisticsService = statisticsService;
         _profileService = profileService;
+        _userProfileService = userProfileService;
         _dataRefreshService = dataRefreshService;
         _navigationStateService = navigationStateService;
         _selectedTab = _navigationStateService.GetWatchInsightsSelectedTabIndex() == StatisticsTabIndex
@@ -135,6 +156,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         _profileScrollOffset = _navigationStateService.GetWatchInsightsScrollOffset(ProfileTabIndex);
         _statisticsScrollOffset = _navigationStateService.GetWatchInsightsScrollOffset(StatisticsTabIndex);
         _dataRefreshService.DataChanged += OnDataChanged;
+        _userProfileService.ProfileChanged += OnUserProfileChanged;
 
         ProfileEmptyCards =
         [
@@ -224,13 +246,19 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public ObservableCollection<TasteGraphLinkItem> TasteGraphLinks { get; } = [];
 
-    public ObservableCollection<TasteCombinationRankItem> TasteCombinationTop10 { get; } = [];
+    public ObservableCollection<TasteCombinationRankItem> TasteCombinationTop5 { get; } = [];
 
     public ObservableCollection<RankingGroup> WatchLikeGroups { get; } = [];
 
     public ObservableCollection<ProfileKeywordItem> ProfileKeywords { get; } = [];
 
     public ObservableCollection<ProfileDnaItem> ProfileDnaItems { get; } = [];
+
+    public bool IsProfileDnaTextScrollable
+    {
+        get => _isProfileDnaTextScrollable;
+        set => SetProperty(ref _isProfileDnaTextScrollable, value);
+    }
 
     public ObservableCollection<WarningMessageItem> ProfileWarnings { get; } = [];
 
@@ -377,9 +405,42 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public bool CanRefreshProfile => !IsLoadingProfile && !IsProfileInsufficient;
 
-    public bool IsProfileInitialLoading => Profile is null && !IsProfileInsufficient && !HasProfileError;
+    public bool IsProfileInitialLoading => (!IsProfileVisualTreeReady || Profile is null)
+                                           && !IsProfileInsufficient
+                                           && !HasProfileError;
 
-    public bool IsStatisticsInitialLoading => !_hasLoadedStatistics && !HasStatisticsError;
+    public bool IsStatisticsInitialLoading => (!IsStatisticsVisualTreeReady || !_hasLoadedStatistics)
+                                              && !HasStatisticsError;
+
+    public bool IsProfileVisualStage1Ready => _profileVisualTreeStage >= 1;
+
+    public bool IsProfileVisualStage2Ready => _profileVisualTreeStage >= 2;
+
+    public bool IsProfileVisualStage3Ready => _profileVisualTreeStage >= 3;
+
+    public bool IsProfileVisualStage4Ready => _profileVisualTreeStage >= 4;
+
+    public bool IsProfileVisualStage5Ready => _profileVisualTreeStage >= 5;
+
+    public bool IsProfileVisualStage6Ready => _profileVisualTreeStage >= 6;
+
+    public bool IsProfileVisualStage7Ready => _profileVisualTreeStage >= 7;
+
+    public bool IsProfileVisualStage8Ready => _profileVisualTreeStage >= ProfileVisualTreeStageCount;
+
+    public bool IsProfileVisualTreeReady => IsProfileVisualStage8Ready && _isProfileVisualTreeRenderCommitted;
+
+    public bool IsStatisticsVisualStage1Ready => _statisticsVisualTreeStage >= 1;
+
+    public bool IsStatisticsVisualStage2Ready => _statisticsVisualTreeStage >= 2;
+
+    public bool IsStatisticsVisualStage3Ready => _statisticsVisualTreeStage >= 3;
+
+    public bool IsStatisticsVisualStage4Ready => _statisticsVisualTreeStage >= 4;
+
+    public bool IsStatisticsVisualStage5Ready => _statisticsVisualTreeStage >= StatisticsVisualTreeStageCount;
+
+    public bool IsStatisticsVisualTreeReady => IsStatisticsVisualStage5Ready && _isStatisticsVisualTreeRenderCommitted;
 
     public string StatisticsErrorMessage
     {
@@ -641,9 +702,27 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public string ProfilePersonaLeadSecondClauseDisplay => AddCharacterSpacing(SplitPersonaLead(ProfilePersonaLead).SecondClause, "\u200A");
 
+    public string ProfilePersonaLeadTwoLineDisplay
+    {
+        get
+        {
+            var parts = SplitPersonaLead(ProfilePersonaLead);
+            var firstClause = AddCharacterSpacing(parts.FirstClause, "\u200A");
+            var secondClause = AddCharacterSpacing(parts.SecondClause, "\u200A");
+            return string.IsNullOrWhiteSpace(secondClause)
+                ? firstClause
+                : $"{firstClause}{Environment.NewLine}{secondClause}";
+        }
+    }
+
+    public bool IsProfilePersonaLeadLong => CountLeadCharacters(ProfilePersonaLead) > PersonaLeadCollapsedTwoLineThreshold;
+
     public string ProfilePersonaDescription { get; private set; } = string.Empty;
 
     public string PersonaPosterGender { get; private set; } = PersonaPosterDefaultGender;
+
+    public PosterBackdropPalette PersonaPosterBackdropPalette { get; private set; } =
+        PersonaPosterPaletteResource.GetPalette(PersonaPosterFallbackKey, PersonaPosterDefaultGender);
 
     public string PersonaPosterImageUri { get; private set; } = ResolvePersonaPosterUri(
         PersonaPosterFallbackKey,
@@ -664,6 +743,18 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     public string ProfileQuadrantAxisTitle { get; private set; } = "熟悉安全 x 情绪沉浸";
 
     public string ProfileQuadrantAxisTitleDisplay => AddCharacterSpacing(ProfileQuadrantAxisTitle, "\u200A");
+
+    public string ProfileQuadrantXAxisLabel { get; private set; } = "熟悉安全";
+
+    public string ProfileQuadrantYAxisLabel { get; private set; } = "情绪沉浸";
+
+    public string ProfileQuadrantXAxisLabelDisplay => AddCharacterSpacing(ProfileQuadrantXAxisLabel, "\u200A");
+
+    public string ProfileQuadrantYAxisLabelDisplay => AddCharacterSpacing(ProfileQuadrantYAxisLabel, "\u200A");
+
+    public string ProfileQuadrantXLabelKind { get; private set; } = "familiar";
+
+    public string ProfileQuadrantYLabelKind { get; private set; } = "emotion";
 
     public string ProfileQuadrantToolTipText { get; private set; } = "熟悉安全：0\n情绪沉浸：0";
 
@@ -717,19 +808,25 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public string PreferenceBubbleLegendText { get; private set; } = "气泡大小代表标签出现次数，颜色区分类型、情绪与场景标签。";
 
-    public string TasteGraphLegendText { get; private set; } = "连线越粗代表组合共现越频繁，节点代表参与组合的标签。";
-
     public string TotalWatchTimeText { get; private set; } = "0分钟";
 
     public string TotalWatchTimeDeltaText { get; private set; } = string.Empty;
 
     public bool HasTotalWatchTimeDelta => !string.IsNullOrWhiteSpace(TotalWatchTimeDeltaText);
 
+    public string TotalWatchTimeDeltaArrowText { get; private set; } = string.Empty;
+
+    public bool HasTotalWatchTimeDeltaArrow => !string.IsNullOrWhiteSpace(TotalWatchTimeDeltaArrowText);
+
     public string WatchDaysText { get; private set; } = "0";
 
     public string WatchDaysDeltaText { get; private set; } = string.Empty;
 
     public bool HasWatchDaysDelta => !string.IsNullOrWhiteSpace(WatchDaysDeltaText);
+
+    public string WatchDaysDeltaArrowText { get; private set; } = string.Empty;
+
+    public bool HasWatchDaysDeltaArrow => !string.IsNullOrWhiteSpace(WatchDaysDeltaArrowText);
 
     public string OverviewRangePrefixText => IsAllRangeSelected ? "共" : string.Empty;
 
@@ -810,7 +907,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     public bool HasRhythmData => Statistics.HasWatchHistoryData;
 
-    public bool HasTasteCombinationData => TasteCombinationTop10.Count > 0 || TasteGraphNodes.Count > 0;
+    public bool HasTasteCombinationData => TasteCombinationTop5.Count > 0 || TasteGraphNodes.Count > 0;
 
     public bool HasWatchLikeData => WatchLikeGroups.Any(x => x.Items.Count > 0);
 
@@ -852,24 +949,77 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
     {
         var stopwatch = Stopwatch.StartNew();
         _isActive = true;
+        await RefreshUserProfileGenderAsync(cancellationToken);
         SelectedTabIndex = _navigationStateService.GetWatchInsightsSelectedTabIndex();
         var shouldForceRefresh = _statisticsRefreshPendingOnActivate;
         Log($"event=activate-start tab={SelectedTab} statisticsPending={shouldForceRefresh.ToString().ToLowerInvariant()}");
         if (IsStatisticsTabSelected)
         {
             _statisticsRefreshPendingOnActivate = false;
-            await RefreshStatisticsAsync(
+            var visualTreeTask = EnsureStatisticsVisualTreeAsync(cancellationToken);
+            var dataTask = RefreshStatisticsAsync(
                 StatisticsRefreshSource.Activate,
                 forceRefresh: shouldForceRefresh,
                 cancellationToken);
+            await Task.WhenAll(visualTreeTask, dataTask);
         }
         else
         {
-            await LoadProfileAsync(ProfileLoadSource.Activate, forceRefresh: false, cancellationToken);
+            var visualTreeTask = EnsureProfileVisualTreeAsync(cancellationToken);
+            var dataTask = LoadProfileAsync(ProfileLoadSource.Activate, forceRefresh: false, cancellationToken);
+            await Task.WhenAll(visualTreeTask, dataTask);
         }
 
         stopwatch.Stop();
         Log($"event=activate-complete tab={SelectedTab} elapsedMs={stopwatch.ElapsedMilliseconds}");
+    }
+
+    public async Task PrepareBackdropPaletteAsync(CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            await RefreshUserProfileGenderAsync(cancellationToken);
+            var context = await _profileService.GetRecommendationContextAsync(cancellationToken);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (!context.HasProfile || string.IsNullOrWhiteSpace(context.PersonaType))
+            {
+                stopwatch.Stop();
+                Log(
+                    "event=prepare-backdrop-palette-skipped "
+                    + $"reason={BuildSafeLogValue(context.SkipReason, "no-profile")} "
+                    + $"elapsedMs={stopwatch.ElapsedMilliseconds}");
+                return;
+            }
+
+            var previousPalette = PersonaPosterBackdropPalette;
+            ApplyPersonaPoster(context.PersonaType);
+            stopwatch.Stop();
+
+            OnPropertyChanged(nameof(PersonaPosterGender));
+            OnPropertyChanged(nameof(PersonaPosterImageUri));
+            OnPropertyChanged(nameof(PersonaPosterFrameUri));
+            OnPropertyChanged(nameof(HasPersonaPoster));
+            OnPropertyChanged(nameof(HasPersonaPosterFrame));
+            if (!PersonaPosterBackdropPalette.Equals(previousPalette))
+            {
+                OnPropertyChanged(nameof(PersonaPosterBackdropPalette));
+            }
+
+            Log($"event=prepare-backdrop-palette-complete elapsedMs={stopwatch.ElapsedMilliseconds}");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+            Log($"event=prepare-backdrop-palette-failed errorType={exception.GetType().Name} elapsedMs={stopwatch.ElapsedMilliseconds}");
+        }
     }
 
     public override void Deactivate()
@@ -880,24 +1030,97 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         _dataChangedRefreshDebounceCts = null;
     }
 
+    private async Task RefreshUserProfileGenderAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var profile = await _userProfileService.LoadAsync(cancellationToken);
+            ApplyUserProfileGender(profile);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Log($"event=user-profile-gender-load-failed errorType={exception.GetType().Name}");
+        }
+    }
+
+    private void OnUserProfileChanged(object? sender, UserProfileModel profile)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            ApplyUserProfileGender(profile);
+            return;
+        }
+
+        dispatcher.InvokeAsync(() => ApplyUserProfileGender(profile), DispatcherPriority.Background);
+    }
+
+    private void ApplyUserProfileGender(UserProfileModel profile)
+    {
+        var nextGender = ResolvePersonaPosterGender(profile.Gender);
+        if (string.Equals(PersonaPosterGender, nextGender, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var previousPalette = PersonaPosterBackdropPalette;
+        PersonaPosterGender = nextGender;
+        ApplyPersonaPoster(ProfilePersonaType);
+        OnPropertyChanged(nameof(PersonaPosterGender));
+        OnPropertyChanged(nameof(PersonaPosterImageUri));
+        OnPropertyChanged(nameof(PersonaPosterFrameUri));
+        OnPropertyChanged(nameof(HasPersonaPoster));
+        OnPropertyChanged(nameof(HasPersonaPosterFrame));
+        if (!PersonaPosterBackdropPalette.Equals(previousPalette))
+        {
+            OnPropertyChanged(nameof(PersonaPosterBackdropPalette));
+        }
+    }
+
     private void SelectProfileTab()
     {
         SelectedTab = ProfileTabKey;
+        _ = EnsureProfileTabReadyAsync();
+    }
+
+    private async Task EnsureProfileTabReadyAsync()
+    {
+        var visualTreeTask = EnsureProfileVisualTreeAsync();
         if (Profile is null && !IsLoadingProfile)
         {
-            _ = LoadProfileAsync(ProfileLoadSource.Tab, forceRefresh: false);
+            await Task.WhenAll(
+                visualTreeTask,
+                LoadProfileAsync(ProfileLoadSource.Tab, forceRefresh: false));
+            return;
         }
+
+        await visualTreeTask;
     }
 
     private void SelectStatisticsTab()
     {
         SelectedTab = StatisticsTabKey;
+        _ = EnsureStatisticsTabReadyAsync();
+    }
+
+    private async Task EnsureStatisticsTabReadyAsync()
+    {
+        var visualTreeTask = EnsureStatisticsVisualTreeAsync();
         if ((!_hasLoadedStatistics || _statisticsRefreshPendingOnActivate) && !IsLoadingStatistics)
         {
             var forceRefresh = _statisticsRefreshPendingOnActivate;
             _statisticsRefreshPendingOnActivate = false;
-            _ = RefreshStatisticsAsync(StatisticsRefreshSource.Tab, forceRefresh);
+            await Task.WhenAll(
+                visualTreeTask,
+                RefreshStatisticsAsync(StatisticsRefreshSource.Tab, forceRefresh));
+            return;
         }
+
+        await visualTreeTask;
     }
 
     private async Task LoadProfileAsync(
@@ -912,9 +1135,12 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         }
 
         var stopwatch = Stopwatch.StartNew();
-        Log($"watch-insights-profile-load-start source={FormatProfileLoadSource(source)}");
+        Log(
+            "watch-insights-profile-load-start "
+            + $"source={FormatProfileLoadSource(source)} forceRefresh={forceRefresh.ToString().ToLowerInvariant()}");
         IsLoadingProfile = true;
         ProfileErrorMessage = string.Empty;
+        await YieldInitialLoadingRenderAsync("profile");
 
         try
         {
@@ -1081,9 +1307,12 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         }
 
         var stopwatch = Stopwatch.StartNew();
-        Log($"watch-insights-statistics-refresh-start source={FormatRefreshSource(source)}");
+        Log(
+            "watch-insights-statistics-refresh-start "
+            + $"source={FormatRefreshSource(source)} forceRefresh={forceRefresh.ToString().ToLowerInvariant()}");
         IsLoadingStatistics = true;
         StatisticsErrorMessage = string.Empty;
+        await YieldInitialLoadingRenderAsync("statistics");
 
         try
         {
@@ -1219,7 +1448,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         ProfileSummaryText = FormatProfileSummaryText(snapshot.Summary.Text);
         ProfilePersonaType = string.IsNullOrWhiteSpace(snapshot.Persona.Type) ? "--" : snapshot.Persona.Type;
         ProfilePersonaTitle = string.IsNullOrWhiteSpace(snapshot.Persona.Title) ? ProfilePersonaType : snapshot.Persona.Title;
-        ProfilePersonaLead = snapshot.Persona.Lead;
+        ProfilePersonaLead = TrimPersonaLeadTerminalPunctuation(snapshot.Persona.Lead);
         ProfilePersonaDescription = FormatPersonaDescription(snapshot.Persona.Description);
         ApplyPersonaPoster(ProfilePersonaType);
         ProfilePersonaConfidenceValue = Math.Clamp(snapshot.Persona.Confidence, 0, 100);
@@ -1231,6 +1460,10 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         var xAxisLabel = xAxis < 0 ? "熟悉安全" : "新鲜探索";
         var yAxisLabel = yAxis < 0 ? "轻松消遣" : "情绪沉浸";
         ProfileQuadrantAxisTitle = $"{xAxisLabel} x {yAxisLabel}";
+        ProfileQuadrantXAxisLabel = xAxisLabel;
+        ProfileQuadrantYAxisLabel = yAxisLabel;
+        ProfileQuadrantXLabelKind = xAxis < 0 ? "familiar" : "explore";
+        ProfileQuadrantYLabelKind = yAxis < 0 ? "relax" : "emotion";
         ProfileQuadrantToolTipText = $"{xAxisLabel}：{Math.Abs(xAxis):0}分\n{yAxisLabel}：{Math.Abs(yAxis):0}分";
         ProfileXAxisText = xAxis.ToString();
         ProfileYAxisText = yAxis.ToString();
@@ -1299,6 +1532,13 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         LastProfileRefreshedAtText = snapshot.Meta.GeneratedAtUtc == default
             ? "尚未生成"
             : $"上次生成 {snapshot.Meta.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}";
+        ApplyPersonaPoster(snapshot.Persona.Type);
+        OnPropertyChanged(nameof(PersonaPosterGender));
+        OnPropertyChanged(nameof(PersonaPosterBackdropPalette));
+        OnPropertyChanged(nameof(PersonaPosterImageUri));
+        OnPropertyChanged(nameof(PersonaPosterFrameUri));
+        OnPropertyChanged(nameof(HasPersonaPoster));
+        OnPropertyChanged(nameof(HasPersonaPosterFrame));
         Log("event=projection-reused projection=profile reason=cache-or-fingerprint-unchanged");
     }
 
@@ -1308,6 +1548,177 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         action();
         stopwatch.Stop();
         Log($"event=projection-stage projection={projection} stage={stage} elapsedMs={stopwatch.ElapsedMilliseconds}");
+    }
+
+    private static async Task YieldInitialLoadingRenderAsync(string tab)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.HasShutdownStarted && !dispatcher.HasShutdownFinished)
+        {
+            await dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
+        }
+        else
+        {
+            await Task.Yield();
+        }
+
+        stopwatch.Stop();
+        Log($"event=initial-loading-render-yield tab={tab} elapsedMs={stopwatch.ElapsedMilliseconds}");
+    }
+
+    private Task EnsureProfileVisualTreeAsync(CancellationToken cancellationToken = default)
+    {
+        if (IsProfileVisualTreeReady)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _profileVisualTreeTask ??= MaterializeVisualTreeAsync(
+            "profile",
+            ProfileVisualTreeStageCount,
+            AdvanceProfileVisualTreeStage,
+            () => _profileVisualTreeStage,
+            () => _isActive && IsProfileTabSelected,
+            cancellationToken,
+            CommitProfileVisualTreeRender,
+            () => _profileVisualTreeTask = null);
+    }
+
+    private Task EnsureStatisticsVisualTreeAsync(CancellationToken cancellationToken = default)
+    {
+        if (IsStatisticsVisualTreeReady)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _statisticsVisualTreeTask ??= MaterializeVisualTreeAsync(
+            "statistics",
+            StatisticsVisualTreeStageCount,
+            AdvanceStatisticsVisualTreeStage,
+            () => _statisticsVisualTreeStage,
+            () => _isActive && IsStatisticsTabSelected,
+            cancellationToken,
+            CommitStatisticsVisualTreeRender,
+            () => _statisticsVisualTreeTask = null);
+    }
+
+    private static async Task MaterializeVisualTreeAsync(
+        string tab,
+        int stageCount,
+        Action<int> advanceStage,
+        Func<int> getCurrentStage,
+        Func<bool> shouldContinue,
+        CancellationToken cancellationToken,
+        Action commitRender,
+        Action completed)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var stageDelayMs = string.Equals(tab, ProfileTabKey, StringComparison.Ordinal)
+            ? ProfileVisualTreeStageDelayMs
+            : StatisticsVisualTreeStageDelayMs;
+        try
+        {
+            await YieldInitialLoadingRenderAsync(tab);
+            await Task.Delay(VisualTreeInitialRenderDelayMs, cancellationToken);
+
+            for (var stage = getCurrentStage() + 1; stage <= stageCount; stage++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!shouldContinue())
+                {
+                    stopwatch.Stop();
+                    Log(
+                        "event=visual-tree-paused "
+                        + $"tab={tab} nextStage={stage}/{stageCount} elapsedMs={stopwatch.ElapsedMilliseconds}");
+                    return;
+                }
+
+                var stageStopwatch = Stopwatch.StartNew();
+                advanceStage(stage);
+                await YieldInitialLoadingRenderAsync(tab);
+                stageStopwatch.Stop();
+                Log(
+                    "event=visual-tree-stage-ready "
+                    + $"tab={tab} stage={stage}/{stageCount} elapsedMs={stageStopwatch.ElapsedMilliseconds}");
+
+                if (stage < stageCount)
+                {
+                    await Task.Delay(stageDelayMs, cancellationToken);
+                }
+            }
+
+            commitRender();
+            stopwatch.Stop();
+            Log($"event=visual-tree-ready tab={tab} elapsedMs={stopwatch.ElapsedMilliseconds}");
+        }
+        finally
+        {
+            completed();
+        }
+    }
+
+    private void AdvanceProfileVisualTreeStage(int stage)
+    {
+        if (stage <= _profileVisualTreeStage)
+        {
+            return;
+        }
+
+        _profileVisualTreeStage = Math.Min(stage, ProfileVisualTreeStageCount);
+        _isProfileVisualTreeRenderCommitted = false;
+        OnPropertyChanged(nameof(IsProfileVisualStage1Ready));
+        OnPropertyChanged(nameof(IsProfileVisualStage2Ready));
+        OnPropertyChanged(nameof(IsProfileVisualStage3Ready));
+        OnPropertyChanged(nameof(IsProfileVisualStage4Ready));
+        OnPropertyChanged(nameof(IsProfileVisualStage5Ready));
+        OnPropertyChanged(nameof(IsProfileVisualStage6Ready));
+        OnPropertyChanged(nameof(IsProfileVisualStage7Ready));
+        OnPropertyChanged(nameof(IsProfileVisualStage8Ready));
+        OnPropertyChanged(nameof(IsProfileVisualTreeReady));
+        OnPropertyChanged(nameof(IsProfileInitialLoading));
+    }
+
+    private void AdvanceStatisticsVisualTreeStage(int stage)
+    {
+        if (stage <= _statisticsVisualTreeStage)
+        {
+            return;
+        }
+
+        _statisticsVisualTreeStage = Math.Min(stage, StatisticsVisualTreeStageCount);
+        _isStatisticsVisualTreeRenderCommitted = false;
+        OnPropertyChanged(nameof(IsStatisticsVisualStage1Ready));
+        OnPropertyChanged(nameof(IsStatisticsVisualStage2Ready));
+        OnPropertyChanged(nameof(IsStatisticsVisualStage3Ready));
+        OnPropertyChanged(nameof(IsStatisticsVisualStage4Ready));
+        OnPropertyChanged(nameof(IsStatisticsVisualStage5Ready));
+        OnPropertyChanged(nameof(IsStatisticsVisualTreeReady));
+        OnPropertyChanged(nameof(IsStatisticsInitialLoading));
+    }
+
+    private void CommitProfileVisualTreeRender()
+    {
+        if (_isProfileVisualTreeRenderCommitted)
+        {
+            return;
+        }
+
+        _isProfileVisualTreeRenderCommitted = true;
+        OnPropertyChanged(nameof(IsProfileVisualTreeReady));
+        OnPropertyChanged(nameof(IsProfileInitialLoading));
+    }
+
+    private void CommitStatisticsVisualTreeRender()
+    {
+        if (_isStatisticsVisualTreeRenderCommitted)
+        {
+            return;
+        }
+
+        _isStatisticsVisualTreeRenderCommitted = true;
+        OnPropertyChanged(nameof(IsStatisticsVisualTreeReady));
+        OnPropertyChanged(nameof(IsStatisticsInitialLoading));
     }
 
     private int CountProfileChips()
@@ -1326,10 +1737,19 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     private void ApplyPersonaPoster(string personaType)
     {
-        PersonaPosterGender = PersonaPosterDefaultGender;
+        PersonaPosterGender = ResolvePersonaPosterGender(PersonaPosterGender);
         var personaKey = ResolvePersonaKey(personaType);
+        PersonaPosterBackdropPalette = PersonaPosterPaletteResource.GetPalette(personaKey, PersonaPosterGender);
         PersonaPosterImageUri = ResolvePersonaPosterUri(personaKey, PersonaPosterGender);
         PersonaPosterFrameUri = ResolvePersonaFrameUri(personaKey);
+    }
+
+    private static string ResolvePersonaPosterGender(string? gender)
+    {
+        return string.Equals(gender?.Trim(), UserProfileMaleGender, StringComparison.Ordinal)
+               || string.Equals(gender?.Trim(), "male", StringComparison.OrdinalIgnoreCase)
+            ? "male"
+            : PersonaPosterDefaultGender;
     }
 
     private static string ResolvePersonaKey(string personaType)
@@ -1606,6 +2026,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
     private void ReplaceDna(IEnumerable<WatchProfileDnaGene> genes)
     {
+        IsProfileDnaTextScrollable = false;
         ProfileDnaItems.Clear();
         foreach (var gene in genes)
         {
@@ -1618,6 +2039,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             ProfileDnaItems.Add(new ProfileDnaItem(
                 gene.Gene,
                 BuildDnaIconText(gene.Gene),
+                BuildDnaIconKind(gene.Gene),
                 BuildDnaSubtitle(gene.Gene),
                 tags,
                 Math.Clamp(gene.Score, 0, 100),
@@ -1693,6 +2115,20 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         };
     }
 
+    private static string BuildDnaIconKind(string gene)
+    {
+        return gene switch
+        {
+            "类型基因" => "type",
+            "情绪基因" => "emotion",
+            "场景基因" => "scene",
+            "节奏基因" => "rhythm",
+            "叙事基因" => "narrative",
+            "探索基因" => "exploration",
+            _ => "type"
+        };
+    }
+
     private static string BuildDnaSubtitle(string gene)
     {
         return gene switch
@@ -1753,6 +2189,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             snapshot.WatchedCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek),
+            FormatDeltaArrow(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek),
             "\uE8FB",
             "watched",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
@@ -1762,6 +2199,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             snapshot.FavoriteCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek),
+            FormatDeltaArrow(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek),
             "\uEB51",
             "favorite",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
@@ -1771,6 +2209,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             snapshot.WantToWatchCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek),
+            FormatDeltaArrow(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek),
             "\uE734",
             "want",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
@@ -1780,6 +2219,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             snapshot.NotInterestedCount.ToString(),
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek),
+            FormatDeltaArrow(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek),
             string.Empty,
             "negative",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
@@ -1788,14 +2228,22 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         TotalWatchTimeDeltaText = FormatDurationDelta(
             snapshot.TimeRange,
             snapshot.TotalWatchSecondsDeltaFromLastMonth);
+        TotalWatchTimeDeltaArrowText = FormatDeltaArrow(
+            snapshot.TimeRange,
+            snapshot.TotalWatchSecondsDeltaFromLastMonth);
         WatchDaysText = snapshot.WatchDays.ToString();
         WatchDaysDeltaText = FormatDelta(snapshot.TimeRange, snapshot.WatchDaysDeltaFromLastMonth);
+        WatchDaysDeltaArrowText = FormatDeltaArrow(snapshot.TimeRange, snapshot.WatchDaysDeltaFromLastMonth);
         OnPropertyChanged(nameof(TotalWatchTimeText));
         OnPropertyChanged(nameof(TotalWatchTimeDeltaText));
         OnPropertyChanged(nameof(HasTotalWatchTimeDelta));
+        OnPropertyChanged(nameof(TotalWatchTimeDeltaArrowText));
+        OnPropertyChanged(nameof(HasTotalWatchTimeDeltaArrow));
         OnPropertyChanged(nameof(WatchDaysText));
         OnPropertyChanged(nameof(WatchDaysDeltaText));
         OnPropertyChanged(nameof(HasWatchDaysDelta));
+        OnPropertyChanged(nameof(WatchDaysDeltaArrowText));
+        OnPropertyChanged(nameof(HasWatchDaysDeltaArrow));
     }
 
     private void BuildMonthlyTags(WatchStatisticsSnapshot snapshot)
@@ -1975,16 +2423,47 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(DominantDurationText));
     }
 
-    private static List<TasteCombinationNode> SelectTasteNodes(
-        IEnumerable<TasteCombinationNode> nodes,
+    private static List<TasteCombinationNode> SelectTasteNodesFromCombinations(
+        IEnumerable<TasteCombinationItem> combinations,
         string kind)
     {
-        return nodes
-            .Where(x => string.Equals(x.Kind, kind, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(x => x.Count)
-            .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase)
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in combinations.Where(HasCompleteTasteCombination))
+        {
+            AddTasteCount(counts, GetTasteCombinationLabel(item, kind), item.OccurrenceCount);
+        }
+
+        return counts
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Take(TasteGraphNodeLimit)
+            .Select(x => new TasteCombinationNode
+            {
+                Id = BuildTasteGraphNodeId(kind, x.Key),
+                Label = x.Key,
+                Kind = kind,
+                Count = x.Value,
+                Weight = x.Value
+            })
             .ToList();
+    }
+
+    private static bool HasCompleteTasteCombination(TasteCombinationItem item)
+    {
+        return !string.IsNullOrWhiteSpace(item.Type)
+               && !string.IsNullOrWhiteSpace(item.Emotion)
+               && !string.IsNullOrWhiteSpace(item.Scene);
+    }
+
+    private static string GetTasteCombinationLabel(TasteCombinationItem item, string kind)
+    {
+        return kind switch
+        {
+            "type" => item.Type,
+            "emotion" => item.Emotion,
+            "scene" => item.Scene,
+            _ => string.Empty
+        };
     }
 
     private static void AddTasteCount(
@@ -2001,31 +2480,151 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         counts[normalized] = counts.TryGetValue(normalized, out var current) ? current + count : count;
     }
 
+    private static Dictionary<string, IReadOnlyList<string>> BuildTasteNodeCombinationTooltips(
+        IEnumerable<TasteCombinationItem> combinations)
+    {
+        var linesByNodeId = new Dictionary<string, List<(string Combination, int Count)>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in combinations)
+        {
+            var combination = FormatTasteCombinationLabel(item);
+            AddTasteNodeCombinationTooltip(linesByNodeId, "type", item.Type, combination, item.OccurrenceCount);
+            AddTasteNodeCombinationTooltip(linesByNodeId, "emotion", item.Emotion, combination, item.OccurrenceCount);
+            AddTasteNodeCombinationTooltip(linesByNodeId, "scene", item.Scene, combination, item.OccurrenceCount);
+        }
+
+        return linesByNodeId.ToDictionary(
+            x => x.Key,
+            x => (IReadOnlyList<string>)x.Value
+                .OrderByDescending(item => item.Count)
+                .ThenBy(item => item.Combination, StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .Select(item => string.Concat(item.Combination, "\uFF1A", item.Count.ToString(), "\u6B21"))
+                .ToList(),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void AddTasteNodeCombinationTooltip(
+        IDictionary<string, List<(string Combination, int Count)>> linesByNodeId,
+        string kind,
+        string label,
+        string combination,
+        int count)
+    {
+        if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(combination))
+        {
+            return;
+        }
+
+        var nodeId = BuildTasteGraphNodeId(kind, label);
+        if (!linesByNodeId.TryGetValue(nodeId, out var lines))
+        {
+            lines = [];
+            linesByNodeId[nodeId] = lines;
+        }
+
+        lines.Add((combination, count));
+    }
+
+    private static Dictionary<string, IReadOnlyCollection<string>> BuildTasteGraphRelatedNodeIds(
+        IEnumerable<TasteCombinationItem> combinations)
+    {
+        var relatedByEdgeKey = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in combinations)
+        {
+            if (string.IsNullOrWhiteSpace(item.Type)
+                || string.IsNullOrWhiteSpace(item.Emotion)
+                || string.IsNullOrWhiteSpace(item.Scene))
+            {
+                continue;
+            }
+
+            var typeId = BuildTasteGraphNodeId("type", item.Type);
+            var emotionId = BuildTasteGraphNodeId("emotion", item.Emotion);
+            var sceneId = BuildTasteGraphNodeId("scene", item.Scene);
+            AddTasteGraphRelatedEdge(relatedByEdgeKey, typeId, emotionId, typeId, emotionId, sceneId);
+            AddTasteGraphRelatedEdge(relatedByEdgeKey, emotionId, sceneId, typeId, emotionId, sceneId);
+        }
+
+        return relatedByEdgeKey.ToDictionary(
+            x => x.Key,
+            x => (IReadOnlyCollection<string>)x.Value.ToList(),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void AddTasteGraphRelatedEdge(
+        IDictionary<string, HashSet<string>> relatedByEdgeKey,
+        string sourceId,
+        string targetId,
+        params string[] relatedNodeIds)
+    {
+        var edgeKey = BuildTasteGraphEdgeKey(sourceId, targetId);
+        if (!relatedByEdgeKey.TryGetValue(edgeKey, out var related))
+        {
+            related = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            relatedByEdgeKey[edgeKey] = related;
+        }
+
+        foreach (var relatedNodeId in relatedNodeIds)
+        {
+            if (!string.IsNullOrWhiteSpace(relatedNodeId))
+            {
+                related.Add(relatedNodeId);
+            }
+        }
+    }
+
+    private static IReadOnlyCollection<string> GetTasteGraphRelatedNodeIds(
+        IReadOnlyDictionary<string, IReadOnlyCollection<string>> relatedByEdgeKey,
+        string sourceId,
+        string targetId)
+    {
+        return relatedByEdgeKey.TryGetValue(BuildTasteGraphEdgeKey(sourceId, targetId), out var related)
+            ? related
+            : [sourceId, targetId];
+    }
+
+    private static string BuildTasteGraphEdgeKey(string sourceId, string targetId)
+    {
+        return $"{sourceId}->{targetId}";
+    }
+
+    private static string FormatTasteCombinationLabel(TasteCombinationItem item)
+    {
+        return $"{item.Type} x {item.Emotion} x {item.Scene}";
+    }
+
     private void BuildTasteCanvasGraph(WatchStatisticsSnapshot snapshot)
     {
-        var nodeById = snapshot.TasteCombinationNodes.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
         var graphNodeById = new Dictionary<string, TasteGraphNodeItem>(StringComparer.OrdinalIgnoreCase);
-        var typeNodes = SelectTasteNodes(snapshot.TasteCombinationNodes, "type");
-        var emotionNodes = SelectTasteNodes(snapshot.TasteCombinationNodes, "emotion");
-        var sceneNodes = SelectTasteNodes(snapshot.TasteCombinationNodes, "scene");
+        var completeCombinations = snapshot.TasteCombinationTop10
+            .Where(HasCompleteTasteCombination)
+            .ToList();
+        var tooltipLinesByNodeId = BuildTasteNodeCombinationTooltips(completeCombinations);
+        var typeNodes = SelectTasteNodesFromCombinations(completeCombinations, "type");
+        var emotionNodes = SelectTasteNodesFromCombinations(completeCombinations, "emotion");
+        var sceneNodes = SelectTasteNodesFromCombinations(completeCombinations, "scene");
 
-        AddTasteGraphNodes(typeNodes, TasteGraphTypeX, graphNodeById);
-        AddTasteGraphNodes(emotionNodes, TasteGraphEmotionX, graphNodeById);
-        AddTasteGraphNodes(sceneNodes, TasteGraphSceneX, graphNodeById);
+        AddTasteGraphNodes(typeNodes, TasteGraphTypeX, graphNodeById, tooltipLinesByNodeId);
+        AddTasteGraphNodes(emotionNodes, TasteGraphEmotionX, graphNodeById, tooltipLinesByNodeId);
+        AddTasteGraphNodes(sceneNodes, TasteGraphSceneX, graphNodeById, tooltipLinesByNodeId);
 
-        AddTasteGraphLinks(snapshot.TasteCombinationEdges, nodeById, graphNodeById, "type", "emotion");
-        AddTasteGraphLinks(snapshot.TasteCombinationEdges, nodeById, graphNodeById, "emotion", "scene");
+        var visibleCombinations = completeCombinations
+            .Where(item => graphNodeById.ContainsKey(BuildTasteGraphNodeId("type", item.Type))
+                && graphNodeById.ContainsKey(BuildTasteGraphNodeId("emotion", item.Emotion))
+                && graphNodeById.ContainsKey(BuildTasteGraphNodeId("scene", item.Scene)))
+            .ToList();
+        var relatedNodeIdsByEdge = BuildTasteGraphRelatedNodeIds(visibleCombinations);
+        AddTasteGraphLinksFromCombinations(visibleCombinations, "type", "emotion", graphNodeById, relatedNodeIdsByEdge);
+        AddTasteGraphLinksFromCombinations(visibleCombinations, "emotion", "scene", graphNodeById, relatedNodeIdsByEdge);
 
-        if (snapshot.TasteCombinationTop10.Count > 0 && (TasteGraphNodes.Count == 0 || TasteGraphLinks.Count == 0))
-        {
-            BuildTasteCanvasGraphFallbackFromCombinations(snapshot);
-        }
+        NormalizeTasteGraphLinks();
     }
 
     private void AddTasteGraphNodes(
         IReadOnlyList<TasteCombinationNode> nodes,
         double x,
-        IDictionary<string, TasteGraphNodeItem> graphNodeById)
+        IDictionary<string, TasteGraphNodeItem> graphNodeById,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> tooltipLinesByNodeId)
     {
         for (var index = 0; index < nodes.Count; index++)
         {
@@ -2035,143 +2634,72 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 node.Label,
                 node.Kind,
                 x,
-                TasteGraphFirstNodeY + index * TasteGraphNodeSpacingY,
+                CalculateTasteGraphNodeY(nodes.Count, index),
                 TasteGraphNodeWidth,
                 TasteGraphNodeHeight,
-                node.Count);
+                node.Count,
+                tooltipLinesByNodeId.TryGetValue(node.Id, out var tooltipLines) ? tooltipLines : []);
             TasteGraphNodes.Add(graphNode);
             graphNodeById[node.Id] = graphNode;
         }
     }
 
-    private void AddTasteGraphLinks(
-        IEnumerable<TasteCombinationEdge> edges,
-        IReadOnlyDictionary<string, TasteCombinationNode> nodeById,
-        IReadOnlyDictionary<string, TasteGraphNodeItem> graphNodeById,
-        string sourceKind,
-        string targetKind)
+    private static double CalculateTasteGraphNodeY(int visibleNodeCount, int index)
     {
-        var links = edges
-            .Where(x => graphNodeById.ContainsKey(x.SourceId)
-                && graphNodeById.ContainsKey(x.TargetId)
-                && nodeById.TryGetValue(x.SourceId, out var source)
-                && nodeById.TryGetValue(x.TargetId, out var target)
-                && string.Equals(source.Kind, sourceKind, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(target.Kind, targetKind, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(x => x.Count)
-            .ThenBy(x => x.SourceId, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(x => x.TargetId, StringComparer.OrdinalIgnoreCase)
-            .Take(TasteGraphLinkLimit)
-            .ToList();
-        var maxCount = links.Count == 0 ? 0 : links.Max(x => x.Count);
-
-        foreach (var edge in links)
+        var lastNodeY = TasteGraphFirstNodeY + ((TasteGraphNodeLimit - 1) * TasteGraphNodeSpacingY);
+        if (visibleNodeCount <= 1)
         {
-            var source = graphNodeById[edge.SourceId];
-            var target = graphNodeById[edge.TargetId];
-            TasteGraphLinks.Add(new TasteGraphLinkItem(
-                source.RightX,
-                source.CenterY,
-                target.LeftX,
-                target.CenterY,
-                CalculateTasteLineThickness(edge.Count, maxCount),
-                edge.Count));
-        }
-    }
-
-    private void BuildTasteCanvasGraphFallbackFromCombinations(WatchStatisticsSnapshot snapshot)
-    {
-        TasteGraphNodes.Clear();
-        TasteGraphLinks.Clear();
-
-        var typeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var emotionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var sceneCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var typeEmotionCounts = new Dictionary<string, (string Source, string Target, int Count)>(StringComparer.OrdinalIgnoreCase);
-        var emotionSceneCounts = new Dictionary<string, (string Source, string Target, int Count)>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var item in snapshot.TasteCombinationTop10)
-        {
-            AddTasteCount(typeCounts, item.Type, item.OccurrenceCount);
-            AddTasteCount(emotionCounts, item.Emotion, item.OccurrenceCount);
-            AddTasteCount(sceneCounts, item.Scene, item.OccurrenceCount);
-
-            var typeEmotionKey = $"{item.Type}|{item.Emotion}";
-            typeEmotionCounts[typeEmotionKey] = typeEmotionCounts.TryGetValue(typeEmotionKey, out var typeEmotion)
-                ? (typeEmotion.Source, typeEmotion.Target, typeEmotion.Count + item.OccurrenceCount)
-                : (item.Type, item.Emotion, item.OccurrenceCount);
-
-            var emotionSceneKey = $"{item.Emotion}|{item.Scene}";
-            emotionSceneCounts[emotionSceneKey] = emotionSceneCounts.TryGetValue(emotionSceneKey, out var emotionScene)
-                ? (emotionScene.Source, emotionScene.Target, emotionScene.Count + item.OccurrenceCount)
-                : (item.Emotion, item.Scene, item.OccurrenceCount);
+            return TasteGraphFirstNodeY + ((lastNodeY - TasteGraphFirstNodeY) / 2d);
         }
 
-        var graphNodeById = new Dictionary<string, TasteGraphNodeItem>(StringComparer.OrdinalIgnoreCase);
-        AddFallbackGraphNodes(typeCounts, "type", TasteGraphTypeX, graphNodeById);
-        AddFallbackGraphNodes(emotionCounts, "emotion", TasteGraphEmotionX, graphNodeById);
-        AddFallbackGraphNodes(sceneCounts, "scene", TasteGraphSceneX, graphNodeById);
-        AddFallbackGraphLinks(typeEmotionCounts.Values, "type", "emotion", graphNodeById);
-        AddFallbackGraphLinks(emotionSceneCounts.Values, "emotion", "scene", graphNodeById);
+        var step = (lastNodeY - TasteGraphFirstNodeY) / Math.Max(1d, visibleNodeCount - 1d);
+        return TasteGraphFirstNodeY + (index * step);
     }
 
-    private void AddFallbackGraphNodes(
-        IReadOnlyDictionary<string, int> counts,
-        string kind,
-        double x,
-        IDictionary<string, TasteGraphNodeItem> graphNodeById)
-    {
-        var items = counts
-            .OrderByDescending(x => x.Value)
-            .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
-            .Take(TasteGraphNodeLimit)
-            .ToList();
-
-        for (var index = 0; index < items.Count; index++)
-        {
-            var item = items[index];
-            var id = BuildTasteGraphNodeId(kind, item.Key);
-            var graphNode = new TasteGraphNodeItem(
-                id,
-                item.Key,
-                kind,
-                x,
-                TasteGraphFirstNodeY + index * TasteGraphNodeSpacingY,
-                TasteGraphNodeWidth,
-                TasteGraphNodeHeight,
-                item.Value);
-            TasteGraphNodes.Add(graphNode);
-            graphNodeById[id] = graphNode;
-        }
-    }
-
-    private void AddFallbackGraphLinks(
-        IEnumerable<(string Source, string Target, int Count)> links,
+    private void AddTasteGraphLinksFromCombinations(
+        IEnumerable<TasteCombinationItem> combinations,
         string sourceKind,
         string targetKind,
-        IReadOnlyDictionary<string, TasteGraphNodeItem> graphNodeById)
+        IReadOnlyDictionary<string, TasteGraphNodeItem> graphNodeById,
+        IReadOnlyDictionary<string, IReadOnlyCollection<string>> relatedNodeIdsByEdge)
     {
-        var items = links
+        var links = combinations
+            .Select(item => (
+                Source: GetTasteCombinationLabel(item, sourceKind),
+                Target: GetTasteCombinationLabel(item, targetKind),
+                Count: item.OccurrenceCount))
             .Where(x => graphNodeById.ContainsKey(BuildTasteGraphNodeId(sourceKind, x.Source))
                 && graphNodeById.ContainsKey(BuildTasteGraphNodeId(targetKind, x.Target)))
+            .GroupBy(
+                x => $"{BuildTasteGraphNodeId(sourceKind, x.Source)}->{BuildTasteGraphNodeId(targetKind, x.Target)}",
+                StringComparer.OrdinalIgnoreCase)
+            .Select(x => (
+                Source: x.First().Source,
+                Target: x.First().Target,
+                Count: x.Sum(item => item.Count)))
             .OrderByDescending(x => x.Count)
             .ThenBy(x => x.Source, StringComparer.OrdinalIgnoreCase)
             .ThenBy(x => x.Target, StringComparer.OrdinalIgnoreCase)
             .Take(TasteGraphLinkLimit)
             .ToList();
-        var maxCount = items.Count == 0 ? 0 : items.Max(x => x.Count);
 
-        foreach (var item in items)
+        foreach (var item in links)
         {
             var source = graphNodeById[BuildTasteGraphNodeId(sourceKind, item.Source)];
             var target = graphNodeById[BuildTasteGraphNodeId(targetKind, item.Target)];
             TasteGraphLinks.Add(new TasteGraphLinkItem(
+                source.Id,
+                target.Id,
                 source.RightX,
                 source.CenterY,
                 target.LeftX,
                 target.CenterY,
-                CalculateTasteLineThickness(item.Count, maxCount),
-                item.Count));
+                2d,
+                0.18d,
+                item.Count,
+                source.Kind,
+                target.Kind,
+                GetTasteGraphRelatedNodeIds(relatedNodeIdsByEdge, source.Id, target.Id)));
         }
     }
 
@@ -2180,33 +2708,50 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         return $"{kind}:{label.Trim().ToLowerInvariant()}";
     }
 
-    private static double CalculateTasteLineThickness(int count, int maxCount)
+    private void NormalizeTasteGraphLinks()
     {
-        if (count <= 0 || maxCount <= 0)
+        if (TasteGraphLinks.Count == 0)
         {
-            return 1.5d;
+            return;
         }
 
-        return Math.Clamp(1.5d + count / (double)maxCount * 5d, 1.5d, 6.5d);
+        var minimumCount = TasteGraphLinks.Min(link => link.Count);
+        var maximumCount = TasteGraphLinks.Max(link => link.Count);
+        for (var index = 0; index < TasteGraphLinks.Count; index++)
+        {
+            var link = TasteGraphLinks[index];
+            var normalizedCount = maximumCount == minimumCount
+                ? 1d
+                : Math.Clamp(
+                    (link.Count - minimumCount) / (double)(maximumCount - minimumCount),
+                    0d,
+                    1d);
+            TasteGraphLinks[index] = link with
+            {
+                StrokeThickness = Math.Clamp(2d * (1d + (1.5d * Math.Sqrt(normalizedCount))), 2d, 5d),
+                BaseOpacity = Math.Clamp(0.16d + (0.4d * normalizedCount), 0.16d, 0.56d)
+            };
+        }
     }
 
     private void BuildTasteCombinationGraph(WatchStatisticsSnapshot snapshot)
     {
         TasteGraphNodes.Clear();
         TasteGraphLinks.Clear();
-        TasteCombinationTop10.Clear();
+        TasteCombinationTop5.Clear();
 
         BuildTasteCanvasGraph(snapshot);
 
-        var maxScore = snapshot.TasteCombinationTop10.Count == 0
+        var topItems = snapshot.TasteCombinationTop10.Take(5).ToList();
+        var maxScore = topItems.Count == 0
             ? 0
-            : snapshot.TasteCombinationTop10.Max(x => x.Score);
+            : topItems.Max(x => x.Score);
         var rank = 1;
-        foreach (var item in snapshot.TasteCombinationTop10)
+        foreach (var item in topItems)
         {
-            TasteCombinationTop10.Add(new TasteCombinationRankItem(
+            TasteCombinationTop5.Add(new TasteCombinationRankItem(
                 rank++,
-                $"{item.Type} x {item.Emotion} x {item.Scene}",
+                FormatTasteCombinationLabel(item),
                 $"{item.OccurrenceCount}次",
                 CalculateProgress(item.Score, maxScore)));
         }
@@ -2274,8 +2819,28 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         {
             > 0 => $"较上月 +{delta.Value}",
             < 0 => $"较上月 {delta.Value}",
-            _ => "与上月持平"
+            _ => "较上月无变化"
         };
+    }
+
+    private static string FormatDeltaArrow(WatchStatisticsTimeRange timeRange, int? delta)
+    {
+        if (timeRange == WatchStatisticsTimeRange.All || !delta.HasValue || delta.Value == 0)
+        {
+            return string.Empty;
+        }
+
+        return delta.Value > 0 ? "\u2191" : "\u2193";
+    }
+
+    private static string FormatDeltaArrow(WatchStatisticsTimeRange timeRange, long? delta)
+    {
+        if (timeRange == WatchStatisticsTimeRange.All || !delta.HasValue || delta.Value == 0)
+        {
+            return string.Empty;
+        }
+
+        return delta.Value > 0 ? "\u2191" : "\u2193";
     }
 
     private static string FormatSeconds(double seconds)
@@ -2310,7 +2875,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
 
         if (deltaSeconds.Value == 0)
         {
-            return "与上月持平";
+            return "较上月无变化";
         }
 
         var prefix = deltaSeconds.Value > 0 ? "较上月 +" : "较上月 -";
@@ -2422,8 +2987,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(ProfilePersonaLeadDisplay));
         OnPropertyChanged(nameof(ProfilePersonaLeadFirstClauseDisplay));
         OnPropertyChanged(nameof(ProfilePersonaLeadSecondClauseDisplay));
+        OnPropertyChanged(nameof(ProfilePersonaLeadTwoLineDisplay));
+        OnPropertyChanged(nameof(IsProfilePersonaLeadLong));
         OnPropertyChanged(nameof(ProfilePersonaDescription));
         OnPropertyChanged(nameof(PersonaPosterGender));
+        OnPropertyChanged(nameof(PersonaPosterBackdropPalette));
         OnPropertyChanged(nameof(PersonaPosterImageUri));
         OnPropertyChanged(nameof(PersonaPosterFrameUri));
         OnPropertyChanged(nameof(HasPersonaPoster));
@@ -2433,6 +3001,12 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         OnPropertyChanged(nameof(ProfileQuadrantName));
         OnPropertyChanged(nameof(ProfileQuadrantAxisTitle));
         OnPropertyChanged(nameof(ProfileQuadrantAxisTitleDisplay));
+        OnPropertyChanged(nameof(ProfileQuadrantXAxisLabel));
+        OnPropertyChanged(nameof(ProfileQuadrantYAxisLabel));
+        OnPropertyChanged(nameof(ProfileQuadrantXAxisLabelDisplay));
+        OnPropertyChanged(nameof(ProfileQuadrantYAxisLabelDisplay));
+        OnPropertyChanged(nameof(ProfileQuadrantXLabelKind));
+        OnPropertyChanged(nameof(ProfileQuadrantYLabelKind));
         OnPropertyChanged(nameof(ProfileQuadrantToolTipText));
         OnPropertyChanged(nameof(ProfileQuadrantDescription));
         OnPropertyChanged(nameof(ProfileXAxisText));
@@ -2478,6 +3052,54 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         return string.IsNullOrWhiteSpace(value) || value.Length <= 1
             ? value
             : string.Join(spacing, value.ToCharArray());
+    }
+
+    private static string BuildSafeLogValue(string? value, string fallback)
+    {
+        var safeValue = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        if (ContainsSensitiveUiFragment(safeValue))
+        {
+            return "redacted";
+        }
+
+        var buffer = new char[Math.Min(safeValue.Length, 64)];
+        var length = 0;
+        foreach (var character in safeValue)
+        {
+            if (length >= buffer.Length)
+            {
+                break;
+            }
+
+            buffer[length++] = char.IsLetterOrDigit(character) || character is '-' or '_' or '.'
+                ? character
+                : '-';
+        }
+
+        return length == 0 ? fallback : new string(buffer, 0, length);
+    }
+
+    private static int CountLeadCharacters(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? 0
+            : value.Count(character => !char.IsWhiteSpace(character));
+    }
+
+    private static string TrimPersonaLeadTerminalPunctuation(string? value)
+    {
+        var result = (value ?? string.Empty).Trim();
+        while (result.Length > 0 && IsPersonaLeadTerminalPunctuation(result[^1]))
+        {
+            result = result[..^1].TrimEnd();
+        }
+
+        return result;
+    }
+
+    private static bool IsPersonaLeadTerminalPunctuation(char character)
+    {
+        return character is '\u3002' or '.';
     }
 
     private static string BuildSafeStatusMessage(string? message, string fallback)
@@ -2589,11 +3211,14 @@ public sealed record OverviewMetricCard(
     string ValueText,
     string UnitText,
     string DeltaText,
+    string DeltaArrowText,
     string IconText,
     string Kind,
     bool IsCompact)
 {
     public bool HasDelta => !string.IsNullOrWhiteSpace(DeltaText);
+
+    public bool HasDeltaArrow => !string.IsNullOrWhiteSpace(DeltaArrowText);
 
     public string PrefixText => IsCompact ? "共" : string.Empty;
 
@@ -2704,6 +3329,7 @@ public sealed record RankedTagItem(int Rank, string Label, string DetailText, do
 public sealed record ProfileDnaItem(
     string Gene,
     string IconText,
+    string IconKind,
     string Subtitle,
     IReadOnlyList<TagChipItem> Tags,
     int Score,
@@ -2754,7 +3380,8 @@ public sealed record TasteGraphNodeItem(
     double Y,
     double Width,
     double Height,
-    int Count)
+    int Count,
+    IReadOnlyList<string> TopCombinationToolTipLines)
 {
     public double LeftX => X;
 
@@ -2763,6 +3390,18 @@ public sealed record TasteGraphNodeItem(
     public double CenterY => Y + Height / 2d;
 
     public string CountText => $"{Count}次";
+
+    public string ToolTipText => $"{Label}：{Count}次";
+
+    public string RichToolTipText
+    {
+        get
+        {
+            var lines = new List<string> { string.Concat(Label, "\uFF1A", Count.ToString(), "\u6B21") };
+            lines.AddRange(TopCombinationToolTipLines);
+            return string.Join(Environment.NewLine, lines);
+        }
+    }
 
     public string KindText => Kind switch
     {
@@ -2782,12 +3421,41 @@ public sealed record TasteGraphNodeItem(
 }
 
 public sealed record TasteGraphLinkItem(
+    string SourceId,
+    string TargetId,
     double X1,
     double Y1,
     double X2,
     double Y2,
     double StrokeThickness,
-    int Count);
+    double BaseOpacity,
+    int Count,
+    string SourceKind,
+    string TargetKind,
+    IReadOnlyCollection<string> RelatedNodeIds)
+{
+    public Geometry PathGeometry => Geometry.Parse(PathData);
+
+    public double GlowStrokeThickness => StrokeThickness + 8d;
+
+    private string PathData
+    {
+        get
+        {
+            var deltaX = Math.Max(1d, X2 - X1);
+            var controlOffset = Math.Clamp(deltaX * 0.44d, 52d, 82d);
+            return FormattableString.Invariant(
+                $"M {X1:0.###},{Y1:0.###} C {X1 + controlOffset:0.###},{Y1:0.###} {X2 - controlOffset:0.###},{Y2:0.###} {X2:0.###},{Y2:0.###}");
+        }
+    }
+
+    public bool IsRelatedTo(string nodeId)
+    {
+        return string.Equals(SourceId, nodeId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(TargetId, nodeId, StringComparison.OrdinalIgnoreCase)
+            || RelatedNodeIds.Any(id => string.Equals(id, nodeId, StringComparison.OrdinalIgnoreCase));
+    }
+}
 
 public sealed record TasteCombinationRankItem(
     int Rank,
@@ -2803,7 +3471,7 @@ public sealed record TasteCombinationRankItem(
 
     public string TagToolTipText => BuildGroupedTagToolTipText();
 
-    public string OccurrenceText => $"出现 {ExtractLeadingNumber(CountText)} 次";
+    public string OccurrenceText => $"{ExtractLeadingNumber(CountText)}次";
 
     private string BuildGroupedTagToolTipText()
     {

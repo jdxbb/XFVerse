@@ -41,7 +41,8 @@
         <Border x:Name="PosterBackdrop"
                 Grid.ColumnSpan="2"
                 IsHitTestVisible="False"
-                helpers:PosterCachedBackdropBehavior.IsEnabled="True">
+                helpers:PosterCachedBackdropBehavior.IsEnabled="True"
+                helpers:PosterCachedBackdropBehavior.PaletteOverride="{Binding PosterBackdropPaletteOverride}">
             <Border.Visibility>
                 <Binding Path="IsPosterBackdropActive" Converter="{StaticResource BooleanToVisibilityConverter}" />
             </Border.Visibility>
@@ -628,32 +629,12 @@
                                 <Setter Property="BorderBrush" Value="#34FFFFFF" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsWatchInsightsRouteActive}" Value="True">
-                                <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource BrushWatchInsightsChromeGlassBorder}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BrushWatchInsightsChromeLine}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <Grid>
-                    <Grid IsHitTestVisible="False">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsWatchInsightsRouteActive}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
-                        <Border Opacity="0.46"
-                                helpers:PosterCachedBackdropBehavior.IsEnabled="True"
-                                helpers:PosterCachedBackdropBehavior.Palette="{Binding Path=(helpers:PosterCachedBackdropBehavior.Palette), RelativeSource={RelativeSource AncestorType=Window}}"
-                                helpers:PosterCachedBackdropBehavior.Variant="Glass" />
-                        <Border Background="{DynamicResource BrushWatchInsightsChromeGlassTint}" />
-                        <Border Background="{DynamicResource BrushWatchInsightsChromeGlassSheen}" />
-                    </Grid>
-
                     <Grid>
                     <Grid.Style>
                         <Style TargetType="Grid">
@@ -705,6 +686,7 @@
                         </StackPanel.Style>
                         <TextBlock Text="{Binding ShellPageTitle}"
                                    VerticalAlignment="Center"
+                                   Effect="{x:Null}"
                                    FontSize="22"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource BrushForegroundPrimary}" />
@@ -719,6 +701,10 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
                                             <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsWatchInsightsRouteActive}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource BrushWatchInsightsChromeMutedForeground}" />
+                                            <Setter Property="Effect" Value="{StaticResource WatchInsightsChromeTextEffect}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

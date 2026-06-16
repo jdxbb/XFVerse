@@ -1,5 +1,128 @@
 # 影片发现阶段日志
 
+## 2026-06-16 - Ranking Medal Size And Number Alignment Polish
+
+Goal:
+
+- Polish the ranking medal overlay so medals are smaller, sit closer to the poster top-left corner, and keep the rank number centered inside the medal before the whole component is placed on the poster.
+
+Completed:
+
+- Reduced normal ranking medal badges from 58x58 to 29x29 and hero ranking medal badges from 70x70 to 35x35, preserving the hero-to-normal size relationship.
+- Moved both normal and hero medal badge margins toward the poster top-left corner.
+- Switched medal rank digits from the serif fallback stack to a modern Segoe UI Variable Display / Segoe UI / Arial stack.
+- Centered rank digits by measuring the rendered glyph geometry and aligning the glyph center to the medal bounds center before drawing the medal overlay.
+
+Not done:
+
+- No ranking data, ranking order, TMDB request behavior, database schema, migration, database update, commit, or push change.
+- No full WPF screenshot pass was run in this turn.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+
+- Blocker: none identified by static patch review.
+- Deferred: manually verify Movie and TV ranking normal posters and first-place hero posters render the smaller medal at the intended top-left position.
+- Deferred: manually verify one-digit and multi-digit ranks remain centered and readable in gold, silver, bronze, and default medals.
+- Noise: exact medal readability depends on the running WPF scale and source PNG transparent padding.
+
+## 2026-06-16 - Ranking And AI Tag Overflow Parity
+
+Goal:
+
+- Align Movie Discovery ranking tag display with the media-library poster-card tag overflow strategy while preserving the ranking date line.
+- Verify the AI recommendation card tag display and make it use the same three-category overflow behavior.
+
+Completed:
+
+- Kept the ranking `ReleaseDateText` in the ranking tag/meta row.
+- Switched Movie / TV ranking hero and normal item tag runs from list-length tag groups to poster-length tag groups, matching the media-library poster-card three-category truncation strategy.
+- Changed ranking tag separators to use the same Discovery library tag divider brush as poster cards.
+- Updated AI recommendation read-model tag projection to use the same three-group fill, overflow marker, and truncation approach as poster cards.
+- Exported current AI recommendation reason and AI tag prompt templates to the requested local prompt folder with dynamic inputs replaced by placeholders.
+
+Not done:
+
+- No ranking request, ranking order, recommendation candidate generation, recommendation prompt behavior, database schema, migration, database update, commit, or push change.
+- No full WPF screenshot pass was run in this turn.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+- Static review confirmed the ranking date run remains present before the poster-style tag groups.
+
+Known Issues:
+
+- Blocker: none identified by solution build.
+- Deferred: manually verify Movie / TV ranking rows still show the date and that long type/emotion/scene labels truncate like media-library poster cards.
+- Deferred: manually verify AI recommendation card tag overflow after metadata hydration with long type/emotion/scene labels.
+- Noise: existing unrelated workspace edits remain preserved.
+
+## 2026-06-16 - Loading And Rating Badge Style Follow-up
+
+Goal:
+
+- Unify visible loading spinners and loading prompt text across page, widget and dialog contexts, and align AI recommendation rating badges with the Movie Discovery ranking score badge style.
+
+Completed:
+
+- Added shared page/widget/dialog loading spinner and loading text styles on top of the existing `LoadingSpinnerTemplate`.
+- Updated Home, Movie Discovery, Recommendation, Library, Favorites, detail pages, Watch Insights, online subtitle search and WebDAV picker loading states to use the shared loading style tiers.
+- Added a shared ranking-style rating badge/text resource and reused it for Home AI recommendation and the AI recommendation page embedded in Movie Discovery.
+- Switched Movie Discovery search and Favorites high-rating text to the shared gold rating color; the light theme gold is brighter than the previous warning color.
+- Changed Home library preview monthly trend text so zero delta displays `较上月无变化`.
+
+Not done:
+
+- No recommendation algorithm, search/ranking request, scan/identification, collection semantics, database schema, migration, database update, commit, or push change.
+- No full desktop screenshot pass was run in this turn.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+
+- Blocker: none identified by solution build.
+- Deferred: manual WPF validation should confirm page/widget/dialog loading spacing and rating badge alignment in light and dark themes.
+- Noise: existing unrelated workspace edits remain preserved.
+
+## 2026-06-16 - Ranking Medal Badge Follow-up
+
+Goal:
+
+- Replace Movie Discovery ranking poster corner rank badges with medal icons and embossed ranking numbers without changing ranking data or order.
+
+Completed:
+
+- Added `RankMedalBadge`, a reusable WPF drawing control that renders the gold, silver, bronze, or default medal image by rank.
+- Added medal image resources from `Assets/medals` to the app project.
+- Replaced the old rounded text rank badges in Movie / TV ranking poster templates, including normal and hero ranking posters.
+- Bound the medal number to `SearchOrder` so the medal shows only the ranking number rather than the previous `#N` text.
+- Implemented rank-specific number styling for rank 1, rank 2, rank 3, and rank 4+ with fill, translucent outline, shadow, and highlight colors.
+
+Not done:
+
+- No ranking service, TMDB request, ranking order, search behavior, recommendation logic, database schema, migration, database update, commit, or push change.
+- No Watch Insights ranking badges were changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+
+- Blocker: none identified by solution build.
+- Deferred: manual WPF verification is still needed for medal placement, scale, and number centering on normal and hero ranking posters.
+- Noise: medal number embossing is drawn in WPF geometry rather than pre-rendered into the image assets.
+
 ## 2026-06-11 - Discovery Search And Ranking Shadow Safe Area Follow-up
 
 Goal:
@@ -2286,3 +2409,261 @@ Known Issues:
 - Blocker: None confirmed by temp-output build.
 - Deferred: Manual validation should confirm both search scrollbar positions, ranking scrollbar position, and the reduced first-row gap.
 - Noise: The first build attempt failed only because the temporary volume was full; scoped temp-output cleanup resolved it.
+
+## 2026-06-16 - Detail Task Recent-sort Touch Follow-up
+
+Goal:
+
+- Make media-library recent-update sorting react as soon as a movie detail page starts lazy probe or AI tag generation work, instead of waiting for the background task to finish.
+
+Completed:
+
+- Added a movie updated-time touch path for detail-page background work.
+- Detail-page lazy probe now touches the movie once a probe task is actually queued.
+- Detail-page local AI tag generation now touches the movie when the background classification task starts.
+- No-source external collection details now touch their collection row when external AI tag generation starts.
+- Media-library movie projection now includes `Movie.UpdatedAt` in the recent-update sort timestamp, so recognized no-source movies can move forward when metadata or tags change.
+
+Not done:
+
+- No ranking/search UI, TMDB request behavior, scan identification rules, database schema, migration, database update, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -v:minimal -p:OutDir=<temp>` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify that returning from Movie Detail to Media Library immediately places a touched item near the front under recent-update descending sort.
+- Noise: detail-page task-start touches are refresh hints only; the original background task completion refresh remains in place.
+
+## 2026-06-16 - Detail TMDB Refresh And Rating Cache Sync
+
+Goal:
+
+- Let Movie Detail show cached metadata first, then refresh TMDB/OMDb data in the background without blocking navigation or issuing duplicate refreshes.
+
+Completed:
+
+- Added a movie metadata refresh service that force-refreshes TMDB detail data, refreshes OMDb/IMDb rating when an IMDb ID is available, and writes the result back to the local movie and collection snapshots.
+- Added in-flight de-duplication and a 4-hour success cooldown backed by the existing external metadata cache, so immediate exit/re-entry does not start another request.
+- Movie Detail now starts the refresh with a non-page cancellation token; leaving the page does not cancel the refresh.
+- A successful refresh broadcasts `MetadataChanged`, so media library, favorites, discovery search/ranking cards, home/recommendation cards and weighted rating displays re-read local cached data instead of each making their own TMDB request.
+- AI recommendation items keep their existing playback-source and watched/unwatched semantics while refreshing local title, poster, tags, TMDB rating and OMDb/IMDb rating data.
+
+Not done:
+
+- No database schema, migration, database update, commit or push was added.
+- No recommendation filtering semantics were changed; playback-source and watched/unwatched filters remain the only recommendation page scope controls.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify that Movie Detail refresh completion updates already-open discovery/recommendation cards and weighted rating text.
+- Noise: a movie refresh may also make one OMDb request when an IMDb ID exists; this is part of the same background refresh path.
+
+## 2026-06-16 - Detail Refresh No-change Sort Guard
+
+Goal:
+
+- Keep a successful detail metadata refresh from moving a movie to the top of the media library recent-update sort when TMDB/OMDb returned no substantive data changes.
+
+Completed:
+
+- Checked current logs: `scan-identification-debug.log` shows TV season TMDB requests and cache hits; `ai-perf-debug.log` shows TMDB/OMDb activity, but the previous implementation did not log movie detail refresh success/cooldown/no-change outcomes explicitly.
+- Added explicit movie detail refresh logs for skipped cooldown, skipped missing TMDB ID, failed TMDB detail, mismatch, and success with `changed`, `metadataChanged`, `ratingChanged`, and `collectionChanged` flags.
+- Split movie refresh result into `Success` and `HasChanges`, so a no-change refresh is still a successful refresh and still writes the 4-hour cooldown marker.
+- Movie metadata, rating sources, and collection snapshots now only update `UpdatedAt` when a substantive field changed; equal TMDB/OMDb values no longer bump recent-update sorting.
+- Movie Detail only broadcasts `MetadataChanged` when `HasChanges` is true.
+
+Not done:
+
+- No database schema, migration, database update, commit or push was added.
+- Runtime validation of the new success/no-change log event still requires launching the updated app and opening a detail page.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- `git diff --check` reported only existing LF-to-CRLF working-copy warnings.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify that `movie-detail-tmdb-metadata-refresh-succeeded changed=false` appears after a no-change refresh and that the item does not move to the top under recent-update descending sort.
+- Noise: existing logs before this patch cannot prove the new success/no-change branch because the event did not exist yet.
+
+## 2026-06-16 - Post-identification OMDb Rating Backfill
+
+Goal:
+
+- Check whether the new detail refresh mechanism is working, and explain why detail refresh filled many IMDb/OMDb ratings that earlier scan/correction did not.
+
+Completed:
+
+- Checked current diagnostics: movie detail refresh succeeds, writes `cooldownHours=4`, skips immediate repeat entry with `skippedReason="cooldown"`, and records a no-change success as `changed=false` while still counting as a successful refresh.
+- Confirmed that rating-only updates are logged as `metadataChanged=false ratingChanged=true`, which explains why existing TMDB metadata can stay unchanged while IMDb/OMDb rating is newly filled.
+- Compared code paths: Movie Detail refresh calls TMDB detail/external IDs and then OMDb rating by IMDb ID, while high-volume correction/batch paths intentionally used `includeOmdbRating=false` to keep the critical path fast.
+- Added a bounded background post-identification hydration queue that reuses existing `EnsureMovieListMetadataAsync` after stable scan applies, stable scan skips, batch AI identification, and single-source movie correction.
+- The background hydration is de-duplicated by movie ID, capped at two concurrent jobs, uses non-request cancellation, and logs queued/start/complete/error events.
+
+Not done:
+
+- No database schema, migration, database update, commit or push was added.
+- No change was made to the recommendation scope semantics; AI recommendations remain based on playback-source availability and watched/unwatched state.
+- No OMDb request was moved back onto the scan/correction critical path.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+- Log evidence showed 5 movie detail refresh successes, 1 cooldown skip, and historical correction rows where IMDb ID existed while OMDb rating was skipped by `includeOmdbRating=false`.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: run a new scan/correction session and verify `movie-list-metadata-hydration-queued/start/complete` appears and missing OMDb ratings backfill without blocking scan completion.
+- Noise: historical log volume is large; the exact old missed-rating count should be treated as diagnostic evidence, not a product metric.
+
+## 2026-06-16 - Home Recommendation And Ranking Visual Polish
+
+Goal:
+
+- Apply the requested display polish for the home library preview, AI recommendation card metadata, and discovery ranking medal badges without changing recommendation or library semantics.
+
+Completed:
+
+- Home library preview now displays `暂无上月记录` when a month-over-month delta is unavailable.
+- AI recommendation card tag display length was expanded substantially so the three tag groups can use a full metadata line before visual trimming.
+- Ranking medal badge styles were enlarged by roughly one third while keeping the top-left anchor, so the growth extends right/down over the poster.
+
+Not done:
+
+- No recommendation filtering, score calculation, collection state, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the home empty previous-month text, AI recommendation tag line trimming, and larger medals at the running app window sizes.
+- Noise: AI recommendation tags can still be visually ellipsized by the card width; the backing tooltip remains the full grouped tag text.
+
+## 2026-06-16 - Home Library Preview Dark Fill And Stroke Polish
+
+Goal:
+
+- Apply the requested home library preview circle-number stroke and dark-theme fill lightening without changing dashboard query semantics.
+
+Completed:
+
+- Added a dedicated home library status icon border brush to both light and dark theme dictionaries.
+- Applied a darker outline to the home library preview circle-number badge while keeping the existing selected-glass fill.
+- Lightened the dark-theme selected-glass fill so the home preview circle-number badge reads less heavy in dark mode.
+
+Not done:
+
+- No home dashboard query, recommendation filtering, collection state, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the home library preview circle-number badge in both light and dark themes.
+- Noise: the stroke color is intentionally tied to theme resources and may need minor visual tuning after a full runtime review.
+
+## 2026-06-16 - Home Icon Foreground And Medal Number Alignment Follow-up
+
+Goal:
+
+- Apply the requested home preview icon foreground and ranking medal number micro-alignment follow-up without changing dashboard or ranking semantics.
+
+Completed:
+
+- Added a dedicated home library status icon foreground brush to both light and dark theme dictionaries.
+- Home library preview circle icons now render white in dark mode while retaining the accent foreground in light mode.
+- Raised ranking medal numbers slightly within the medal artwork.
+
+Not done:
+
+- No home dashboard query, ranking data, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the home preview icon color in dark mode and medal number placement on ranking posters.
+- Noise: the medal number lift is a small geometry offset and may need one more visual adjustment after runtime review.
+
+## 2026-06-16 - Rank Medal Digit Per-rank Offset Follow-up
+
+Goal:
+
+- Apply the requested per-medal ranking digit offset correction without changing ranking order or medal assets.
+
+Completed:
+
+- Replaced the previous shared medal digit lift with rank-specific offsets.
+- Gold, silver, and bronze digits now move slightly left and upward with separate vertical amounts.
+- Normal medal digits move upward by the same amount as bronze without the added left shift.
+
+Not done:
+
+- No ranking data, dashboard query, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify one-digit and multi-digit ranks on gold, silver, bronze, and normal medal art.
+- Noise: offsets are intentionally small and may need one more visual pass after runtime rendering.
+
+## 2026-06-16 - Rank Medal Digit Vertical Follow-up
+
+Goal:
+
+- Move ranking medal digits upward a little more by medal type without changing medal assets or ranking order.
+
+Completed:
+
+- Gold digit offset was moved slightly upward.
+- Silver digit offset was moved upward more than gold.
+- Bronze digit offset was moved upward more than silver.
+- Normal medal digit offset now matches the bronze upward amount.
+
+Not done:
+
+- No ranking data, dashboard query, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the rank digit placement in the running ranking poster UI.
+- Noise: per-rank offsets remain tiny visual constants and may need final adjustment after viewing the actual WPF rendering.

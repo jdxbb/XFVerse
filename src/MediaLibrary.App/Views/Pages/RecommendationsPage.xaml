@@ -10,7 +10,6 @@
         <SolidColorBrush x:Key="RecommendationPosterAccentBrush" Color="#E2E8F0" />
         <SolidColorBrush x:Key="RecommendationPosterAccentTextBrush" Color="#111827" />
         <SolidColorBrush x:Key="RecommendationPosterActiveBrush" Color="{DynamicResource ColorAccent}" />
-        <SolidColorBrush x:Key="RecommendationPosterRatingHighlightBrush" Color="{DynamicResource ColorWarning}" />
         <SolidColorBrush x:Key="RecommendationPosterNotInterestedBrush" Color="{DynamicResource ColorDanger}" />
         <SolidColorBrush x:Key="RecommendationTagDividerBrush" Color="#7DD3FC" />
 
@@ -311,32 +310,15 @@
             <Setter Property="FontWeight" Value="Normal" />
         </Style>
 
-        <Style x:Key="RecommendationPosterRatingBadgeStyle" TargetType="Border">
-            <Setter Property="MinWidth" Value="42" />
-            <Setter Property="Height" Value="30" />
-            <Setter Property="Padding" Value="8,0" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Background" Value="{StaticResource RecommendationPosterAccentBrush}" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Opacity" Value="0.9" />
+        <Style x:Key="RecommendationPosterRatingBadgeStyle"
+               TargetType="{x:Type helpers:CachedShadowBorder}"
+               BasedOn="{StaticResource RankingRatingBadgeStyle}">
             <Setter Property="HorizontalAlignment" Value="Right" />
         </Style>
 
-        <Style x:Key="RecommendationPosterRatingTextStyle" TargetType="TextBlock">
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="FontSize" Value="13.5" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="LineHeight" Value="16" />
-            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
-            <Setter Property="Foreground" Value="{StaticResource RecommendationPosterAccentTextBrush}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsHighWeightedAverageRating}" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource RecommendationPosterRatingHighlightBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+        <Style x:Key="RecommendationPosterRatingTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource RankingRatingTextStyle}" />
 
         <Style x:Key="RecommendationPosterActionButtonBaseStyle" TargetType="Button">
             <Setter Property="MinHeight" Value="20" />
@@ -795,14 +777,14 @@
                                                    Text="{Binding ReleaseDateText}"
                                                    helpers:TrimmedTextToolTipBehavior.FullText="{Binding ReleaseDateText}"
                                                    Style="{StaticResource RecommendationPosterMetaTextStyle}" />
-                                        <Border Grid.Row="0"
+                                        <helpers:CachedShadowBorder Grid.Row="0"
                                                 Grid.RowSpan="2"
                                                 Grid.Column="2"
                                                 VerticalAlignment="Center"
                                                 Style="{StaticResource RecommendationPosterRatingBadgeStyle}">
                                             <TextBlock Text="{Binding WeightedAverageRatingText}"
                                                        Style="{StaticResource RecommendationPosterRatingTextStyle}" />
-                                        </Border>
+                                        </helpers:CachedShadowBorder>
                                         <TextBlock Grid.Row="2"
                                                    Grid.ColumnSpan="3"
                                                    Margin="0,2,0,0"
@@ -874,12 +856,12 @@
                     </Style.Triggers>
                 </Style>
             </Grid.Style>
-            <Control Width="38"
-                     Height="38"
-                     Margin="0,-72,0,0"
-                     HorizontalAlignment="Center"
-                     VerticalAlignment="Center"
-                     Template="{StaticResource LoadingSpinnerTemplate}" />
+            <StackPanel Margin="0,-72,0,0"
+                        Style="{StaticResource WidgetLoadingHostStyle}">
+                <Control Style="{StaticResource WidgetLoadingSpinnerStyle}" />
+                <TextBlock Text="{Binding StatusMessage}"
+                           Style="{StaticResource WidgetLoadingTextStyle}" />
+            </StackPanel>
         </Grid>
 
         <Border Grid.RowSpan="3"

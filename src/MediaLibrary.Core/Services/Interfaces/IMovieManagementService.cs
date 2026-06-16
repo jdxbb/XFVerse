@@ -25,6 +25,10 @@ public interface IMovieManagementService
         CancellationToken cancellationToken = default,
         string changeSource = "Manual");
 
+    Task<bool> TouchMovieUpdatedAtAsync(
+        int movieId,
+        CancellationToken cancellationToken = default);
+
     Task RemoveFromLibraryAsync(
         int movieId,
         CancellationToken cancellationToken = default);

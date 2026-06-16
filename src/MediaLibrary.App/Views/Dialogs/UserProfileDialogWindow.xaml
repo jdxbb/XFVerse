@@ -164,6 +164,21 @@
             <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
         </Style>
 
+        <Style x:Key="ProfileValidatedTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ProfileCompactTextBoxStyle}">
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="Invalid">
+                    <Setter Property="Foreground" Value="{DynamicResource BrushErrorForeground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BrushErrorBorder}" />
+                    <Setter Property="Background" Value="{DynamicResource BrushErrorBackground}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ProfileCompactComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource CorrectionDialogComboBoxStyle}">
+            <Setter Property="Width" Value="226" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+
         <Style x:Key="ProfileFieldLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DialogFieldLabelTextStyle}">
             <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
@@ -483,7 +498,7 @@
                                     <TextBlock Style="{StaticResource ProfileFieldLabelTextStyle}" Text="手机号：" />
                                     <TextBox x:Name="PhoneTextBox"
                                              MaxLength="24"
-                                             Style="{StaticResource ProfileCompactTextBoxStyle}" />
+                                             Style="{StaticResource ProfileValidatedTextBoxStyle}" />
                                 </StackPanel>
                                 <StackPanel Grid.Row="3" Margin="0,6,0,0">
                                     <TextBlock Style="{StaticResource ProfileFieldLabelTextStyle}" Text="个性签名：" />
@@ -507,21 +522,25 @@
                                 </Grid.RowDefinitions>
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource ProfileFieldLabelTextStyle}" Text="性别：" />
-                                    <TextBox x:Name="GenderTextBox"
-                                             MaxLength="16"
-                                             Style="{StaticResource ProfileCompactTextBoxStyle}" />
+                                    <ComboBox x:Name="GenderComboBox"
+                                              IsEditable="False"
+                                              SelectedValuePath="Tag"
+                                              Style="{StaticResource ProfileCompactComboBoxStyle}">
+                                        <ComboBoxItem Content="&#x5973;" Tag="&#x5973;" />
+                                        <ComboBoxItem Content="&#x7537;" Tag="&#x7537;" />
+                                    </ComboBox>
                                 </StackPanel>
                                 <StackPanel Grid.Row="1" Margin="0,6,0,0">
                                     <TextBlock Style="{StaticResource ProfileFieldLabelTextStyle}" Text="年龄：" />
                                     <TextBox x:Name="AgeTextBox"
                                              MaxLength="8"
-                                             Style="{StaticResource ProfileCompactTextBoxStyle}" />
+                                             Style="{StaticResource ProfileValidatedTextBoxStyle}" />
                                 </StackPanel>
                                 <StackPanel Grid.Row="2" Margin="0,6,0,0">
                                     <TextBlock Style="{StaticResource ProfileFieldLabelTextStyle}" Text="邮箱：" />
                                     <TextBox x:Name="EmailTextBox"
                                              MaxLength="64"
-                                             Style="{StaticResource ProfileCompactTextBoxStyle}" />
+                                             Style="{StaticResource ProfileValidatedTextBoxStyle}" />
                                 </StackPanel>
                             </Grid>
                         </Grid>
@@ -553,7 +572,7 @@
                        FontSize="13"
                        FontWeight="SemiBold"
                        TextAlignment="Center"
-                       TextTrimming="CharacterEllipsis" />
+                       TextWrapping="Wrap" />
         </Border>
     </Grid>
 </Window>

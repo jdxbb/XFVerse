@@ -21,16 +21,23 @@
     <Color x:Key="ColorSeasonEpisodeTargetBackground">#6A4D60</Color>
     <Color x:Key="ColorSeasonEpisodeTargetBorder">#B3E4AABD</Color>
     <Color x:Key="ColorDivider">#41454E</Color>
+    <Color x:Key="ColorWatchInsightsChromeStroke">#80000000</Color>
+    <Color x:Key="ColorWatchInsightsTabChromeStroke">#CC30343B</Color>
+    <Color x:Key="ColorWatchInsightsChromeLine">#40000000</Color>
+    <Color x:Key="ColorWatchInsightsChromeMutedForeground">#E7EBF2</Color>
+    <Color x:Key="ColorWatchInsightsChromeAccentForeground">#CE92A6</Color>
+    <Color x:Key="ColorWatchInsightsProfileLeadBracket">#B8F8FAFC</Color>
     <Color x:Key="ColorAccent">#D99AAF</Color>
     <Color x:Key="ColorAccentHover">#E4AABD</Color>
     <Color x:Key="ColorAccentPressed">#C8879D</Color>
-    <Color x:Key="ColorAccentSoft">#4A3A43</Color>
+    <Color x:Key="ColorAccentSoft">#735C69</Color>
     <Color x:Key="ColorSuccess">#83CFA3</Color>
     <Color x:Key="ColorSuccessHover">#96DCB2</Color>
     <Color x:Key="ColorSuccessPressed">#6AB78B</Color>
     <Color x:Key="ColorWarning">#E1BB76</Color>
     <Color x:Key="ColorWarningHover">#E9CA8D</Color>
     <Color x:Key="ColorWarningPressed">#C9A05D</Color>
+    <Color x:Key="ColorRatingGold">#E9CA8D</Color>
     <Color x:Key="ColorDanger">#E8949A</Color>
     <Color x:Key="ColorDangerHover">#EFA6AB</Color>
     <Color x:Key="ColorDangerPressed">#D0787F</Color>
@@ -71,29 +78,41 @@
     <Color x:Key="ColorErrorBackground">#4A2830</Color>
     <Color x:Key="ColorErrorBorder">#8C525B</Color>
     <Color x:Key="ColorWarningForeground">#E9CA8D</Color>
-    <Color x:Key="ColorWarningBackground">#463722</Color>
-    <Color x:Key="ColorWarningBorder">#826A45</Color>
+    <Color x:Key="ColorWarningBackground">#806A4C</Color>
+    <Color x:Key="ColorWarningBorder">#BDA77A</Color>
     <Color x:Key="ColorSuccessForeground">#96DCB2</Color>
-    <Color x:Key="ColorSuccessBackground">#213D30</Color>
-    <Color x:Key="ColorSuccessBorder">#527B63</Color>
+    <Color x:Key="ColorSuccessBackground">#527A61</Color>
+    <Color x:Key="ColorSuccessBorder">#79A98D</Color>
     <Color x:Key="ColorInfoForeground">#B2C8E6</Color>
-    <Color x:Key="ColorInfoBackground">#293648</Color>
+    <Color x:Key="ColorInfoBackground">#465B78</Color>
     <Color x:Key="ColorInfoBorder">#5A6E89</Color>
     <Color x:Key="ColorWatchInsightsProgressTrack">#24FFFFFF</Color>
-    <Color x:Key="ColorWatchInsightsDnaIndicator">#EDF6FF</Color>
-    <Color x:Key="ColorWatchInsightsDnaIndicatorGlow">#5FAFD5FF</Color>
-    <Color x:Key="ColorWatchInsightsKeywordLowBackground">#3B4250</Color>
+    <Color x:Key="ColorWatchInsightsDnaIndicator">#9BC7F2</Color>
+    <Color x:Key="ColorWatchInsightsDnaIndicatorGlow">#569BC7F2</Color>
+    <Color x:Key="ColorWatchInsightsDnaIndicatorGlowEdge">#009BC7F2</Color>
+    <Color x:Key="ColorWatchInsightsKeywordLowBackground">#4A5263</Color>
     <Color x:Key="ColorWatchInsightsKeywordLowBorder">#8793A8</Color>
-    <Color x:Key="ColorWatchInsightsKeywordMediumBackground">#334C62</Color>
+    <Color x:Key="ColorWatchInsightsKeywordMediumBackground">#3F617D</Color>
     <Color x:Key="ColorWatchInsightsKeywordMediumBorder">#7EA6C9</Color>
-    <Color x:Key="ColorWatchInsightsKeywordHighBackground">#564566</Color>
+    <Color x:Key="ColorWatchInsightsKeywordHighBackground">#6A557C</Color>
     <Color x:Key="ColorWatchInsightsKeywordHighBorder">#B09ACB</Color>
-    <Color x:Key="ColorWatchInsightsDnaTypeBackground">#563B47</Color>
+    <Color x:Key="ColorWatchInsightsDnaTypeBackground">#6A4A58</Color>
     <Color x:Key="ColorWatchInsightsDnaTypeBorder">#B47F94</Color>
-    <Color x:Key="ColorWatchInsightsDnaEmotionBackground">#554A31</Color>
+    <Color x:Key="ColorWatchInsightsDnaEmotionBackground">#695B3B</Color>
     <Color x:Key="ColorWatchInsightsDnaEmotionBorder">#BEA466</Color>
-    <Color x:Key="ColorWatchInsightsDnaSceneBackground">#345140</Color>
+    <Color x:Key="ColorWatchInsightsDnaSceneBackground">#527A61</Color>
     <Color x:Key="ColorWatchInsightsDnaSceneBorder">#79A98D</Color>
+    <Color x:Key="ColorWatchInsightsDnaRhythmIcon">#7BD7F2</Color>
+    <Color x:Key="ColorWatchInsightsDnaExplorationIcon">#C5A5FF</Color>
+    <Color x:Key="ColorWatchInsightsCalendarLowBackground">#335476</Color>
+    <Color x:Key="ColorWatchInsightsCalendarLowBorder">#72A1D4</Color>
+    <Color x:Key="ColorWatchInsightsTasteTypeBackground">#4A6574</Color>
+    <Color x:Key="ColorWatchInsightsTasteTypeBorder">#557486</Color>
+    <Color x:Key="ColorWatchInsightsTasteEmotionBackground">#714E5B</Color>
+    <Color x:Key="ColorWatchInsightsTasteEmotionBorder">#815768</Color>
+    <Color x:Key="ColorWatchInsightsTasteSceneBackground">#47705A</Color>
+    <Color x:Key="ColorWatchInsightsTasteSceneBorder">#557866</Color>
+    <Color x:Key="ColorWatchInsightsTasteRankBorder">#30262C</Color>
     <Color x:Key="ColorWatchInsightsQuadrantFamiliar">#8FADFF</Color>
     <Color x:Key="ColorWatchInsightsQuadrantExplore">#69D2C1</Color>
     <Color x:Key="ColorWatchInsightsQuadrantRelax">#F0C875</Color>
@@ -104,6 +123,7 @@
     <Color x:Key="ColorNoSourceForeground">#E0C9B1</Color>
     <Color x:Key="ColorNoSourceBackground">#40342D</Color>
     <Color x:Key="ColorNoSourceBorder">#766254</Color>
+    <sys:Double x:Key="WatchInsightsTabChromeTextEffectOpacity">1</sys:Double>
     <Color x:Key="ColorDataInsufficientForeground">#D8CBDD</Color>
     <Color x:Key="ColorDataInsufficientBackground">#393041</Color>
     <Color x:Key="ColorDataInsufficientBorder">#6F5F77</Color>
@@ -156,6 +176,10 @@
     <SolidColorBrush x:Key="BrushSeasonEpisodeTargetBackground" Color="{StaticResource ColorSeasonEpisodeTargetBackground}" />
     <SolidColorBrush x:Key="BrushSeasonEpisodeTargetBorder" Color="{StaticResource ColorSeasonEpisodeTargetBorder}" />
     <SolidColorBrush x:Key="BrushDivider" Color="{StaticResource ColorDivider}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsChromeStroke" Color="{StaticResource ColorWatchInsightsChromeStroke}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsChromeLine" Color="{StaticResource ColorWatchInsightsChromeLine}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsChromeMutedForeground" Color="{StaticResource ColorWatchInsightsChromeMutedForeground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsChromeAccentForeground" Color="{StaticResource ColorWatchInsightsChromeAccentForeground}" />
     <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
     <SolidColorBrush x:Key="BrushAccentHover" Color="{StaticResource ColorAccentHover}" />
     <SolidColorBrush x:Key="BrushAccentPressed" Color="{StaticResource ColorAccentPressed}" />
@@ -166,6 +190,7 @@
     <SolidColorBrush x:Key="BrushWarning" Color="{StaticResource ColorWarning}" />
     <SolidColorBrush x:Key="BrushWarningHover" Color="{StaticResource ColorWarningHover}" />
     <SolidColorBrush x:Key="BrushWarningPressed" Color="{StaticResource ColorWarningPressed}" />
+    <SolidColorBrush x:Key="BrushRatingGold" Color="{StaticResource ColorRatingGold}" />
     <SolidColorBrush x:Key="BrushDanger" Color="{StaticResource ColorDanger}" />
     <SolidColorBrush x:Key="BrushDangerHover" Color="{StaticResource ColorDangerHover}" />
     <SolidColorBrush x:Key="BrushDangerPressed" Color="{StaticResource ColorDangerPressed}" />
@@ -230,6 +255,17 @@
     <SolidColorBrush x:Key="BrushWatchInsightsDnaEmotionBorder" Color="{StaticResource ColorWatchInsightsDnaEmotionBorder}" />
     <SolidColorBrush x:Key="BrushWatchInsightsDnaSceneBackground" Color="{StaticResource ColorWatchInsightsDnaSceneBackground}" />
     <SolidColorBrush x:Key="BrushWatchInsightsDnaSceneBorder" Color="{StaticResource ColorWatchInsightsDnaSceneBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaRhythmIcon" Color="{StaticResource ColorWatchInsightsDnaRhythmIcon}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsDnaExplorationIcon" Color="{StaticResource ColorWatchInsightsDnaExplorationIcon}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsCalendarLowBackground" Color="{StaticResource ColorWatchInsightsCalendarLowBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsCalendarLowBorder" Color="{StaticResource ColorWatchInsightsCalendarLowBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsTasteTypeBackground" Color="{StaticResource ColorWatchInsightsTasteTypeBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsTasteTypeBorder" Color="{StaticResource ColorWatchInsightsTasteTypeBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsTasteEmotionBackground" Color="{StaticResource ColorWatchInsightsTasteEmotionBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsTasteEmotionBorder" Color="{StaticResource ColorWatchInsightsTasteEmotionBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsTasteSceneBackground" Color="{StaticResource ColorWatchInsightsTasteSceneBackground}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsTasteSceneBorder" Color="{StaticResource ColorWatchInsightsTasteSceneBorder}" />
+    <SolidColorBrush x:Key="BrushWatchInsightsTasteRankBorder" Color="{StaticResource ColorWatchInsightsTasteRankBorder}" />
     <SolidColorBrush x:Key="BrushWatchInsightsQuadrantFamiliar" Color="{StaticResource ColorWatchInsightsQuadrantFamiliar}" />
     <SolidColorBrush x:Key="BrushWatchInsightsQuadrantExplore" Color="{StaticResource ColorWatchInsightsQuadrantExplore}" />
     <SolidColorBrush x:Key="BrushWatchInsightsQuadrantRelax" Color="{StaticResource ColorWatchInsightsQuadrantRelax}" />
@@ -279,6 +315,8 @@
         <GradientStop Color="#06000000" Offset="1" />
     </LinearGradientBrush>
     <SolidColorBrush x:Key="BrushWatchInsightsChromeGlassBorder" Color="#58DCE6F2" />
+    <SolidColorBrush x:Key="BrushHomeLibraryStatusIconBorder" Color="#9A5B3645" />
+    <SolidColorBrush x:Key="BrushHomeLibraryStatusIconForeground" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="BrushGlassBorder" Color="#8AC5CAD3" />
     <LinearGradientBrush x:Key="BrushGlassButton" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#D0444750" Offset="0" />
@@ -305,8 +343,8 @@
         <GradientStop Color="#E9B7758C" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="BrushGlassSelected" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#A57A5363" Offset="0" />
-        <GradientStop Color="#8F6E4757" Offset="1" />
+        <GradientStop Color="#BF8F6576" Offset="0" />
+        <GradientStop Color="#A87E596A" Offset="1" />
     </LinearGradientBrush>
     <DropShadowEffect x:Key="ShadowLargeCard"
                       BlurRadius="45"

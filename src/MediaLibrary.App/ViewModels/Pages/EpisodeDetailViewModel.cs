@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using MediaLibrary.App.Helpers;
 using MediaLibrary.App.Models.Enums;
@@ -21,6 +22,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
 
     private readonly INavigationStateService _navigationStateService;
     private readonly ITvDetailQueryService _tvDetailQueryService;
+    private readonly ITvMetadataHydrationService _metadataHydrationService;
     private readonly ITvSeasonCollectionService _tvSeasonCollectionService;
     private readonly IMovieIdentificationService _movieIdentificationService;
     private readonly ITmdbService _tmdbService;
@@ -30,6 +32,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     private readonly IMediaProbeService _mediaProbeService;
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly IDataRefreshService _dataRefreshService;
+    private readonly ConcurrentDictionary<int, byte> _backgroundRefreshingEpisodeMetadataIds = new();
     private readonly HashSet<int> _lazyProbeCheckedMediaFileIds = [];
     private readonly HashSet<int> _probingMediaFileIds = [];
     private bool _isProbeCompletionRefreshQueued;
@@ -100,6 +103,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     public EpisodeDetailViewModel(
         INavigationStateService navigationStateService,
         ITvDetailQueryService tvDetailQueryService,
+        ITvMetadataHydrationService metadataHydrationService,
         ITvSeasonCollectionService tvSeasonCollectionService,
         IMovieIdentificationService movieIdentificationService,
         ITmdbService tmdbService,
@@ -113,6 +117,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
     {
         _navigationStateService = navigationStateService;
         _tvDetailQueryService = tvDetailQueryService;
+        _metadataHydrationService = metadataHydrationService;
         _tvSeasonCollectionService = tvSeasonCollectionService;
         _movieIdentificationService = movieIdentificationService;
         _tmdbService = tmdbService;
@@ -782,6 +787,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
             IsDetailLoading = false;
             ScheduleDetailLazyProbe(model.EpisodeId, model.Sources, cancellationToken);
             _ = LoadTmdbRatingAsync(model.EpisodeId, cancellationToken);
+            StartEpisodeMetadataRefresh(model.SeriesId, model.EpisodeId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -789,6 +795,59 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         catch (Exception exception)
         {
             Clear($"加载剧集详情失败：{DescribeException(exception)}");
+        }
+    }
+
+    private void StartEpisodeMetadataRefresh(
+        int seriesId,
+        int episodeId)
+    {
+        if (seriesId <= 0 || episodeId <= 0 || !_backgroundRefreshingEpisodeMetadataIds.TryAdd(episodeId, 0))
+        {
+            return;
+        }
+
+        _ = RefreshEpisodeMetadataInBackgroundAsync(seriesId, episodeId);
+    }
+
+    private async Task RefreshEpisodeMetadataInBackgroundAsync(
+        int seriesId,
+        int episodeId)
+    {
+        try
+        {
+            var result = await Task.Run(
+                () => _metadataHydrationService.EnsureHydratedBySeriesIdAsync(
+                    seriesId,
+                    force: true,
+                    cancellationToken: CancellationToken.None));
+            if (result.HasChanges)
+            {
+                _dataRefreshService.NotifyMetadataChanged();
+            }
+
+            if (_navigationStateService.SelectedTvEpisodeId != episodeId)
+            {
+                return;
+            }
+
+            await ActivateAsync(CancellationToken.None);
+            if (_navigationStateService.SelectedTvEpisodeId == episodeId && result.HasErrors)
+            {
+                StatusMessage = result.BuildStatusMessage();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ScanIdentificationDiagnostics.Write(
+                $"event=tv-episode-detail-tmdb-metadata-refresh-failed seriesId={seriesId} episodeId={episodeId} error={ScanIdentificationDiagnostics.FormatValue(DescribeException(exception), 220)}");
+        }
+        finally
+        {
+            _backgroundRefreshingEpisodeMetadataIds.TryRemove(episodeId, out _);
         }
     }
 

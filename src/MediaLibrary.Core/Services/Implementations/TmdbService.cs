@@ -208,7 +208,8 @@ public sealed class TmdbService : ITmdbService
 
     public async Task<MetadataSearchCandidate?> GetMovieDetailsAsync(
         int tmdbId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool forceRefresh = false)
     {
         var options = await GetRequestOptionsAsync(cancellationToken);
         if (!options.HasCredential)
@@ -221,7 +222,7 @@ public sealed class TmdbService : ITmdbService
         var shouldWriteDetailCache = false;
         var externalIdsFailed = false;
         cancellationToken.ThrowIfCancellationRequested();
-        if (TryGetCachedCandidate(DetailCache, detailCacheKey, out var cachedDetails))
+        if (!forceRefresh && TryGetCachedCandidate(DetailCache, detailCacheKey, out var cachedDetails))
         {
             AiPerfDiagnostics.RecordExternalCall("tmdb-detail-cache-hit", TimeSpan.Zero, false);
             detailsCandidate = cachedDetails;
@@ -229,51 +230,29 @@ public sealed class TmdbService : ITmdbService
         else
         {
             AiPerfDiagnostics.RecordExternalCall("tmdb-detail-cache-miss", TimeSpan.Zero, false);
-            var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<MetadataSearchCandidate>(
-                TmdbProvider,
-                TmdbDetailCacheType,
-                detailCacheKey,
-                cancellationToken);
-            if (persistentDetails.IsHit && persistentDetails.Value is not null)
+            if (!forceRefresh)
             {
-                AiPerfDiagnostics.RecordExternalCall("tmdb-detail-persistent-cache-hit", TimeSpan.Zero, false);
-                detailsCandidate = CloneCandidate(persistentDetails.Value);
-                SetCacheValue(DetailCache, detailCacheKey, CloneCandidate(detailsCandidate), DetailCacheTtl, DetailCacheLimit);
+                var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<MetadataSearchCandidate>(
+                    TmdbProvider,
+                    TmdbDetailCacheType,
+                    detailCacheKey,
+                    cancellationToken);
+                if (persistentDetails.IsHit && persistentDetails.Value is not null)
+                {
+                    AiPerfDiagnostics.RecordExternalCall("tmdb-detail-persistent-cache-hit", TimeSpan.Zero, false);
+                    detailsCandidate = CloneCandidate(persistentDetails.Value);
+                    SetCacheValue(DetailCache, detailCacheKey, CloneCandidate(detailsCandidate), DetailCacheTtl, DetailCacheLimit);
+                }
+                else
+                {
+                    detailsCandidate = await LoadMovieDetailsFromTmdbAsync(tmdbId, options, cancellationToken);
+                    shouldWriteDetailCache = true;
+                }
             }
             else
             {
                 AiPerfDiagnostics.RecordExternalCall("tmdb-detail-persistent-cache-miss", TimeSpan.Zero, false);
-                var detailStopwatch = Stopwatch.StartNew();
-                var detailError = false;
-                JsonDocument detailsDocument;
-                try
-                {
-                    using var detailsResponse = await SendGetAsync(
-                        $"movie/{tmdbId}?language={TmdbLanguage}&append_to_response=credits",
-                        options,
-                        "tmdb-detail",
-                        cancellationToken);
-                    EnsureSuccessStatusCode(detailsResponse);
-
-                    await using var detailsStream = await detailsResponse.Content.ReadAsStreamAsync(cancellationToken);
-                    detailsDocument = await JsonDocument.ParseAsync(detailsStream, cancellationToken: cancellationToken);
-                }
-                catch
-                {
-                    detailError = true;
-                    throw;
-                }
-                finally
-                {
-                    detailStopwatch.Stop();
-                    AiPerfDiagnostics.RecordExternalCall("tmdb-detail", detailStopwatch.Elapsed, detailError);
-                }
-
-                using (detailsDocument)
-                {
-                    detailsCandidate = BuildDetailsCandidate(tmdbId, detailsDocument.RootElement);
-                }
-
+                detailsCandidate = await LoadMovieDetailsFromTmdbAsync(tmdbId, options, cancellationToken);
                 shouldWriteDetailCache = true;
             }
         }
@@ -283,7 +262,7 @@ public sealed class TmdbService : ITmdbService
         {
             var externalCacheKey = BuildTmdbExternalIdsCacheKey(tmdbId, options);
             cancellationToken.ThrowIfCancellationRequested();
-            if (TryGetCachedString(ExternalIdsCache, externalCacheKey, out var cachedImdbId))
+            if (!forceRefresh && TryGetCachedString(ExternalIdsCache, externalCacheKey, out var cachedImdbId))
             {
                 AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids-cache-hit", TimeSpan.Zero, false);
                 imdbId = cachedImdbId;
@@ -291,57 +270,40 @@ public sealed class TmdbService : ITmdbService
             else
             {
                 AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids-cache-miss", TimeSpan.Zero, false);
-                var persistentExternalIds = await ExternalMetadataPersistentCache.TryGetAsync<TmdbExternalIdsPersistentPayload>(
-                    TmdbProvider,
-                    TmdbExternalIdsCacheType,
-                    externalCacheKey,
-                    cancellationToken);
-                if (persistentExternalIds.IsHit
-                    && !string.IsNullOrWhiteSpace(persistentExternalIds.Value?.ImdbId))
+                if (!forceRefresh)
                 {
-                    AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids-persistent-cache-hit", TimeSpan.Zero, false);
-                    imdbId = persistentExternalIds.Value.ImdbId;
-                    SetCacheValue(ExternalIdsCache, externalCacheKey, imdbId, ExternalIdsCacheTtl, ExternalIdsCacheLimit);
+                    var persistentExternalIds = await ExternalMetadataPersistentCache.TryGetAsync<TmdbExternalIdsPersistentPayload>(
+                        TmdbProvider,
+                        TmdbExternalIdsCacheType,
+                        externalCacheKey,
+                        cancellationToken);
+                    if (persistentExternalIds.IsHit
+                        && !string.IsNullOrWhiteSpace(persistentExternalIds.Value?.ImdbId))
+                    {
+                        AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids-persistent-cache-hit", TimeSpan.Zero, false);
+                        imdbId = persistentExternalIds.Value.ImdbId;
+                        SetCacheValue(ExternalIdsCache, externalCacheKey, imdbId, ExternalIdsCacheTtl, ExternalIdsCacheLimit);
+                    }
+                    else
+                    {
+                        var externalResult = await LoadMovieExternalImdbIdFromTmdbAsync(
+                            tmdbId,
+                            externalCacheKey,
+                            options,
+                            cancellationToken);
+                        imdbId = externalResult.ImdbId;
+                        externalIdsFailed = externalResult.Failed;
+                    }
                 }
                 else
                 {
-                    AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids-persistent-cache-miss", TimeSpan.Zero, false);
-                    var externalStopwatch = Stopwatch.StartNew();
-                    var externalError = false;
-                    try
-                    {
-                        using var externalIdsResponse = await SendGetAsync($"movie/{tmdbId}/external_ids", options, "tmdb-movie-external-ids", cancellationToken);
-                        externalError = !externalIdsResponse.IsSuccessStatusCode;
-                        externalIdsFailed = externalError;
-                        if (externalIdsResponse.IsSuccessStatusCode)
-                        {
-                            await using var externalStream = await externalIdsResponse.Content.ReadAsStreamAsync(cancellationToken);
-                            using var externalDocument = await JsonDocument.ParseAsync(externalStream, cancellationToken: cancellationToken);
-                            imdbId = GetString(externalDocument.RootElement, "imdb_id");
-                            if (!string.IsNullOrWhiteSpace(imdbId) && !cancellationToken.IsCancellationRequested)
-                            {
-                                SetCacheValue(ExternalIdsCache, externalCacheKey, imdbId, ExternalIdsCacheTtl, ExternalIdsCacheLimit);
-                                await ExternalMetadataPersistentCache.SetAsync(
-                                    TmdbProvider,
-                                    TmdbExternalIdsCacheType,
-                                    externalCacheKey,
-                                    new TmdbExternalIdsPersistentPayload(imdbId),
-                                    ExternalIdsPersistentCacheTtl,
-                                    cancellationToken);
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        externalError = true;
-                        externalIdsFailed = true;
-                        throw;
-                    }
-                    finally
-                    {
-                        externalStopwatch.Stop();
-                        AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids", externalStopwatch.Elapsed, externalError);
-                    }
+                    var externalResult = await LoadMovieExternalImdbIdFromTmdbAsync(
+                        tmdbId,
+                        externalCacheKey,
+                        options,
+                        cancellationToken);
+                    imdbId = externalResult.ImdbId;
+                    externalIdsFailed = externalResult.Failed;
                 }
             }
         }
@@ -363,6 +325,94 @@ public sealed class TmdbService : ITmdbService
         }
 
         return detailsCandidate;
+    }
+
+    private async Task<MetadataSearchCandidate> LoadMovieDetailsFromTmdbAsync(
+        int tmdbId,
+        TmdbRequestOptions options,
+        CancellationToken cancellationToken)
+    {
+        var detailStopwatch = Stopwatch.StartNew();
+        var detailError = false;
+        JsonDocument detailsDocument;
+        try
+        {
+            using var detailsResponse = await SendGetAsync(
+                $"movie/{tmdbId}?language={TmdbLanguage}&append_to_response=credits",
+                options,
+                "tmdb-detail",
+                cancellationToken);
+            EnsureSuccessStatusCode(detailsResponse);
+
+            await using var detailsStream = await detailsResponse.Content.ReadAsStreamAsync(cancellationToken);
+            detailsDocument = await JsonDocument.ParseAsync(detailsStream, cancellationToken: cancellationToken);
+        }
+        catch
+        {
+            detailError = true;
+            throw;
+        }
+        finally
+        {
+            detailStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-detail", detailStopwatch.Elapsed, detailError);
+        }
+
+        using (detailsDocument)
+        {
+            return BuildDetailsCandidate(tmdbId, detailsDocument.RootElement);
+        }
+    }
+
+    private async Task<(string ImdbId, bool Failed)> LoadMovieExternalImdbIdFromTmdbAsync(
+        int tmdbId,
+        string externalCacheKey,
+        TmdbRequestOptions options,
+        CancellationToken cancellationToken)
+    {
+        AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids-persistent-cache-miss", TimeSpan.Zero, false);
+        var externalStopwatch = Stopwatch.StartNew();
+        var externalError = false;
+        try
+        {
+            using var externalIdsResponse = await SendGetAsync(
+                $"movie/{tmdbId}/external_ids",
+                options,
+                "tmdb-movie-external-ids",
+                cancellationToken);
+            externalError = !externalIdsResponse.IsSuccessStatusCode;
+            if (!externalIdsResponse.IsSuccessStatusCode)
+            {
+                return (string.Empty, true);
+            }
+
+            await using var externalStream = await externalIdsResponse.Content.ReadAsStreamAsync(cancellationToken);
+            using var externalDocument = await JsonDocument.ParseAsync(externalStream, cancellationToken: cancellationToken);
+            var imdbId = GetString(externalDocument.RootElement, "imdb_id");
+            if (!string.IsNullOrWhiteSpace(imdbId) && !cancellationToken.IsCancellationRequested)
+            {
+                SetCacheValue(ExternalIdsCache, externalCacheKey, imdbId, ExternalIdsCacheTtl, ExternalIdsCacheLimit);
+                await ExternalMetadataPersistentCache.SetAsync(
+                    TmdbProvider,
+                    TmdbExternalIdsCacheType,
+                    externalCacheKey,
+                    new TmdbExternalIdsPersistentPayload(imdbId),
+                    ExternalIdsPersistentCacheTtl,
+                    cancellationToken);
+            }
+
+            return (imdbId, false);
+        }
+        catch
+        {
+            externalError = true;
+            throw;
+        }
+        finally
+        {
+            externalStopwatch.Stop();
+            AiPerfDiagnostics.RecordExternalCall("tmdb-external-ids", externalStopwatch.Elapsed, externalError);
+        }
     }
 
     public async Task<TmdbMovieDiscoveryPage> SearchDiscoveryMoviesAsync(
@@ -823,7 +873,8 @@ public sealed class TmdbService : ITmdbService
     public async Task<TmdbTvSeriesDetailResult?> GetTvSeriesDetailsAsync(
         int seriesId,
         string language = TmdbLanguage,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool forceRefresh = false)
     {
         if (seriesId <= 0)
         {
@@ -838,23 +889,26 @@ public sealed class TmdbService : ITmdbService
         }
 
         var cacheKey = BuildTmdbTvSeriesDetailCacheKey(seriesId, safeLanguage, options);
-        if (TryGetCacheValue(TvSeriesDetailCache, cacheKey, out var cachedDetails))
+        if (!forceRefresh && TryGetCacheValue(TvSeriesDetailCache, cacheKey, out var cachedDetails))
         {
             AiPerfDiagnostics.RecordExternalCall("tmdb-tv-series-detail-cache-hit", TimeSpan.Zero, false);
             return CloneTvSeriesDetail(cachedDetails);
         }
 
-        var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeriesDetailResult>(
-            TmdbProvider,
-            TmdbDetailCacheType,
-            cacheKey,
-            cancellationToken);
-        if (persistentDetails.IsHit && persistentDetails.Value is not null)
+        if (!forceRefresh)
         {
-            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-series-detail-persistent-cache-hit", TimeSpan.Zero, false);
-            var cloned = CloneTvSeriesDetail(persistentDetails.Value);
-            SetCacheValue(TvSeriesDetailCache, cacheKey, CloneTvSeriesDetail(cloned), DetailCacheTtl, DetailCacheLimit);
-            return cloned;
+            var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeriesDetailResult>(
+                TmdbProvider,
+                TmdbDetailCacheType,
+                cacheKey,
+                cancellationToken);
+            if (persistentDetails.IsHit && persistentDetails.Value is not null)
+            {
+                AiPerfDiagnostics.RecordExternalCall("tmdb-tv-series-detail-persistent-cache-hit", TimeSpan.Zero, false);
+                var cloned = CloneTvSeriesDetail(persistentDetails.Value);
+                SetCacheValue(TvSeriesDetailCache, cacheKey, CloneTvSeriesDetail(cloned), DetailCacheTtl, DetailCacheLimit);
+                return cloned;
+            }
         }
 
         var requestStopwatch = Stopwatch.StartNew();
@@ -911,7 +965,8 @@ public sealed class TmdbService : ITmdbService
         int seriesId,
         int seasonNumber,
         string language = TmdbLanguage,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool forceRefresh = false)
     {
         if (seriesId <= 0 || seasonNumber < 0)
         {
@@ -931,7 +986,7 @@ public sealed class TmdbService : ITmdbService
 
         var cacheKey = BuildTmdbTvSeasonDetailCacheKey(seriesId, seasonNumber, safeLanguage, options);
         var cacheKeyHash = HashCachePart(cacheKey);
-        if (TryGetCacheValue(TvSeasonDetailCache, cacheKey, out var cachedDetails))
+        if (!forceRefresh && TryGetCacheValue(TvSeasonDetailCache, cacheKey, out var cachedDetails))
         {
             AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail-cache-hit", TimeSpan.Zero, false);
             ScanIdentificationDiagnostics.Write(
@@ -939,19 +994,22 @@ public sealed class TmdbService : ITmdbService
             return CloneTvSeasonDetail(cachedDetails);
         }
 
-        var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeasonDetailResult>(
-            TmdbProvider,
-            TmdbDetailCacheType,
-            cacheKey,
-            cancellationToken);
-        if (persistentDetails.IsHit && persistentDetails.Value is not null)
+        if (!forceRefresh)
         {
-            AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail-persistent-cache-hit", TimeSpan.Zero, false);
-            var cloned = CloneTvSeasonDetail(persistentDetails.Value);
-            SetCacheValue(TvSeasonDetailCache, cacheKey, CloneTvSeasonDetail(cloned), DetailCacheTtl, DetailCacheLimit);
-            ScanIdentificationDiagnostics.Write(
-                $"event=tmdb-tv-season-detail-persistent-cache-hit seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} cacheKeyHash={ScanIdentificationDiagnostics.FormatValue(cacheKeyHash)} episodeCount={cloned.Episodes.Count}");
-            return cloned;
+            var persistentDetails = await ExternalMetadataPersistentCache.TryGetAsync<TmdbTvSeasonDetailResult>(
+                TmdbProvider,
+                TmdbDetailCacheType,
+                cacheKey,
+                cancellationToken);
+            if (persistentDetails.IsHit && persistentDetails.Value is not null)
+            {
+                AiPerfDiagnostics.RecordExternalCall("tmdb-tv-season-detail-persistent-cache-hit", TimeSpan.Zero, false);
+                var cloned = CloneTvSeasonDetail(persistentDetails.Value);
+                SetCacheValue(TvSeasonDetailCache, cacheKey, CloneTvSeasonDetail(cloned), DetailCacheTtl, DetailCacheLimit);
+                ScanIdentificationDiagnostics.Write(
+                    $"event=tmdb-tv-season-detail-persistent-cache-hit seriesId={seriesId} seasonNumber={seasonNumber} language={ScanIdentificationDiagnostics.FormatValue(safeLanguage)} cacheKeyHash={ScanIdentificationDiagnostics.FormatValue(cacheKeyHash)} episodeCount={cloned.Episodes.Count}");
+                return cloned;
+            }
         }
 
         ScanIdentificationDiagnostics.Write(

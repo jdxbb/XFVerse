@@ -1849,16 +1849,10 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <StackPanel HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
-                            <Control Width="34"
-                                     Height="34"
-                                     HorizontalAlignment="Center"
-                                     Template="{StaticResource LoadingSpinnerTemplate}" />
-                            <TextBlock Margin="0,12,0,0"
-                                       HorizontalAlignment="Center"
-                                       Text="加载中"
-                                       Style="{StaticResource InlineLoadingStyle}" />
+                        <StackPanel Style="{StaticResource PageLoadingHostStyle}">
+                            <Control Style="{StaticResource PageLoadingSpinnerStyle}" />
+                            <TextBlock Text="加载中"
+                                       Style="{StaticResource PageLoadingTextStyle}" />
                             <TextBlock Text="正在加载媒体库..."
                                        Margin="0,12,0,0"
                                        Visibility="Collapsed"
@@ -2161,16 +2155,10 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <StackPanel HorizontalAlignment="Center"
-                                        VerticalAlignment="Center">
-                                <Control Width="34"
-                                         Height="34"
-                                         HorizontalAlignment="Center"
-                                         Template="{StaticResource LoadingSpinnerTemplate}" />
-                                <TextBlock Margin="0,12,0,0"
-                                           HorizontalAlignment="Center"
-                                           Text="正在加载已移出媒体库项目..."
-                                           Style="{StaticResource InlineLoadingStyle}" />
+                            <StackPanel Style="{StaticResource WidgetLoadingHostStyle}">
+                                <Control Style="{StaticResource WidgetLoadingSpinnerStyle}" />
+                                <TextBlock Text="正在加载已移出媒体库项目..."
+                                           Style="{StaticResource WidgetLoadingTextStyle}" />
                             </StackPanel>
                         </Border>
                         <Border HorizontalAlignment="Stretch"

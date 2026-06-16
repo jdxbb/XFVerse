@@ -145,6 +145,11 @@ public static class PosterPaletteBackdropBehavior
             return;
         }
 
+        if (PosterCachedBackdropBehavior.GetPaletteOverride(target).HasValue)
+        {
+            return;
+        }
+
         var applyVersion = (int)image.GetValue(ApplyVersionProperty) + 1;
         image.SetValue(ApplyVersionProperty, applyVersion);
         var hasSourceKey = TryGetRequestedSourceKey(image, out var sourceKey);

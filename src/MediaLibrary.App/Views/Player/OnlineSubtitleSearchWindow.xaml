@@ -541,14 +541,9 @@
                                     </Style.Triggers>
                                 </Style>
                             </StackPanel.Style>
-                            <Control Width="34"
-                                     Height="34"
-                                     Margin="0,0,0,10"
-                                     HorizontalAlignment="Center"
-                                     Template="{StaticResource LoadingSpinnerTemplate}" />
+                            <Control Style="{StaticResource DialogLoadingSpinnerStyle}" />
                             <TextBlock Text="正在搜索在线字幕..."
-                                       TextAlignment="Center"
-                                       Style="{StaticResource BodyMutedTextStyle}" />
+                                       Style="{StaticResource DialogLoadingTextStyle}" />
                         </StackPanel>
 
                         <TextBlock HorizontalAlignment="Center"

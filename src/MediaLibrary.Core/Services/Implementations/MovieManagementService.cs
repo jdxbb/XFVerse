@@ -253,6 +253,22 @@ public sealed class MovieManagementService : IMovieManagementService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> TouchMovieUpdatedAtAsync(
+        int movieId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = new AppDbContext(AppDbContextOptionsFactory.Create());
+        var movie = await dbContext.Movies.FirstOrDefaultAsync(x => x.Id == movieId, cancellationToken);
+        if (movie is null)
+        {
+            return false;
+        }
+
+        movie.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task RemoveFromLibraryAsync(
         int movieId,
         CancellationToken cancellationToken = default)

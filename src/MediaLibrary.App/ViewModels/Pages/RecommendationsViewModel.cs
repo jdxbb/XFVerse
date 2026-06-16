@@ -39,6 +39,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private const string WatchFilterUnwatched = "未看";
     private readonly IRecommendationService _recommendationService;
     private readonly IUserCollectionService _userCollectionService;
+    private readonly IMovieDetailQueryService _movieDetailQueryService;
     private readonly INavigationStateService _navigationStateService;
     private readonly IDataRefreshService _dataRefreshService;
     private readonly IRecommendationPreferenceService _recommendationPreferenceService;
@@ -66,6 +67,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     public RecommendationsViewModel(
         IRecommendationService recommendationService,
         IUserCollectionService userCollectionService,
+        IMovieDetailQueryService movieDetailQueryService,
         INavigationStateService navigationStateService,
         IDataRefreshService dataRefreshService,
         IRecommendationPreferenceService recommendationPreferenceService)
@@ -73,6 +75,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     {
         _recommendationService = recommendationService;
         _userCollectionService = userCollectionService;
+        _movieDetailQueryService = movieDetailQueryService;
         _navigationStateService = navigationStateService;
         _dataRefreshService = dataRefreshService;
         _recommendationPreferenceService = recommendationPreferenceService;
@@ -1390,6 +1393,25 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             }
 
             var collectionItem = collectionItems.FirstOrDefault(x => IsSameRecommendation(x, item));
+            if (collectionItem is not null)
+            {
+                item.ApplyCollectionMetadata(collectionItem);
+            }
+
+            if (item.MovieId > 0)
+            {
+                var detail = await _movieDetailQueryService.GetMovieDetailAsync(item.MovieId, cancellationToken);
+                if (!IsCurrentLoad(requestVersion))
+                {
+                    return;
+                }
+
+                if (detail is not null)
+                {
+                    item.ApplyMovieDetailMetadata(detail);
+                }
+            }
+
             if (collectionItem is null)
             {
                 if (!item.IsInLibrary)

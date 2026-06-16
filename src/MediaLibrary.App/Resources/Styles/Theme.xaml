@@ -57,6 +57,23 @@
         <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
 
+    <DropShadowEffect x:Key="WatchInsightsChromeTextEffect"
+                      x:Shared="False"
+                      BlurRadius="2.35"
+                      Color="{DynamicResource ColorWatchInsightsChromeStroke}"
+                      Direction="270"
+                      Opacity="1"
+                      RenderingBias="Performance"
+                      ShadowDepth="0" />
+    <DropShadowEffect x:Key="WatchInsightsTabChromeTextEffect"
+                      x:Shared="False"
+                      BlurRadius="1.85"
+                      Color="{DynamicResource ColorWatchInsightsTabChromeStroke}"
+                      Direction="270"
+                      Opacity="{DynamicResource WatchInsightsTabChromeTextEffectOpacity}"
+                      RenderingBias="Performance"
+                      ShadowDepth="0" />
+
     <Style x:Key="SidebarFooterCardStyle" TargetType="Border">
         <Setter Property="Background" Value="#223047" />
         <Setter Property="CornerRadius" Value="{StaticResource RadiusCompactCard}" />

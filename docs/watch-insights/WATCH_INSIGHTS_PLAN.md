@@ -434,7 +434,7 @@ Scope completed:
 - Updated `WatchProfileService.PersonaTypes`, persona definitions, selection rules, invalid-type fallback, and profile prompt version `wi-profile-persona-23-v6`.
 - Invalid AI persona type now falls back to `类型探索家`; fallback title / description are type-explorer compatible.
 - Added poster resource folders for the four new formal keys using the current `1男.png` / `1女.png` placeholders.
-- Kept legacy `eclectic_omnivore` resources in place to avoid deleting possible user assets, but it is no longer a formal persona key.
+- Confirmed `eclectic_omnivore` is the redundant legacy folder; the current official poster set is 23 persona folders / 46 gendered poster PNGs, excluding root placeholders and `Frames`.
 - Added legacy UI fallback from `童心奇想家` to `animation_narrative_fan`; `童心奇想家` is not a legal persona type.
 
 Out of scope kept:
@@ -483,6 +483,8 @@ Scope completed:
 - Added four color frame resources under `Assets/WatchPersonas/Frames/`.
 - Persona card frame selection now follows the user-provided matching rule instead of always using the single default frame.
 - Existing default frame remains as fallback.
+- Watch Insights loading backdrop now uses the permanent persona palette resource through a cache-only preflight before page activation, so it no longer depends on runtime poster decoding for the loading color.
+- Watch Insights profile and statistics visuals are now split into four and five deferred module batches, allowing the loading shell to render before heavy cards, charts, bubbles, and triptych visuals are materialized.
 
 Frame matching:
 - Blue: 1, 2, 3, 7, 8, 9, 12, 13, 15, 22.
@@ -495,6 +497,235 @@ Out of scope kept:
 - No recommendation logic change.
 - No database field or migration.
 - No runtime image cache.
+
+### WI-8.3: Persona Lead And Painted Label Refinement
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Increased the AI persona lead limit from 33 to 40 characters in both the main prompt and the type-explorer repair prompt.
+- Kept local persona lead normalization aligned to the same 40-character ceiling and bumped the profile prompt version so stale profile cache is not treated as current.
+- Enlarged the lead corner brackets and moved the opening bracket upward and the closing bracket downward.
+- Continued positioning both brackets from the actual first and last visible characters, with separate single-line and two-line hosts for collapsed and expanded navigation layouts.
+- Added a dynamic painted background behind the persona label text.
+- The painted background selects the highest-chroma color from the current fixed persona poster palette, then creates a restrained pale light-theme variant or a deeper dark-theme variant.
+- The background follows the measured text width with 26-pixel side padding and uses five overlapping, round-ended, irregular strokes with a subtle right-up brush direction.
+
+Out of scope kept:
+- No persona taxonomy, recommendation logic, database field, migration, database update, commit, or push.
+- No bitmap brush asset or runtime poster decoding was added.
+
+### WI-8.4: Quadrant, Calendar, And Preference Wave Refinement
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Expanded the taste-quadrant explanation area toward the center while keeping its left edge fixed.
+- Moved the full quadrant coordinate view upward and increased the quadrant AI explanation target from 110-170 to 150-220 Chinese characters across 3-4 sentences.
+- Bumped the Watch Profile prompt version so refreshed profiles use the longer quadrant explanation contract.
+- Shifted the calendar navigation row right, then shifted its legend an additional amount to the right.
+- Shifted the three calendar metric cards slightly right and upward without moving the calendar grid again.
+- Added an alternating full-height preference-graph wave that starts from the left and right in turn approximately every eight seconds.
+- The wave crosses the full graph in 4.2 seconds, gradually fades, and applies a stronger directional force than the pointer ripple while remaining inside the existing physics loop.
+- Rounded the pointer ripple by reducing its final horizontal-to-vertical expansion ratio.
+
+Out of scope kept:
+- No statistics data semantics, preference tag generation, database field, migration, database update, commit, or push.
+- No distant or repeating concentric ripple field was added.
+
+### WI-8.5: Flat Watch-vs-Like Focus Cards
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Replaced the watch-versus-like pseudo-perspective presentation with three ordinary flat WPF cards.
+- Removed card skew transforms, folded shade overlays, and all hover-time angle changes.
+- Kept a fixed 24-pixel overlap between adjacent cards to express stacking without perspective.
+- Made the middle `经常喜爱` card the default primary card with ZIndex 3, 1.04 scale, full opacity, stronger shadow, and a 10-pixel upward offset.
+- Made the default side cards use 0.94 scale, 0.68 opacity, weaker shadows, and an 8-pixel downward offset.
+- Added explicit left-primary and right-primary stacking orders, with the middle card remaining between the primary and far card.
+- Animated scale, opacity, shadow opacity, and translation over 220 milliseconds with restrained cubic easing.
+- Restored the middle card as primary when the pointer leaves the complete three-card area.
+
+Out of scope kept:
+- No watch/like/want ranking data, conclusion prompt, database field, migration, database update, commit, or push.
+- No rotation, perspective camera, trapezoid, skew, or simulated perspective effect remains in this module.
+
+### WI-8.6: Taste Combination Graph And Top5 Refinement
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Removed the lower-left taste graph legend.
+- Normalized every visible graph link against the current visible minimum and maximum occurrence counts.
+- Set inactive link opacity to `0.18 + 0.45 * normalizedCount` and thickness to `2 * (1 + 1.5 * sqrt(normalizedCount))`, clamped to 2-5 pixels.
+- Set links connected to the hovered or selected node to 0.9 opacity.
+- Added click-to-select and click-again-to-clear behavior, with hover temporarily taking focus over the selected node.
+- Replaced graph node cards with shadow-free 74-pixel circular labels containing only the tag text and moved the count into a tooltip.
+- Increased vertical spacing between graph labels from 10 to 20 pixels while preserving each column center.
+- Added theme-aware mist-blue type, rose-pink emotion, and mint-green scene label resources with slightly darker borders.
+- Changed the right ranking to Top5, inserted explicit `x` separators between rounded-rectangle labels, and shortened the occurrence text to `x次`.
+
+Out of scope kept:
+- No taste-combination calculation, statistics persistence, database field, migration, database update, commit, or push.
+
+### WI-8.7: Quadrant Calendar And Local Preference Waves
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Raised the taste-quadrant axis title/body group, with an extra upward offset while the sidebar is expanded.
+- Moved the taste-quadrant coordinate canvas further upward and aligned the `A 标签 x B 标签` line to the body text readable width.
+- Shortened the quadrant prompt target to 130-190 Chinese characters across 2-3 sentences.
+- Bumped the Watch Profile prompt version to `wi-profile-persona-23-parallel-v17-quadrant-brief`.
+- Centered the viewing-calendar previous/month/next navigation over the calendar grid and widened the spacing between the three controls.
+- Moved the viewing-calendar heat legend below the grid and centered it on the calendar width, with the return-to-current-month action retained on that row.
+- Raised the three calendar metric cards as a group.
+- Replaced the full-height alternating preference-bubble sweep with randomized local wave emitters that expand from different zones and curve more strongly near edges/corners.
+
+Out of scope kept:
+- No statistics calculation, watch-history semantics, recommendation behavior, database field, migration, database update, commit, or push.
+
+### WI-8.8: Watch-vs-Like Triptych Size And Shadow Safe Area
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Enlarged the three flat watch-vs-like cards from 320x252 to 338x264 and expanded the triptych stage from 280/960 to 326/1000.
+- Reduced the default adjacent overlap from 24px to 18px and pushed both side cards slightly outward so the primary middle card covers the right card less in the default state.
+- Kept the primary middle card as the default focus, but lowered the default lift from 10px to 6px and lowered side/intermediate/far card animation targets so the larger cards grow downward.
+- Enlarged only the `经常想看` star badge viewbox from 30px to 33px while keeping the badge host center unchanged.
+- Reused the previous shadow-safe layout approach for this local triptych by giving the stage real vertical drawing room, disabling stage/Viewbox clipping, and keeping the cached-shadow card path unchanged.
+- Reduced the module minimum height from 548px to 532px so the conclusion block sits slightly higher after the larger card stage.
+
+Out of scope kept:
+- No watch/like/want ranking data, profile conclusion text, AI prompt, statistics calculation, database field, migration, database update, commit, or push.
+
+### WI-8.9: Taste Combination Graph Layout And Bezier Links
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Increased the taste-combination graph canvas height and vertical node spacing so the left-side tag rows breathe more.
+- Centered the `类型` / `情绪` / `场景` column labels on their node columns and removed the subtitle period.
+- Switched graph labels and Top5 chips to the same type / emotion / scene color resources used by the preference-bubble graph.
+- Replaced straight `Line` links with cubic Bezier `Path` links that start at source node right edges and end at target node left edges, with restrained horizontal control points.
+- Added theme-aware gradient link colors from source-kind border color to target-kind border color.
+- Lowered the maximum inactive link opacity and added a lightweight selected-link glow layer without reintroducing live drop-shadow effects.
+- Expanded selected-node highlighting so a selected tag highlights both pair links for any Top10 `A x B x C` combination containing that tag.
+- Added richer node tooltips: first line remains `标签：次数`, followed by up to three highest-count combinations in `组合：次数` format, with a faster graph-local tooltip delay.
+- Reworked the right Top5 panel so it sizes to content, is vertically centered against the graph, has larger row gaps, shifts combination/progress content right, and vertically centers `x次` on the progress bar row.
+
+Out of scope kept:
+- No taste-combination calculation, statistics query, profile AI, recommendation behavior, database field, migration, database update, commit, or push.
+
+### WI-8.10: Chrome Text Outline And Overview Delta Arrows
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Split Watch Insights tab-highlight text outline into a dedicated `WatchInsightsTabChromeTextEffect`.
+- Light theme tab-highlight outline now uses black; dark theme tab-highlight outline now uses white.
+- Increased the shared Watch Insights chrome text outline blur used by the collapsed status subtitle and the tab-right status text, preserving light-theme white outline and dark-theme black outline.
+- Changed zero month-over-month overview delta text to `较上月无变化`.
+- Added up/down arrow text immediately to the right of the current metric value when the month-over-month delta is non-zero.
+- Applied the arrow behavior to the four overview status cards, total watch time, and watch-day count.
+
+Out of scope kept:
+- No statistics calculation, watch-history semantics, profile AI, recommendation behavior, database field, migration, database update, commit, or push.
+
+### WI-8.11: Persona Lead Brackets And Acrylic Paint Label
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Kept persona lead brackets as inline `Run` text before and after the lead copy, so the lead reads as one complete sentence.
+- Changed the lead brackets to inherit the lead text font, size, and weight while using the same muted quote color/opacity as the taste-summary quotation marks.
+- Increased the persona label render safe area so the paint layer has room above and below the text.
+- Removed the old persona-label projected text shadow path; this pass changes only the paint backdrop, not the label text rendering.
+- Replaced separated highlight-style strokes with an opaque acrylic/impasto-like paint body and four connected back-and-forth brush passes.
+- Removed the old edge-stroke path that could read as a thin line inside the painted label.
+- Added clipped thick/dry-brush texture marks at a restrained right-up to left-down 30-degree angle.
+
+Out of scope kept:
+- No persona text, AI prompt, profile data, statistics data, recommendation behavior, database field, migration, database update, commit, or push.
+
+### WI-8.12: Watch DNA Icon And Overflow Height Polish
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Replaced the text placeholder icons in the Watch DNA cards with pure vector icons: movie ticket, heart, sofa, route branching, waveform, and compass.
+- Kept the icon slot size and position unchanged by rendering each icon inside the existing 48x48 icon area.
+- Removed the icon slot background so the icons read as standalone no-background line icons.
+- Matched type, emotion, scene, and narrative icon colors to their corresponding chip colors; added dedicated cyan-blue and purple icon brushes for rhythm and exploration.
+- Added a page-level Watch DNA overflow state that turns on when any DNA description ScrollViewer needs internal scrolling.
+- When any DNA text needs scrolling, all six DNA cards become slightly taller.
+- In non-progress DNA cards, the chip row and description move down together; in progress DNA cards, only the description moves down while the progress bar and labels stay fixed.
+
+Out of scope kept:
+- No DNA text generation, AI prompt, profile data, statistics data, recommendation behavior, database field, migration, database update, commit, or push.
+
+### WI-8.13: Quadrant Rhythm Calendar Waves And Watch-Like Polish
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Split the taste-quadrant `A x B` title into separate X-axis label, separator, and Y-axis label so each axis label can use its corresponding quadrant color.
+- Moved the taste-quadrant coordinate canvas slightly left.
+- Raised the taste-quadrant title/body block a little more when the sidebar is expanded.
+- Updated the viewing-time spline chart to use height-based colors: blue at the x-axis, purple at low values, pink-orange at middle values, and red at high values.
+- Applied the same color ramp to the viewing-time chart area fill while preserving the previous top-to-bottom opacity falloff.
+- Added a dedicated deeper blue calendar heat color for `<30min` days and its legend swatch.
+- Centered the previous/current/next calendar navigation group against the calendar grid.
+- Changed preference-bubble wave emitters to start from random positions on the content-area edge only, with longer duration, farther reach, and slower visual fade.
+- Raised the Watch-vs-Like triptych stage and conclusion panel slightly, and moved the wanted star badge up by 0.5px.
+
+Out of scope kept:
+- No profile/statistics calculation, AI prompt, recommendation behavior, database field, migration, database update, commit, or push.
+
+### WI-8.14: Tab Gray Outline And Delta Arrow Placement Correction
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Changed the selected/hovered Watch Insights tab text outline to light gray in the light theme and dark gray in the dark theme.
+- Kept the separate status-subtitle and tab-right status text outline resource unchanged.
+- Moved non-zero overview delta arrows from the current metric value row to the right side of the `compared with last month` delta text row.
+- Applied the arrow placement correction to the four overview status cards, total watch time, and watch-day count.
+
+Out of scope kept:
+- No statistics calculation, month-over-month delta semantics, AI prompt, recommendation behavior, database field, migration, database update, commit, or push.
+
+### WI-8.15: Taste Combination Top5 And Triple-Only Graph Polish
+
+Status:
+- Completed in this pass.
+
+Scope completed:
+- Shifted the taste-combination Top5 card left and slightly downward.
+- Added a taste-combination-only rank badge style with a theme-specific border darker than the badge fill.
+- Removed the Top5 progress bars so each row is rank, combination, and occurrence count aligned on one vertical center line.
+- Moved the occurrence count column left by reducing the right column width and left-aligning the count text.
+- Changed the selected-link glow from a hard wide path to a blurred, lower-opacity glow layer.
+- Rebuilt graph node selection from complete type x emotion x scene combinations only, with at most four visible labels per column.
+- Changed graph link generation to use only visible complete three-category combinations, not the old aggregate pair-edge list.
+- Kept the four-slot column height stable while distributing fewer than four labels evenly across the same vertical range.
+
+Out of scope kept:
+- No taste-combination source statistics, AI prompt, recommendation behavior, database field, migration, database update, commit, or push.
 
 ## Stage Acceptance Criteria
 

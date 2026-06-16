@@ -662,6 +662,18 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
 
         try
         {
+            var persistedRatings = await LoadPersistedSeriesRatingsAsync(season.SeriesId, cancellationToken);
+            var persistedImdbRating = persistedRatings.FirstOrDefault(
+                rating => string.Equals(rating.SourceName, "IMDb", StringComparison.OrdinalIgnoreCase));
+            if (persistedImdbRating is { ScoreValue: > 0 })
+            {
+                return FormatRating(
+                    "IMDb 剧集评分",
+                    persistedImdbRating.ScoreValue,
+                    persistedImdbRating.ScoreScale,
+                    persistedImdbRating.VoteCount);
+            }
+
             return await BuildSeriesImdbRatingDisplayAsync(season.SeriesTmdbId, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -988,7 +1000,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         return await dbContext.TvSeasons
             .AsNoTracking()
             .Where(x => x.Id == seasonId)
-            .Select(x => new SeasonRatingKey(x.Series!.TmdbSeriesId, x.SeasonNumber))
+            .Select(x => new SeasonRatingKey(x.TvSeriesId, x.Series!.TmdbSeriesId, x.SeasonNumber))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -1145,7 +1157,7 @@ public sealed class TvDetailQueryService : ITvDetailQueryService
         public ProtocolType ProtocolType { get; set; }
     }
 
-    private sealed record SeasonRatingKey(int? SeriesTmdbId, int SeasonNumber);
+    private sealed record SeasonRatingKey(int SeriesId, int? SeriesTmdbId, int SeasonNumber);
 
     private sealed record EpisodeRatingKey(int? SeriesTmdbId, int SeasonNumber, int EpisodeNumber);
 }

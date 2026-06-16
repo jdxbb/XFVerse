@@ -176,8 +176,13 @@ public sealed class LibraryMovieListItem
         LibraryMediaItemKind.Season => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集",
         LibraryMediaItemKind.Other when IsTvLikeUnidentifiedItem => $"已看 {WatchedEpisodeCount} / {TotalEpisodeCount} 集",
         LibraryMediaItemKind.Other when IsTvLikeUnidentifiedSeries => $"已看 {WatchedSeasonCount} / {SeasonCount} 季",
-        _ => $"{ProgressValue:0}%"
+        _ => FormatProgressPercent(ProgressValue)
     };
+
+    private static string FormatProgressPercent(double value)
+    {
+        return value == 0d ? "0%" : $"{value:0.0}%";
+    }
 
     public DateTime UpdatedAt { get; set; }
 

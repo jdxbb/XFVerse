@@ -1,5 +1,61 @@
 # 影片发现 Known Issues
 
+## 2026-06-16 Ranking Medal Size And Number Alignment Polish
+
+Blocker:
+
+- None identified by static patch review.
+
+Deferred:
+
+- Verify the normal ranking medal is visually half the previous size and sits closer to the poster top-left corner.
+- Verify the first-place hero medal is visually half the previous size while remaining proportionally larger than normal medals.
+- Verify rank digits use the modern sans-serif appearance and no longer look like the old serif digits.
+- Verify rank digits are centered on the medal face before the overall medal is positioned on the poster.
+- Verify one-digit and multi-digit ranks remain readable on gold, silver, bronze, and default medal images.
+
+Noise:
+
+- The medal PNGs may include transparent padding; final perceived centering should be checked in the running WPF window.
+- Existing unrelated workspace edits remain preserved.
+
+## 2026-06-16 Ranking And AI Tag Overflow Parity
+
+Blocker:
+
+- None identified by solution build.
+
+Deferred:
+
+- Verify Movie and TV ranking hero rows keep the date visible before the poster-style tag groups.
+- Verify Movie and TV normal ranking rows keep the date visible before the poster-style tag groups.
+- Verify long type, emotion, and scene tags truncate with the same `..` overflow behavior used by media-library poster cards.
+- Verify ranking tag separator color matches the Discovery poster-card separator in light and dark themes.
+- Verify AI recommendation cards truncate type, emotion, and scene tag groups like media-library poster cards after recommendation metadata is hydrated.
+
+Noise:
+
+- This change is display-only for ranking and AI recommendation tags; ranking order and recommendation generation remain unchanged.
+- Existing unrelated workspace edits remain preserved.
+
+## 2026-06-16 Ranking Medal Badge Follow-up
+
+Blocker:
+
+- None identified by solution build.
+
+Deferred:
+
+- Verify gold, silver, bronze, and default medal assets load on Movie and TV ranking posters.
+- Verify normal and hero ranking posters use consistent top-left medal placement relative to the poster.
+- Verify the number is centered consistently on the medal face for one-digit and multi-digit rankings.
+- Verify rank-specific number colors, translucent outline, shadow, and highlight remain readable over each medal asset.
+
+Noise:
+
+- Medal digits are rendered by `RankMedalBadge` at runtime rather than baked into the PNG assets.
+- Existing unrelated workspace edits remain preserved.
+
 ## 2026-06-06 7.4e Discovery 回归收口
 
 Blocker:
@@ -896,3 +952,18 @@ Deferred:
 Noise:
 
 - Scrollbar transforms are render-only and do not participate in poster column calculation. The first build attempt was temporary-volume noise; the retry passed after scoped cleanup.
+
+## 2026-06-16 Detail Task Recent-sort Touch Follow-up
+
+Blocker:
+
+- None confirmed by build.
+
+Deferred:
+
+- Manually verify Movie Detail lazy probe and AI tag generation both move the touched movie forward immediately after returning to Media Library under recent-update descending sort.
+- Manually verify recognized no-source movie rows also move forward when their stored movie metadata or tags update.
+
+Noise:
+
+- External no-source items only move forward when they already have a collection row to touch; pure transient search/recommendation detail views remain outside the media-library sort list.

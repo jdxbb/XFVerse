@@ -183,7 +183,9 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private int? _pendingWatchHistoryMediaFileId;
     private int _pendingWatchHistoryInitialPositionSeconds;
     private bool _pendingWatchHistoryStartQueued;
-    private DateTime _historyStartedAt;
+    private int _historyWatchedSeconds;
+    private int _lastTrackedPlayPositionSeconds;
+    private int _lastPlaybackHistoryNotifiedPositionSeconds;
     private bool _isUpdatingPosition;
     private bool _isStopping;
     private bool _isPlaybackRunning;
@@ -237,6 +239,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     private bool _hasPendingPlayerPreferencesSave;
     private string _pendingPlayerPreferencesSaveReason = "preferences";
     private CancellationTokenSource? _resumeMessageClearCts;
+    private double? _resumeMessageClearBaselineSeconds;
     private int _temporaryOnlineSubtitleId;
 
     public PlayerWindowViewModel(
@@ -979,7 +982,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             ResolveSourceResumePosition(source));
         MpvPlaybackDiagnostics.Write($"mpv-watch-history-start mediaFileId={source.MediaFileId}");
         _activeMediaFileId = source.MediaFileId;
-        _historyStartedAt = DateTime.UtcNow;
+        ResetWatchHistoryProgressTracking(ResolveSourceResumePosition(source));
         SetMainPlaybackUiState(shouldResumePlaying ? MainPlaybackUiState.Playing : MainPlaybackUiState.Paused, "watch-history-started");
         SetPlaybackState(shouldResumePlaying);
         _timer.Start();
@@ -1088,7 +1091,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             _watchHistoryId = watchHistoryId;
             MpvPlaybackDiagnostics.Write($"mpv-watch-history-start mediaFileId={mediaFileId}");
             _activeMediaFileId = mediaFileId;
-            _historyStartedAt = DateTime.UtcNow;
+            ResetWatchHistoryProgressTracking(initialPositionSeconds);
             SetMainPlaybackUiState(MainPlaybackUiState.Playing, "watch-history-ready");
             _timer.Start();
             StopCommand.RaiseCanExecuteChanged();
@@ -2610,7 +2613,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
 
             if (resumePosition > 5 && updateResumeMessage)
             {
-                SetResumeMessage($"\u5df2\u4ece {FormatTime(resumePosition)} \u7ee7\u7eed\u64ad\u653e");
+                SetResumeMessage($"\u5df2\u4ece {FormatTime(resumePosition)} \u7ee7\u7eed\u64ad\u653e", resumePosition);
             }
             else if (updateResumeMessage)
             {
@@ -3010,11 +3013,6 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         DispatchPlaybackState(engineIsPlaying);
         if (engineIsPlaying)
         {
-            if (!awaitingInitialProgress)
-            {
-                ScheduleResumeMessageClearAfterPlaybackStarted();
-            }
-
             _ = StartPendingWatchHistoryAfterPlaybackReadyAsync();
         }
 
@@ -3420,6 +3418,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         _isUpdatingPosition = false;
         OnPropertyChanged(nameof(PositionText));
         ReleaseStartupOverlayOnInitialProgress(playbackSeconds);
+        TryScheduleResumeMessageClearAfterPlaybackProgress(playbackSeconds);
         UpdateSeekRecoveryProgress(playbackSeconds);
         if (HasPendingSubtitleSwitch() && !_pendingSubtitleSwitchTimePositionLogged)
         {
@@ -3457,18 +3456,10 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         {
             var isPlaying = IsPlaybackEnginePlaying();
             SetMainPlaybackUiState(isPlaying ? MainPlaybackUiState.Playing : MainPlaybackUiState.Paused, "initial-playback-progress");
-            if (isPlaying)
-            {
-                ScheduleResumeMessageClearAfterPlaybackStarted();
-            }
         }
         else
         {
             RefreshBufferingOverlayProjection("initial-playback-progress");
-            if (IsPlaybackEnginePlaying())
-            {
-                ScheduleResumeMessageClearAfterPlaybackStarted();
-            }
         }
     }
 
@@ -4147,6 +4138,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         PositionSeconds = playbackSeconds;
         _isUpdatingPosition = false;
         OnPropertyChanged(nameof(PositionText));
+        TryScheduleResumeMessageClearAfterPlaybackProgress(playbackSeconds);
         UpdateSeekRecoveryProgress(playbackSeconds);
 
         if (engine.Duration > TimeSpan.Zero)
@@ -4167,8 +4159,8 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var watched = (int)Math.Max(0, (DateTime.UtcNow - _historyStartedAt).TotalSeconds);
         var normalizedPosition = Math.Max(0, positionSeconds);
+        var watched = UpdateTrackedDurationWatchedSeconds(normalizedPosition);
         var mediaDurationSeconds = GetCurrentMediaDurationSeconds();
         if (normalizedPosition <= 0 || watched < 3)
         {
@@ -4216,12 +4208,38 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
                 mediaDurationSeconds);
             UpdateActiveSourceProgressSnapshot(normalizedPosition);
             NotifyAutoWatchedChanged(autoWatchedChanged);
+            NotifyPlaybackHistoryChanged(normalizedPosition, watched);
             MpvPlaybackDiagnostics.Write($"mpv-watch-history-save mediaFileId={_activeMediaFileId ?? SelectedSource?.MediaFileId ?? 0} positionSeconds={normalizedPosition} completed={isCompleted.ToString().ToLowerInvariant()}");
         }
         catch
         {
             // Saving progress is best-effort; playback window shutdown must not crash the app.
         }
+    }
+
+    private void ResetWatchHistoryProgressTracking(int initialPositionSeconds)
+    {
+        _historyWatchedSeconds = 0;
+        _lastTrackedPlayPositionSeconds = Math.Max(0, initialPositionSeconds);
+        _lastPlaybackHistoryNotifiedPositionSeconds = 0;
+    }
+
+    private void ResetWatchHistoryProgressBaseline(int positionSeconds)
+    {
+        _lastTrackedPlayPositionSeconds = Math.Max(0, positionSeconds);
+    }
+
+    private int UpdateTrackedDurationWatchedSeconds(int positionSeconds)
+    {
+        var normalizedPosition = Math.Max(0, positionSeconds);
+        var delta = normalizedPosition - _lastTrackedPlayPositionSeconds;
+        if (delta > 0)
+        {
+            _historyWatchedSeconds += delta;
+        }
+
+        _lastTrackedPlayPositionSeconds = normalizedPosition;
+        return _historyWatchedSeconds;
     }
 
     private async Task PersistProgressSnapshotWithTimeoutAsync(int positionSeconds, bool isCompleted, bool discardInvalid)
@@ -4262,6 +4280,19 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         }
 
         _dataRefreshService.NotifyCollectionChanged();
+    }
+
+    private void NotifyPlaybackHistoryChanged(int positionSeconds, int watchedSeconds)
+    {
+        if (positionSeconds <= 0
+            || watchedSeconds < 3
+            || positionSeconds == _lastPlaybackHistoryNotifiedPositionSeconds)
+        {
+            return;
+        }
+
+        _lastPlaybackHistoryNotifiedPositionSeconds = positionSeconds;
+        _dataRefreshService.NotifyPlaybackChanged();
     }
 
     private void UpdateActiveSourceProgressSnapshot(int positionSeconds)
@@ -4699,6 +4730,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        ResetWatchHistoryProgressBaseline((int)Math.Round(Math.Max(0d, targetSeconds)));
         if (_isPlaybackRunning || IsPlaybackEnginePlaying())
         {
             BeginSeekRecovery(targetSeconds, startedFromSeconds);
@@ -4904,16 +4936,17 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         SetOperationNotice(kind, text, reason, duration);
     }
 
-    private void SetResumeMessage(string text)
+    private void SetResumeMessage(string text, int? clearBaselineSeconds = null)
     {
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is not null && !dispatcher.CheckAccess())
         {
-            _ = dispatcher.InvokeAsync(() => SetResumeMessage(text));
+            _ = dispatcher.InvokeAsync(() => SetResumeMessage(text, clearBaselineSeconds));
             return;
         }
 
         CancelResumeMessageClear();
+        _resumeMessageClearBaselineSeconds = Math.Max(0, clearBaselineSeconds ?? (int)Math.Max(0d, PositionSeconds));
         ResumeMessage = text;
     }
 
@@ -4927,7 +4960,34 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
         }
 
         CancelResumeMessageClear();
+        _resumeMessageClearBaselineSeconds = null;
         ResumeMessage = string.Empty;
+    }
+
+    private void TryScheduleResumeMessageClearAfterPlaybackProgress(double playbackSeconds)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(() => TryScheduleResumeMessageClearAfterPlaybackProgress(playbackSeconds));
+            return;
+        }
+
+        if (_disposed
+            || string.IsNullOrWhiteSpace(ResumeMessage)
+            || _resumeMessageClearCts is not null
+            || !IsPlaybackEnginePlaying())
+        {
+            return;
+        }
+
+        var baseline = _resumeMessageClearBaselineSeconds;
+        if (baseline.HasValue && playbackSeconds <= baseline.Value + 0.25d)
+        {
+            return;
+        }
+
+        ScheduleResumeMessageClearAfterPlaybackStarted();
     }
 
     private void ScheduleResumeMessageClearAfterPlaybackStarted()
@@ -4939,7 +4999,7 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        if (_disposed || string.IsNullOrWhiteSpace(ResumeMessage))
+        if (_disposed || string.IsNullOrWhiteSpace(ResumeMessage) || _resumeMessageClearCts is not null)
         {
             return;
         }
@@ -4984,13 +5044,16 @@ public sealed class PlayerWindowViewModel : ViewModelBase, IDisposable
     {
         if (!_disposed && ReferenceEquals(_resumeMessageClearCts, cts))
         {
+            _resumeMessageClearBaselineSeconds = null;
             ResumeMessage = string.Empty;
         }
     }
 
     private void CancelResumeMessageClear()
     {
-        _resumeMessageClearCts?.Cancel();
+        var cts = _resumeMessageClearCts;
+        _resumeMessageClearCts = null;
+        cts?.Cancel();
     }
 
     private void RefreshDisplayStatusProjection(string reason)

@@ -456,7 +456,7 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
                 ResumePositionText = resumePositionText,
                 ProgressPercent = progressPercent,
                 ProgressValue = progressPercent,
-                ProgressPercentText = hasProgressPercent ? $"{progressPercent:0.#}%" : string.Empty,
+                ProgressPercentText = hasProgressPercent ? FormatProgressPercent(progressPercent) : string.Empty,
                 HasProgress = hasProgressPosition,
                 HasProgressPosition = hasProgressPosition,
                 HasProgressPercent = hasProgressPercent,
@@ -477,9 +477,14 @@ public sealed class HomeDashboardQueryService : IHomeDashboardQueryService
             : item.ProgressPercent >= 90
                 ? "接近看完"
                 : item.HasProgressPercent
-                    ? $"{item.WatchPositionText} · {item.ProgressPercent:0}%"
+                    ? $"{item.WatchPositionText} · {FormatProgressPercent(item.ProgressPercent)}"
                     : item.WatchPositionText;
         return item;
+    }
+
+    private static string FormatProgressPercent(double value)
+    {
+        return value == 0d ? "0%" : $"{value:0.0}%";
     }
 
     private static string FormatLastPlayedText(DateTime time)
