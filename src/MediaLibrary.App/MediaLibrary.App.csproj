@@ -9,6 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MediaLibrary.App</RootNamespace>
     <AssemblyName>MediaLibrary.App</AssemblyName>
+    <ApplicationIcon>Assets\app-logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

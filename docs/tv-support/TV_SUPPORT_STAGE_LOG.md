@@ -1,5 +1,44 @@
 # TV Support Stage Log
 
+## Phase 4 TV Scan Bugfix - Resolution NxN Guard - 2026-06-17
+
+Goal:
+
+- Fix a TV scan parser false positive where video resolution tokens such as `3840x2160` could be treated as `NxN` Season/Episode markers.
+- Preserve conservative TV scan semantics without adding title-specific, anime-specific, folder-specific, or TMDB-ID-specific rules.
+
+Root cause:
+
+- The generic `NxN` parser accepted any 1-4 digit pair.
+- A filename containing a title+number episode marker plus a technical tail such as `3840x2160` could be parsed as Season 3840 / Episode 2160 before the verified title-number sequence path applied.
+- Multiple files in the same directory could then be attached to the same synthetic unknown Episode, making real Episodes appear source-less while one false Episode accumulated many playback sources.
+
+Completed:
+
+- Added a generic resolution-pair guard to the `NxN` parser so common video dimensions are not treated as Season/Episode markers.
+- Kept valid explicit markers such as `S04E29`, `1x02`, `Episode 01`, and verified same-folder title-number sequences on their existing paths.
+- Performed a read-only database audit for the reported title using safe titles/counts/file names only; no local paths, WebDAV URLs, credentials, tokens, or private directory names were written to docs.
+- After explicit user authorization, backed up the local app database and performed a one-off repair of already mis-bound rows: moved 88 active playback sources from hidden unknown containers to the recognized TV Seasons/Episodes, restored the target Seasons to automatic visibility, and removed empty wrong software containers.
+
+Not done:
+
+- No automatic in-app data repair workflow was added for other already mis-bound Season/Episode rows.
+- No TMDB matching threshold, AI prompt, correction transaction, schema migration, commit, or push was changed.
+- No hardcoded title, anime, folder, filename prefix, or TMDB ID rule was added.
+
+Verification:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` remained empty.
+- Database repair backup was created before writing; post-repair `quick_check` returned `ok` and `foreign_key_check` returned 0 rows.
+- Post-repair target Season active-source counts were 25 / 12 / 22 / 30, and remaining active sources under the synthetic high-number Season containers were 0.
+
+Known Issues:
+
+- Blocker: None confirmed by build verification.
+- Deferred: Broader automated data-health tooling for detecting and repairing impossible Season/Episode numbers remains a later maintenance phase.
+- Noise: Metadata-only TV details can still show source-less Episodes until real active `MediaFile` rows are attached.
+
 ## Season Detail Action State Follow-up - 2026-06-08
 
 Goal:

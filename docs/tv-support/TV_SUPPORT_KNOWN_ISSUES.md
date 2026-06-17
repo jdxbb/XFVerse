@@ -1,5 +1,20 @@
 # TV Support Known Issues
 
+## Phase 4 TV Scan Resolution NxN Guard Known Issues
+
+Blocker:
+
+- None confirmed by build verification.
+
+Deferred:
+
+- Automatic in-app repair for data that was already mis-bound by interpreting a resolution token such as `3840x2160` as Season/Episode is not implemented. The reported local database was repaired once after explicit user authorization.
+- Broader data-health tooling for detecting impossible Season/Episode numbers remains a later maintenance phase.
+
+Noise:
+
+- Metadata-only TV detail can still show source-less Seasons/Episodes by design until a real active playback source is attached.
+
 ## Phase 4.18 Full Regression Known Issues
 
 Blocker:

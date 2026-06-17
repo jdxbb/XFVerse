@@ -1543,7 +1543,7 @@
                 <DataTrigger Binding="{Binding Kind}" Value="watched">
                     <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushInfoBackground}" />
                     <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushInfoBorder}" />
-                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushInfoBorder}" />
+                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushAccent}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="favorite">
                     <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
@@ -1560,7 +1560,7 @@
                 <DataTrigger Binding="{Binding Kind}" Value="negative">
                     <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushWarningBackground}" />
                     <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushWarningBorder}" />
-                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushWarningBorder}" />
+                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushAccent}" />
                     <Setter TargetName="StatusIconText" Property="Icon" Value="prohibit" />
                 </DataTrigger>
             </DataTemplate.Triggers>
@@ -2332,7 +2332,7 @@
 
                                     <Grid Grid.Row="1" Margin="0,8,0,0">
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="112" />
+                                            <RowDefinition Height="102" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
@@ -2454,7 +2454,7 @@
                                             </Grid>
                                         </Grid>
 
-                                        <Grid Grid.Row="2" Margin="0,12,0,0">
+                                        <Grid Grid.Row="2" Margin="0,8,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="1.5*" />
                                                 <ColumnDefinition Width="17*" />

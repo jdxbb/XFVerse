@@ -153,36 +153,6 @@
             </Setter>
         </Style>
 
-        <Style x:Key="OnlineSubtitleFilterContextMenuStyle" TargetType="ContextMenu" BasedOn="{StaticResource ContextMenuStyle}">
-            <Setter Property="Padding" Value="7" />
-            <Setter Property="MaxHeight" Value="420" />
-            <Setter Property="Background" Value="{DynamicResource BrushPopupBackground}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
-            <Setter Property="HasDropShadow" Value="False" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <EventSetter Event="PreviewMouseWheel" Handler="ContextMenu_PreviewMouseWheel" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ContextMenu">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12"
-                                Padding="{TemplateBinding Padding}"
-                                SnapsToDevicePixels="True">
-                            <ScrollViewer MaxHeight="{TemplateBinding MaxHeight}"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          VerticalScrollBarVisibility="Auto">
-                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
-                            </ScrollViewer>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <Style x:Key="OnlineSubtitleModernScrollThumbStyle" TargetType="{x:Type Thumb}">
             <Setter Property="Template">
                 <Setter.Value>
@@ -246,6 +216,40 @@
                     <Setter Property="Opacity" Value="1" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="OnlineSubtitleFilterContextMenuStyle" TargetType="ContextMenu" BasedOn="{StaticResource ContextMenuStyle}">
+            <Setter Property="Padding" Value="7" />
+            <Setter Property="MaxHeight" Value="420" />
+            <Setter Property="Background" Value="{DynamicResource BrushPopupBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <EventSetter Event="PreviewMouseWheel" Handler="ContextMenu_PreviewMouseWheel" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer MaxHeight="{TemplateBinding MaxHeight}"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto"
+                                          helpers:ScrollBarAutoRevealBehavior.IsEnabled="True">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource OnlineSubtitleModernScrollBarStyle}" />
+                                </ScrollViewer.Resources>
+                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="OnlineSubtitleResultItemStyle" TargetType="ListBoxItem">

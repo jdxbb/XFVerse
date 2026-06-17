@@ -739,6 +739,12 @@ public static partial class TvEpisodeFileNameParser
                 continue;
             }
 
+            if (string.Equals(entry.Kind, "NxN", StringComparison.OrdinalIgnoreCase)
+                && IsVideoResolutionPair(seasonNumber, episodeNumber))
+            {
+                continue;
+            }
+
             return new EpisodeMatch(match, NormalizeSeasonNumber(seasonNumber), episodeNumber, entry.Kind, null);
         }
 
@@ -900,6 +906,16 @@ public static partial class TvEpisodeFileNameParser
     {
         return value is 480 or 720 or 1080 or 2160 or 4320
                || value is >= 1900 and <= 2099;
+    }
+
+    private static bool IsVideoResolutionPair(int left, int right)
+    {
+        return IsVideoResolutionDimension(left) && IsVideoResolutionDimension(right);
+    }
+
+    private static bool IsVideoResolutionDimension(int value)
+    {
+        return value is 480 or 576 or 720 or 1080 or 1280 or 1920 or 2160 or 3840 or 4096 or 4320 or 7680;
     }
 
     private static bool TryNormalizeSequenceTitlePrefix(string value, out string prefixKey)

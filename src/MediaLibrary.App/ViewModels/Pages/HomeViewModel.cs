@@ -491,7 +491,7 @@ public sealed class HomeViewModel : PageViewModelBase
         {
             > 0 => "↑",
             < 0 => "↓",
-            0 => "→",
+            0 => string.Empty,
             _ => string.Empty
         };
     }

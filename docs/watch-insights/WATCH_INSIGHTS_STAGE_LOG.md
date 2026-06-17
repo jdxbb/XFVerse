@@ -1,5 +1,25 @@
 # Watch Insights Stage Log
 
+## 2026-06-17 Watch Insights Persona And Overview Icon Follow-up
+
+Stage goal:
+- Apply focused Watch Insights visual polish for persona spacing and overview status icon color without changing statistics/profile semantics.
+
+Completed:
+- Moved the Watch Persona lead/body area upward by shortening the persona-label row and reducing the body block top margin.
+- Changed the overview `watched` and `not-interested` status icon foregrounds to the theme accent color while preserving their existing card backgrounds and borders.
+
+Explicitly not done:
+- No Watch Insights statistics query, AI generation, recommendation algorithm, database schema, migration, commit, or push was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: none.
+- Deferred: manually verify the persona label/lead/body spacing and overview icon color in the running WPF app across light and dark themes.
+- Noise: none.
+
 ## 2026-06-17 Watch Insights Visual Polish Follow-up
 
 Stage goal:

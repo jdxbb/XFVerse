@@ -1,5 +1,27 @@
 # UI 初级重构阶段日志
 
+## 2026-06-17 - Cross-Page Micro Polish Follow-up
+
+Goal:
+- Apply focused UI polish for scan progress metric icons, online-subtitle language filtering, and Home month-over-month trend presentation.
+- Keep changes scoped to presentation and existing view-model formatting only.
+
+Completed:
+- Reduced the Scan Tasks progress metric icons from 28px to 22px and tightened the icon/text gap.
+- Routed the Online Subtitle Search filter context menu, including the language filter, through the existing modern 6px auto-reveal scrollbar style.
+- Suppressed the Home library status trend arrow when the month-over-month delta is exactly zero and the text says `较上月无变化`.
+
+Explicitly not done:
+- No scan logic, subtitle search/download behavior, Home statistics query, database schema, migration, commit, or push was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: none.
+- Deferred: manually verify the Scan Tasks metric icon scale, online-subtitle language menu scrollbar, and Home unchanged-delta text in the running WPF app.
+- Noise: none.
+
 ## 2026-06-17 - Cross-Page Icon And Spacing Polish
 
 Goal:
