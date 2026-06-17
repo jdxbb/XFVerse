@@ -1,5 +1,26 @@
 # Online Subtitles Stage Log
 
+## 2026-06-17 - Search Dialog Scrollbar Polish
+
+Completed:
+
+- Replaced the online subtitle search result list scrollbar template with the app's modern scrollbar styling and auto-reveal behavior.
+- Kept result list selection, virtualization, and search/download behavior unchanged.
+
+Not done:
+
+- No subtitle provider API, binding model, database schema, migration, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+
+- Blocker: none.
+- Deferred: manual search dialog verification is still needed with enough results to force scrolling.
+- Noise: none.
+
 ## Phase 5.0a Audit Summary
 
 Completed:

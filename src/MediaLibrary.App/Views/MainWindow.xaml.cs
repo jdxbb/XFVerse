@@ -408,12 +408,12 @@ public partial class MainWindow : Window
 
         if (WindowState == WindowState.Maximized)
         {
-            MaximizeRestoreButton.Content = "\uE923";
+            MaximizeRestoreButton.Content = "copy-simple";
             MaximizeRestoreButton.ToolTip = "还原";
             return;
         }
 
-        MaximizeRestoreButton.Content = "\uE922";
+        MaximizeRestoreButton.Content = "square";
         MaximizeRestoreButton.ToolTip = "最大化";
     }
 

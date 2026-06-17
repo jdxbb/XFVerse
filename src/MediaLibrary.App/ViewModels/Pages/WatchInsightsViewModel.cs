@@ -1145,7 +1145,8 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
         try
         {
             var serviceStopwatch = Stopwatch.StartNew();
-            var profile = await _profileService.GetProfileAsync(forceRefresh, cancellationToken);
+            // Profile generation writes the shared cache; keep it running after page navigation cancels UI activation.
+            var profile = await _profileService.GetProfileAsync(forceRefresh, CancellationToken.None);
             serviceStopwatch.Stop();
             var projectionStopwatch = Stopwatch.StartNew();
             if (CanReuseProfileProjection(profile))
@@ -1167,6 +1168,11 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
                 + $"serviceMs={serviceStopwatch.ElapsedMilliseconds} "
                 + $"projectionMs={projectionStopwatch.ElapsedMilliseconds} "
                 + $"elapsedMs={stopwatch.ElapsedMilliseconds}");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            stopwatch.Stop();
+            Log($"watch-insights-profile-load-canceled source={FormatProfileLoadSource(source)}");
         }
         catch (Exception exception)
         {
@@ -2190,7 +2196,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek),
             FormatDeltaArrow(snapshot.TimeRange, snapshot.WatchedDeltaFromLastWeek),
-            "\uE8FB",
+            "check",
             "watched",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
         OverviewCards.Add(new(
@@ -2200,7 +2206,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek),
             FormatDeltaArrow(snapshot.TimeRange, snapshot.FavoriteDeltaFromLastWeek),
-            "\uEB51",
+            "heart",
             "favorite",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
         OverviewCards.Add(new(
@@ -2210,7 +2216,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek),
             FormatDeltaArrow(snapshot.TimeRange, snapshot.WantToWatchDeltaFromLastWeek),
-            "\uE734",
+            "star",
             "want",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
         OverviewCards.Add(new(
@@ -2220,7 +2226,7 @@ public sealed class WatchInsightsViewModel : PageViewModelBase
             "部",
             FormatDelta(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek),
             FormatDeltaArrow(snapshot.TimeRange, snapshot.NotInterestedDeltaFromLastWeek),
-            string.Empty,
+            "prohibit",
             "negative",
             snapshot.TimeRange == WatchStatisticsTimeRange.All));
 

@@ -83,9 +83,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-        <Setter Property="FontSize" Value="12" />
-        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="ContentTemplate" Value="{StaticResource PhosphorCaptionIconContentTemplate}" />
         <Setter Property="Foreground" Value="{DynamicResource BrushPlayerTextSecondary}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -153,7 +151,6 @@
 
     <Style x:Key="PlayerControlGlyphTextStyle" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-        <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
         <Setter Property="FontSize" Value="15" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -175,6 +172,7 @@
         <Setter Property="MinHeight" Value="36" />
         <Setter Property="Background" Value="{DynamicResource BrushPlayerSurfaceElevated}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BrushPlayerBorder}" />
+        <Setter Property="ContentTemplate" Value="{StaticResource PhosphorSmallIconContentTemplate}" />
     </Style>
 
     <Style x:Key="PlayerOverlayPanelStyle" TargetType="Border">

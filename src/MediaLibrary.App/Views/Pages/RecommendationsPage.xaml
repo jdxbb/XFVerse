@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Views.Pages.RecommendationsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
              Cursor="Arrow">
     <UserControl.Resources>
@@ -255,6 +256,13 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <DataTemplate x:Key="RecommendationPreferenceGearIconTemplate">
+            <controls:PhosphorIcon Icon="{Binding}"
+                                   Width="18"
+                                   Height="18"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" />
+        </DataTemplate>
 
         <Style x:Key="RecommendationPreferenceDialogCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
             <Setter Property="Width" Value="38" />
@@ -652,7 +660,7 @@
                         <Button Content="开"
                                 Command="{Binding SetCustomPreferenceEnabledCommand}"
                                 CommandParameter="True"
-                                IsEnabled="{Binding CanEditCustomPreference}"
+                                IsEnabled="{Binding CanEnableCustomPreference}"
                                 Style="{StaticResource RecommendationPreferenceSwitchOnStyle}" />
                         <Button Content="关"
                                 Command="{Binding SetCustomPreferenceEnabledCommand}"
@@ -662,14 +670,12 @@
                     </StackPanel>
                 </Border>
                 <Button Margin="6,0,0,0"
+                        Content="gear-six"
+                        ContentTemplate="{StaticResource RecommendationPreferenceGearIconTemplate}"
                         ToolTip="编辑自定义偏好"
                         IsEnabled="{Binding CanEditCustomPreference}"
                         Command="{Binding EditPreferenceCommand}"
-                        Style="{StaticResource RecommendationPreferenceGearButtonStyle}">
-                    <TextBlock FontFamily="Segoe MDL2 Assets"
-                               FontSize="13"
-                               Text="&#xE713;" />
-                </Button>
+                        Style="{StaticResource RecommendationPreferenceGearButtonStyle}" />
 
                 <Button Content="{Binding RefreshBatchButtonText}"
                         Command="{Binding RefreshBatchCommand}"
@@ -895,13 +901,11 @@
                                    Text="自定义推荐偏好"
                                    Style="{StaticResource CardTitleTextStyle}" />
                         <Button Grid.Column="1"
+                                Content="x"
+                                ContentTemplate="{StaticResource PhosphorCaptionIconContentTemplate}"
                                 ToolTip="关闭"
                                 Command="{Binding CancelPreferenceCommand}"
-                                Style="{StaticResource RecommendationPreferenceDialogCloseButtonStyle}">
-                            <TextBlock FontFamily="Segoe MDL2 Assets"
-                                       FontSize="12"
-                                       Text="&#xE711;" />
-                        </Button>
+                                Style="{StaticResource RecommendationPreferenceDialogCloseButtonStyle}" />
                     </Grid>
 
                     <Grid Grid.Row="2">

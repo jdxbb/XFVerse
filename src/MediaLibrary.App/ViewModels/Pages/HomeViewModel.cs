@@ -451,10 +451,10 @@ public sealed class HomeViewModel : PageViewModelBase
         Replace(
             LibraryStatusOverview,
             [
-                BuildStatusMetric("已看", watchedCount, watchedDelta, "✓"),
-                BuildStatusMetric("喜爱", favoriteCount, favoriteDelta, "♡"),
-                BuildStatusMetric("想看", wantToWatchCount, wantToWatchDelta, "☆"),
-                BuildStatusMetric("不想看", notInterestedCount, notInterestedDelta, "!")
+                BuildStatusMetric("已看", watchedCount, watchedDelta, "check"),
+                BuildStatusMetric("喜爱", favoriteCount, favoriteDelta, "heart"),
+                BuildStatusMetric("想看", wantToWatchCount, wantToWatchDelta, "star"),
+                BuildStatusMetric("不想看", notInterestedCount, notInterestedDelta, "prohibit")
             ]);
     }
 

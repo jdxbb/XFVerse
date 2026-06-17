@@ -485,12 +485,12 @@ public partial class PlayerWindow : Window
 
         if (_isFullScreen || WindowState == WindowState.Maximized)
         {
-            button.Content = "\uE923";
+            button.Content = "copy-simple";
             button.ToolTip = null;
             return;
         }
 
-        button.Content = "\uE922";
+        button.Content = "square";
         button.ToolTip = null;
     }
 
@@ -1859,6 +1859,7 @@ public partial class PlayerWindow : Window
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         WindowState = WindowState.Maximized;
+        UpdateFullScreenToggleButton();
         UpdatePlayerChromeVisibility();
         _lastCursorPosition = null;
         MarkControlBarActivity();
@@ -1875,6 +1876,7 @@ public partial class PlayerWindow : Window
         WindowState = WindowState.Normal;
         CenterWindowOnCurrentMonitor();
         _ = Dispatcher.BeginInvoke(CenterWindowOnCurrentMonitor, DispatcherPriority.Loaded);
+        UpdateFullScreenToggleButton();
         UpdatePlayerChromeVisibility();
         UpdatePlayerMaximizeRestoreButton();
         _controlBarTimer.Stop();
@@ -1893,6 +1895,14 @@ public partial class PlayerWindow : Window
 
         ShowControlBar();
         RestartControlBarTimer();
+    }
+
+    private void UpdateFullScreenToggleButton()
+    {
+        if (FullscreenToggleButton is not null)
+        {
+            FullscreenToggleButton.Content = _isFullScreen ? "arrows-in-simple" : "arrows-out-simple";
+        }
     }
 
     private bool ShouldKeepHiddenChromeForPassiveInput()

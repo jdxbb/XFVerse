@@ -11,6 +11,11 @@ internal static class WatchCompletionDiagnostics
 
     public static void Write(string message)
     {
+        if (!DiagnosticMessageFilter.ShouldWrite(message, "XFVERSE_WATCH_COMPLETION_DIAGNOSTICS"))
+        {
+            return;
+        }
+
         try
         {
             var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [WATCH-COMPLETION] {message}";

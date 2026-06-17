@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
                     xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <Style x:Key="InputFocusVisualStyle" TargetType="Control">
         <Setter Property="Template">
@@ -229,15 +230,14 @@
                                                   ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                                   ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                                   IsHitTestVisible="False" />
-                                <TextBlock Grid.Column="1"
-                                           Margin="0,0,10,0"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="10"
-                                           Foreground="{DynamicResource BrushForegroundMuted}"
-                                           IsHitTestVisible="False"
-                                           Text="&#xE70D;" />
+                                <controls:PhosphorIcon Grid.Column="1"
+                                                       Margin="0,0,10,0"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource BrushForegroundMuted}"
+                                                       Icon="caret-down"
+                                                       IsHitTestVisible="False"
+                                                       Style="{StaticResource PhosphorCaptionIconStyle}" />
                             </Grid>
                         </Border>
                         <ToggleButton Background="Transparent"

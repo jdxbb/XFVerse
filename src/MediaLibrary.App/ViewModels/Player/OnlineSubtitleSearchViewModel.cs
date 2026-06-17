@@ -137,8 +137,8 @@ public sealed class OnlineSubtitleSearchViewModel : ViewModelBase
     public string SortDirectionButtonToolTip => BuildFilterButtonText("顺序", _isSortAscending ? "升序" : "降序");
 
     public string SortDirectionIconData => _isSortAscending
-        ? "M 8 18 L 8 6 M 4 10 L 8 6 L 12 10 M 15 7 H 23 M 15 12 H 21 M 15 17 H 19"
-        : "M 8 6 L 8 18 M 4 14 L 8 18 L 12 14 M 15 7 H 19 M 15 12 H 21 M 15 17 H 23";
+        ? "sort-ascending"
+        : "sort-descending";
 
     public OpenSubtitlesLanguageOption? SelectedLanguage
     {

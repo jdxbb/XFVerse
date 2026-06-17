@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
         xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
@@ -296,8 +297,9 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding IconGlyph}"
-                                           Style="{StaticResource ShellNavigationIconTextStyle}" />
+                                <controls:PhosphorIcon Icon="{Binding IconGlyph}"
+                                                       Style="{StaticResource PhosphorNavIconStyle}"
+                                                       Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" />
                                 <TextBlock Grid.Column="1"
                                            Margin="12,0,0,0"
                                            Text="{Binding Title}">
@@ -458,21 +460,20 @@
                                            Foreground="{DynamicResource BrushSidebarMuted}"
                                            FontSize="12" />
                             </StackPanel>
-                            <TextBlock Grid.Column="2"
-                                       VerticalAlignment="Center"
-                                       Text="⌃"
-                                       Foreground="{DynamicResource BrushSidebarMuted}">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource ShellIconGlyphTextStyle}">
-                                        <Setter Property="FontSize" Value="14" />
+                            <controls:PhosphorIcon Grid.Column="2"
+                                                   Icon="caret-up"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource BrushSidebarMuted}">
+                                <controls:PhosphorIcon.Style>
+                                    <Style TargetType="controls:PhosphorIcon" BasedOn="{StaticResource PhosphorCaptionIconStyle}">
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                </controls:PhosphorIcon.Style>
+                            </controls:PhosphorIcon>
                         </Grid>
                     </Button>
 
@@ -549,7 +550,12 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="◎" Style="{StaticResource ShellMenuIconTextStyle}" />
+                                        <controls:PhosphorIcon Width="24"
+                                                               Height="16"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource BrushForegroundMuted}"
+                                                               Icon="pencil-simple" />
                                         <TextBlock Grid.Column="1" Margin="8,0,0,0" Text="个人资料" VerticalAlignment="Center" />
                                     </Grid>
                                 </Button>
@@ -561,7 +567,12 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="▤" Style="{StaticResource ShellMenuIconTextStyle}" />
+                                        <controls:PhosphorIcon Width="24"
+                                                               Height="16"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource BrushForegroundMuted}"
+                                                               Icon="list" />
                                         <TextBlock Grid.Column="1" Margin="8,0,0,0" Text="扫描任务" VerticalAlignment="Center" />
                                     </Grid>
                                 </Button>
@@ -573,7 +584,12 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="⚙" Style="{StaticResource ShellMenuIconTextStyle}" />
+                                        <controls:PhosphorIcon Width="24"
+                                                               Height="16"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource BrushForegroundMuted}"
+                                                               Icon="gear-six" />
                                         <TextBlock Grid.Column="1" Margin="8,0,0,0" Text="设置" VerticalAlignment="Center" />
                                     </Grid>
                                 </Button>
@@ -585,7 +601,12 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="↩" Style="{StaticResource ShellMenuIconTextStyle}" />
+                                        <controls:PhosphorIcon Width="24"
+                                                               Height="16"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource BrushForegroundMuted}"
+                                                               Icon="arrow-left" />
                                         <TextBlock Grid.Column="1" Margin="8,0,0,0" Text="退出登录" VerticalAlignment="Center" />
                                     </Grid>
                                 </Button>
@@ -657,7 +678,7 @@
                             Margin="10,0,0,0"
                             HorizontalAlignment="Left"
                             Command="{Binding CurrentPageViewModel.NavigateBackCommand}"
-                            Content="&#xE72B;">
+                            Content="arrow-left">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource WindowCaptionButtonStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -731,11 +752,9 @@
                                 Height="36"
                                 MinWidth="36"
                                 MinHeight="36"
-                                Style="{StaticResource SmallIconButtonStyle}">
-                            <TextBlock Text="{Binding ThemeToggleIcon}"
-                                       Style="{StaticResource ShellIconGlyphTextStyle}"
-                                       Foreground="{DynamicResource BrushForegroundSecondary}" />
-                        </Button>
+                                Content="{Binding ThemeToggleIcon}"
+                                ContentTemplate="{StaticResource PhosphorSmallIconContentTemplate}"
+                                Style="{StaticResource SmallIconButtonStyle}" />
 
                         <Border Width="1"
                                 Height="22"
@@ -745,17 +764,17 @@
 
                         <Button x:Name="MinimizeButton"
                                 Margin="0"
-                                Content="&#xE921;"
+                                Content="minus"
                                 Click="MinimizeButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="MaximizeRestoreButton"
                                 Margin="0"
-                                Content="&#xE922;"
+                                Content="copy-simple"
                                 Click="MaximizeRestoreButton_Click"
                                 Style="{StaticResource WindowCaptionButtonStyle}" />
                         <Button x:Name="CloseButton"
                                 Margin="0"
-                                Content="&#xE8BB;"
+                                Content="x"
                                 Click="CloseButton_Click"
                                 Style="{StaticResource WindowCaptionCloseButtonStyle}" />
                     </StackPanel>

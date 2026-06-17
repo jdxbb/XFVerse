@@ -25,6 +25,8 @@
     <Resource Include="Assets\poster-placeholder.png" />
     <None Remove="Assets\medals\**\*.png" />
     <Resource Include="Assets\medals\**\*.png" />
+    <None Remove="Assets\Icons\Phosphor\**\*.svg" />
+    <Resource Include="Assets\Icons\Phosphor\**\*.svg" />
     <Content Include="Assets\WatchPersonas\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>Assets\WatchPersonas\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>

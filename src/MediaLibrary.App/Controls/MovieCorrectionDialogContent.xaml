@@ -1,6 +1,7 @@
 <UserControl x:Class="MediaLibrary.App.Controls.MovieCorrectionDialogContent"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
              xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers">
     <UserControl.Resources>
         <Style x:Key="CorrectionClearButtonStyle"
@@ -9,9 +10,8 @@
             <Setter Property="Width" Value="22" />
             <Setter Property="Height" Value="22" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="10" />
-            <Setter Property="Content" Value="&#xE711;" />
+            <Setter Property="Content" Value="x" />
+            <Setter Property="ContentTemplate" Value="{StaticResource PhosphorSmallIconContentTemplate}" />
             <Setter Property="Visibility" Value="Visible" />
             <Style.Triggers>
                 <Trigger Property="Tag" Value="">
@@ -44,7 +44,9 @@
             <Setter Property="FontSize" Value="12" />
         </Style>
 
-        <Style x:Key="CorrectionToolbarIconStyle" TargetType="TextBlock">
+        <Style x:Key="CorrectionToolbarIconStyle" TargetType="{x:Type controls:PhosphorIcon}">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
         </Style>
@@ -59,17 +61,12 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
-        <Style x:Key="CorrectionInlineMetaIconStyle" TargetType="TextBlock">
+        <Style x:Key="CorrectionInlineMetaIconStyle" TargetType="{x:Type controls:PhosphorIcon}">
             <Setter Property="Width" Value="16" />
             <Setter Property="Height" Value="16" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundMuted}" />
-            <Setter Property="LineHeight" Value="16" />
-            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
-            <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="RenderTransform">
                 <Setter.Value>
                     <TranslateTransform Y="-1" />
@@ -243,18 +240,18 @@
                                             </Grid.ColumnDefinitions>
                                             <ContentPresenter HorizontalAlignment="Stretch"
                                                               Content="{TemplateBinding Content}" />
-                                            <TextBlock x:Name="Arrow"
-                                                       Grid.Column="1"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       FontFamily="Segoe MDL2 Assets"
-                                                       FontSize="12"
-                                                       Foreground="{DynamicResource BrushForegroundMuted}"
-                                                       Text="&#xE70D;" />
+                                            <controls:PhosphorIcon x:Name="Arrow"
+                                                                   Grid.Column="1"
+                                                                   Width="12"
+                                                                   Height="12"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource BrushForegroundMuted}"
+                                                                   Icon="caret-down" />
                                         </Grid>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="Arrow" Property="Text" Value="&#xE70E;" />
+                                                <Setter TargetName="Arrow" Property="Icon" Value="caret-up" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -372,14 +369,8 @@
                             Command="{Binding SearchCandidatesCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
                         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets"
-                                       RenderTransformOrigin="0.5,0.5"
-                                       Style="{StaticResource CorrectionToolbarIconStyle}"
-                                       Text="&#xE721;">
-                                <TextBlock.RenderTransform>
-                                    <ScaleTransform ScaleX="-1" />
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
+                            <controls:PhosphorIcon Icon="magnifying-glass"
+                                                   Style="{StaticResource CorrectionToolbarIconStyle}" />
                             <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="TMDB" />
                         </StackPanel>
                     </Button>
@@ -387,10 +378,8 @@
                             Command="{Binding AiSuggestSearchCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
                         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe UI Symbol"
-                                       FontSize="16"
-                                       Style="{StaticResource CorrectionToolbarIconStyle}"
-                                       Text="✦" />
+                            <controls:PhosphorIcon Icon="sparkle"
+                                                   Style="{StaticResource CorrectionToolbarIconStyle}" />
                             <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="AI辅助识别" />
                         </StackPanel>
                     </Button>
@@ -493,14 +482,8 @@
                             Command="{Binding SearchCandidatesCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
                         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets"
-                                       RenderTransformOrigin="0.5,0.5"
-                                       Style="{StaticResource CorrectionToolbarIconStyle}"
-                                       Text="&#xE721;">
-                                <TextBlock.RenderTransform>
-                                    <ScaleTransform ScaleX="-1" />
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
+                            <controls:PhosphorIcon Icon="magnifying-glass"
+                                                   Style="{StaticResource CorrectionToolbarIconStyle}" />
                             <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="TMDB" />
                         </StackPanel>
                     </Button>
@@ -508,10 +491,8 @@
                             Command="{Binding AiSuggestSearchCommand}"
                             Style="{StaticResource CorrectionToolbarButtonStyle}">
                         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe UI Symbol"
-                                       FontSize="16"
-                                       Style="{StaticResource CorrectionToolbarIconStyle}"
-                                       Text="✦" />
+                            <controls:PhosphorIcon Icon="sparkle"
+                                                   Style="{StaticResource CorrectionToolbarIconStyle}" />
                             <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Text="AI辅助识别" />
                         </StackPanel>
                     </Button>
@@ -725,9 +706,9 @@
                                 </Grid>
                                  <StackPanel Grid.Column="4" VerticalAlignment="Center">
                                      <StackPanel Orientation="Horizontal">
-                                         <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE787;" />
+                                         <controls:PhosphorIcon Width="16" Height="16" VerticalAlignment="Center" Foreground="{DynamicResource BrushForegroundMuted}" Icon="calendar-blank" />
                                          <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding ReleaseDateText}" />
-                                         <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource BrushForegroundMuted}" Text="&#xE823;" />
+                                         <controls:PhosphorIcon Width="16" Height="16" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource BrushForegroundMuted}" Icon="clock" />
                                          <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding RuntimeText}" />
                                      </StackPanel>
                                      <Grid Margin="0,9,0,0">
@@ -834,11 +815,11 @@
                                                          VerticalAlignment="Center"
                                                          Background="{DynamicResource BrushBorder}" />
                                                  <Grid Width="16" Height="16" VerticalAlignment="Center">
-                                                     <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE787;" />
+                                                     <controls:PhosphorIcon Icon="calendar-blank" Style="{StaticResource CorrectionInlineMetaIconStyle}" />
                                                  </Grid>
                                                  <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding FirstAirDateDisplayText}" />
                                                  <Grid Width="16" Height="16" Margin="14,0,0,0" VerticalAlignment="Center">
-                                                     <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                                     <controls:PhosphorIcon Icon="television" Style="{StaticResource CorrectionInlineMetaIconStyle}" />
                                                  </Grid>
                                                  <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
                                              </StackPanel>
@@ -885,11 +866,11 @@
                                                     <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesAndSeasonTitle}" />
                                                     <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
                                                         <Grid Width="16" Height="16" VerticalAlignment="Center">
-                                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE787;" />
+                                                            <controls:PhosphorIcon Icon="calendar-blank" Style="{StaticResource CorrectionInlineMetaIconStyle}" />
                                                         </Grid>
                                                         <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding AirDateDisplayText}" />
                                                         <Grid Width="16" Height="16" Margin="14,0,0,0" VerticalAlignment="Center">
-                                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                                            <controls:PhosphorIcon Icon="television" Style="{StaticResource CorrectionInlineMetaIconStyle}" />
                                                         </Grid>
                                                         <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding EpisodeCountText}" />
                                                     </StackPanel>
@@ -958,7 +939,7 @@
                                                 Orientation="Horizontal">
                                         <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesTitle}" />
                                         <Grid Width="16" Height="16" Margin="14,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                            <controls:PhosphorIcon Icon="television" Style="{StaticResource CorrectionInlineMetaIconStyle}" />
                                         </Grid>
                                         <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SeasonCountText}" />
                                     </StackPanel>
@@ -983,7 +964,7 @@
                                                     <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource BrushForegroundPrimary}" Text="{Binding SeriesAndSeasonTitle}" />
                                                     <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
                                                         <Grid Width="16" Height="16" VerticalAlignment="Center">
-                                                            <TextBlock Style="{StaticResource CorrectionInlineMetaIconStyle}" Text="&#xE8B2;" />
+                                                            <controls:PhosphorIcon Icon="file-video" Style="{StaticResource CorrectionInlineMetaIconStyle}" />
                                                         </Grid>
                                                         <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyMutedTextStyle}" Text="{Binding SourceCountText}" />
                                                     </StackPanel>
@@ -1023,34 +1004,10 @@
                     </Border.Style>
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center">
-                        <Grid Width="34"
-                              Height="34"
-                              HorizontalAlignment="Center">
-                            <Ellipse Stroke="{DynamicResource BrushBorder}"
-                                     StrokeThickness="3" />
-                            <Path Data="M17,2 A15,15 0 0 1 32,17"
-                                  Stroke="{DynamicResource BrushAccent}"
-                                  StrokeThickness="3"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round">
-                                <Path.RenderTransform>
-                                    <RotateTransform CenterX="17"
-                                                     CenterY="17" />
-                                </Path.RenderTransform>
-                                <Path.Triggers>
-                                    <EventTrigger RoutedEvent="Loaded">
-                                        <BeginStoryboard>
-                                            <Storyboard RepeatBehavior="Forever">
-                                                <DoubleAnimation Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
-                                                                 From="0"
-                                                                 To="360"
-                                                                 Duration="0:0:0.9" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </EventTrigger>
-                                </Path.Triggers>
-                            </Path>
-                        </Grid>
+                        <ContentControl Width="34"
+                                        Height="34"
+                                        HorizontalAlignment="Center"
+                                        Template="{StaticResource PhosphorLoadingSpinnerTemplate}" />
                         <TextBlock Margin="0,10,0,0"
                                    HorizontalAlignment="Center"
                                    Style="{StaticResource BodyMutedTextStyle}"

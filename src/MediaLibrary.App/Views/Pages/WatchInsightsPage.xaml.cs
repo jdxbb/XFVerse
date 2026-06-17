@@ -18,7 +18,8 @@ namespace MediaLibrary.App.Views.Pages;
 public partial class WatchInsightsPage : UserControl
 {
     private const int ScrollRestoreMaxAttempts = 16;
-    private const double BubbleRippleDistanceThreshold = 32d;
+    private const double BubbleRippleDistanceThreshold = 24d;
+    private const double BubbleRippleMinimumIntervalMilliseconds = 64d;
     private const double BubbleSweepIntervalSeconds = 9.4d;
     private const double BubbleSweepDurationSeconds = 8.6d;
     private const string InitialLoadingNone = "none";
@@ -300,7 +301,8 @@ public partial class WatchInsightsPage : UserControl
 
         var rippleDistance = (position - _lastBubbleRipplePosition).Length;
         var rippleElapsed = Stopwatch.GetElapsedTime(_lastBubbleRippleTimestamp, now);
-        if (rippleDistance >= BubbleRippleDistanceThreshold && rippleElapsed >= TimeSpan.FromMilliseconds(90))
+        if (rippleDistance >= BubbleRippleDistanceThreshold
+            && rippleElapsed >= TimeSpan.FromMilliseconds(BubbleRippleMinimumIntervalMilliseconds))
         {
             CreateBubbleRipple(position, _bubblePointerVelocity);
             _lastBubbleRipplePosition = position;

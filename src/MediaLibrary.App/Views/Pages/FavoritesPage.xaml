@@ -336,43 +336,41 @@
                     <ControlTemplate TargetType="{x:Type Button}">
                         <Border Background="Transparent">
                             <Grid>
-                                <TextBlock x:Name="StateIconStroke"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="20"
-                                           Foreground="{StaticResource FavoriteIconOutlineBrush}"
-                                           IsHitTestVisible="False"
-                                           Opacity="0"
-                                           Text="{Binding Text, ElementName=StateIcon}">
-                                    <TextBlock.Effect>
+                                <controls:PhosphorIcon x:Name="StateIconStroke"
+                                                       Width="20"
+                                                       Height="20"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource FavoriteIconOutlineBrush}"
+                                                       Icon="{Binding Icon, ElementName=StateIcon}"
+                                                       IsHitTestVisible="False"
+                                                       Opacity="0">
+                                    <controls:PhosphorIcon.Effect>
                                         <DropShadowEffect BlurRadius="3"
                                                           Color="#FFFFFFFF"
                                                           Direction="0"
                                                           Opacity="1"
                                                           ShadowDepth="0" />
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                                <TextBlock x:Name="StateIcon"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="20"
-                                           Foreground="{StaticResource FavoriteIconOutlineBrush}"
-                                           Text="&#xEB51;" />
+                                    </controls:PhosphorIcon.Effect>
+                                </controls:PhosphorIcon>
+                                <controls:PhosphorIcon x:Name="StateIcon"
+                                                       Width="20"
+                                                       Height="20"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource FavoriteIconOutlineBrush}"
+                                                       Icon="heart" />
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsFavoriteTab}" Value="True">
-                                <Setter TargetName="StateIcon" Property="Text" Value="&#xEB52;" />
+                                <Setter TargetName="StateIcon" Property="Icon" Value="heart-fill" />
                                 <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
-                                <Setter TargetName="StateIconStroke" Property="Text" Value="&#xEB52;" />
                                 <Setter TargetName="StateIconStroke" Property="Opacity" Value="1" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsWantToWatchTab}" Value="True">
-                                <Setter TargetName="StateIcon" Property="Text" Value="&#xE735;" />
+                                <Setter TargetName="StateIcon" Property="Icon" Value="star-fill" />
                                 <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
-                                <Setter TargetName="StateIconStroke" Property="Text" Value="&#xE735;" />
                                 <Setter TargetName="StateIconStroke" Property="Opacity" Value="1" />
                             </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">

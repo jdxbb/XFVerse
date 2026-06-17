@@ -1,5 +1,23 @@
 # Player Stage Log
 
+## 2026-06-17 - Fullscreen Icon Polish
+
+Goal:
+- Update the player fullscreen toggle iconography to the requested Phosphor simple-arrow icons without changing playback behavior.
+
+Completed:
+- Changed the collapsed/fullscreen entry icon to `arrows-out-simple`.
+- Changed the active fullscreen exit icon to `arrows-in-simple`.
+- Kept the existing fullscreen toggle button size, shortcut behavior, and window-state logic.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: none.
+- Deferred: manual playback-window verification is still needed for hover/pressed visuals and state transitions.
+- Noise: none.
+
 ## R1
 
 Goal: introduce the new mpv core in parallel and establish the minimum playback baseline.

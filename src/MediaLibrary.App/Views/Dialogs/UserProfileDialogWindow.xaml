@@ -1,7 +1,8 @@
 <Window x:Class="MediaLibrary.App.Views.Dialogs.UserProfileDialogWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
+        xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
+        xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
         Title="个人资料"
         SizeToContent="WidthAndHeight"
         ResizeMode="NoResize"
@@ -176,7 +177,83 @@
 
         <Style x:Key="ProfileCompactComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource CorrectionDialogComboBoxStyle}">
             <Setter Property="Width" Value="226" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Padding" Value="10,0" />
             <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid>
+                            <Border x:Name="InputChrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource BrushInputBorder}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="28" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      IsHitTestVisible="False" />
+                                    <controls:PhosphorIcon Grid.Column="1"
+                                                           Margin="0,0,10,0"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BrushForegroundMuted}"
+                                                           Icon="caret-down"
+                                                           IsHitTestVisible="False"
+                                                           Style="{StaticResource PhosphorCaptionIconStyle}" />
+                                </Grid>
+                            </Border>
+                            <ToggleButton Background="Transparent"
+                                          BorderThickness="0"
+                                          Cursor="Hand"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                        <Border Background="Transparent" />
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup AllowsTransparency="True"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="320"
+                                        Margin="0,4,0,0"
+                                        Padding="3"
+                                        Background="{DynamicResource BrushSurfaceRaised}"
+                                        BorderBrush="{DynamicResource BrushBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="InputChrome" Property="Background" Value="{DynamicResource BrushDisabledBackground}" />
+                                <Setter TargetName="InputChrome" Property="BorderBrush" Value="{DynamicResource BrushDisabledBorder}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrushDisabledForeground}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="ProfileFieldLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DialogFieldLabelTextStyle}">
@@ -276,15 +353,9 @@
                             Click="CloseButton_Click"
                             Style="{StaticResource ProfileHeaderIconButtonStyle}"
                             ToolTip="关闭">
-                        <Viewbox Width="14"
-                                 Height="14"
-                                 Stretch="Uniform">
-                            <Path Data="M2,2 L12,12 M12,2 L2,12"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  StrokeThickness="2"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round" />
-                        </Viewbox>
+                        <controls:PhosphorIcon Icon="x"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                               Style="{StaticResource PhosphorCaptionIconStyle}" />
                     </Button>
                 </Grid>
 
@@ -323,25 +394,19 @@
                                     Click="RemoveAvatarButton_Click"
                                     Style="{StaticResource ProfileAvatarOverlayButtonStyle}"
                                     Visibility="Collapsed">
-                                <Viewbox Width="10" Height="10" Stretch="Uniform">
-                                    <Path Data="M1,1 L9,9 M9,1 L1,9"
-                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="2"
-                                          StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round" />
-                                </Viewbox>
+                                <controls:PhosphorIcon Icon="x"
+                                                       Width="10"
+                                                       Height="10"
+                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </Button>
                             <Button x:Name="AvatarAddButton"
                                     Click="ChooseAvatarButton_Click"
                                     Style="{StaticResource ProfileAvatarOverlayButtonStyle}"
                                     Visibility="Collapsed">
-                                <Viewbox Width="11" Height="11" Stretch="Uniform">
-                                    <Path Data="M5.5,1 L5.5,10 M1,5.5 L10,5.5"
-                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="2"
-                                          StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round" />
-                                </Viewbox>
+                                <controls:PhosphorIcon Icon="plus"
+                                                       Width="11"
+                                                       Height="11"
+                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </Button>
                         </Grid>
 
@@ -382,23 +447,15 @@
                                     ToolTip="编辑">
                                 <Grid Width="18"
                                       Height="18">
-                                    <TextBlock x:Name="EditIconPath"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontFamily="Segoe MDL2 Assets"
-                                               FontSize="15"
-                                               FontWeight="Normal"
-                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                               Text="&#xE70F;" />
-                                    <TextBlock x:Name="DoneIconPath"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontFamily="Segoe MDL2 Assets"
-                                               FontSize="15"
-                                               FontWeight="Normal"
-                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                               Text="&#xE73E;"
-                                               Visibility="Collapsed" />
+                                    <controls:PhosphorIcon x:Name="EditIconPath"
+                                                           Icon="pencil-simple"
+                                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                           Style="{StaticResource PhosphorSmallIconStyle}" />
+                                    <controls:PhosphorIcon x:Name="DoneIconPath"
+                                                           Icon="check"
+                                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                           Style="{StaticResource PhosphorSmallIconStyle}"
+                                                           Visibility="Collapsed" />
                                 </Grid>
                             </Button>
                         </Grid>

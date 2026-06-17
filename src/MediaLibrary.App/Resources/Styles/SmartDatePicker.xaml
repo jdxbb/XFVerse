@@ -129,19 +129,12 @@
                                                        Foreground="{TemplateBinding Foreground}"
                                                        Text="{Binding DisplayText}"
                                                        TextTrimming="CharacterEllipsis" />
-                                            <Viewbox Grid.Column="2"
-                                                     Width="15"
-                                                     Height="15"
-                                                     VerticalAlignment="Center">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Data="M7,2 V5 M17,2 V5 M4,9 H20 M5,4 H19 C20.1,4 21,4.9 21,6 V19 C21,20.1 20.1,21 19,21 H5 C3.9,21 3,20.1 3,19 V6 C3,4.9 3.9,4 5,4"
-                                                          Stroke="{TemplateBinding Foreground}"
-                                                          StrokeThickness="2"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
+                                            <controls:PhosphorIcon Grid.Column="2"
+                                                                   Width="15"
+                                                                   Height="15"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="{TemplateBinding Foreground}"
+                                                                   Icon="calendar-blank" />
                                         </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>
@@ -188,16 +181,10 @@
                                         <Button Command="{Binding PreviousMonthCommand}"
                                                 Style="{StaticResource SmartDatePickerChevronButtonStyle}"
                                                 ToolTip="上个月">
-                                            <Viewbox Width="14" Height="14">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Data="M15,5 L8,12 L15,19"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                          StrokeThickness="2.4"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
+                                            <controls:PhosphorIcon Width="14"
+                                                                   Height="14"
+                                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                                   Icon="caret-left" />
                                         </Button>
                                         <TextBlock Grid.Column="1"
                                                    HorizontalAlignment="Center"
@@ -210,16 +197,10 @@
                                                 Command="{Binding NextMonthCommand}"
                                                 Style="{StaticResource SmartDatePickerChevronButtonStyle}"
                                                 ToolTip="下个月">
-                                            <Viewbox Width="14" Height="14">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Data="M9,5 L16,12 L9,19"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                          StrokeThickness="2.4"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
+                                            <controls:PhosphorIcon Width="14"
+                                                                   Height="14"
+                                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                                   Icon="caret-right" />
                                         </Button>
                                     </Grid>
 

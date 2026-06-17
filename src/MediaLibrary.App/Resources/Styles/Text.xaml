@@ -26,46 +26,6 @@
         <Setter Property="Opacity" Value="0.9" />
     </Style>
 
-    <ControlTemplate x:Key="PosterLoadingSpinnerTemplate" TargetType="{x:Type Control}">
-        <Viewbox Width="{TemplateBinding Width}"
-                 Height="{TemplateBinding Height}">
-            <Grid Width="34"
-                  Height="34">
-                <Ellipse Stroke="#66F7F7F5"
-                         StrokeThickness="3" />
-                <Path x:Name="SpinnerArc"
-                      Data="M17,2 A15,15 0 0 1 32,17"
-                      Stroke="{DynamicResource BrushAccent}"
-                      StrokeThickness="3"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round">
-                    <Path.RenderTransform>
-                        <RotateTransform CenterX="17"
-                                         CenterY="17" />
-                    </Path.RenderTransform>
-                </Path>
-            </Grid>
-        </Viewbox>
-        <ControlTemplate.Triggers>
-            <Trigger Property="Visibility" Value="Visible">
-                <Trigger.EnterActions>
-                    <BeginStoryboard x:Name="PosterSpinnerRotationStoryboard">
-                        <Storyboard RepeatBehavior="Forever">
-                            <DoubleAnimation Storyboard.TargetName="SpinnerArc"
-                                             Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
-                                             From="0"
-                                             To="360"
-                                             Duration="0:0:0.9" />
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.EnterActions>
-                <Trigger.ExitActions>
-                    <StopStoryboard BeginStoryboardName="PosterSpinnerRotationStoryboard" />
-                </Trigger.ExitActions>
-            </Trigger>
-        </ControlTemplate.Triggers>
-    </ControlTemplate>
-
     <Style x:Key="PosterPlaceholderLoadingIndicatorStyle" TargetType="Control">
         <Setter Property="Visibility" Value="Visible" />
         <Style.Triggers>
@@ -114,7 +74,7 @@
                          Height="28"
                          HorizontalAlignment="Center"
                          Style="{StaticResource PosterPlaceholderLoadingIndicatorStyle}"
-                         Template="{StaticResource PosterLoadingSpinnerTemplate}" />
+                         Template="{StaticResource PhosphorLoadingSpinnerTemplate}" />
                 <TextBlock Grid.Row="1"
                            HorizontalAlignment="Center"
                            Style="{StaticResource PosterPlaceholderNoPosterLabelStyle}" />
@@ -139,7 +99,7 @@
                          Height="34"
                          HorizontalAlignment="Center"
                          Style="{StaticResource PosterPlaceholderLoadingIndicatorStyle}"
-                         Template="{StaticResource PosterLoadingSpinnerTemplate}" />
+                         Template="{StaticResource PhosphorLoadingSpinnerTemplate}" />
                 <TextBlock Grid.Row="1"
                            HorizontalAlignment="Center"
                            FontSize="22"
@@ -160,7 +120,7 @@
                          HorizontalAlignment="Center"
                          VerticalAlignment="Center"
                          Style="{StaticResource PosterPlaceholderLoadingIndicatorStyle}"
-                         Template="{StaticResource PosterLoadingSpinnerTemplate}" />
+                         Template="{StaticResource PhosphorLoadingSpinnerTemplate}" />
                 <TextBlock HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            FontSize="26"

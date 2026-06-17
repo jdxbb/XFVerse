@@ -14,6 +14,11 @@ public static partial class ScanIdentificationDiagnostics
 
     public static void Write(string message)
     {
+        if (!DiagnosticMessageFilter.ShouldWrite(message, "XFVERSE_SCAN_IDENTIFICATION_DIAGNOSTICS"))
+        {
+            return;
+        }
+
         try
         {
             var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [SCAN-ID] {message}";

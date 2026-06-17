@@ -666,13 +666,13 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public string PreferenceButtonText => IsSeasonWatched ? FavoriteButtonText : WantToWatchButtonText;
 
-    public string WatchedButtonIcon => IsSeasonWatched ? "\uE711" : "\uE8FB";
+    public string WatchedButtonIcon => IsSeasonWatched ? "x-circle" : "check-circle";
 
     public string PreferenceButtonIcon => IsSeasonWatched
-        ? IsFavorite ? "\uEB52" : "\uEB51"
-        : IsWantToWatch ? "\uE735" : "\uE734";
+        ? IsFavorite ? "heart-fill" : "heart"
+        : IsWantToWatch ? "star-fill" : "star";
 
-    public string NotInterestedButtonIcon => IsNotInterested ? "\uE7A7" : "!";
+    public string NotInterestedButtonIcon => IsNotInterested ? "arrow-counter-clockwise" : "prohibit";
 
     public string NotInterestedButtonText => IsNotInterested ? "取消不想看" : "不想看";
 
@@ -692,7 +692,7 @@ public sealed class TvSeasonDetailViewModel : PageViewModelBase
 
     public string AddSeasonToLibraryButtonText => IsVisibleInLibrary ? "移出媒体库" : "加入媒体库";
 
-    public string AddSeasonToLibraryButtonIcon => IsVisibleInLibrary ? "\uE738" : "\uE710";
+    public string AddSeasonToLibraryButtonIcon => IsVisibleInLibrary ? "minus-square" : "plus-square";
 
     private LibraryVisibilityState CurrentLibraryVisibilityState
     {

@@ -609,7 +609,7 @@ public sealed class EpisodeDetailViewModel : PageViewModelBase
         ? "取消已看"
         : "标记已看";
 
-    public string WatchedButtonIcon => IsWatched ? "\uE711" : "\uE8FB";
+    public string WatchedButtonIcon => IsWatched ? "x-circle" : "check-circle";
 
     public bool IsUpdatingWatched
     {

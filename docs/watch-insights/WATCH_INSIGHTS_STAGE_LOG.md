@@ -1,5 +1,59 @@
 # Watch Insights Stage Log
 
+## 2026-06-17 Watch Insights Visual Polish Follow-up
+
+Stage goal:
+- Polish Watch Insights iconography, loading colors, persona spacing, DNA clipping, frequent-tag rotation, taste-rank badge color, and preference-graph pointer feedback.
+
+Completed:
+- Moved the Watch Persona body upward and reduced the gap between the intro and persona label area.
+- Switched the overview watched icon to `check` and aligned watched/not-interested overview icon foregrounds with the surrounding icon color treatment.
+- Added loading spinner/text color styles that use accent color on light backgrounds and white on dark theme or poster-backdrop surfaces.
+- Rotated the frequent-tag title icon 45 degrees clockwise.
+- Fixed Watch DNA card and description viewport heights so scrollability detection no longer changes small-card height, while still showing slightly more of the last visible line.
+- Matched dark-theme high-frequency combination rank badge fill/border treatment to the accent bubble family.
+- Increased preference-graph mouse ripple generation frequency while keeping the effect throttled.
+
+Explicitly not done:
+- No Watch Insights statistics query, AI generation, recommendation algorithm, database schema, migration, commit, or push was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: none.
+- Deferred: spinner contrast and DNA clipping still require manual visual verification in both theme modes.
+- Noise: loading contrast uses theme/poster state as a background proxy rather than measuring rendered pixel luminance.
+
+## 2026-06-17 Watch Insights Profile Spinner Crash And Preference Toggle Fix
+
+Stage goal:
+- Fix the profile refresh spinner crash introduced during icon migration, keep Watch Profile generation alive after page navigation cancellation, and correct custom recommendation preference toggle behavior.
+
+Completed:
+- Split the Watch Insights profile and statistics refresh icon styles so statistics no longer inherits the profile loading trigger.
+- Changed refresh spinner storyboards to use named `BeginStoryboard` registrations that `StopStoryboard` can resolve when loading ends.
+- Kept Watch Profile service generation detached from page activation cancellation, preserving the existing automatic generation mechanism while allowing in-flight generation to finish and write cache after navigation.
+- Disabled enabling custom recommendation preferences when no saved preference text exists.
+- Auto-enabled custom recommendation preferences only when saving from empty preference text to non-empty text.
+- Removed automatic recommendation reloads from custom preference enable/disable, confirm, and clear operations; users must click refresh to request a new batch.
+- Hardened Phosphor icon SVG parsing so a malformed or unsupported icon path does not crash WPF rendering.
+
+Explicitly not done:
+- No Watch Profile auto-generation mechanism, statistics query, recommendation algorithm, AI prompt, database schema, database update, migration, commit, or push was changed.
+
+Validation:
+- Windows Application log showed `.NET Runtime` event 1026 at the crash time with `System.InvalidOperationException` from `StopStoryboard` resolving `ProfileRefreshSpinStoryboard`.
+- Static review confirmed custom preference save/toggle/clear no longer call `RequestReloadAsync(forceRefresh: false)`.
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Migration diff remained empty.
+
+Known Issues:
+- Blocker: none identified by solution build.
+- Deferred: manually verify clicking generate profile, waiting for completion, and switching pages during generation no longer exits the app.
+- Deferred: manually verify custom preference toggle states and manual refresh-only recommendation behavior in the running app.
+- Noise: historical Windows Error Reporting entries remain on disk and can still appear in Event Viewer history.
+
 ## 2026-06-16 Watch Insights Micro Layout Polish
 
 Stage goal:

@@ -109,10 +109,23 @@
 
         <DataTemplate x:Key="TvSeasonDetailActionButtonTemplate">
             <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="14"
-                           Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+                <controls:PhosphorIcon Width="16"
+                                       Height="16"
+                                       VerticalAlignment="Center"
+                                       Icon="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}">
+                    <controls:PhosphorIcon.Style>
+                        <Style TargetType="{x:Type controls:PhosphorIcon}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" Value="star-fill">
+                                    <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" Value="heart-fill">
+                                    <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </controls:PhosphorIcon.Style>
+                </controls:PhosphorIcon>
                 <TextBlock Margin="12,0,0,0"
                            VerticalAlignment="Center"
                            Text="{Binding}" />
@@ -121,33 +134,14 @@
 
         <DataTemplate x:Key="TvSeasonDetailNotInterestedActionButtonTemplate">
             <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-                <Grid Width="16"
-                      Height="16"
-                      VerticalAlignment="Center">
-                    <Path x:Name="NotInterestedIcon"
-                          Data="M11,3 H13 L12.65,14 H11.35 Z M11,17 H13 V20 H11 Z"
-                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                          Stretch="Uniform" />
-                    <Path x:Name="CancelNotInterestedIcon"
-                          Data="M7.2,7.4 H4.3 V4.5 M4.55,7.35 C6.35,4.85 9.05,3.5 12,3.5 C16.7,3.5 20.5,7.3 20.5,12 C20.5,16.7 16.7,20.5 12,20.5 C9.45,20.5 7.15,19.38 5.6,17.6"
-                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                          StrokeEndLineCap="Round"
-                          StrokeLineJoin="Round"
-                          StrokeStartLineCap="Round"
-                          StrokeThickness="2.1"
-                          Stretch="Uniform"
-                          Visibility="Collapsed" />
-                </Grid>
+                <controls:PhosphorIcon Width="16"
+                                       Height="16"
+                                       VerticalAlignment="Center"
+                                       Icon="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
                 <TextBlock Margin="12,0,0,0"
                            VerticalAlignment="Center"
                            Text="{Binding}" />
             </StackPanel>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
-                    <Setter TargetName="NotInterestedIcon" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="CancelNotInterestedIcon" Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
         </DataTemplate>
     </UserControl.Resources>
 
@@ -286,11 +280,11 @@
                                            helpers:TrimmedTextToolTipBehavior.FullText="{Binding SeriesAndOriginalNameText}" />
                                 <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource BrushForegroundSecondary}" Text="&#xE787;" />
+                                        <controls:PhosphorIcon Width="16" Height="16" VerticalAlignment="Center" Foreground="{DynamicResource BrushForegroundSecondary}" Icon="calendar-blank" />
                                         <TextBlock Margin="6,0,0,0" FontSize="17" Foreground="{DynamicResource BrushForegroundSecondary}" Text="{Binding AirDateText}" />
                                     </StackPanel>
                                     <StackPanel Margin="18,0,0,0" Orientation="Horizontal">
-                                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource BrushForegroundSecondary}" Text="&#xE8B2;" />
+                                        <controls:PhosphorIcon Width="16" Height="16" VerticalAlignment="Center" Foreground="{DynamicResource BrushForegroundSecondary}" Icon="television" />
                                         <TextBlock Margin="6,0,0,0" FontSize="17" Foreground="{DynamicResource BrushForegroundSecondary}" Text="{Binding EpisodeCountText}" />
                                     </StackPanel>
                                 </StackPanel>
@@ -307,7 +301,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Horizontal">
                                         <Border Width="24" Height="24" Margin="0,0,7,0" Background="{DynamicResource BrushGlassSelected}" CornerRadius="7">
-                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource BrushAccent}" LineHeight="16" LineStackingStrategy="BlockLineHeight" Text="&#x2605;" TextAlignment="Center" />
+                                            <controls:PhosphorIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource BrushAccent}" Icon="star-fill" />
                                         </Border>
                                         <TextBlock VerticalAlignment="Center" Style="{StaticResource TvSeasonSmallCardTitleStyle}" Text="TMDB" />
                                     </StackPanel>
@@ -442,8 +436,8 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Grid.Column="4" Command="{Binding ToggleNotInterestedCommand}" Content="{Binding NotInterestedButtonText}" ContentTemplate="{StaticResource TvSeasonDetailNotInterestedActionButtonTemplate}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="{Binding IsNotInterested}" />
-                    <Button Grid.Column="6" Command="{Binding OpenSeasonCorrectionCommand}" Content="修正季归属" ContentTemplate="{StaticResource TvSeasonDetailActionButtonTemplate}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="&#xE70F;" />
+                    <Button Grid.Column="4" Command="{Binding ToggleNotInterestedCommand}" Content="{Binding NotInterestedButtonText}" ContentTemplate="{StaticResource TvSeasonDetailNotInterestedActionButtonTemplate}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="{Binding NotInterestedButtonIcon}" />
+                    <Button Grid.Column="6" Command="{Binding OpenSeasonCorrectionCommand}" Content="修正季归属" ContentTemplate="{StaticResource TvSeasonDetailActionButtonTemplate}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="pencil-simple" />
                     <Button Grid.Column="8" Command="{Binding AddSeasonToLibraryCommand}" Content="{Binding AddSeasonToLibraryButtonText}" ContentTemplate="{StaticResource TvSeasonDetailActionButtonTemplate}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="{Binding AddSeasonToLibraryButtonIcon}" />
                 </Grid>
             </Grid>

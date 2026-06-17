@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using MediaLibrary.Core.Diagnostics;
 
 namespace MediaLibrary.App.Helpers;
 
@@ -13,6 +14,11 @@ public static class MpvPlaybackDiagnostics
 
     public static void Write(string message)
     {
+        if (!DiagnosticMessageFilter.ShouldWrite(message, "XFVERSE_MPV_PLAYBACK_DIAGNOSTICS"))
+        {
+            return;
+        }
+
         try
         {
             var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [MPV] {message}";

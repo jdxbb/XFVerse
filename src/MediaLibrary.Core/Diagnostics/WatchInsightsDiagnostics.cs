@@ -6,6 +6,9 @@ namespace MediaLibrary.Core.Diagnostics;
 public static class WatchInsightsDiagnostics
 {
     private static readonly string LogPath = DiagnosticLogPathResolver.Resolve("watch-insights-perf.log");
+    private static readonly bool IsVerboseEnabled =
+        DiagnosticMessageFilter.IsEnabledByEnvironment("XFVERSE_WATCH_INSIGHTS_DIAGNOSTICS");
+    private static readonly object SyncRoot = new();
     private static readonly Channel<string> Lines = Channel.CreateUnbounded<string>(
         new UnboundedChannelOptions
         {
@@ -15,15 +18,29 @@ public static class WatchInsightsDiagnostics
 
     static WatchInsightsDiagnostics()
     {
-        _ = Task.Run(WriteLoopAsync);
+        if (IsVerboseEnabled)
+        {
+            _ = Task.Run(WriteLoopAsync);
+        }
     }
 
     public static void Write(string message)
     {
         var safeMessage = string.IsNullOrWhiteSpace(message) ? "event=empty" : message.Trim();
+        if (!IsVerboseEnabled && !DiagnosticMessageFilter.ShouldWriteReleaseMessage(safeMessage))
+        {
+            return;
+        }
+
         var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [WATCH-INSIGHTS-PERF] {safeMessage}";
         Debug.WriteLine(line);
-        Lines.Writer.TryWrite(line);
+        if (IsVerboseEnabled)
+        {
+            Lines.Writer.TryWrite(line);
+            return;
+        }
+
+        WriteReleaseLine(line);
     }
 
     private static async Task WriteLoopAsync()
@@ -43,6 +60,22 @@ public static class WatchInsightsDiagnostics
             await foreach (var line in Lines.Reader.ReadAllAsync())
             {
                 await writer.WriteLineAsync(line);
+            }
+        }
+        catch
+        {
+            // Diagnostics must never affect Watch Insights behavior.
+        }
+    }
+
+    private static void WriteReleaseLine(string line)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
+            lock (SyncRoot)
+            {
+                File.AppendAllText(LogPath, line + Environment.NewLine);
             }
         }
         catch

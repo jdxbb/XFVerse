@@ -73,16 +73,29 @@ public sealed class LibraryViewModel : PageViewModelBase
 
     private static readonly string[] EmotionTagLabels =
     [
-        "治愈", "温暖", "感动", "轻松", "欢乐", "浪漫", "热血", "紧张", "悬疑", "压抑",
-        "沉重", "震撼", "孤独", "荒诞", "黑色幽默", "催泪", "励志", "思考向", "爽感", "惊悚",
+        "治愈", "温暖", "感动", "轻松", "欢乐", "浪漫", "热血", "紧张", "好奇", "压抑",
+        "沉重", "震撼", "孤独", "荒诞", "黑色幽默", "催泪", "励志", "思考向", "爽感", "不安",
         "梦幻", "怀旧", "燃", "克制", "讽刺", "黑暗", "温柔"
     ];
 
     private static readonly string[] SceneTagLabels =
     [
-        "独自观看", "情侣", "朋友", "亲子", "家人", "深夜", "放松", "下饭", "周末", "聚会",
+        "独自观看", "情侣", "朋友", "亲子", "家人", "深夜", "解压", "下饭", "周末", "聚会",
         "高专注", "背景播放", "二刷", "影院感", "通勤", "短时观看", "长片沉浸", "节日", "雨天", "睡前"
     ];
+
+    private static readonly IReadOnlyDictionary<string, string> LegacyEmotionTagAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["悬疑"] = "好奇",
+            ["惊悚"] = "不安"
+        };
+
+    private static readonly IReadOnlyDictionary<string, string> LegacySceneTagAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["放松"] = "解压"
+        };
 
     private static readonly IReadOnlyList<string> DefaultCollectionStatusFilters =
     [
@@ -532,12 +545,12 @@ public sealed class LibraryViewModel : PageViewModelBase
     public string SortButtonText => $"排序：{SelectedSortOption}";
 
     public string SortDirectionIcon => string.Equals(SelectedSortDirection, "升序", StringComparison.Ordinal)
-        ? "↑"
-        : "↓";
+        ? "sort-ascending"
+        : "sort-descending";
 
     public string SortDirectionIconData => string.Equals(SelectedSortDirection, "升序", StringComparison.Ordinal)
-        ? "M 8 18 L 8 6 M 4 10 L 8 6 L 12 10 M 15 7 H 23 M 15 12 H 21 M 15 17 H 19"
-        : "M 8 6 L 8 18 M 4 14 L 8 18 L 12 14 M 15 7 H 19 M 15 12 H 21 M 15 17 H 23";
+        ? "sort-ascending"
+        : "sort-descending";
 
     public string SortDirectionButtonToolTip => $"顺序：{SelectedSortDirection}";
 
@@ -999,6 +1012,7 @@ public sealed class LibraryViewModel : PageViewModelBase
             _allMovies.Clear();
             _allMovies.AddRange(movies);
             ApplyExternalTagCache(_allMovies);
+            NormalizeLegacyMovieTagLabels(_allMovies);
             NormalizeTvGenreLabels(_allMovies);
 
             var tagDecadeStopwatch = Stopwatch.StartNew();
@@ -2771,7 +2785,9 @@ public sealed class LibraryViewModel : PageViewModelBase
             _ => Array.Empty<string>()
         };
 
-        return tags.Any(tag => string.Equals(tag, selectedTag, StringComparison.OrdinalIgnoreCase));
+        return tags
+            .Select(tag => NormalizeTagForFilter(category, tag))
+            .Any(tag => string.Equals(tag, selectedTag, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool MatchesContentTypeFilter(LibraryMovieListItem item, string filter)
@@ -3957,6 +3973,38 @@ public sealed class LibraryViewModel : PageViewModelBase
             IsBatchOperationRunning = false;
             RefreshBatchCommandState();
         }
+    }
+
+    private static void NormalizeLegacyMovieTagLabels(IEnumerable<LibraryMovieListItem> items)
+    {
+        foreach (var item in items.Where(item => item.IsMovie))
+        {
+            item.EmotionTagsText = NormalizeLegacyTagText(item.EmotionTagsText, LegacyEmotionTagAliases);
+            item.SceneTagsText = NormalizeLegacyTagText(item.SceneTagsText, LegacySceneTagAliases);
+        }
+    }
+
+    private static string NormalizeLegacyTagText(string? text, IReadOnlyDictionary<string, string> aliases)
+    {
+        var tags = SplitTags(text)
+            .Select(tag => aliases.TryGetValue(tag, out var normalized) ? normalized : tag)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return tags.Length == 0 ? string.Empty : string.Join("、", tags);
+    }
+
+    private static string NormalizeTagForFilter(string category, string tag)
+    {
+        if (string.Equals(category, TagCategoryType, StringComparison.Ordinal)
+            || string.Equals(category, TagCategoryTv, StringComparison.Ordinal))
+        {
+            return tag;
+        }
+
+        var aliases = string.Equals(category, TagCategoryEmotion, StringComparison.Ordinal)
+            ? LegacyEmotionTagAliases
+            : LegacySceneTagAliases;
+        return aliases.TryGetValue(tag, out var normalized) ? normalized : tag;
     }
 
     private void CancelBatchOperation()

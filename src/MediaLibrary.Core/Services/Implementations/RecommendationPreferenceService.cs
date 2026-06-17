@@ -183,7 +183,7 @@ public sealed class RecommendationPreferenceService : IRecommendationPreferenceS
 
         return new RecommendationPreferenceModel
         {
-            IsEnabled = preference.IsEnabled,
+            IsEnabled = preference.IsEnabled && text.Length > 0,
             Text = text,
             UpdatedAt = preference.UpdatedAt == default ? DateTimeOffset.MinValue : preference.UpdatedAt
         };

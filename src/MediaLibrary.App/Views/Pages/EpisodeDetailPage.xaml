@@ -128,10 +128,10 @@
 
         <DataTemplate x:Key="EpisodeDetailActionButtonTemplate">
             <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="14"
-                           Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+                <controls:PhosphorIcon Width="16"
+                                       Height="16"
+                                       VerticalAlignment="Center"
+                                       Icon="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
                 <TextBlock Margin="12,0,0,0"
                            VerticalAlignment="Center"
                            Text="{Binding}" />
@@ -261,12 +261,12 @@
                                           Height="17"
                                           Margin="18,0,0,0"
                                           VerticalAlignment="Bottom">
-                                        <TextBlock HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   FontFamily="Segoe MDL2 Assets"
-                                                   FontSize="14"
-                                                   Foreground="{DynamicResource BrushForegroundMuted}"
-                                                   Text="&#xE787;" />
+                                        <controls:PhosphorIcon Width="14"
+                                                               Height="14"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource BrushForegroundMuted}"
+                                                               Icon="calendar-blank" />
                                     </Grid>
                                     <TextBlock Grid.Column="2"
                                                Margin="6,0,0,0"
@@ -288,7 +288,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Horizontal">
                                         <Border Width="24" Height="24" Margin="0,0,7,0" HorizontalAlignment="Left" Background="{DynamicResource BrushGlassSelected}" CornerRadius="7">
-                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource BrushAccent}" LineHeight="16" LineStackingStrategy="BlockLineHeight" Text="&#x2605;" TextAlignment="Center" />
+                                            <controls:PhosphorIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource BrushAccent}" Icon="star-fill" />
                                         </Border>
                                         <TextBlock VerticalAlignment="Center" Style="{StaticResource EpisodeDetailSmallCardTitleStyle}" Text="TMDB" />
                                     </StackPanel>
@@ -394,9 +394,9 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0" Command="{Binding OpenPlayerCommand}" Content="{Binding PrimaryPlayButtonText}" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanOpenPlayer}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="&#xE768;" />
+                    <Button Grid.Column="0" Command="{Binding OpenPlayerCommand}" Content="{Binding PrimaryPlayButtonText}" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanOpenPlayer}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="play" />
                     <Button Grid.Column="2" Command="{Binding ToggleWatchedCommand}" Content="{Binding WatchedButtonText}" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanToggleWatched}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="{Binding WatchedButtonIcon}" />
-                    <Button Grid.Column="4" Command="{Binding CorrectionPlaceholderCommand}" Content="单集识别修正" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanUseIdentificationCorrection}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="&#xE70F;" />
+                    <Button Grid.Column="4" Command="{Binding CorrectionPlaceholderCommand}" Content="单集识别修正" ContentTemplate="{StaticResource EpisodeDetailActionButtonTemplate}" IsEnabled="{Binding CanUseIdentificationCorrection}" Style="{StaticResource GlassSecondaryButtonStyle}" Tag="pencil-simple" />
                 </Grid>
             </Grid>
         </Grid>
@@ -623,57 +623,11 @@
                         <ColumnDefinition Width="10" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Viewbox Width="20"
-                             Height="20"
-                             VerticalAlignment="Center">
-                        <Canvas Width="20" Height="20">
-                            <Ellipse Canvas.Left="1.2"
-                                     Canvas.Top="1.2"
-                                     Width="15.6"
-                                     Height="15.6"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.4" />
-                            <Ellipse Canvas.Left="7.1"
-                                     Canvas.Top="7.1"
-                                     Width="3.8"
-                                     Height="3.8"
-                                     Fill="{DynamicResource BrushForegroundMuted}" />
-                            <Ellipse Canvas.Left="7.3"
-                                     Canvas.Top="3.3"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Ellipse Canvas.Left="11.2"
-                                     Canvas.Top="7.2"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Ellipse Canvas.Left="7.3"
-                                     Canvas.Top="11.1"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Ellipse Canvas.Left="3.4"
-                                     Canvas.Top="7.2"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Path Data="M13.5,15.1 C15.6,17 17.3,17.8 19,17.8"
-                                  Fill="Transparent"
-                                  Stroke="{DynamicResource BrushForegroundMuted}"
-                                  StrokeEndLineCap="Round"
-                                  StrokeThickness="1.4" />
-                        </Canvas>
-                    </Viewbox>
+                    <controls:PhosphorIcon Width="20"
+                                           Height="20"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource BrushForegroundMuted}"
+                                           Icon="file-video" />
                     <helpers:CachedShadowBorder Grid.Column="2"
                                                 Margin="-12,-8"
                                                 Padding="12,8"

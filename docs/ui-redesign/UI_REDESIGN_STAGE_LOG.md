@@ -1,5 +1,33 @@
 # UI 初级重构阶段日志
 
+## 2026-06-17 - Cross-Page Icon And Spacing Polish
+
+Goal:
+- Apply focused visual polish for icon choices, icon sizing, badge sizing, and compact form alignment across the WPF app.
+- Keep the work scoped to UI presentation and existing view-model icon state only.
+
+Completed:
+- Updated Home library preview and Watch Insights overview watched status icons to the plain check mark, and reduced the Home AI recommendation rating badge footprint.
+- Normalized bottom-left avatar popup menu icon rendering with Phosphor icons and switched the settings entry to `gear-six`.
+- Enlarged the AI recommendation preference glyph while preserving the existing button hit area.
+- Swapped API/WebDAV sensitive input reveal icons to the Phosphor eye/eye-slash pair.
+- Reduced scan progress metric and remove icons without changing the surrounding layout structure.
+- Aligned profile edit ComboBox text with the lower profile inputs through a matching compact template.
+- Updated detail page watched/not-interested icon states and made filled favorite/rating glyphs use the accent color.
+- Added missing Phosphor assets for fullscreen out/in and undo-style actions.
+
+Explicitly not done:
+- No database schema, migration, media-library semantics, scan logic, recommendation logic, commit, or push was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- Icon cleanup searches found no remaining `corners-out`, `corners-in`, `eye-closed`, or TMDB `funnel-simple` usage in the touched UI surfaces.
+
+Known Issues:
+- Blocker: none.
+- Deferred: final visual acceptance still needs a manual pass in the running WPF app across light and dark themes.
+- Noise: several adjusted icon sizes are optical-size fixes and may need one more pixel-level pass after screenshot review.
+
 ## 2026-06-13 - User Profile Dialog Visual Polish Follow-up
 
 Goal:

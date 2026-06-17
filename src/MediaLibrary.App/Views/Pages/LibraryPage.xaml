@@ -291,12 +291,13 @@
                                     <ContentPresenter ContentSource="Header"
                                                       RecognizesAccessKey="True"
                                                       VerticalAlignment="Center" />
-                                    <TextBlock x:Name="SubmenuArrow"
-                                               Grid.Column="1"
-                                               Margin="8,0,0,0"
-                                               VerticalAlignment="Center"
-                                               Text="›"
-                                               Foreground="{DynamicResource BrushForegroundMuted}" />
+                                    <controls:PhosphorIcon x:Name="SubmenuArrow"
+                                                           Grid.Column="1"
+                                                           Margin="8,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BrushForegroundMuted}"
+                                                           Icon="caret-right"
+                                                           Style="{StaticResource PhosphorCaptionIconStyle}" />
                                 </Grid>
                             </Border>
                             <Popup x:Name="PART_Popup"
@@ -945,45 +946,27 @@
                             <Button HorizontalAlignment="Right"
                                     VerticalAlignment="Center"
                                     Margin="0,0,4,0"
+                                    Content="x"
+                                    ContentTemplate="{StaticResource PhosphorCaptionIconContentTemplate}"
                                     Command="{Binding ClearSearchCommand}"
-                                    Style="{StaticResource LibrarySearchClearButtonStyle}">
-                                <TextBlock FontFamily="Segoe MDL2 Assets"
-                                           FontSize="10"
-                                           Text="&#xE711;" />
-                            </Button>
+                                    Style="{StaticResource LibrarySearchClearButtonStyle}" />
                         </Grid>
                     </StackPanel>
 
                     <Button Grid.Column="2"
                             VerticalAlignment="Bottom"
+                            Content="magnifying-glass"
+                            ContentTemplate="{StaticResource PhosphorSmallIconContentTemplate}"
                             Command="{Binding ApplySearchCommand}"
                             Click="SearchButton_Click"
-                            Style="{StaticResource LibraryToolbarIconButtonStyle}">
-                        <TextBlock FontFamily="Segoe MDL2 Assets"
-                                   FontSize="16"
-                                   RenderTransformOrigin="0.5,0.5"
-                                   Text="&#xE721;">
-                            <TextBlock.RenderTransform>
-                                <ScaleTransform ScaleX="-1" />
-                            </TextBlock.RenderTransform>
-                        </TextBlock>
-                    </Button>
+                            Style="{StaticResource LibraryToolbarIconButtonStyle}" />
                     <Button Grid.Column="4"
                             VerticalAlignment="Bottom"
                             Command="{Binding ToggleSortDirectionCommand}"
+                            Content="{Binding SortDirectionIconData}"
+                            ContentTemplate="{StaticResource PhosphorSmallIconContentTemplate}"
                             Style="{StaticResource LibrarySortDirectionIconButtonStyle}"
-                            ToolTip="{Binding SortDirectionButtonToolTip}">
-                        <Viewbox Width="16" Height="16">
-                            <Canvas Width="26" Height="24">
-                                <Path Data="{Binding SortDirectionIconData}"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="2"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round" />
-                            </Canvas>
-                        </Viewbox>
-                    </Button>
+                            ToolTip="{Binding SortDirectionButtonToolTip}" />
                     <Canvas x:Name="ToolbarRightButtonGrid"
                             Grid.Column="6"
                             Height="28"
@@ -2285,24 +2268,21 @@
                                                                 Command="{Binding DataContext.DeleteRemovedLibraryGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
                                                                 Style="{StaticResource LibraryRemovedPanelDangerButtonStyle}" />
-                                                        <TextBlock Grid.Column="6"
-                                                                   VerticalAlignment="Center"
-                                                                   HorizontalAlignment="Right"
-                                                                   FontFamily="Segoe MDL2 Assets"
-                                                                   FontSize="10"
-                                                                   Foreground="{DynamicResource BrushForegroundMuted}"
-                                                                   >
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Text" Value="&#xE70D;" />
+                                                        <controls:PhosphorIcon Grid.Column="6"
+                                                                               HorizontalAlignment="Right"
+                                                                               VerticalAlignment="Center"
+                                                                               Foreground="{DynamicResource BrushForegroundMuted}">
+                                                            <controls:PhosphorIcon.Style>
+                                                                <Style TargetType="controls:PhosphorIcon" BasedOn="{StaticResource PhosphorCaptionIconStyle}">
+                                                                    <Setter Property="Icon" Value="caret-down" />
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding IsExpanded}" Value="True">
-                                                                            <Setter Property="Text" Value="&#xE70E;" />
+                                                                            <Setter Property="Icon" Value="caret-up" />
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
+                                                            </controls:PhosphorIcon.Style>
+                                                        </controls:PhosphorIcon>
                                                     </Grid>
                                                 </Border>
                                             </Expander.Header>

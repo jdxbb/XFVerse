@@ -24,6 +24,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
     private const string CandidatePoolRefillFailedMessage = "候选补充失败，请稍后重试";
     private const string CandidatePoolRefillNoCandidatesMessage = "本次没有补充到新的候选影片，请稍后重试";
     private static readonly string AiPoolDiagnosticLogPath = DiagnosticLogPathResolver.Resolve("ai-pool-debug.log");
+    private static readonly bool AiPoolDiagnosticsEnabled =
+        DiagnosticMessageFilter.IsEnabledByEnvironment("XFVERSE_AI_POOL_DIAGNOSTICS");
     private static readonly object AiPoolDiagnosticFileLock = new();
     private const string RefreshBatchText = "换一批";
     private const string RetryRecommendationText = "重试";
@@ -87,7 +89,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         ToggleNotInterestedCommand = new AsyncRelayCommand(ToggleNotInterestedAsync, CanToggleNotInterested);
         SelectLibraryScopeCommand = new RelayCommand(value => SelectedLibraryScope = GetPlaybackSourceOptionValue(value));
         SelectWatchFilterCommand = new RelayCommand(value => SelectedWatchFilter = GetWatchFilterOptionValue(value));
-        SetCustomPreferenceEnabledCommand = new RelayCommand(SetCustomPreferenceEnabled, _ => CanEditCustomPreference);
+        SetCustomPreferenceEnabledCommand = new RelayCommand(SetCustomPreferenceEnabled, CanSetCustomPreferenceEnabled);
         EditPreferenceCommand = new AsyncRelayCommand(OpenPreferenceDialogAsync, () => CanEditCustomPreference);
         ConfirmPreferenceCommand = new AsyncRelayCommand(ConfirmPreferenceAsync, () => CanConfirmPreference);
         CancelPreferenceCommand = new RelayCommand(CancelPreferenceDialog);
@@ -204,6 +206,10 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     public bool CanEditCustomPreference => !IsLoading && !_isWaitingForCandidatePoolRefill;
 
+    public bool HasSavedCustomPreference => !string.IsNullOrEmpty(NormalizePreferenceText(_savedCustomPreferenceText));
+
+    public bool CanEnableCustomPreference => CanEditCustomPreference && HasSavedCustomPreference;
+
     public int CustomPreferenceMaxLength => RecommendationPreferenceModel.MaxTextLength;
 
     public bool IsCustomPreferenceEnabled
@@ -283,8 +289,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
                                         && HasPreferenceDraftChanged;
 
     public bool CanClearPreference => CanEditCustomPreference
-                                      && (!string.IsNullOrEmpty(NormalizePreferenceText(_savedCustomPreferenceText))
-                                          || IsCustomPreferenceEnabled);
+                                      && (HasSavedCustomPreference || IsCustomPreferenceEnabled);
 
     public bool CanRequestRecommendations
     {
@@ -318,6 +323,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         ConfirmPreferenceCommand.RaiseCanExecuteChanged();
         ClearPreferenceCommand.RaiseCanExecuteChanged();
         OnPropertyChanged(nameof(CanEditCustomPreference));
+        OnPropertyChanged(nameof(CanEnableCustomPreference));
         OnPropertyChanged(nameof(CanConfirmPreference));
         OnPropertyChanged(nameof(CanClearPreference));
     }
@@ -399,6 +405,22 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
     private async Task SaveCustomPreferenceEnabledAsync(bool isEnabled, bool previousValue)
     {
+        if (isEnabled && !HasSavedCustomPreference)
+        {
+            _isApplyingPreferenceState = true;
+            try
+            {
+                IsCustomPreferenceEnabled = previousValue;
+            }
+            finally
+            {
+                _isApplyingPreferenceState = false;
+            }
+
+            StatusMessage = "请先填写自定义推荐偏好";
+            return;
+        }
+
         try
         {
             var saved = await _recommendationPreferenceService.SaveAsync(
@@ -411,7 +433,6 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             StatusMessage = isEnabled
                 ? "自定义推荐偏好已开启，下一次推荐将生效"
                 : "自定义推荐偏好已关闭，下一次推荐将生效";
-            await RequestReloadAsync(forceRefresh: false);
         }
         catch (Exception exception)
         {
@@ -446,6 +467,17 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         }
     }
 
+    private bool CanSetCustomPreferenceEnabled(object? value)
+    {
+        if (!CanEditCustomPreference)
+        {
+            return false;
+        }
+
+        var isEnabled = bool.TryParse(value?.ToString(), out var parsed) && parsed;
+        return !isEnabled || HasSavedCustomPreference;
+    }
+
     private void SetCustomPreferenceEnabled(object? value)
     {
         if (!CanEditCustomPreference)
@@ -453,7 +485,14 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             return;
         }
 
-        IsCustomPreferenceEnabled = bool.TryParse(value?.ToString(), out var isEnabled) && isEnabled;
+        var isEnabled = bool.TryParse(value?.ToString(), out var parsed) && parsed;
+        if (isEnabled && !HasSavedCustomPreference)
+        {
+            StatusMessage = "请先填写自定义推荐偏好";
+            return;
+        }
+
+        IsCustomPreferenceEnabled = isEnabled;
     }
 
     private async Task ConfirmPreferenceAsync()
@@ -468,17 +507,20 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
         try
         {
+            var hadSavedPreference = HasSavedCustomPreference;
+            var normalizedDraft = NormalizePreferenceText(DraftCustomPreferenceText);
+            var shouldEnableAfterSave = IsCustomPreferenceEnabled
+                                        || (!hadSavedPreference && normalizedDraft.Length > 0);
             var saved = await _recommendationPreferenceService.SaveAsync(
                 new RecommendationPreferenceModel
                 {
-                    IsEnabled = IsCustomPreferenceEnabled,
+                    IsEnabled = shouldEnableAfterSave,
                     Text = DraftCustomPreferenceText
                 });
             ApplyCustomPreference(saved);
             _originalCustomPreferenceText = saved.Text;
             IsPreferenceDialogOpen = false;
             StatusMessage = "推荐偏好已保存，下一次推荐将生效";
-            await RequestReloadAsync(forceRefresh: false);
         }
         catch (Exception exception)
         {
@@ -518,7 +560,6 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             DraftCustomPreferenceText = string.Empty;
             IsPreferenceDialogOpen = false;
             StatusMessage = "推荐偏好已清空，下一次推荐将生效";
-            await RequestReloadAsync(forceRefresh: false);
         }
         catch (Exception exception)
         {
@@ -538,6 +579,12 @@ public sealed class RecommendationsViewModel : PageViewModelBase
         {
             _isApplyingPreferenceState = false;
         }
+
+        OnPropertyChanged(nameof(HasSavedCustomPreference));
+        OnPropertyChanged(nameof(CanEnableCustomPreference));
+        OnPropertyChanged(nameof(CanClearPreference));
+        SetCustomPreferenceEnabledCommand.RaiseCanExecuteChanged();
+        ClearPreferenceCommand.RaiseCanExecuteChanged();
     }
 
     private void OnPreferenceDraftBaselineChanged()
@@ -1498,11 +1545,14 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             $"[AI-POOL] event=refill-ui-recover reason={reason}{modeSegment} combination={combinationKey}");
     }
 
-    // TODO: Remove AI-POOL temporary diagnostics after candidate pool validation.
     private static void WriteAiPoolDiagnostic(string message)
     {
+        if (!AiPoolDiagnosticsEnabled && !DiagnosticMessageFilter.ShouldWriteReleaseMessage(message))
+        {
+            return;
+        }
+
         Debug.WriteLine(message);
-        Console.WriteLine(message);
         try
         {
             lock (AiPoolDiagnosticFileLock)

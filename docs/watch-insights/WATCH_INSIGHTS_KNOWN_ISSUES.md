@@ -1,5 +1,22 @@
 # Watch Insights Known Issues
 
+## 2026-06-17 Watch Insights Profile Spinner Crash And Preference Toggle Fix
+
+Blocker:
+- None identified by solution build.
+
+Deferred:
+- Verify manual profile generation no longer crashes when the spinner stops.
+- Verify profile generation started by entering Watch Insights continues after navigating away and produces cache for the next entry.
+- Verify the statistics refresh icon does not spin while only profile generation is running.
+- Verify custom recommendation preference cannot be switched on when no preference text is saved.
+- Verify saving the first non-empty preference automatically switches the preference on.
+- Verify editing an existing preference keeps the previous on/off state.
+- Verify toggling preference on/off, saving text, and clearing text do not request a new recommendation batch until refresh is clicked.
+
+Noise:
+- Older `.NET Runtime` event 1026 and Windows Error Reporting entries from before this fix remain visible in Event Viewer.
+
 ## 2026-06-16 Watch Insights Micro Layout Polish
 
 Blocker:

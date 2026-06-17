@@ -1,5 +1,36 @@
 # 影片发现阶段日志
 
+## 2026-06-17 - Ranking Medal Number Micro Alignment Follow-up
+
+Goal:
+
+- Apply screenshot feedback for the ranking medal number placement: move gold slightly left, lift silver slightly, lift bronze slightly more, and reduce remaining ordinary-medal number drift.
+
+Completed:
+
+- Gold medal digits now move a very small step left from the previous screenshot pass.
+- Silver medal digits now move a very small step upward.
+- Bronze medal digits now move upward by a slightly larger amount than silver.
+- Rank digits now prefer the Arial Black / Segoe UI font stack and each digit is centered vertically and horizontally by its actual ink geometry inside a fixed-width digit cell.
+- Ordinary medal ranks no longer depend on proportional digit metrics alone for alignment; one-digit and multi-digit ranks share the same slot-based layout path.
+
+Not done:
+
+- No medal artwork, glow resource, poster layout, ranking request, ranking order, recommendation logic, database schema, migration, database update, commit or push was changed.
+- No full WPF screenshot pass was run in this turn.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the screenshot case again for gold, silver, bronze, and ordinary medal ranks on Movie and TV ranking posters.
+- Deferred: manually compare ordinary medal ranks with narrow digits such as 1 and wider digits such as 8 or 0.
+- Noise: exact optical centering can still be affected by WPF text rasterization and the transparent padding in the medal PNGs.
+
 ## 2026-06-16 - Ranking Medal Size And Number Alignment Polish
 
 Goal:
@@ -2667,3 +2698,208 @@ Known Issues:
 - Blocker: none confirmed by build.
 - Deferred: manually verify the rank digit placement in the running ranking poster UI.
 - Noise: per-rank offsets remain tiny visual constants and may need final adjustment after viewing the actual WPF rendering.
+
+## 2026-06-17 - Rank Medal Digit Vertical Ratio Follow-up
+
+Goal:
+
+- Apply the requested ranking medal digit vertical micro-adjustment while keeping medal artwork, ranking order, and list layout unchanged.
+
+Completed:
+
+- Gold medal digits were lifted by a smaller extra amount.
+- Silver medal digits were lifted by one extra amount.
+- Bronze medal digits were lifted by twice the silver extra amount.
+- Normal medal digits were lifted by the same extra amount as silver.
+
+Not done:
+
+- No ranking data, dashboard query, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the digit placement on gold, silver, bronze, and normal ranking medal art in the running WPF UI.
+- Noise: WPF text geometry and image scaling can make sub-pixel vertical offsets look slightly different between poster sizes.
+
+## 2026-06-17 - Rank Medal Digit Position And Contrast Follow-up
+
+Goal:
+
+- Apply the requested ranking medal digit left/up micro-adjustments and use one fixed, higher-contrast digit color style for all medal ranks.
+
+Completed:
+
+- Gold medal digits were nudged slightly left while keeping the existing vertical placement.
+- Silver, bronze, and normal medal digits were lifted by the same shared extra amount.
+- Gold, silver, bronze, and normal medal digits now share the same fixed warm-white fill with a stronger dark outline and shadow.
+
+Not done:
+
+- No medal artwork, poster layout, ranking request, ranking order, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the digit placement and contrast in the running WPF ranking UI.
+- Noise: sub-pixel placement can still appear slightly different between normal and hero ranking medal sizes.
+
+## 2026-06-17 - Rank Medal Digit Shared Lift Follow-up
+
+Goal:
+
+- Apply the requested ranking medal digit upward micro-adjustment and record why the medal set can feel visually odd in the poster UI.
+
+Completed:
+
+- Gold medal digits were lifted by a separate very small extra amount.
+- Silver medal digits were lifted upward.
+- Bronze and normal medal digits use the same additional upward amount as silver.
+- The medal-set visual mismatch was identified as an asset/style issue rather than a ranking-data issue: the gold medal has crown-heavy artwork, silver and bronze use a different laurel medal composition, and the normal medal uses a much plainer frame, so the set reads less cohesive when shrunk onto poster corners.
+
+Not done:
+
+- No medal artwork, poster layout, ranking request, ranking order, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify gold, silver, bronze, and normal medal digit placement in the running WPF ranking UI.
+- Noise: the current medal images are not one consistent visual set; replacing or normalizing the assets would be a separate visual pass.
+
+## 2026-06-17 - Rank Medal Optical Center And Glow Follow-up
+
+Goal:
+
+- Reduce ordinary medal digit visual drift, keep the requested tiny upward adjustments, and add a subtle medal-colored glow to ranking medals.
+
+Completed:
+
+- Gold medal digits now use a separate very small extra upward adjustment.
+- Silver medal digits now use a smaller upward adjustment than the previous pass.
+- Bronze and ordinary medal digits share the same additional upward adjustment as silver.
+- Rank digit horizontal placement now uses a fixed layout box center instead of glyph-outline bounds, reducing optical drift from narrow or asymmetric numerals.
+- Added weak static `DropShadowEffect` resources for gold, silver, bronze, and ordinary medal glow colors sampled from the medal artwork.
+- Ranking medal styles now select the appropriate static glow resource by rank while keeping ordinary ranks on the ordinary-medal glow.
+
+Not done:
+
+- No medal artwork, poster layout, ranking request, ranking order, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the ordinary medal digits, especially narrow and two-digit ranks, in the running WPF ranking UI.
+- Noise: medal glow is intentionally weak; it may need a small opacity tweak after screenshot review on dark and bright posters.
+
+## 2026-06-17 - Rank Medal Tabular Digit Follow-up
+
+Goal:
+
+- Apply the requested gold, silver, and bronze digit micro-offsets and make ordinary medal digit alignment more consistent without rank-specific hard-coded numeral exceptions.
+
+Completed:
+
+- Gold medal digits were moved slightly right by a very small amount.
+- Silver medal digits were lifted by a very small amount.
+- Bronze medal digits were lifted slightly more than silver.
+- Ordinary medal digits now render each numeral in an equal-width cell before centering the whole number group, reducing visual drift from narrow or asymmetric numerals.
+
+Not done:
+
+- No medal artwork, glow resource, poster layout, ranking request, ranking order, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify ordinary medal ranks with one-digit and two-digit numbers in the running WPF ranking UI.
+- Noise: equal-width digit cells improve consistency, but proportional-font glyph shapes can still create small optical differences.
+
+## 2026-06-17 - Rank Medal Screenshot Alignment Follow-up
+
+Goal:
+
+- Respond to screenshot feedback that ordinary medal digits still looked visually inconsistent and apply another small silver/bronze vertical adjustment.
+
+Completed:
+
+- Silver medal digits were lifted by another very small amount.
+- Bronze medal digits were lifted slightly more than silver.
+- Ordinary medal vertical placement was kept separate from silver so silver tweaks no longer move ordinary ranks unintentionally.
+- Ordinary medal digit rendering now left-aligns each temporary digit geometry, measures its real ink bounds, and centers each digit inside a shared max-digit-width cell before centering the whole number group.
+
+Not done:
+
+- No medal artwork, glow resource, poster layout, ranking request, ranking order, recommendation logic, database schema, migration, database update, commit or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the screenshot case again for ordinary medal ranks 4, 5, 6, and 7.
+- Noise: if the ordinary medal still appears inconsistent after this pass, the remaining issue is likely optical font shape/background contrast rather than coordinate math.
+
+## 2026-06-17 - Release Diagnostics And AI Tag Vocabulary Cleanup
+
+Goal:
+
+- Reduce runtime logging overhead for release usage while keeping error-oriented diagnostics.
+- Review the type / emotion / scene AI tag vocabularies, keep the type vocabulary unchanged, and remove cross-category ambiguity from emotion and scene labels.
+
+Completed:
+
+- Added a shared diagnostic message filter so high-volume diagnostic sinks default to writing only failure, exception, timeout, retry-exhausted, slow, invalid, and recover-failure events.
+- AI performance, scan identification, Watch Insights, watch completion, MPV playback, video cache, and AI recommendation pool diagnostics now keep verbose logging behind explicit `XFVERSE_*_DIAGNOSTICS=1` environment switches.
+- Removed default console writes from AI performance and AI recommendation pool diagnostics.
+- Kept `ScanTaskLog` persistence unchanged because it is product-visible scan history rather than temporary debug logging.
+- Kept the type tag vocabulary unchanged.
+- Replaced emotion tags `悬疑` / `惊悚` with `好奇` / `不安` so suspense / thriller remain type labels while emotion labels describe viewer feeling.
+- Replaced scene tag `放松` with `解压` so scene labels describe viewing use-cases more clearly.
+- Added compatibility aliases so legacy emotion values `悬疑` / `惊悚` normalize to `好奇` / `不安`, and legacy scene value `放松` normalizes to `解压` where the target vocabulary supports it.
+- Synced the media-library tag filter option lists and in-memory legacy tag normalization with the updated emotion / scene labels.
+
+Not done:
+
+- No type vocabulary item was changed.
+- No stored movie tag data was migrated or rewritten.
+- No recommendation algorithm, scan matching rule, database schema, migration, database update, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` is empty.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify that media-library emotion filter `好奇` matches legacy `悬疑`, emotion filter `不安` matches legacy `惊悚`, and scene filter `解压` matches legacy `放松`.
+- Noise: old persisted tag text is normalized in the media-library view model and AI normalization paths, but the database values are intentionally not rewritten in this pass.

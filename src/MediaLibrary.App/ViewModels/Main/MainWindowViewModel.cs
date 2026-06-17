@@ -43,7 +43,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _isUserMenuOpen;
     private bool _hasUserAvatar;
     private string _userMenuStatusMessage = string.Empty;
-    private string _themeToggleIcon = "☀";
+    private string _themeToggleIcon = "sun";
     private string _themeToggleToolTip = "当前浅色主题，切换到深色主题";
 
     public MainWindowViewModel(
@@ -74,12 +74,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         VisibleNavigationItems =
         [
-            new NavigationItemViewModel(NavigationPageKey.Home, "首页", homeViewModel, "⌂"),
-            new NavigationItemViewModel(NavigationPageKey.Library, "媒体库", libraryViewModel, "▦"),
-            new NavigationItemViewModel(NavigationPageKey.MovieDiscovery, "影片发现", movieDiscoveryViewModel, "✦"),
-            new NavigationItemViewModel(NavigationPageKey.WatchHistory, "观影历史", watchHistoryViewModel, "◷"),
-            new NavigationItemViewModel(NavigationPageKey.Favorites, "收藏夹", favoritesViewModel, "♡"),
-            new NavigationItemViewModel(NavigationPageKey.WatchInsights, "观影洞察", watchInsightsViewModel, "◎")
+            new NavigationItemViewModel(NavigationPageKey.Home, "首页", homeViewModel, "house-simple"),
+            new NavigationItemViewModel(NavigationPageKey.Library, "媒体库", libraryViewModel, "film-slate"),
+            new NavigationItemViewModel(NavigationPageKey.MovieDiscovery, "影片发现", movieDiscoveryViewModel, "sparkle"),
+            new NavigationItemViewModel(NavigationPageKey.WatchHistory, "观影历史", watchHistoryViewModel, "clock"),
+            new NavigationItemViewModel(NavigationPageKey.Favorites, "收藏夹", favoritesViewModel, "heart"),
+            new NavigationItemViewModel(NavigationPageKey.WatchInsights, "观影洞察", watchInsightsViewModel, "dna")
         ];
 
         var hiddenRouteItems = new[]
@@ -575,12 +575,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (string.Equals(themeMode, "Dark", StringComparison.OrdinalIgnoreCase))
         {
-            ThemeToggleIcon = "☾";
+            ThemeToggleIcon = "moon-stars";
             ThemeToggleToolTip = "当前深色主题，切换到浅色主题";
             return;
         }
 
-        ThemeToggleIcon = "☀";
+        ThemeToggleIcon = "sun";
         ThemeToggleToolTip = "当前浅色主题，切换到深色主题";
     }
 

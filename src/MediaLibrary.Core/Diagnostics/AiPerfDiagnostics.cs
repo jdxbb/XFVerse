@@ -6,6 +6,8 @@ namespace MediaLibrary.Core.Diagnostics;
 public static class AiPerfDiagnostics
 {
     private static readonly string LogPath = DiagnosticLogPathResolver.Resolve("ai-perf-debug.log");
+    private static readonly bool IsVerboseEnabled =
+        DiagnosticMessageFilter.IsEnabledByEnvironment("XFVERSE_AI_PERF_DIAGNOSTICS");
     private static readonly object FileLock = new();
     private static readonly AsyncLocal<AiPerfScope?> CurrentScope = new();
 
@@ -67,9 +69,13 @@ public static class AiPerfDiagnostics
 
     public static void WriteEvent(string message)
     {
+        if (!IsVerboseEnabled && !DiagnosticMessageFilter.ShouldWriteReleaseMessage(message))
+        {
+            return;
+        }
+
         var line = $"[AI-PERF] {message}";
         Debug.WriteLine(line);
-        Console.WriteLine(line);
         try
         {
             lock (FileLock)

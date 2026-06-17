@@ -7,6 +7,13 @@ namespace MediaLibrary.App.Controls;
 
 public sealed class RankMedalBadge : FrameworkElement
 {
+    private const double GoldNumberLeftNudgeRatio = -0.003d;
+    private const double GoldNumberTinyUpNudgeRatio = -0.002d;
+    private const double SilverNumberUpNudgeRatio = -0.016d;
+    private const double BronzeNumberExtraUpNudgeRatio = -0.012d;
+    private const double OrdinaryNumberUpNudgeRatio = -0.010d;
+    private static readonly FontFamily RankNumberFontFamily = new("Arial Black, Segoe UI Variable Display, Segoe UI, Arial");
+
     public static readonly DependencyProperty RankProperty = DependencyProperty.Register(
         nameof(Rank),
         typeof(int),
@@ -71,32 +78,30 @@ public sealed class RankMedalBadge : FrameworkElement
     private static void DrawRankNumber(DrawingContext drawingContext, int rank, Rect bounds, double pixelsPerDip)
     {
         var text = rank.ToString(CultureInfo.InvariantCulture);
-        var style = RankNumberStyle.ForRank(rank);
+        var style = RankNumberStyle.CreateDefault();
         var fontSize = CalculateFontSize(text, bounds);
-        var formattedText = new FormattedText(
-            text,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            new Typeface(
-                new FontFamily("Segoe UI Variable Display, Segoe UI, Arial"),
-                FontStyles.Normal,
-                FontWeights.Black,
-                FontStretches.Normal),
-            fontSize,
-            style.FillBrush,
-            pixelsPerDip)
-        {
-            TextAlignment = TextAlignment.Center
-        };
-
-        var measuredGeometry = formattedText.BuildGeometry(new Point());
-        var measuredBounds = measuredGeometry.Bounds;
+        var typeface = new Typeface(
+            RankNumberFontFamily,
+            FontStyles.Normal,
+            FontWeights.Black,
+            FontStretches.Normal);
+        var digitCellWidth = CalculateDigitCellWidth(typeface, fontSize, style.FillBrush, pixelsPerDip, bounds);
+        var tabularTextWidth = digitCellWidth * text.Length;
+        var layoutWidth = CalculateLayoutWidth(tabularTextWidth, text, bounds);
         var medalCenter = new Point(bounds.Left + bounds.Width / 2d, bounds.Top + bounds.Height / 2d);
         var offsetRatio = GetNumberOffsetRatio(rank);
-        var origin = new Point(
-            medalCenter.X - measuredBounds.Left - (measuredBounds.Width / 2d) + (bounds.Height * offsetRatio.X),
-            medalCenter.Y - measuredBounds.Top - (measuredBounds.Height / 2d) + (bounds.Height * offsetRatio.Y));
-        var geometry = formattedText.BuildGeometry(origin);
+        var layoutLeft = medalCenter.X - (layoutWidth / 2d) + (bounds.Height * offsetRatio.X);
+        var digitLeft = layoutLeft + ((layoutWidth - tabularTextWidth) / 2d);
+        var digitCenterY = medalCenter.Y + (bounds.Height * offsetRatio.Y);
+        var geometry = BuildTabularNumberGeometry(
+            text,
+            typeface,
+            fontSize,
+            style.FillBrush,
+            pixelsPerDip,
+            digitLeft,
+            digitCenterY,
+            digitCellWidth);
         var offset = Math.Max(0.4d, bounds.Height * 0.012d);
         var outlineThickness = Math.Max(0.75d, bounds.Height * 0.028d);
 
@@ -123,14 +128,88 @@ public sealed class RankMedalBadge : FrameworkElement
         return Math.Max(7d, bounds.Height * ratio);
     }
 
+    private static FormattedText CreateFormattedText(
+        string text,
+        Typeface typeface,
+        double fontSize,
+        Brush brush,
+        double pixelsPerDip)
+    {
+        return new FormattedText(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            typeface,
+            fontSize,
+            brush,
+            pixelsPerDip)
+        {
+            TextAlignment = TextAlignment.Left
+        };
+    }
+
+    private static Geometry BuildTabularNumberGeometry(
+        string text,
+        Typeface typeface,
+        double fontSize,
+        Brush brush,
+        double pixelsPerDip,
+        double left,
+        double centerY,
+        double digitCellWidth)
+    {
+        var group = new GeometryGroup { FillRule = FillRule.Nonzero };
+        for (var i = 0; i < text.Length; i++)
+        {
+            var digitText = CreateFormattedText(text[i].ToString(), typeface, fontSize, brush, pixelsPerDip);
+            var digitBounds = digitText.BuildGeometry(new Point()).Bounds;
+            var digitOrigin = new Point(
+                left + (i * digitCellWidth) + (digitCellWidth / 2d) - digitBounds.Left - (digitBounds.Width / 2d),
+                centerY - digitBounds.Top - (digitBounds.Height / 2d));
+            group.Children.Add(digitText.BuildGeometry(digitOrigin));
+        }
+
+        return group;
+    }
+
+    private static double CalculateDigitCellWidth(
+        Typeface typeface,
+        double fontSize,
+        Brush brush,
+        double pixelsPerDip,
+        Rect bounds)
+    {
+        var width = 0d;
+        for (var digit = 0; digit <= 9; digit++)
+        {
+            var digitText = CreateFormattedText(digit.ToString(CultureInfo.InvariantCulture), typeface, fontSize, brush, pixelsPerDip);
+            var digitBounds = digitText.BuildGeometry(new Point()).Bounds;
+            width = Math.Max(width, Math.Max(digitText.WidthIncludingTrailingWhitespace, digitBounds.Width));
+        }
+
+        return Math.Max(width, bounds.Height * 0.2d);
+    }
+
+    private static double CalculateLayoutWidth(double tabularTextWidth, string text, Rect bounds)
+    {
+        var minimumRatio = text.Length switch
+        {
+            <= 1 => 0.48d,
+            2 => 0.62d,
+            _ => 0.74d
+        };
+        var sideBearingAllowance = bounds.Height * 0.08d;
+        return Math.Max(bounds.Width * minimumRatio, tabularTextWidth + sideBearingAllowance);
+    }
+
     private static Point GetNumberOffsetRatio(int rank)
     {
         return rank switch
         {
-            1 => new Point(-0.012d, -0.052d),
-            2 => new Point(-0.014d, -0.066d),
-            3 => new Point(-0.014d, -0.078d),
-            _ => new Point(0d, -0.078d)
+            1 => new Point(-0.012d + GoldNumberLeftNudgeRatio, -0.058d + GoldNumberTinyUpNudgeRatio),
+            2 => new Point(-0.014d, -0.078d + SilverNumberUpNudgeRatio),
+            3 => new Point(-0.014d, -0.102d + SilverNumberUpNudgeRatio + BronzeNumberExtraUpNudgeRatio),
+            _ => new Point(0d, -0.090d + OrdinaryNumberUpNudgeRatio)
         };
     }
 
@@ -140,15 +219,9 @@ public sealed class RankMedalBadge : FrameworkElement
         SolidColorBrush ShadowBrush,
         SolidColorBrush HighlightBrush)
     {
-        public static RankNumberStyle ForRank(int rank)
+        public static RankNumberStyle CreateDefault()
         {
-            return rank switch
-            {
-                1 => Create("#6A3F00", "#4DFFF1B8", "#33000000", "#2EFFFFFF"),
-                2 => Create("#3F4652", "#47FFFFFF", "#2E000000", "#33FFFFFF"),
-                3 => Create("#5B2E16", "#40FFD8B0", "#33000000", "#26FFFFFF"),
-                _ => Create("#4B5563", "#40FFFFFF", "#29000000", "#26FFFFFF")
-            };
+            return Create("#FFFFF7", "#A8000000", "#73000000", "#40FFFFFF");
         }
 
         private static RankNumberStyle Create(string fill, string outline, string shadow, string highlight)

@@ -180,14 +180,21 @@
             <Setter Property="CornerRadius" Value="10" />
         </Style>
 
+        <DataTemplate x:Key="ScanRemoveIconContentTemplate">
+            <controls:PhosphorIcon Icon="{Binding}"
+                                   Width="12"
+                                   Height="12"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" />
+        </DataTemplate>
+
         <Style x:Key="ScanRemoveIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SmallIconButtonStyle}">
             <Setter Property="Width" Value="28" />
             <Setter Property="Height" Value="28" />
             <Setter Property="MinWidth" Value="28" />
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Content" Value="x" />
+            <Setter Property="ContentTemplate" Value="{StaticResource ScanRemoveIconContentTemplate}" />
             <Setter Property="ToolTip" Value="移除路径" />
         </Style>
 
@@ -241,18 +248,13 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <Style x:Key="ScanMetricIconStyle" TargetType="TextBlock">
-            <Setter Property="Width" Value="34" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Margin" Value="0,0,12,0" />
+        <Style x:Key="ScanMetricIconStyle" TargetType="{x:Type controls:PhosphorIcon}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="0,0,10,0" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="20" />
             <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
-            <Setter Property="LineHeight" Value="34" />
-            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
-            <Setter Property="TextAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="ScanMetricValueTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
@@ -451,7 +453,6 @@
                                                                                Text="{Binding Path}"
                                                                                TextTrimming="CharacterEllipsis" />
                                                                     <Button Grid.Column="2"
-                                                                            Content="&#xE711;"
                                                                             Command="{Binding DataContext.DeleteScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
                                                                             CommandParameter="{Binding}"
                                                                             Style="{StaticResource ScanRemoveIconButtonStyle}" />
@@ -655,7 +656,6 @@
                                                                    Text="{Binding Path}"
                                                                    TextTrimming="CharacterEllipsis" />
                                                         <Button Grid.Column="2"
-                                                                Content="&#xE711;"
                                                                 Command="{Binding DataContext.DeleteLocalScanPathCommand, RelativeSource={RelativeSource AncestorType={x:Type pages:ScanTasksPage}}}"
                                                                 CommandParameter="{Binding}"
                                                                 Style="{StaticResource ScanRemoveIconButtonStyle}" />
@@ -760,12 +760,8 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Style="{StaticResource ScanMetricIconBoxStyle}">
-                                                <Viewbox Width="18" Height="18">
-                                                    <Path Data="M9.55,17.2 L3.35,11 L4.95,9.4 L9.55,14 L19.05,4.5 L20.65,6.1 Z"
-                                                          Style="{StaticResource ScanMetricIconPathStyle}" />
-                                                </Viewbox>
-                                            </Border>
+                                            <controls:PhosphorIcon Icon="check"
+                                                                   Style="{StaticResource ScanMetricIconStyle}" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="已扫描" Style="{StaticResource BodyMutedTextStyle}" />
                                                 <TextBlock Text="{Binding ScannedCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
@@ -781,12 +777,8 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Style="{StaticResource ScanMetricIconBoxStyle}">
-                                                <Viewbox Width="18" Height="18">
-                                                    <Path Data="M11,4 H13 V11 H20 V13 H13 V20 H11 V13 H4 V11 H11 Z"
-                                                          Style="{StaticResource ScanMetricIconPathStyle}" />
-                                                </Viewbox>
-                                            </Border>
+                                            <controls:PhosphorIcon Icon="plus"
+                                                                   Style="{StaticResource ScanMetricIconStyle}" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="新增" Style="{StaticResource BodyMutedTextStyle}" />
                                                 <TextBlock Text="{Binding NewFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
@@ -802,12 +794,8 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Style="{StaticResource ScanMetricIconBoxStyle}">
-                                                <Viewbox Width="18" Height="18">
-                                                    <Path Data="M7.6,7.2 C8.8,5.9 10.35,5.2 12,5.2 C15.25,5.2 17.9,7.85 17.9,11.1 H20.7 L16.8,15 L12.9,11.1 H15.7 C15.7,9.05 14.05,7.4 12,7.4 C10.95,7.4 9.95,7.85 9.25,8.6 Z M3.3,12.9 L7.2,9 L11.1,12.9 H8.3 C8.3,14.95 9.95,16.6 12,16.6 C13.05,16.6 14.05,16.15 14.75,15.4 L16.4,16.8 C15.2,18.1 13.65,18.8 12,18.8 C8.75,18.8 6.1,16.15 6.1,12.9 Z"
-                                                          Style="{StaticResource ScanMetricIconPathStyle}" />
-                                                </Viewbox>
-                                            </Border>
+                                            <controls:PhosphorIcon Icon="arrows-clockwise"
+                                                                   Style="{StaticResource ScanMetricIconStyle}" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="更新" Style="{StaticResource BodyMutedTextStyle}" />
                                                 <TextBlock Text="{Binding UpdatedFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
@@ -823,12 +811,8 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Style="{StaticResource ScanMetricIconBoxStyle}">
-                                                <Viewbox Width="18" Height="18">
-                                                    <Path Data="M5,11 H19 V13.4 H5 Z"
-                                                          Style="{StaticResource ScanMetricIconPathStyle}" />
-                                                </Viewbox>
-                                            </Border>
+                                            <controls:PhosphorIcon Icon="minus"
+                                                                   Style="{StaticResource ScanMetricIconStyle}" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="忽略" Style="{StaticResource BodyMutedTextStyle}" />
                                                 <TextBlock Text="{Binding IgnoredFileCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
@@ -844,12 +828,8 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Style="{StaticResource ScanMetricIconBoxStyle}">
-                                                <Viewbox Width="18" Height="18">
-                                                    <Path Data="M12,3 L22,20 H2 Z M11,9 H13 V14 H11 Z M11,16 H13 V18 H11 Z"
-                                                          Style="{StaticResource ScanMetricIconPathStyle}" />
-                                                </Viewbox>
-                                            </Border>
+                                            <controls:PhosphorIcon Icon="warning"
+                                                                   Style="{StaticResource ScanMetricIconStyle}" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="错误" Style="{StaticResource BodyMutedTextStyle}" />
                                                 <TextBlock Text="{Binding ErrorCount}" Style="{StaticResource ScanMetricValueTextStyle}" />
@@ -865,12 +845,8 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Style="{StaticResource ScanMetricIconBoxStyle}">
-                                                <Viewbox Width="18" Height="18">
-                                                    <Path Data="M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 M11,6 H13 V11.3 L17,13.6 L15.8,15.6 L11,12.8 Z"
-                                                          Style="{StaticResource ScanMetricIconPathStyle}" />
-                                                </Viewbox>
-                                            </Border>
+                                            <controls:PhosphorIcon Icon="clock"
+                                                                   Style="{StaticResource ScanMetricIconStyle}" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="耗时" Style="{StaticResource BodyMutedTextStyle}" />
                                                 <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource ScanMetricValueTextStyle}" />

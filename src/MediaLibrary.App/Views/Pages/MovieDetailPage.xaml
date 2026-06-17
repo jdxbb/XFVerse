@@ -192,10 +192,23 @@
 
         <DataTemplate x:Key="MovieDetailActionButtonTemplate">
             <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="14"
-                           Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+                <controls:PhosphorIcon Width="16"
+                                       Height="16"
+                                       VerticalAlignment="Center"
+                                       Icon="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}">
+                    <controls:PhosphorIcon.Style>
+                        <Style TargetType="{x:Type controls:PhosphorIcon}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" Value="star-fill">
+                                    <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" Value="heart-fill">
+                                    <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </controls:PhosphorIcon.Style>
+                </controls:PhosphorIcon>
                 <TextBlock Margin="12,0,0,0"
                            VerticalAlignment="Center"
                            Text="{Binding}" />
@@ -204,33 +217,14 @@
 
         <DataTemplate x:Key="MovieDetailNotInterestedActionButtonTemplate">
             <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-                <Grid Width="16"
-                      Height="16"
-                      VerticalAlignment="Center">
-                    <Path x:Name="NotInterestedIcon"
-                          Data="M11,3 H13 L12.65,14 H11.35 Z M11,17 H13 V20 H11 Z"
-                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                          Stretch="Uniform" />
-                    <Path x:Name="CancelNotInterestedIcon"
-                          Data="M7.2,7.4 H4.3 V4.5 M4.55,7.35 C6.35,4.85 9.05,3.5 12,3.5 C16.7,3.5 20.5,7.3 20.5,12 C20.5,16.7 16.7,20.5 12,20.5 C9.45,20.5 7.15,19.38 5.6,17.6"
-                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                          StrokeEndLineCap="Round"
-                          StrokeLineJoin="Round"
-                          StrokeStartLineCap="Round"
-                          StrokeThickness="2.1"
-                          Stretch="Uniform"
-                          Visibility="Collapsed" />
-                </Grid>
+                <controls:PhosphorIcon Width="16"
+                                       Height="16"
+                                       VerticalAlignment="Center"
+                                       Icon="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
                 <TextBlock Margin="12,0,0,0"
                            VerticalAlignment="Center"
                            Text="{Binding}" />
             </StackPanel>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
-                    <Setter TargetName="NotInterestedIcon" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="CancelNotInterestedIcon" Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
         </DataTemplate>
     </UserControl.Resources>
 
@@ -376,22 +370,22 @@
                                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding OriginalTitle}" />
                             <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock VerticalAlignment="Center"
-                                               FontFamily="Segoe MDL2 Assets"
-                                               FontSize="16"
-                                               Foreground="{DynamicResource BrushForegroundSecondary}"
-                                               Text="&#xE787;" />
+                                    <controls:PhosphorIcon Width="16"
+                                                           Height="16"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BrushForegroundSecondary}"
+                                                           Icon="calendar-blank" />
                                     <TextBlock Margin="6,0,0,0"
                                                FontSize="17"
                                                Foreground="{DynamicResource BrushForegroundSecondary}"
                                                Text="{Binding ReleaseDateText}" />
                                 </StackPanel>
                                 <StackPanel Margin="18,0,0,0" Orientation="Horizontal">
-                                    <TextBlock VerticalAlignment="Center"
-                                               FontFamily="Segoe MDL2 Assets"
-                                               FontSize="16"
-                                               Foreground="{DynamicResource BrushForegroundSecondary}"
-                                               Text="&#xE823;" />
+                                    <controls:PhosphorIcon Width="16"
+                                                           Height="16"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BrushForegroundSecondary}"
+                                                           Icon="clock" />
                                     <TextBlock Margin="6,0,0,0"
                                                FontSize="17"
                                                Foreground="{DynamicResource BrushForegroundSecondary}"
@@ -437,14 +431,12 @@
                                                             Background="{DynamicResource BrushGlassSelected}"
                                                             CornerRadius="7">
                                                         <Grid>
-                                                            <TextBlock HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center"
-                                                                       FontSize="16"
-                                                                       Foreground="{DynamicResource BrushAccent}"
-                                                                       LineHeight="16"
-                                                                       LineStackingStrategy="BlockLineHeight"
-                                                                       Text="&#x2605;"
-                                                                       TextAlignment="Center" />
+                                                            <controls:PhosphorIcon Width="16"
+                                                                                   Height="16"
+                                                                                   HorizontalAlignment="Center"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Foreground="{DynamicResource BrushAccent}"
+                                                                                   Icon="star-fill" />
                                                         </Grid>
                                                     </Border>
                                                     <TextBlock VerticalAlignment="Center"
@@ -660,7 +652,7 @@
                         ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
                         IsEnabled="{Binding CanOpenPlayer}"
                         Style="{StaticResource GlassSecondaryButtonStyle}"
-                        Tag="&#xE768;" />
+                        Tag="play" />
                 <Button Grid.Column="2"
                         Command="{Binding TogglePreferenceCommand}"
                         Content="{Binding PreferenceButtonText}"
@@ -700,7 +692,7 @@
                         Content="{Binding NotInterestedButtonText}"
                         ContentTemplate="{StaticResource MovieDetailNotInterestedActionButtonTemplate}"
                         IsEnabled="{Binding CanToggleNotInterested}"
-                        Tag="{Binding IsNotInterested}">
+                        Tag="{Binding NotInterestedButtonIcon}">
                     <Button.Style>
                         <Style BasedOn="{StaticResource GlassSecondaryButtonStyle}" TargetType="Button">
                             <Setter Property="Visibility" Value="Visible" />
@@ -718,7 +710,7 @@
                         ContentTemplate="{StaticResource MovieDetailActionButtonTemplate}"
                         IsEnabled="{Binding CanUseIdentificationCorrection}"
                         Style="{StaticResource GlassSecondaryButtonStyle}"
-                        Tag="&#xE70F;" />
+                        Tag="pencil-simple" />
                 <Button Grid.Column="10"
                         Command="{Binding AddToLibraryCommand}"
                         Content="{Binding AddToLibraryButtonText}"
@@ -962,57 +954,11 @@
                         <ColumnDefinition Width="10" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Viewbox Width="20"
-                             Height="20"
-                             VerticalAlignment="Center">
-                        <Canvas Width="20" Height="20">
-                            <Ellipse Canvas.Left="1.2"
-                                     Canvas.Top="1.2"
-                                     Width="15.6"
-                                     Height="15.6"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.4" />
-                            <Ellipse Canvas.Left="7.1"
-                                     Canvas.Top="7.1"
-                                     Width="3.8"
-                                     Height="3.8"
-                                     Fill="{DynamicResource BrushForegroundMuted}" />
-                            <Ellipse Canvas.Left="7.3"
-                                     Canvas.Top="3.3"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Ellipse Canvas.Left="11.2"
-                                     Canvas.Top="7.2"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Ellipse Canvas.Left="7.3"
-                                     Canvas.Top="11.1"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Ellipse Canvas.Left="3.4"
-                                     Canvas.Top="7.2"
-                                     Width="3.4"
-                                     Height="3.4"
-                                     Fill="Transparent"
-                                     Stroke="{DynamicResource BrushForegroundMuted}"
-                                     StrokeThickness="1.1" />
-                            <Path Data="M13.5,15.1 C15.6,17 17.3,17.8 19,17.8"
-                                  Fill="Transparent"
-                                  Stroke="{DynamicResource BrushForegroundMuted}"
-                                  StrokeEndLineCap="Round"
-                                  StrokeThickness="1.4" />
-                        </Canvas>
-                    </Viewbox>
+                    <controls:PhosphorIcon Width="20"
+                                           Height="20"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource BrushForegroundMuted}"
+                                           Icon="file-video" />
                     <helpers:CachedShadowBorder Grid.Column="2"
                                                 Margin="-12,-8"
                                                 Padding="12,8"

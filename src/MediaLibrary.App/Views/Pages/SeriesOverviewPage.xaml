@@ -24,10 +24,11 @@
 
         <DataTemplate x:Key="SeriesDetailActionButtonTemplate">
             <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="14"
-                           Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+                <controls:PhosphorIcon Width="16"
+                                       Height="16"
+                                       VerticalAlignment="Center"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                       Icon="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
                 <TextBlock Margin="10,0,0,0"
                            VerticalAlignment="Center"
                            Text="{Binding}" />
@@ -228,22 +229,22 @@
                                        helpers:TrimmedTextToolTipBehavior.FullText="{Binding OriginalName}" />
                             <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock VerticalAlignment="Center"
-                                               FontFamily="Segoe MDL2 Assets"
-                                               FontSize="16"
-                                               Foreground="{DynamicResource BrushForegroundSecondary}"
-                                               Text="&#xE787;" />
+                                    <controls:PhosphorIcon Width="16"
+                                                           Height="16"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BrushForegroundSecondary}"
+                                                           Icon="calendar-blank" />
                                     <TextBlock Margin="6,0,0,0"
                                                FontSize="17"
                                                Foreground="{DynamicResource BrushForegroundSecondary}"
                                                Text="{Binding FirstAirDateText}" />
                                 </StackPanel>
                                 <StackPanel Margin="18,0,0,0" Orientation="Horizontal">
-                                    <TextBlock VerticalAlignment="Center"
-                                               FontFamily="Segoe MDL2 Assets"
-                                               FontSize="16"
-                                               Foreground="{DynamicResource BrushForegroundSecondary}"
-                                               Text="&#xE8B2;" />
+                                    <controls:PhosphorIcon Width="16"
+                                                           Height="16"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BrushForegroundSecondary}"
+                                                           Icon="television" />
                                     <TextBlock Margin="6,0,0,0"
                                                FontSize="17"
                                                Foreground="{DynamicResource BrushForegroundSecondary}"
@@ -271,14 +272,12 @@
                                             </Grid.RowDefinitions>
                                             <StackPanel HorizontalAlignment="Left" Orientation="Horizontal">
                                                 <Border Width="24" Height="24" Margin="0,0,7,0" Background="{DynamicResource BrushGlassSelected}" CornerRadius="7">
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               FontSize="16"
-                                                               Foreground="{DynamicResource BrushAccent}"
-                                                               LineHeight="16"
-                                                               LineStackingStrategy="BlockLineHeight"
-                                                               Text="&#x2605;"
-                                                               TextAlignment="Center" />
+                                                    <controls:PhosphorIcon Width="16"
+                                                                           Height="16"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="{DynamicResource BrushAccent}"
+                                                                           Icon="star-fill" />
                                                 </Border>
                                                 <TextBlock VerticalAlignment="Center"
                                                            Style="{StaticResource SeriesDetailSmallCardTitleStyle}"

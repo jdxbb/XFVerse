@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using MediaLibrary.Core.Diagnostics;
 
 namespace MediaLibrary.App.Helpers;
 
@@ -13,6 +14,11 @@ public static class VideoCacheDiagnostics
 
     public static void Write(string category, string message)
     {
+        if (!DiagnosticMessageFilter.ShouldWrite($"{category} {message}", "XFVERSE_VIDEO_CACHE_DIAGNOSTICS"))
+        {
+            return;
+        }
+
         try
         {
             var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{category}] {message}";

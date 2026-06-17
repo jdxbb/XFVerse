@@ -387,15 +387,15 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string NotInterestedButtonText { get => _notInterestedButtonText; private set => SetProperty(ref _notInterestedButtonText, value); }
 
-    public string WatchedButtonIcon => IsWatched ? "\uE711" : "\uE8FB";
+    public string WatchedButtonIcon => IsWatched ? "x-circle" : "check-circle";
 
     public string PreferenceButtonText => IsWatched ? FavoriteButtonText : WantToWatchButtonText;
 
     public string PreferenceButtonIcon => IsWatched
-        ? IsFavorite ? "\uEB52" : "\uEB51"
-        : IsWantToWatch ? "\uE735" : "\uE734";
+        ? IsFavorite ? "heart-fill" : "heart"
+        : IsWantToWatch ? "star-fill" : "star";
 
-    public string NotInterestedButtonIcon => IsNotInterested ? "\uE7A7" : "!";
+    public string NotInterestedButtonIcon => IsNotInterested ? "arrow-counter-clockwise" : "prohibit";
 
     public string ManualSearchQuery { get => _manualSearchQuery; set => SetProperty(ref _manualSearchQuery, value); }
 
@@ -771,7 +771,7 @@ public sealed class MovieDetailViewModel : PageViewModelBase
 
     public string AddToLibraryButtonText => IsVisibleInLibrary ? "移出媒体库" : "加入媒体库";
 
-    public string AddToLibraryButtonIcon => IsVisibleInLibrary ? "\uE738" : "\uE710";
+    public string AddToLibraryButtonIcon => IsVisibleInLibrary ? "minus-square" : "plus-square";
 
     public bool IsVisibleInLibrary
     {

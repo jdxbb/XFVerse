@@ -815,8 +815,8 @@ public sealed class MovieDiscoveryViewModel : PageViewModelBase
     public string SearchSortDirectionButtonToolTip => BuildFilterButtonText("顺序", ActiveSearchSortDirection);
 
     public string SearchSortDirectionIconData => string.Equals(ActiveSearchSortDirection, DirectionAscending, StringComparison.Ordinal)
-        ? "M 8 18 L 8 6 M 4 10 L 8 6 L 12 10 M 15 7 H 23 M 15 12 H 21 M 15 17 H 19"
-        : "M 8 6 L 8 18 M 4 14 L 8 18 L 12 14 M 15 7 H 19 M 15 12 H 21 M 15 17 H 23";
+        ? "sort-ascending"
+        : "sort-descending";
 
     public IReadOnlyList<string> ActiveSearchSortOptions => IsTvSearchSelected ? TvSortOptions : SortOptions;
 

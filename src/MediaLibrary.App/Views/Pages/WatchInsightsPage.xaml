@@ -280,8 +280,6 @@
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="16" />
             <Setter Property="Foreground" Value="{DynamicResource BrushForegroundPrimary}" />
             <Setter Property="ToolTip" Value="刷新画像" />
             <Setter Property="Template">
@@ -308,10 +306,10 @@
             </Setter>
         </Style>
 
-        <Style x:Key="WatchInsightsRefreshGlyphStyle" TargetType="{x:Type TextBlock}">
-            <Setter Property="Text" Value="&#xE72C;" />
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="16" />
+        <Style x:Key="WatchInsightsRefreshGlyphBaseStyle" TargetType="{x:Type controls:PhosphorIcon}">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Icon" Value="arrows-clockwise" />
             <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
             <Setter Property="RenderTransform">
@@ -319,10 +317,14 @@
                     <RotateTransform Angle="0" />
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="WatchInsightsRefreshGlyphStyle" TargetType="{x:Type controls:PhosphorIcon}" BasedOn="{StaticResource WatchInsightsRefreshGlyphBaseStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DataContext.IsProfileRefreshAnimating, RelativeSource={RelativeSource AncestorType=TabControl}}" Value="True">
+                    <Setter Property="Icon" Value="spinner-gap" />
                     <DataTrigger.EnterActions>
-                        <BeginStoryboard x:Name="ProfileRefreshSpinStoryboard">
+                        <BeginStoryboard Name="ProfileRefreshSpinStoryboard">
                             <Storyboard RepeatBehavior="Forever">
                                 <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
                                                  From="0"
@@ -338,11 +340,12 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="WatchInsightsStatisticsRefreshGlyphStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource WatchInsightsRefreshGlyphStyle}">
+        <Style x:Key="WatchInsightsStatisticsRefreshGlyphStyle" TargetType="{x:Type controls:PhosphorIcon}" BasedOn="{StaticResource WatchInsightsRefreshGlyphBaseStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DataContext.IsStatisticsRefreshAnimating, RelativeSource={RelativeSource AncestorType=TabControl}}" Value="True">
+                    <Setter Property="Icon" Value="spinner-gap" />
                     <DataTrigger.EnterActions>
-                        <BeginStoryboard x:Name="StatisticsRefreshSpinStoryboard">
+                        <BeginStoryboard Name="StatisticsRefreshSpinStoryboard">
                             <Storyboard RepeatBehavior="Forever">
                                 <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
                                                  From="0"
@@ -412,7 +415,7 @@
                                                Style="{StaticResource WatchInsightsTabStatusTextStyle}" />
                                     <Button Command="{Binding DataContext.RefreshProfileCommand, RelativeSource={RelativeSource TemplatedParent}}"
                                             Style="{StaticResource WatchInsightsRefreshIconButtonStyle}">
-                                        <TextBlock Style="{StaticResource WatchInsightsRefreshGlyphStyle}" />
+                                        <controls:PhosphorIcon Style="{StaticResource WatchInsightsRefreshGlyphStyle}" />
                                     </Button>
                                 </StackPanel>
                                 <StackPanel Panel.ZIndex="3"
@@ -433,7 +436,7 @@
                                     <Button Command="{Binding DataContext.RefreshStatisticsCommand, RelativeSource={RelativeSource TemplatedParent}}"
                                             Style="{StaticResource WatchInsightsRefreshIconButtonStyle}"
                                             ToolTip="刷新统计">
-                                        <TextBlock Style="{StaticResource WatchInsightsStatisticsRefreshGlyphStyle}" />
+                                        <controls:PhosphorIcon Style="{StaticResource WatchInsightsStatisticsRefreshGlyphStyle}" />
                                     </Button>
                                 </StackPanel>
                                 <TabPanel x:Name="HeaderPanel"
@@ -606,6 +609,64 @@
             <Setter Property="Panel.ZIndex" Value="20" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+
+        <SolidColorBrush x:Key="WatchInsightsLoadingOnDarkBrush" Color="#FFFFFFFF" />
+
+        <ControlTemplate x:Key="WatchInsightsLoadingSpinnerTemplate" TargetType="{x:Type Control}">
+            <controls:PhosphorIcon x:Name="SpinnerIcon"
+                                   Icon="spinner-gap"
+                                   Width="{TemplateBinding Width}"
+                                   Height="{TemplateBinding Height}"
+                                   Foreground="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                   RenderTransformOrigin="0.5,0.5">
+                <controls:PhosphorIcon.RenderTransform>
+                    <RotateTransform />
+                </controls:PhosphorIcon.RenderTransform>
+            </controls:PhosphorIcon>
+            <ControlTemplate.Triggers>
+                <Trigger Property="Visibility" Value="Visible">
+                    <Trigger.EnterActions>
+                        <BeginStoryboard x:Name="WatchInsightsSpinnerRotationStoryboard">
+                            <Storyboard RepeatBehavior="Forever">
+                                <DoubleAnimation Storyboard.TargetName="SpinnerIcon"
+                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                 From="0"
+                                                 To="360"
+                                                 Duration="0:0:0.9" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                    <Trigger.ExitActions>
+                        <StopStoryboard BeginStoryboardName="WatchInsightsSpinnerRotationStoryboard" />
+                    </Trigger.ExitActions>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="WatchInsightsLoadingSpinnerStyle" TargetType="{x:Type Control}" BasedOn="{StaticResource PageLoadingSpinnerStyle}">
+            <Setter Property="Tag" Value="{DynamicResource BrushAccent}" />
+            <Setter Property="Template" Value="{StaticResource WatchInsightsLoadingSpinnerTemplate}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.ThemeToggleIcon, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" Value="moon-stars">
+                    <Setter Property="Tag" Value="{StaticResource WatchInsightsLoadingOnDarkBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding DataContext.IsPosterBackdropActive, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" Value="True">
+                    <Setter Property="Tag" Value="{StaticResource WatchInsightsLoadingOnDarkBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WatchInsightsLoadingTextStyle" TargetType="TextBlock" BasedOn="{StaticResource PageLoadingTextStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource BrushAccent}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.ThemeToggleIcon, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" Value="moon-stars">
+                    <Setter Property="Foreground" Value="{StaticResource WatchInsightsLoadingOnDarkBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding DataContext.IsPosterBackdropActive, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource WatchInsightsLoadingOnDarkBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="ProfileTasteSummaryCardStyle" TargetType="{x:Type helpers:CachedShadowBorder}" BasedOn="{StaticResource WatchInsightsModuleCardStyle}">
@@ -937,6 +998,14 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
 
+        <Style x:Key="ProfileDnaGlyphStyle" TargetType="{x:Type controls:PhosphorIcon}">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+
         <Style x:Key="ProfileDnaIconPathStyle" TargetType="{x:Type Path}">
             <Setter Property="Fill" Value="Transparent" />
             <Setter Property="StrokeThickness" Value="2.35" />
@@ -1002,13 +1071,9 @@
         <Style x:Key="ProfileDnaCardStyle"
                TargetType="{x:Type helpers:CachedShadowBorder}"
                BasedOn="{StaticResource ProfileInnerPanelStyle}">
-            <Setter Property="MinHeight" Value="230" />
+            <Setter Property="Height" Value="244" />
+            <Setter Property="MinHeight" Value="244" />
             <Setter Property="ShadowVisualOpacity" Value="0.82" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding DataContext.IsProfileDnaTextScrollable, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}" Value="True">
-                    <Setter Property="MinHeight" Value="238" />
-                </DataTrigger>
-            </Style.Triggers>
         </Style>
 
         <ItemsPanelTemplate x:Key="ProfileDnaExpandedPanel">
@@ -1279,7 +1344,7 @@
             <Setter Property="Height" Value="30" />
             <Setter Property="CornerRadius" Value="999" />
             <Setter Property="Background" Value="{DynamicResource BrushAccentSoft}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BrushWatchInsightsTasteRankBorder}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
             <Setter Property="BorderThickness" Value="1.4" />
         </Style>
 
@@ -1396,42 +1461,13 @@
                                 Background="{DynamicResource BrushAccentSoft}"
                                 BorderBrush="{DynamicResource BrushBorder}"
                                 BorderThickness="1">
-                            <Grid>
-                                <TextBlock x:Name="StatusIconText"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="18"
-                                           Foreground="{DynamicResource BrushForegroundPrimary}"
-                                           Text="{Binding IconText}" />
-                                <Path x:Name="StatusNotInterestedIcon"
-                                      Width="16"
-                                      Height="16"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"
-                                      Data="M11,3 H13 L12.65,14 H11.35 Z M11,17 H13 V20 H11 Z"
-                                      Fill="{DynamicResource BrushForegroundPrimary}"
-                                      Stretch="Uniform"
-                                      Visibility="Collapsed" />
-                                <Path x:Name="StatusFavoriteIcon"
-                                      Width="18"
-                                      Height="18"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"
-                                      Data="M12,21 C10.8,19.9 3,14.2 3,8.4 C3,5.4 5.3,3.2 8.2,3.2 C9.9,3.2 11.2,4 12,5.2 C12.8,4 14.1,3.2 15.8,3.2 C18.7,3.2 21,5.4 21,8.4 C21,14.2 13.2,19.9 12,21 Z"
-                                      Fill="{DynamicResource BrushRatingStarFill}"
-                                      Stretch="Uniform"
-                                      Visibility="Collapsed" />
-                                <Path x:Name="StatusWantIcon"
-                                      Width="18"
-                                      Height="18"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"
-                                      Data="M12,2.7 L14.9,8.5 L21.3,9.4 L16.7,13.9 L17.8,20.3 L12,17.2 L6.2,20.3 L7.3,13.9 L2.7,9.4 L9.1,8.5 Z"
-                                      Fill="{DynamicResource BrushRatingStarFill}"
-                                      Stretch="Uniform"
-                                      Visibility="Collapsed" />
-                            </Grid>
+                            <controls:PhosphorIcon x:Name="StatusIconText"
+                                                   Width="18"
+                                                   Height="18"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource BrushForegroundPrimary}"
+                                                   Icon="{Binding IconText}" />
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" />
@@ -1507,24 +1543,25 @@
                 <DataTrigger Binding="{Binding Kind}" Value="watched">
                     <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushInfoBackground}" />
                     <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushInfoBorder}" />
+                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushInfoBorder}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="favorite">
                     <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
                     <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
-                    <Setter TargetName="StatusIconText" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="StatusFavoriteIcon" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
+                    <Setter TargetName="StatusIconText" Property="Icon" Value="heart-fill" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="want">
                     <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushSuccessBackground}" />
                     <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushSuccessBorder}" />
-                    <Setter TargetName="StatusIconText" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="StatusWantIcon" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
+                    <Setter TargetName="StatusIconText" Property="Icon" Value="star-fill" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="negative">
                     <Setter TargetName="StatusIcon" Property="Background" Value="{DynamicResource BrushWarningBackground}" />
                     <Setter TargetName="StatusIcon" Property="BorderBrush" Value="{DynamicResource BrushWarningBorder}" />
-                    <Setter TargetName="StatusIconText" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="StatusNotInterestedIcon" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="StatusIconText" Property="Foreground" Value="{DynamicResource BrushWarningBorder}" />
+                    <Setter TargetName="StatusIconText" Property="Icon" Value="prohibit" />
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
@@ -1543,7 +1580,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="54" />
                         <RowDefinition Height="48" />
-                        <RowDefinition Height="90" />
+                        <RowDefinition Height="94" />
                     </Grid.RowDefinitions>
 
                     <Grid VerticalAlignment="Top">
@@ -1552,74 +1589,32 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Border Style="{StaticResource ProfileDnaIconStyle}">
-                            <Viewbox Width="32"
-                                     Height="32"
-                                     HorizontalAlignment="Center"
-                                     VerticalAlignment="Center"
-                                     Stretch="Uniform">
-                                <Grid Width="32" Height="32">
-                                    <Path x:Name="DnaTicketIcon"
-                                          Data="M4,11 L27,7 L29,13 C26.2,13.7 26.3,18.2 29,19 L27,25 L4,29 L2,23 C4.8,22.2 4.8,17.8 2,17 Z M12,10.4 L15.1,27.2"
-                                          Stroke="{DynamicResource BrushWatchInsightsDnaTypeBorder}"
-                                          Style="{StaticResource ProfileDnaIconPathStyle}" />
-                                    <Path x:Name="DnaHeartIcon"
-                                          Data="M16,27 C8.8,21.1 4.2,16.4 4.2,10.4 C4.2,6.7 6.8,4.4 10.2,4.4 C12.8,4.4 14.8,5.9 16,8.2 C17.2,5.9 19.2,4.4 21.8,4.4 C25.2,4.4 27.8,6.7 27.8,10.4 C27.8,16.4 23.2,21.1 16,27 Z"
-                                          Stroke="{DynamicResource BrushWatchInsightsDnaEmotionBorder}"
-                                          Style="{StaticResource ProfileDnaIconPathStyle}" />
-                                    <Path x:Name="DnaSofaIcon"
-                                          Data="M7,15 V11 C7,8.2 9.2,6 12,6 H20 C22.8,6 25,8.2 25,11 V15 M6,15 H26 C28,15 29.5,16.6 29.5,18.6 V24 H2.5 V18.6 C2.5,16.6 4,15 6,15 Z M7,24 V27 M25,24 V27 M10,15 V10.8 M22,15 V10.8"
-                                          Stroke="{DynamicResource BrushWatchInsightsDnaSceneBorder}"
-                                          Style="{StaticResource ProfileDnaIconPathStyle}" />
-                                    <Path x:Name="DnaRouteIcon"
-                                          Data="M16,26 V19 C16,16 13.4,14.5 10,13 M16,19 C16,15.4 18.8,13.4 23,10.5 M10,13 C7.6,12.2 6,10.6 6,8 M23,10.5 C25.2,9 26,7.6 26,5.5 M16,26 C16,24 17.3,22.6 19,22"
-                                          Stroke="{DynamicResource BrushWatchInsightsKeywordMediumBorder}"
-                                          Style="{StaticResource ProfileDnaIconPathStyle}" />
-                                    <Ellipse x:Name="DnaRouteStartIcon"
-                                             Width="5"
-                                             Height="5"
-                                             Margin="13.5,24,0,0"
-                                             Stroke="{DynamicResource BrushWatchInsightsKeywordMediumBorder}"
-                                             Style="{StaticResource ProfileDnaIconEllipseStyle}" />
-                                    <Ellipse x:Name="DnaRouteLeftIcon"
-                                             Width="5"
-                                             Height="5"
-                                             Margin="3.5,4.5,0,0"
-                                             Stroke="{DynamicResource BrushWatchInsightsKeywordMediumBorder}"
-                                             Style="{StaticResource ProfileDnaIconEllipseStyle}" />
-                                    <Ellipse x:Name="DnaRouteRightIcon"
-                                             Width="5"
-                                             Height="5"
-                                             Margin="23.5,2.5,0,0"
-                                             Stroke="{DynamicResource BrushWatchInsightsKeywordMediumBorder}"
-                                             Style="{StaticResource ProfileDnaIconEllipseStyle}" />
-                                    <Path x:Name="DnaWaveIcon"
-                                          Data="M3,16 H6.5 L9,9 L13,24 L17,6 L21,22 L24.5,16 H29"
-                                          Stroke="{DynamicResource BrushWatchInsightsDnaRhythmIcon}"
-                                          Style="{StaticResource ProfileDnaIconPathStyle}" />
-                                    <Ellipse x:Name="DnaCompassCircleIcon"
-                                             Width="26"
-                                             Height="26"
-                                             Margin="3"
-                                             Stroke="{DynamicResource BrushWatchInsightsDnaExplorationIcon}"
-                                             Style="{StaticResource ProfileDnaIconEllipseStyle}" />
-                                    <Path x:Name="DnaCompassTicksIcon"
-                                          Data="M16,4.2 V7.2 M16,24.8 V27.8 M4.2,16 H7.2 M24.8,16 H27.8"
-                                          Stroke="{DynamicResource BrushWatchInsightsDnaExplorationIcon}"
-                                          Style="{StaticResource ProfileDnaIconPathStyle}" />
-                                    <Path x:Name="DnaCompassNeedleIcon"
-                                          Data="M20.6,8.1 L16.8,17.7 L15.0,15.9 Z M11.4,23.9 L15.2,14.3 L17.0,16.1 Z"
-                                          Fill="{DynamicResource BrushWatchInsightsDnaExplorationIcon}"
-                                          Stroke="{DynamicResource BrushWatchInsightsDnaExplorationIcon}"
-                                          Style="{StaticResource ProfileDnaIconPathStyle}" />
-                                    <Ellipse x:Name="DnaCompassCenterIcon"
-                                             Width="3.6"
-                                             Height="3.6"
-                                             Margin="14.2"
-                                             Fill="{DynamicResource BrushWatchInsightsDnaExplorationIcon}"
-                                             Stroke="{DynamicResource BrushWatchInsightsDnaExplorationIcon}"
-                                             Style="{StaticResource ProfileDnaIconEllipseStyle}" />
-                                </Grid>
-                            </Viewbox>
+                            <Grid>
+                                <controls:PhosphorIcon x:Name="DnaTicketIcon"
+                                                       Foreground="{DynamicResource BrushWatchInsightsDnaTypeBorder}"
+                                                       Icon="ticket"
+                                                       Style="{StaticResource ProfileDnaGlyphStyle}" />
+                                <controls:PhosphorIcon x:Name="DnaHeartIcon"
+                                                       Foreground="{DynamicResource BrushWatchInsightsDnaEmotionBorder}"
+                                                       Icon="heartbeat"
+                                                       Style="{StaticResource ProfileDnaGlyphStyle}" />
+                                <controls:PhosphorIcon x:Name="DnaSofaIcon"
+                                                       Foreground="{DynamicResource BrushWatchInsightsDnaSceneBorder}"
+                                                       Icon="armchair"
+                                                       Style="{StaticResource ProfileDnaGlyphStyle}" />
+                                <controls:PhosphorIcon x:Name="DnaRouteIcon"
+                                                       Foreground="{DynamicResource BrushWatchInsightsKeywordMediumBorder}"
+                                                       Icon="git-branch"
+                                                       Style="{StaticResource ProfileDnaGlyphStyle}" />
+                                <controls:PhosphorIcon x:Name="DnaWaveIcon"
+                                                       Foreground="{DynamicResource BrushWatchInsightsDnaRhythmIcon}"
+                                                       Icon="wave-sine"
+                                                       Style="{StaticResource ProfileDnaGlyphStyle}" />
+                                <controls:PhosphorIcon x:Name="DnaCompassIcon"
+                                                       Foreground="{DynamicResource BrushWatchInsightsDnaExplorationIcon}"
+                                                       Icon="compass"
+                                                       Style="{StaticResource ProfileDnaGlyphStyle}" />
+                            </Grid>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Gene}" Style="{StaticResource SectionTitleTextStyle}" />
@@ -1716,20 +1711,14 @@
                                   VerticalScrollBarVisibility="Auto">
                         <ScrollViewer.Style>
                             <Style TargetType="{x:Type ScrollViewer}">
-                                <Setter Property="Height" Value="69" />
-                                <Setter Property="Margin" Value="0,9,0,0" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding DataContext.IsProfileDnaTextScrollable, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}" Value="True">
-                                        <Setter Property="Height" Value="80" />
-                                        <Setter Property="Margin" Value="0,9,0,0" />
-                                    </DataTrigger>
-                                </Style.Triggers>
+                                <Setter Property="Height" Value="84" />
+                                <Setter Property="Margin" Value="0,6,0,0" />
                             </Style>
                         </ScrollViewer.Style>
                         <ScrollViewer.Resources>
                             <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource InsightModernScrollBarStyle}" />
                         </ScrollViewer.Resources>
-                        <TextBlock Padding="0,0,10,14"
+                        <TextBlock Padding="0,0,10,8"
                                    LineHeight="23"
                                    LineStackingStrategy="BlockLineHeight"
                                    Text="{Binding Description}"
@@ -1750,18 +1739,12 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IconKind}" Value="narrative">
                     <Setter TargetName="DnaRouteIcon" Property="Visibility" Value="Visible" />
-                    <Setter TargetName="DnaRouteStartIcon" Property="Visibility" Value="Visible" />
-                    <Setter TargetName="DnaRouteLeftIcon" Property="Visibility" Value="Visible" />
-                    <Setter TargetName="DnaRouteRightIcon" Property="Visibility" Value="Visible" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IconKind}" Value="rhythm">
                     <Setter TargetName="DnaWaveIcon" Property="Visibility" Value="Visible" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IconKind}" Value="exploration">
-                    <Setter TargetName="DnaCompassCircleIcon" Property="Visibility" Value="Visible" />
-                    <Setter TargetName="DnaCompassTicksIcon" Property="Visibility" Value="Visible" />
-                    <Setter TargetName="DnaCompassNeedleIcon" Property="Visibility" Value="Visible" />
-                    <Setter TargetName="DnaCompassCenterIcon" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="DnaCompassIcon" Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
@@ -2347,7 +2330,7 @@
                                                    Style="{StaticResource BodyMutedTextStyle}" />
                                     </StackPanel>
 
-                                    <Grid Grid.Row="1" Margin="0,14,0,0">
+                                    <Grid Grid.Row="1" Margin="0,8,0,0">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="112" />
                                             <RowDefinition Height="Auto" />
@@ -2471,7 +2454,7 @@
                                             </Grid>
                                         </Grid>
 
-                                        <Grid Grid.Row="2" Margin="0,20,0,0">
+                                        <Grid Grid.Row="2" Margin="0,12,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="1.5*" />
                                                 <ColumnDefinition Width="17*" />
@@ -2941,7 +2924,7 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <Border Width="38" Height="38" CornerRadius="12" Background="{DynamicResource BrushInfoBackground}" BorderBrush="{DynamicResource BrushInfoBorder}" BorderThickness="1">
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="18" Text="&#xE823;" />
+                                                <controls:PhosphorIcon Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" Icon="clock" />
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding TotalWatchTimeTitle}" Style="{StaticResource SectionTitleTextStyle}" />
@@ -3029,7 +3012,7 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <Border Width="38" Height="38" CornerRadius="12" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushAccent}" BorderThickness="1">
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="18" Text="&#xE787;" />
+                                                <controls:PhosphorIcon Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" Icon="calendar-blank" />
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding WatchDaysTitle}" Style="{StaticResource SectionTitleTextStyle}" />
@@ -3116,7 +3099,16 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <Border Width="38" Height="38" CornerRadius="12" Background="{DynamicResource BrushSuccessBackground}" BorderBrush="{DynamicResource BrushSuccessBorder}" BorderThickness="1">
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="18" Text="&#xE8EC;" />
+                                                <controls:PhosphorIcon Width="18"
+                                                                       Height="18"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       Icon="ticket"
+                                                                       RenderTransformOrigin="0.5,0.5">
+                                                    <controls:PhosphorIcon.RenderTransform>
+                                                        <RotateTransform Angle="45" />
+                                                    </controls:PhosphorIcon.RenderTransform>
+                                                </controls:PhosphorIcon>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding FrequentTagsTitle}" Style="{StaticResource SectionTitleTextStyle}" />
@@ -3418,8 +3410,8 @@
                                         </Grid.ColumnDefinitions>
                                         <Border Width="44" Height="44" Margin="12,0,0,0" CornerRadius="14" Background="{DynamicResource BrushInfoBackground}" BorderBrush="{DynamicResource BrushInfoBorder}" BorderThickness="1">
                                             <Grid>
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="22" Text="&#xE787;" />
-                                                <TextBlock Margin="0,0,4,3" HorizontalAlignment="Right" VerticalAlignment="Bottom" FontSize="11" FontWeight="Bold" Text="✓" />
+                                                <controls:PhosphorIcon Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center" Icon="calendar-blank" />
+                                                <controls:PhosphorIcon Width="11" Height="11" Margin="0,0,4,3" HorizontalAlignment="Right" VerticalAlignment="Bottom" Icon="check" />
                                             </Grid>
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="30,0,0,0" VerticalAlignment="Center">
@@ -3441,7 +3433,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <Border Width="44" Height="44" Margin="12,0,0,0" CornerRadius="14" Background="{DynamicResource BrushAccentSoft}" BorderBrush="{DynamicResource BrushAccent}" BorderThickness="1">
-                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe UI Emoji" FontSize="21" Text="🔥" />
+                                            <controls:PhosphorIcon Width="21" Height="21" HorizontalAlignment="Center" VerticalAlignment="Center" Icon="fire" />
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="30,0,0,0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding ContinuousWatchDaysTitle}" Style="{StaticResource BodyMutedTextStyle}" />
@@ -3462,7 +3454,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <Border Width="44" Height="44" Margin="12,0,0,0" CornerRadius="14" Background="{DynamicResource BrushWarningBackground}" BorderBrush="{DynamicResource BrushWarningBorder}" BorderThickness="1">
-                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe UI Emoji" FontSize="21" Text="🏆" />
+                                            <controls:PhosphorIcon Width="21" Height="21" HorizontalAlignment="Center" VerticalAlignment="Center" Icon="trophy" />
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="30,0,0,0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding MostActiveDateTitle}" Style="{StaticResource BodyMutedTextStyle}" />
@@ -3707,12 +3699,12 @@
                                                                         HorizontalAlignment="Left"
                                                                         CornerRadius="12"
                                                                         BorderThickness="1">
-                                                                    <controls:WeekPartIcon x:Name="WeekPartIcon"
+                                                                    <controls:PhosphorIcon x:Name="WeekPartIcon"
                                                                                            Width="22"
                                                                                            Height="22"
                                                                                            HorizontalAlignment="Center"
                                                                                            VerticalAlignment="Center"
-                                                                                           Kind="{Binding IconKind}" />
+                                                                                           Icon="suitcase-simple" />
                                                                 </Border>
                                                                 <StackPanel Grid.Column="2"
                                                                             VerticalAlignment="Center"
@@ -3731,11 +3723,13 @@
                                                                     <Setter TargetName="WeekPartLegendIcon" Property="Background" Value="{DynamicResource BrushInfoBackground}" />
                                                                     <Setter TargetName="WeekPartLegendIcon" Property="BorderBrush" Value="{DynamicResource BrushInfoBorder}" />
                                                                     <Setter TargetName="WeekPartIcon" Property="Foreground" Value="{DynamicResource BrushInfo}" />
+                                                                    <Setter TargetName="WeekPartIcon" Property="Icon" Value="suitcase-simple" />
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding IconKind}" Value="Weekend">
                                                                     <Setter TargetName="WeekPartLegendIcon" Property="Background" Value="{DynamicResource BrushAccentSoft}" />
                                                                     <Setter TargetName="WeekPartLegendIcon" Property="BorderBrush" Value="{DynamicResource BrushAccent}" />
                                                                     <Setter TargetName="WeekPartIcon" Property="Foreground" Value="{DynamicResource BrushAccent}" />
+                                                                    <Setter TargetName="WeekPartIcon" Property="Icon" Value="coffee" />
                                                                 </DataTrigger>
                                                             </DataTemplate.Triggers>
                                                         </DataTemplate>
@@ -4078,9 +4072,9 @@
                         </Style>
                     </Border.Style>
                     <StackPanel Style="{StaticResource PageLoadingHostStyle}">
-                        <Control Style="{StaticResource PageLoadingSpinnerStyle}" />
+                        <Control Style="{StaticResource WatchInsightsLoadingSpinnerStyle}" />
                         <TextBlock Text="正在加载观影画像..."
-                                   Style="{StaticResource PageLoadingTextStyle}" />
+                                   Style="{StaticResource WatchInsightsLoadingTextStyle}" />
                     </StackPanel>
                 </Border>
                 </Grid>
@@ -4209,9 +4203,9 @@
                         </Style>
                     </Border.Style>
                     <StackPanel Style="{StaticResource PageLoadingHostStyle}">
-                        <Control Style="{StaticResource PageLoadingSpinnerStyle}" />
+                        <Control Style="{StaticResource WatchInsightsLoadingSpinnerStyle}" />
                         <TextBlock Text="正在加载观影统计..."
-                                   Style="{StaticResource PageLoadingTextStyle}" />
+                                   Style="{StaticResource WatchInsightsLoadingTextStyle}" />
                     </StackPanel>
                 </Border>
                 </Grid>

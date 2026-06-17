@@ -154,30 +154,30 @@
                     <ControlTemplate TargetType="Button">
                         <Border Background="Transparent">
                             <Grid>
-                                <TextBlock x:Name="WantIconStroke"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="20"
-                                           Foreground="{StaticResource DiscoveryWantEmptyStarStrokeBrush}"
-                                           IsHitTestVisible="False"
-                                           Opacity="0"
-                                           Text="&#xE735;">
-                                    <TextBlock.Effect>
+                                <controls:PhosphorIcon x:Name="WantIconStroke"
+                                                       Width="20"
+                                                       Height="20"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource DiscoveryWantEmptyStarStrokeBrush}"
+                                                       Icon="star-fill"
+                                                       IsHitTestVisible="False"
+                                                       Opacity="0">
+                                    <controls:PhosphorIcon.Effect>
                                         <DropShadowEffect BlurRadius="3"
                                                           Color="#FFFFFFFF"
                                                           Direction="0"
                                                           Opacity="1"
                                                           ShadowDepth="0" />
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                                <TextBlock x:Name="WantIcon"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="20"
-                                           Foreground="{TemplateBinding Foreground}"
-                                           Text="&#xE734;" />
+                                    </controls:PhosphorIcon.Effect>
+                                </controls:PhosphorIcon>
+                                <controls:PhosphorIcon x:Name="WantIcon"
+                                                       Width="20"
+                                                       Height="20"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{TemplateBinding Foreground}"
+                                                       Icon="star" />
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -185,12 +185,12 @@
                                 <Setter Property="Opacity" Value="1" />
                             </Trigger>
                             <DataTrigger Binding="{Binding IsWantToWatch}" Value="True">
-                                <Setter TargetName="WantIcon" Property="Text" Value="&#xE735;" />
+                                <Setter TargetName="WantIcon" Property="Icon" Value="star-fill" />
                                 <Setter TargetName="WantIcon" Property="Foreground" Value="{DynamicResource BrushRatingStarFill}" />
                                 <Setter TargetName="WantIconStroke" Property="Opacity" Value="1" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsWatched}" Value="True">
-                                <Setter TargetName="WantIcon" Property="Text" Value="&#xE734;" />
+                                <Setter TargetName="WantIcon" Property="Icon" Value="star" />
                                 <Setter TargetName="WantIcon" Property="Foreground" Value="{StaticResource DiscoveryWantEmptyStarStrokeBrush}" />
                                 <Setter TargetName="WantIconStroke" Property="Opacity" Value="0" />
                             </DataTrigger>
@@ -345,12 +345,13 @@
                                                       HorizontalAlignment="Center"
                                                       RecognizesAccessKey="True"
                                                       VerticalAlignment="Center" />
-                                    <TextBlock x:Name="SubmenuArrow"
-                                               Grid.Column="1"
-                                               Margin="4,0,0,0"
-                                               VerticalAlignment="Center"
-                                               Text="&#x203A;"
-                                               Foreground="{DynamicResource BrushForegroundMuted}" />
+                                    <controls:PhosphorIcon x:Name="SubmenuArrow"
+                                                           Grid.Column="1"
+                                                           Margin="4,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BrushForegroundMuted}"
+                                                           Icon="caret-right"
+                                                           Style="{StaticResource PhosphorCaptionIconStyle}" />
                                 </Grid>
                             </Border>
                             <Popup x:Name="PART_Popup"
@@ -1008,14 +1009,55 @@
             <Setter Property="ClipToBounds" Value="True" />
         </Style>
 
+        <DropShadowEffect x:Key="DiscoveryRankingGoldMedalGlowEffect"
+                          BlurRadius="10"
+                          Direction="270"
+                          Opacity="0.16"
+                          RenderingBias="Quality"
+                          ShadowDepth="0"
+                          Color="#F2C770" />
+        <DropShadowEffect x:Key="DiscoveryRankingSilverMedalGlowEffect"
+                          BlurRadius="9"
+                          Direction="270"
+                          Opacity="0.14"
+                          RenderingBias="Quality"
+                          ShadowDepth="0"
+                          Color="#BDC1C9" />
+        <DropShadowEffect x:Key="DiscoveryRankingBronzeMedalGlowEffect"
+                          BlurRadius="9"
+                          Direction="270"
+                          Opacity="0.14"
+                          RenderingBias="Quality"
+                          ShadowDepth="0"
+                          Color="#F7AE78" />
+        <DropShadowEffect x:Key="DiscoveryRankingDefaultMedalGlowEffect"
+                          BlurRadius="8"
+                          Direction="270"
+                          Opacity="0.12"
+                          RenderingBias="Quality"
+                          ShadowDepth="0"
+                          Color="#CBB6A5" />
+
         <Style x:Key="DiscoveryRankingMedalBadgeStyle" TargetType="{x:Type controls:RankMedalBadge}">
             <Setter Property="Width" Value="39" />
             <Setter Property="Height" Value="39" />
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="VerticalAlignment" Value="Top" />
             <Setter Property="Margin" Value="3,3,0,0" />
+            <Setter Property="Effect" Value="{StaticResource DiscoveryRankingDefaultMedalGlowEffect}" />
             <Setter Property="IsHitTestVisible" Value="False" />
             <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Rank, RelativeSource={RelativeSource Self}}" Value="1">
+                    <Setter Property="Effect" Value="{StaticResource DiscoveryRankingGoldMedalGlowEffect}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Rank, RelativeSource={RelativeSource Self}}" Value="2">
+                    <Setter Property="Effect" Value="{StaticResource DiscoveryRankingSilverMedalGlowEffect}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Rank, RelativeSource={RelativeSource Self}}" Value="3">
+                    <Setter Property="Effect" Value="{StaticResource DiscoveryRankingBronzeMedalGlowEffect}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="DiscoveryRankingHeroMedalBadgeStyle"
@@ -1878,43 +1920,25 @@
                                     <Button HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
                                             Margin="0,0,4,0"
+                                            Content="x"
+                                            ContentTemplate="{StaticResource PhosphorCaptionIconContentTemplate}"
                                             Command="{Binding ClearSearchTextCommand}"
-                                            Style="{StaticResource DiscoverySearchClearButtonStyle}">
-                                        <TextBlock FontFamily="Segoe MDL2 Assets"
-                                                   FontSize="10"
-                                                   Text="&#xE711;" />
-                                    </Button>
+                                            Style="{StaticResource DiscoverySearchClearButtonStyle}" />
                                 </Grid>
 
                                 <Button Grid.Column="2"
                                         VerticalAlignment="Bottom"
+                                        Content="magnifying-glass"
+                                        ContentTemplate="{StaticResource PhosphorSmallIconContentTemplate}"
                                         Command="{Binding SearchCommand}"
-                                        Style="{StaticResource DiscoveryToolbarIconButtonStyle}">
-                                    <TextBlock FontFamily="Segoe MDL2 Assets"
-                                               FontSize="16"
-                                               RenderTransformOrigin="0.5,0.5"
-                                               Text="&#xE721;">
-                                        <TextBlock.RenderTransform>
-                                            <ScaleTransform ScaleX="-1" />
-                                        </TextBlock.RenderTransform>
-                                    </TextBlock>
-                                </Button>
+                                        Style="{StaticResource DiscoveryToolbarIconButtonStyle}" />
                                 <Button Grid.Column="4"
                                         VerticalAlignment="Bottom"
+                                        Content="{Binding SearchSortDirectionIconData}"
+                                        ContentTemplate="{StaticResource PhosphorSmallIconContentTemplate}"
                                         Command="{Binding ToggleSearchSortDirectionCommand}"
                                         Style="{StaticResource DiscoverySortDirectionIconButtonStyle}"
-                                        ToolTip="{Binding SearchSortDirectionButtonToolTip}">
-                                    <Viewbox Width="16" Height="16">
-                                        <Canvas Width="26" Height="24">
-                                            <Path Data="{Binding SearchSortDirectionIconData}"
-                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                  StrokeThickness="2"
-                                                  StrokeStartLineCap="Round"
-                                                  StrokeEndLineCap="Round"
-                                                  StrokeLineJoin="Round" />
-                                        </Canvas>
-                                    </Viewbox>
-                                </Button>
+                                        ToolTip="{Binding SearchSortDirectionButtonToolTip}" />
                                 <Grid Grid.Column="6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -2721,16 +2745,7 @@
                                                 </StackPanel.Style>
                                                 <Button Command="{Binding GoPreviousSearchPageCommand}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 15 5 L 8 12 L 15 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-left" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
@@ -2738,16 +2753,7 @@
                                                            Style="{StaticResource BodyTextStyle}" />
                                                 <Button Command="{Binding GoNextSearchPageCommand}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 9 5 L 16 12 L 9 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-right" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                             </StackPanel>
                                         </Grid>
@@ -2960,16 +2966,7 @@
                                                         Orientation="Horizontal">
                                                 <Button Command="{Binding GoPreviousSearchPageCommand}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 15 5 L 8 12 L 15 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-left" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
@@ -2977,16 +2974,7 @@
                                                            Style="{StaticResource BodyTextStyle}" />
                                                 <Button Command="{Binding GoNextSearchPageCommand}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 9 5 L 16 12 L 9 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-right" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                             </StackPanel>
                                         </Grid>
@@ -3061,16 +3049,7 @@
                                                 <Button Command="{Binding GoPreviousSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoPreviousTvSearchPage}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 15 5 L 8 12 L 15 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-left" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
@@ -3079,16 +3058,7 @@
                                                 <Button Command="{Binding GoNextSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoNextTvSearchPage}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 9 5 L 16 12 L 9 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-right" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                             </StackPanel>
                                         </Grid>
@@ -3312,16 +3282,7 @@
                                                 <Button Command="{Binding GoPreviousSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoPreviousTvSearchPage}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 15 5 L 8 12 L 15 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-left" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                                 <TextBlock Margin="14,0"
                                                            VerticalAlignment="Center"
@@ -3330,16 +3291,7 @@
                                                 <Button Command="{Binding GoNextSearchPageCommand}"
                                                         IsEnabled="{Binding CanGoNextTvSearchPage}"
                                                         Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                                    <Viewbox Width="16" Height="16">
-                                                        <Canvas Width="24" Height="24">
-                                                            <Path Data="M 9 5 L 16 12 L 9 19"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="2.2"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
+                                                    <controls:PhosphorIcon Icon="caret-right" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                                 </Button>
                                             </StackPanel>
                                         </Grid>
@@ -3585,16 +3537,7 @@
                                         <Button Command="{Binding GoPreviousRankingPageCommand}"
                                                 IsEnabled="{Binding CanGoPreviousRankingPage}"
                                                 Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                            <Viewbox Width="16" Height="16">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Data="M 15 5 L 8 12 L 15 19"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                          StrokeThickness="2.2"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
+                                            <controls:PhosphorIcon Icon="caret-left" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                         </Button>
                                         <TextBlock Margin="14,0"
                                                    VerticalAlignment="Center"
@@ -3604,16 +3547,7 @@
                                                 IsEnabled="{Binding CanGoNextRankingPage}"
                                                 PreviewMouseLeftButtonDown="RankingNextPageButton_PreviewMouseLeftButtonDown"
                                                 Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                            <Viewbox Width="16" Height="16">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Data="M 9 5 L 16 12 L 9 19"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                          StrokeThickness="2.2"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
+                                            <controls:PhosphorIcon Icon="caret-right" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                         </Button>
                                     </StackPanel>
                                     </Grid>
@@ -3786,16 +3720,7 @@
                                         <Button Command="{Binding GoPreviousRankingPageCommand}"
                                                 IsEnabled="{Binding CanGoPreviousTvRankingPage}"
                                                 Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                            <Viewbox Width="16" Height="16">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Data="M 15 5 L 8 12 L 15 19"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                          StrokeThickness="2.2"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
+                                            <controls:PhosphorIcon Icon="caret-left" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                         </Button>
                                         <TextBlock Margin="14,0"
                                                    VerticalAlignment="Center"
@@ -3805,16 +3730,7 @@
                                                 IsEnabled="{Binding CanGoNextTvRankingPage}"
                                                 PreviewMouseLeftButtonDown="RankingNextPageButton_PreviewMouseLeftButtonDown"
                                                 Style="{StaticResource DiscoveryPagerIconButtonStyle}">
-                                            <Viewbox Width="16" Height="16">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Data="M 9 5 L 16 12 L 9 19"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                          StrokeThickness="2.2"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
+                                            <controls:PhosphorIcon Icon="caret-right" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Style="{StaticResource PhosphorSmallIconStyle}" />
                                         </Button>
                                     </StackPanel>
                                     </Grid>
@@ -3904,3 +3820,4 @@
         </Grid>
     </Grid>
 </UserControl>
+

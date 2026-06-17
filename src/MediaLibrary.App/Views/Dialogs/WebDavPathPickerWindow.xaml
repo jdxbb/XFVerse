@@ -1,6 +1,7 @@
 <Window x:Class="MediaLibrary.App.Views.Dialogs.WebDavPathPickerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MediaLibrary.App.Controls"
         xmlns:helpers="clr-namespace:MediaLibrary.App.Helpers"
         Title="选择 WebDAV 路径"
         Width="700"
@@ -45,8 +46,7 @@
             <Setter Property="MinWidth" Value="34" />
             <Setter Property="MinHeight" Value="30" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="ContentTemplate" Value="{StaticResource PhosphorCaptionIconContentTemplate}" />
         </Style>
 
         <Style x:Key="WebDavPathPickerSelectionDotButtonStyle" TargetType="Button">
@@ -205,13 +205,11 @@
                            Text="选择 WebDAV 扫描路径"
                            Style="{StaticResource DialogTitleStyle}" />
                 <Button Grid.Column="1"
+                        Content="x"
+                        ContentTemplate="{StaticResource PhosphorCaptionIconContentTemplate}"
                         Click="CancelButton_Click"
                         Style="{StaticResource WebDavPathPickerCloseButtonStyle}"
-                        ToolTip="关闭">
-                    <TextBlock FontFamily="Segoe MDL2 Assets"
-                               FontSize="12"
-                               Text="&#xE711;" />
-                </Button>
+                        ToolTip="关闭" />
             </Grid>
 
             <Border Grid.Row="2"
@@ -235,13 +233,13 @@
                                 Margin="12,0,0,0"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
-                        <Button Content="&#xE72B;"
+                        <Button Content="arrow-left"
                                 Click="ParentButton_Click"
                                 IsEnabled="{Binding CanGoParent}"
                                 Style="{StaticResource WebDavPathPickerIconButtonStyle}"
                                 ToolTip="上一级" />
                         <Button Margin="6,0,0,0"
-                                Content="&#xE72A;"
+                                Content="arrow-right"
                                 Click="ForwardButton_Click"
                                 IsEnabled="{Binding CanGoForward}"
                                 Style="{StaticResource WebDavPathPickerIconButtonStyle}"
@@ -251,15 +249,17 @@
                                 IsEnabled="{Binding IsNotBusy}"
                                 Style="{StaticResource WebDavPathPickerIconButtonStyle}"
                                 ToolTip="刷新">
-                            <TextBlock Text="&#xE72C;"
-                                       RenderTransformOrigin="0.5,0.5">
-                                <TextBlock.RenderTransform>
+                            <controls:PhosphorIcon RenderTransformOrigin="0.5,0.5">
+                                <controls:PhosphorIcon.RenderTransform>
                                     <RotateTransform Angle="0" />
-                                </TextBlock.RenderTransform>
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
+                                </controls:PhosphorIcon.RenderTransform>
+                                <controls:PhosphorIcon.Style>
+                                    <Style TargetType="{x:Type controls:PhosphorIcon}" BasedOn="{StaticResource PhosphorCaptionIconStyle}">
+                                        <Setter Property="Icon" Value="arrow-clockwise" />
+                                        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                <Setter Property="Icon" Value="spinner-gap" />
                                                 <DataTrigger.EnterActions>
                                                     <BeginStoryboard x:Name="WebDavPathPickerRefreshSpinner">
                                                         <Storyboard RepeatBehavior="Forever">
@@ -276,8 +276,8 @@
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                </controls:PhosphorIcon.Style>
+                            </controls:PhosphorIcon>
                         </Button>
                     </StackPanel>
                 </Grid>

@@ -180,8 +180,8 @@ public sealed class SeriesOverviewViewModel : PageViewModelBase
     }
 
     public string AddSeriesToLibraryButtonIcon => Seasons.Count > 0 && Seasons.All(x => x.IsVisibleInLibrary)
-        ? "\uE738"
-        : "\uE710";
+        ? "minus-square"
+        : "plus-square";
 
     public void PrepareForActivation()
     {

@@ -136,7 +136,7 @@ public sealed class SettingsViewModel : PageViewModelBase
     private string _selectedCloseWindowBehavior = CloseWindowBehaviorExit;
     private bool _startPlayerFullscreenOnPlay = true;
     private bool _autoScanWebDavOnStartup;
-    private string _themeToggleIcon = "☀";
+    private string _themeToggleIcon = "sun";
     private string _themeToggleToolTip = "当前浅色主题，切换到深色主题";
     private string _aboutStatusMessage = "XFVerse 影音管理系统";
     private int? _editingScanPathId;
@@ -2437,12 +2437,12 @@ public sealed class SettingsViewModel : PageViewModelBase
     {
         if (string.Equals(themeMode, "Dark", StringComparison.OrdinalIgnoreCase))
         {
-            ThemeToggleIcon = "☾";
+            ThemeToggleIcon = "moon-stars";
             ThemeToggleToolTip = "当前深色主题，切换到浅色主题";
             return;
         }
 
-        ThemeToggleIcon = "☀";
+        ThemeToggleIcon = "sun";
         ThemeToggleToolTip = "当前浅色主题，切换到深色主题";
     }
 
