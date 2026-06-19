@@ -32,6 +32,8 @@ restore/
 TestResults/
 *.tmp
 *.temp
+/XFVerse-TestSetup-*.exe
+/XFVerse-Setup-*.exe
 
 # Local databases
 *.db

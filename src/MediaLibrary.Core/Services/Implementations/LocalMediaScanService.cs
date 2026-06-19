@@ -6,6 +6,7 @@ using MediaLibrary.Core.Models.Enums;
 using MediaLibrary.Core.Models.ReadModels;
 using MediaLibrary.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace MediaLibrary.Core.Services.Implementations;
 
@@ -73,8 +74,10 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                 {
                     Id = x.Id,
                     ScanPathId = x.ScanPathId,
-                    ScanPathDisplayName = x.ScanPath != null ? x.ScanPath.DisplayName : string.Empty,
-                    ScanPath = x.ScanPath != null ? x.ScanPath.Path : string.Empty,
+                    BaseUrl = x.SourceBaseUrlSnapshot ?? (x.SourceConnection != null ? x.SourceConnection.BaseUrl : string.Empty),
+                    Username = x.SourceUsernameSnapshot ?? (x.SourceConnection != null ? x.SourceConnection.Username : string.Empty),
+                    ScanPathDisplayName = x.ScanPathDisplayNameSnapshot ?? (x.ScanPath != null ? x.ScanPath.DisplayName : string.Empty),
+                    ScanPath = x.ScanPathSnapshot ?? (x.ScanPath != null ? x.ScanPath.Path : string.Empty),
                     TaskType = x.TaskType,
                     Status = x.Status,
                     StartedAt = ToLocalDisplayTime(x.StartedAt),
@@ -90,6 +93,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
                     TopReasonSummaryText = ScanReasonSummaryFormatter.FormatTopReasons(x.ReasonSummaryJson, 3)
                 })
             .ToListAsync(cancellationToken);
+        ApplyScanTaskLogSnapshots(recentLogs);
 
         return new ScanOverviewModel
         {
@@ -489,6 +493,9 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             TaskType = ScanTaskType.Refresh,
             Status = ScanTaskStatus.Running,
             StartedAt = now,
+            ScanPathSnapshot = scanPath.Path,
+            ScanPathDisplayNameSnapshot = scanPath.DisplayName,
+            ReasonSummaryJson = BuildSnapshotReasonSummaryJson(CreateScanTaskLogSnapshot(scanPath)),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -1124,7 +1131,10 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         log.IgnoredFileCount = result.IgnoredFileCount;
         log.ErrorCount = result.ErrorCount;
         log.ErrorMessage = string.IsNullOrWhiteSpace(errorMessage) ? null : errorMessage;
-        log.ReasonSummaryJson = BuildPathReasonSummaryJson(result, status);
+        log.ReasonSummaryJson = BuildPathReasonSummaryJson(
+            result,
+            status,
+            ScanReasonSummaryFormatter.Parse(log.ReasonSummaryJson)?.Snapshot);
         log.EndedAt = DateTime.UtcNow;
         log.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1175,7 +1185,7 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             log.EndedAt = completedAt;
             log.ReasonSummaryJson = string.IsNullOrWhiteSpace(reasonSummaryJson)
                 ? log.ReasonSummaryJson
-                : reasonSummaryJson;
+                : AttachExistingScanTaskLogSnapshot(reasonSummaryJson, log.ReasonSummaryJson);
             log.UpdatedAt = completedAt;
         }
 
@@ -1338,9 +1348,13 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         }
     }
 
-    private static string BuildPathReasonSummaryJson(PathScanExecutionResult result, ScanTaskStatus status)
+    private static string BuildPathReasonSummaryJson(
+        PathScanExecutionResult result,
+        ScanTaskStatus status,
+        ScanTaskLogSnapshot? snapshot)
     {
         var summary = new ScanReasonSummaryBuilder();
+        summary.SetSnapshot(snapshot);
         summary.AddSkipped("ignored-file", "文件已忽略", result.IgnoredFileCount);
         if (status == ScanTaskStatus.Cancelled)
         {
@@ -1356,6 +1370,72 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
         }
 
         return summary.ToJson();
+    }
+
+    private static string BuildSnapshotReasonSummaryJson(ScanTaskLogSnapshot snapshot)
+    {
+        var summary = new ScanReasonSummaryBuilder();
+        summary.SetSnapshot(snapshot);
+        return summary.ToJson();
+    }
+
+    private static ScanTaskLogSnapshot CreateScanTaskLogSnapshot(ScanPath scanPath)
+    {
+        return new ScanTaskLogSnapshot
+        {
+            ScanPath = scanPath.Path,
+            ScanPathDisplayName = scanPath.DisplayName
+        };
+    }
+
+    private static string AttachExistingScanTaskLogSnapshot(string reasonSummaryJson, string? existingJson)
+    {
+        var snapshot = ScanReasonSummaryFormatter.Parse(existingJson)?.Snapshot;
+        if (snapshot is null)
+        {
+            return reasonSummaryJson;
+        }
+
+        var summary = ScanReasonSummaryFormatter.Parse(reasonSummaryJson);
+        if (summary is null)
+        {
+            return reasonSummaryJson;
+        }
+
+        summary.Snapshot = snapshot;
+        return JsonSerializer.Serialize(summary, ScanReasonSummaryJson.Options);
+    }
+
+    private static void ApplyScanTaskLogSnapshots(IEnumerable<ScanTaskLogItem> logs)
+    {
+        foreach (var log in logs)
+        {
+            var snapshot = ScanReasonSummaryFormatter.Parse(log.ReasonSummaryJson)?.Snapshot;
+            if (snapshot is null)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(log.BaseUrl) && !string.IsNullOrWhiteSpace(snapshot.BaseUrl))
+            {
+                log.BaseUrl = snapshot.BaseUrl;
+            }
+
+            if (string.IsNullOrWhiteSpace(log.Username) && !string.IsNullOrWhiteSpace(snapshot.Username))
+            {
+                log.Username = snapshot.Username;
+            }
+
+            if (string.IsNullOrWhiteSpace(log.ScanPath) && !string.IsNullOrWhiteSpace(snapshot.ScanPath))
+            {
+                log.ScanPath = snapshot.ScanPath;
+            }
+
+            if (string.IsNullOrWhiteSpace(log.ScanPathDisplayName) && !string.IsNullOrWhiteSpace(snapshot.ScanPathDisplayName))
+            {
+                log.ScanPathDisplayName = snapshot.ScanPathDisplayName;
+            }
+        }
     }
 
     private static void AddReasonSummary(

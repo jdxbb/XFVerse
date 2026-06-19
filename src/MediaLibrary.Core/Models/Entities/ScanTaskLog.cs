@@ -30,6 +30,14 @@ public sealed class ScanTaskLog
 
     public string? ErrorMessage { get; set; }
 
+    public string? SourceBaseUrlSnapshot { get; set; }
+
+    public string? SourceUsernameSnapshot { get; set; }
+
+    public string? ScanPathSnapshot { get; set; }
+
+    public string? ScanPathDisplayNameSnapshot { get; set; }
+
     public string? ReasonSummaryJson { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -1901,3 +1901,31 @@ Known Issues:
 - Blocker: none confirmed by build.
 - Deferred: manually verify WebDAV startup where `Playing` fires before the first real time position; the resume message should remain visible until playback position advances.
 - Noise: extremely small initial position jitter below the guard threshold is intentionally ignored.
+
+## 2026-06-19 Player Volume And Brightness Standards Audit
+
+Goal:
+
+- Verify whether player volume and brightness values at 100 follow the intended mpv semantics, and change only confirmed defects.
+
+Completed:
+
+- Confirmed UI volume 100 maps directly to mpv volume 100, which is the standard neutral level with no reduction or amplification.
+- Confirmed UI brightness 100 maps to mpv brightness 0, preserving the source video's original brightness.
+- Added mpv initialization option `volume-max=200` so the existing UI boost range from 101% to 200% is not restricted by mpv's default 130% ceiling.
+
+Not done:
+
+- Did not boost or reinterpret volume 100.
+- Did not change brightness mapping, monitor backlight, contrast, gamma, player preference schema, database schema, migration, database update, commit, or push behavior.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 0 warnings and 0 errors.
+- Static code audit confirmed volume 100 maps to mpv 100, brightness 100 maps to mpv 0, and mpv initialization now sets `volume-max=200`.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually compare 100%, 130%, and 200% volume on a quiet source and watch for source-dependent clipping above 100%.
+- Noise: source mastering, Windows system volume, output-device gain, and display characteristics can make neutral 100% feel quiet or dark.

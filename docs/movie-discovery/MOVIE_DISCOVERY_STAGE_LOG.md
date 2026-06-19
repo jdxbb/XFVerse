@@ -1,5 +1,34 @@
 # 影片发现阶段日志
 
+## 2026-06-17 - Ranking Medal Digit Micro Position Follow-up
+
+Goal:
+
+- Apply the requested small ranking medal digit placement polish: move the gold medal number slightly left, and move ordinary medal numbers slightly up and left.
+
+Completed:
+
+- Gold medal digits now use a slightly larger left nudge while keeping the existing vertical placement.
+- Ordinary medal digits now use their own left nudge instead of staying horizontally neutral.
+- Ordinary medal digits now move slightly further upward.
+
+Not done:
+
+- No medal artwork, glow resource, poster layout, ranking request, ranking order, recommendation logic, database schema, migration, database update, commit, or push was changed.
+- No full WPF screenshot pass was run in this turn.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 1 file-lock copy warning from the normal Debug output directory.
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal -p:OutDir="%TEMP%\\XFVerseCodexBuildScanLogSnapshotMigration\\"` passed with 0 warnings and 0 errors.
+- Ranking medal polish did not add its own migration; the current migrations diff is from the scan-log history snapshot database change.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify the running ranking UI for gold and ordinary medal digit placement on Movie / TV ranking cards.
+- Noise: sub-pixel WPF text rendering and transparent padding in medal PNGs can still make tiny offsets look different between normal and hero poster sizes.
+
 ## 2026-06-17 - Ranking Medal Number Micro Alignment Follow-up
 
 Goal:
@@ -2903,3 +2932,110 @@ Known Issues:
 - Blocker: none confirmed by build.
 - Deferred: manually verify that media-library emotion filter `好奇` matches legacy `悬疑`, emotion filter `不安` matches legacy `惊悚`, and scene filter `解压` matches legacy `放松`.
 - Noise: old persisted tag text is normalized in the media-library view model and AI normalization paths, but the database values are intentionally not rewritten in this pass.
+
+## 2026-06-19 - Ordinary Ranking Medal Digit Micro-adjustment
+
+Goal:
+
+- Move only the ordinary ranking medal number slightly upward.
+
+Completed:
+
+- Reduced the ordinary medal vertical adjustment to a small upward nudge.
+- Kept medal artwork, badge size, poster placement, and ranking behavior unchanged.
+
+Not done:
+
+- No ranking data source, sorting, recommendation logic, database schema, migration, database update, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 0 warnings and 0 errors.
+- Runtime visual confirmation remains manual.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify one-digit and multi-digit ordinary ranks in the running WPF ranking UI.
+- Noise: perceived alignment can vary slightly because the medal PNG contains transparent padding.
+
+## 2026-06-19 - Ordinary Ranking Medal Digit Upward Follow-up
+
+Goal:
+
+- Move only the ordinary ranking medal number slightly further upward.
+
+Completed:
+
+- Increased the ordinary medal number's upward nudge by a small amount.
+- Kept its horizontal position, medal artwork, badge size, poster placement, and all ranking behavior unchanged.
+
+Not done:
+
+- No gold, silver, or bronze medal placement was changed.
+- No ranking data source, sorting, recommendation logic, database schema, migration, database update, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 0 warnings and 0 errors.
+- This follow-up added no migration; the current migration changes were already present in the workspace.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify ordinary one-digit and multi-digit ranks in the running WPF ranking UI.
+- Noise: transparent padding and sub-pixel rendering can affect perceived alignment.
+
+## 2026-06-20 - Ordinary Ranking Medal Digit Additional 0.35px Lift
+
+Goal:
+
+- Move only the ordinary ranking medal number upward by approximately another 0.35px at its 39px display size.
+
+Completed:
+
+- Changed the ordinary medal vertical nudge ratio from `-0.028` to `-0.037`.
+- Kept its horizontal position, medal artwork, badge size, poster placement, and all ranking behavior unchanged.
+
+Not done:
+
+- No gold, silver, or bronze medal placement was changed.
+- No ranking data source, sorting, recommendation logic, database schema, migration, database update, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 0 warnings and 0 errors.
+- This follow-up added no migration; the current migration changes were already present in the workspace.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify ordinary one-digit and multi-digit ranks in the running WPF ranking UI.
+- Noise: transparent padding and sub-pixel rendering can affect perceived alignment.
+
+## 2026-06-20 - Ordinary Ranking Medal Digit Additional 0.23px Lift
+
+Goal:
+
+- Move only the ordinary ranking medal number upward by approximately another 0.23px at its 39px display size.
+
+Completed:
+
+- Changed the ordinary medal vertical nudge ratio from `-0.022` to `-0.028`.
+- Kept its horizontal position, medal artwork, badge size, poster placement, and all ranking behavior unchanged.
+
+Not done:
+
+- No gold, silver, or bronze medal placement was changed.
+- No ranking data source, sorting, recommendation logic, database schema, migration, database update, commit, or push was changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 0 warnings and 0 errors.
+- This follow-up added no migration; the current migration changes were already present in the workspace.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually verify ordinary one-digit and multi-digit ranks in the running WPF ranking UI.
+- Noise: transparent padding and sub-pixel rendering can affect perceived alignment.

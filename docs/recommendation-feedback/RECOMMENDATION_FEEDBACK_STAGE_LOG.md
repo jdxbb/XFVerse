@@ -1,5 +1,35 @@
 # Recommendation Feedback Stage Log
 
+## 2026-06-17 - Candidate Pool Wait Consume Follow-up
+
+Goal:
+
+- Fix the AI recommendation "change batch" flow when the candidate pool is empty and a background refill is still running.
+
+Result:
+
+- When the user clicks "change batch" while the candidate pool is empty and refill is active, the UI still enters the existing waiting state.
+- After the refill succeeds, the Recommendation VM now immediately consumes the newly refilled candidate pool with a force-refresh request and applies the returned three recommendations to the current card list.
+- The previous behavior only cleared the waiting state and emitted a suppressed recommendation-change notification, which required a second click to show the new recommendations.
+- If consume-after-refill returns no item or fails, the UI preserves the existing recovery path and retry messaging.
+
+Not done:
+
+- No recommendation prompt, candidate generation strategy, hard filter, Movie-only boundary, database schema, migration, database update, commit, or push was changed.
+- No TV recommendation scope was added.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal` passed with 1 file-lock copy warning from the normal Debug output directory.
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal -p:OutDir="%TEMP%\\XFVerseCodexBuildScanLogSnapshotMigration\\"` passed with 0 warnings and 0 errors.
+- Recommendation behavior did not add its own migration; the current migrations diff is from the scan-log history snapshot database change.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually reproduce an empty candidate pool with an active refill, click "change batch" once, and verify the three displayed cards update immediately after AI returns.
+- Noise: refill timing is asynchronous, so manual validation should use diagnostics or a controlled low-water candidate pool state.
+
 ## Phase 4.18 Phase 4 Recommendation Boundary Note
 
 Goal: record the Phase 4 full-regression result for Movie AI recommendations after TV support stabilization.

@@ -15,6 +15,18 @@ public sealed class ScanTaskLogConfiguration : IEntityTypeConfiguration<ScanTask
         builder.Property(x => x.ErrorMessage)
             .HasMaxLength(4000);
 
+        builder.Property(x => x.SourceBaseUrlSnapshot)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.SourceUsernameSnapshot)
+            .HasMaxLength(200);
+
+        builder.Property(x => x.ScanPathSnapshot)
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.ScanPathDisplayNameSnapshot)
+            .HasMaxLength(200);
+
         builder.Property(x => x.ReasonSummaryJson)
             .HasMaxLength(12000);
 

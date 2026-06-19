@@ -146,6 +146,11 @@ public sealed class SettingsViewModel : PageViewModelBase
     private bool _editingScanPathRecursive = true;
     private int _selectedSettingsTabIndex = GeneralSettingsTabIndex;
     private bool _isGeneralSettingsContentReady;
+    private bool _isTestingConnection;
+    private bool _isTestingTmdbConnection;
+    private bool _isTestingOmdbConnection;
+    private bool _isTestingOpenSubtitlesConnection;
+    private bool _isTestingAiConnection;
 
     public SettingsViewModel(
         ISettingsService settingsService,
@@ -174,16 +179,16 @@ public sealed class SettingsViewModel : PageViewModelBase
             .ToList();
         _selectedOpenSubtitlesLanguage = OpenSubtitlesLanguages.FirstOrDefault(x => x.Code == "zh-cn")
                                          ?? OpenSubtitlesLanguages.FirstOrDefault();
-        SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync);
-        TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync);
-        SaveTmdbSettingsCommand = new AsyncRelayCommand(SaveTmdbSettingsAsync, HasTmdbSettingsChanges);
-        TestTmdbConnectionCommand = new AsyncRelayCommand(TestTmdbConnectionAsync);
-        SaveOmdbSettingsCommand = new AsyncRelayCommand(SaveOmdbSettingsAsync, HasOmdbSettingsChanges);
-        TestOmdbConnectionCommand = new AsyncRelayCommand(TestOmdbConnectionAsync);
-        SaveOpenSubtitlesSettingsCommand = new AsyncRelayCommand(SaveOpenSubtitlesSettingsAsync, HasOpenSubtitlesSettingsChanges);
-        TestOpenSubtitlesConnectionCommand = new AsyncRelayCommand(TestOpenSubtitlesConnectionAsync);
-        SaveAiSettingsCommand = new AsyncRelayCommand(SaveAiSettingsAsync, HasAiSettingsChanges);
-        TestAiSettingsCommand = new AsyncRelayCommand(TestAiSettingsAsync);
+        SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync, () => !IsTestingConnection);
+        TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, () => !IsTestingConnection);
+        SaveTmdbSettingsCommand = new AsyncRelayCommand(SaveTmdbSettingsAsync, CanSaveTmdbSettings);
+        TestTmdbConnectionCommand = new AsyncRelayCommand(TestTmdbConnectionAsync, () => !IsTestingTmdbConnection);
+        SaveOmdbSettingsCommand = new AsyncRelayCommand(SaveOmdbSettingsAsync, CanSaveOmdbSettings);
+        TestOmdbConnectionCommand = new AsyncRelayCommand(TestOmdbConnectionAsync, () => !IsTestingOmdbConnection);
+        SaveOpenSubtitlesSettingsCommand = new AsyncRelayCommand(SaveOpenSubtitlesSettingsAsync, CanSaveOpenSubtitlesSettings);
+        TestOpenSubtitlesConnectionCommand = new AsyncRelayCommand(TestOpenSubtitlesConnectionAsync, () => !IsTestingOpenSubtitlesConnection);
+        SaveAiSettingsCommand = new AsyncRelayCommand(SaveAiSettingsAsync, CanSaveAiSettings);
+        TestAiSettingsCommand = new AsyncRelayCommand(TestAiSettingsAsync, () => !IsTestingAiConnection);
         SaveThemeSettingsCommand = new AsyncRelayCommand(SaveThemeSettingsAsync);
         ToggleThemeSettingsCommand = new AsyncRelayCommand(ToggleThemeSettingsAsync);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath);
@@ -805,6 +810,71 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     public string ApiStatusMessage { get => _apiStatusMessage; set => SetProperty(ref _apiStatusMessage, value); }
 
+    public bool IsTestingConnection
+    {
+        get => _isTestingConnection;
+        private set
+        {
+            if (SetProperty(ref _isTestingConnection, value))
+            {
+                SaveConnectionCommand.RaiseCanExecuteChanged();
+                TestConnectionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsTestingTmdbConnection
+    {
+        get => _isTestingTmdbConnection;
+        private set
+        {
+            if (SetProperty(ref _isTestingTmdbConnection, value))
+            {
+                SaveTmdbSettingsCommand.RaiseCanExecuteChanged();
+                TestTmdbConnectionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsTestingOmdbConnection
+    {
+        get => _isTestingOmdbConnection;
+        private set
+        {
+            if (SetProperty(ref _isTestingOmdbConnection, value))
+            {
+                SaveOmdbSettingsCommand.RaiseCanExecuteChanged();
+                TestOmdbConnectionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsTestingOpenSubtitlesConnection
+    {
+        get => _isTestingOpenSubtitlesConnection;
+        private set
+        {
+            if (SetProperty(ref _isTestingOpenSubtitlesConnection, value))
+            {
+                SaveOpenSubtitlesSettingsCommand.RaiseCanExecuteChanged();
+                TestOpenSubtitlesConnectionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsTestingAiConnection
+    {
+        get => _isTestingAiConnection;
+        private set
+        {
+            if (SetProperty(ref _isTestingAiConnection, value))
+            {
+                SaveAiSettingsCommand.RaiseCanExecuteChanged();
+                TestAiSettingsCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public string ThemeStatusMessage { get => _themeStatusMessage; set => SetProperty(ref _themeStatusMessage, value); }
 
     public string SoftwareCacheStatusMessage { get => _softwareCacheStatusMessage; set => SetProperty(ref _softwareCacheStatusMessage, value); }
@@ -1038,9 +1108,19 @@ public sealed class SettingsViewModel : PageViewModelBase
                || !StringEqualsPersisted(TmdbApiKey, _loadedTmdbApiKey);
     }
 
+    private bool CanSaveTmdbSettings()
+    {
+        return !IsTestingTmdbConnection && HasTmdbSettingsChanges();
+    }
+
     private bool HasOmdbSettingsChanges()
     {
         return !StringEqualsPersisted(OmdbApiKey, _loadedOmdbApiKey);
+    }
+
+    private bool CanSaveOmdbSettings()
+    {
+        return !IsTestingOmdbConnection && HasOmdbSettingsChanges();
     }
 
     private bool HasOpenSubtitlesSettingsChanges()
@@ -1050,6 +1130,11 @@ public sealed class SettingsViewModel : PageViewModelBase
                || !StringEqualsPersisted(OpenSubtitlesUsername, _loadedOpenSubtitlesUsername)
                || !string.Equals(OpenSubtitlesPassword ?? string.Empty, _loadedOpenSubtitlesPassword ?? string.Empty, StringComparison.Ordinal)
                || !string.Equals(GetSelectedOpenSubtitlesLanguageCode(), _loadedOpenSubtitlesLanguageCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool CanSaveOpenSubtitlesSettings()
+    {
+        return !IsTestingOpenSubtitlesConnection && HasOpenSubtitlesSettingsChanges();
     }
 
     private bool HasAiSettingsChanges()
@@ -1071,6 +1156,11 @@ public sealed class SettingsViewModel : PageViewModelBase
                || !StringEqualsPersisted(AiRecommendationTimeoutSeconds, _loadedAiRecommendationTimeoutSeconds)
                || !StringEqualsPersisted(AiWatchProfileModel, _loadedAiWatchProfileModel)
                || !StringEqualsPersisted(AiWatchProfileTimeoutSeconds, _loadedAiWatchProfileTimeoutSeconds);
+    }
+
+    private bool CanSaveAiSettings()
+    {
+        return !IsTestingAiConnection && HasAiSettingsChanges();
     }
 
     private void MarkTmdbInputsAsPersisted()
@@ -1467,22 +1557,66 @@ public sealed class SettingsViewModel : PageViewModelBase
 
     private async Task TestConnectionAsync()
     {
-        var result = await _webDavService.TestConnectionAsync(
-            new WebDavConnectionModel
-            {
-                Id = ConnectionId,
-                Name = ConnectionName,
-                BaseUrl = BaseUrl,
-                Username = Username,
-                Password = Password,
-                IsEnabled = IsConnectionEnabled
-            });
+        IsTestingConnection = true;
+        try
+        {
+            var result = await _webDavService.TestConnectionAsync(
+                new WebDavConnectionModel
+                {
+                    Id = ConnectionId,
+                    Name = ConnectionName,
+                    BaseUrl = BaseUrl,
+                    Username = Username,
+                    Password = Password,
+                    IsEnabled = IsConnectionEnabled
+                });
 
-        ConnectionStatusMessage = result.Message;
+            ConnectionStatusMessage = result.Message;
+        }
+        finally
+        {
+            IsTestingConnection = false;
+        }
+    }
+
+    private async Task TestTmdbConnectionAsync()
+    {
+        IsTestingTmdbConnection = true;
+        try
+        {
+            var hasTmdbCredential = !string.IsNullOrWhiteSpace(TmdbReadAccessToken)
+                                    || !string.IsNullOrWhiteSpace(TmdbApiKey);
+            if (!hasTmdbCredential)
+            {
+                TmdbConfigStatusKind = ApiConfigStatusFailure;
+                TmdbStatusMessage = "请先填写 TMDB Read Access Token 或 API Key。";
+                return;
+            }
+
+            try
+            {
+                TmdbConfigStatusKind = ApiConfigStatusUntested;
+                TmdbStatusMessage = "正在测试 TMDB 连接...";
+                var settings = await _settingsService.GetApplicationSettingAsync();
+                await TestTmdbAsync(settings.TmdbBaseUrl);
+                TmdbConfigStatusKind = ApiConfigStatusSuccess;
+                TmdbStatusMessage = "TMDB 连接正常。";
+            }
+            catch (Exception exception)
+            {
+                TmdbConfigStatusKind = ApiConfigStatusFailure;
+                TmdbStatusMessage = $"TMDB 连接失败：{exception.Message}";
+            }
+        }
+        finally
+        {
+            IsTestingTmdbConnection = false;
+        }
     }
 
     private async Task SaveTmdbSettingsAsync()
     {
+        IsTestingTmdbConnection = true;
         try
         {
             var saved = await SaveApplicationSettingsAsync(settings =>
@@ -1502,37 +1636,15 @@ public sealed class SettingsViewModel : PageViewModelBase
             TmdbConfigStatusKind = ApiConfigStatusFailure;
             TmdbStatusMessage = $"保存 TMDB 配置失败：{exception.Message}";
         }
-    }
-
-    private async Task TestTmdbConnectionAsync()
-    {
-        var hasTmdbCredential = !string.IsNullOrWhiteSpace(TmdbReadAccessToken)
-                                || !string.IsNullOrWhiteSpace(TmdbApiKey);
-        if (!hasTmdbCredential)
+        finally
         {
-            TmdbConfigStatusKind = ApiConfigStatusFailure;
-            TmdbStatusMessage = "请先填写 TMDB Read Access Token 或 API Key。";
-            return;
-        }
-
-        try
-        {
-            TmdbConfigStatusKind = ApiConfigStatusUntested;
-            TmdbStatusMessage = "正在测试 TMDB 连接...";
-            var settings = await _settingsService.GetApplicationSettingAsync();
-            await TestTmdbAsync(settings.TmdbBaseUrl);
-            TmdbConfigStatusKind = ApiConfigStatusSuccess;
-            TmdbStatusMessage = "TMDB 连接正常。";
-        }
-        catch (Exception exception)
-        {
-            TmdbConfigStatusKind = ApiConfigStatusFailure;
-            TmdbStatusMessage = $"TMDB 连接失败：{exception.Message}";
+            IsTestingTmdbConnection = false;
         }
     }
 
     private async Task SaveOmdbSettingsAsync()
     {
+        IsTestingOmdbConnection = true;
         try
         {
             var saved = await SaveApplicationSettingsAsync(settings =>
@@ -1550,34 +1662,47 @@ public sealed class SettingsViewModel : PageViewModelBase
             OmdbConfigStatusKind = ApiConfigStatusFailure;
             OmdbStatusMessage = $"保存 OMDb 配置失败：{exception.Message}";
         }
+        finally
+        {
+            IsTestingOmdbConnection = false;
+        }
     }
 
     private async Task TestOmdbConnectionAsync()
     {
-        if (string.IsNullOrWhiteSpace(OmdbApiKey))
-        {
-            OmdbConfigStatusKind = ApiConfigStatusFailure;
-            OmdbStatusMessage = "请先填写 OMDb API Key。";
-            return;
-        }
-
+        IsTestingOmdbConnection = true;
         try
         {
-            OmdbConfigStatusKind = ApiConfigStatusUntested;
-            OmdbStatusMessage = "正在测试 OMDb 连接...";
-            await TestOmdbAsync();
-            OmdbConfigStatusKind = ApiConfigStatusSuccess;
-            OmdbStatusMessage = "OMDb 连接正常。";
+            if (string.IsNullOrWhiteSpace(OmdbApiKey))
+            {
+                OmdbConfigStatusKind = ApiConfigStatusFailure;
+                OmdbStatusMessage = "请先填写 OMDb API Key。";
+                return;
+            }
+
+            try
+            {
+                OmdbConfigStatusKind = ApiConfigStatusUntested;
+                OmdbStatusMessage = "正在测试 OMDb 连接...";
+                await TestOmdbAsync();
+                OmdbConfigStatusKind = ApiConfigStatusSuccess;
+                OmdbStatusMessage = "OMDb 连接正常。";
+            }
+            catch (Exception exception)
+            {
+                OmdbConfigStatusKind = ApiConfigStatusFailure;
+                OmdbStatusMessage = $"OMDb 连接失败：{exception.Message}";
+            }
         }
-        catch (Exception exception)
+        finally
         {
-            OmdbConfigStatusKind = ApiConfigStatusFailure;
-            OmdbStatusMessage = $"OMDb 连接失败：{exception.Message}";
+            IsTestingOmdbConnection = false;
         }
     }
 
     private async Task SaveOpenSubtitlesSettingsAsync()
     {
+        IsTestingOpenSubtitlesConnection = true;
         try
         {
             ClearOpenSubtitlesTokenIfCredentialsChanged();
@@ -1602,46 +1727,59 @@ public sealed class SettingsViewModel : PageViewModelBase
             OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
             OpenSubtitlesStatusMessage = $"保存 OpenSubtitles 配置失败：{exception.Message}";
         }
+        finally
+        {
+            IsTestingOpenSubtitlesConnection = false;
+        }
     }
 
     private async Task TestOpenSubtitlesConnectionAsync()
     {
-        if (string.IsNullOrWhiteSpace(OpenSubtitlesApiKey))
-        {
-            OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
-            OpenSubtitlesStatusMessage = "请先填写 OpenSubtitles API Key。";
-            return;
-        }
-
+        IsTestingOpenSubtitlesConnection = true;
         try
         {
-            OpenSubtitlesConfigStatusKind = ApiConfigStatusUntested;
-            OpenSubtitlesStatusMessage = "正在探测 OpenSubtitles API 能力...";
-            ClearOpenSubtitlesTokenIfCredentialsChanged();
-            var result = await _openSubtitlesClientService.ProbeAsync(BuildOpenSubtitlesOptionsFromInputs());
-            if (!string.IsNullOrWhiteSpace(result.Token))
+            if (string.IsNullOrWhiteSpace(OpenSubtitlesApiKey))
             {
-                _openSubtitlesToken = result.Token;
-            }
-            else if (IsOpenSubtitlesAuthFailure(result.ErrorKind) && !string.IsNullOrWhiteSpace(_openSubtitlesToken))
-            {
-                _openSubtitlesToken = string.Empty;
+                OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
+                OpenSubtitlesStatusMessage = "请先填写 OpenSubtitles API Key。";
+                return;
             }
 
-            OpenSubtitlesConfigStatusKind = IsOpenSubtitlesProbeSuccessful(result)
-                ? ApiConfigStatusSuccess
-                : ApiConfigStatusFailure;
-            OpenSubtitlesStatusMessage = FormatOpenSubtitlesProbeResult(result);
+            try
+            {
+                OpenSubtitlesConfigStatusKind = ApiConfigStatusUntested;
+                OpenSubtitlesStatusMessage = "正在探测 OpenSubtitles API 能力...";
+                ClearOpenSubtitlesTokenIfCredentialsChanged();
+                var result = await _openSubtitlesClientService.ProbeAsync(BuildOpenSubtitlesOptionsFromInputs());
+                if (!string.IsNullOrWhiteSpace(result.Token))
+                {
+                    _openSubtitlesToken = result.Token;
+                }
+                else if (IsOpenSubtitlesAuthFailure(result.ErrorKind) && !string.IsNullOrWhiteSpace(_openSubtitlesToken))
+                {
+                    _openSubtitlesToken = string.Empty;
+                }
+
+                OpenSubtitlesConfigStatusKind = IsOpenSubtitlesProbeSuccessful(result)
+                    ? ApiConfigStatusSuccess
+                    : ApiConfigStatusFailure;
+                OpenSubtitlesStatusMessage = FormatOpenSubtitlesProbeResult(result);
+            }
+            catch (Exception exception)
+            {
+                OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
+                OpenSubtitlesStatusMessage = $"OpenSubtitles 探测失败：{exception.GetType().Name}";
+            }
         }
-        catch (Exception exception)
+        finally
         {
-            OpenSubtitlesConfigStatusKind = ApiConfigStatusFailure;
-            OpenSubtitlesStatusMessage = $"OpenSubtitles 探测失败：{exception.GetType().Name}";
+            IsTestingOpenSubtitlesConnection = false;
         }
     }
 
     private async Task SaveAiSettingsAsync()
     {
+        IsTestingAiConnection = true;
         try
         {
             var saved = await SaveApplicationSettingsAsync(settings =>
@@ -1664,10 +1802,15 @@ public sealed class SettingsViewModel : PageViewModelBase
             AiConfigStatusKind = ApiConfigStatusFailure;
             ApiStatusMessage = $"保存 AI 接口配置失败：{exception.Message}";
         }
+        finally
+        {
+            IsTestingAiConnection = false;
+        }
     }
 
     private async Task TestAiSettingsAsync()
     {
+        IsTestingAiConnection = true;
         try
         {
             if (string.IsNullOrWhiteSpace(AiBaseUrl)
@@ -1723,6 +1866,10 @@ public sealed class SettingsViewModel : PageViewModelBase
         {
             AiConfigStatusKind = ApiConfigStatusFailure;
             ApiStatusMessage = $"AI 测试失败：{FormatAiProbeError(exception)}";
+        }
+        finally
+        {
+            IsTestingAiConnection = false;
         }
     }
 

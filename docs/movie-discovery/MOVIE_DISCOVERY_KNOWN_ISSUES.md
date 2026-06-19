@@ -1,5 +1,65 @@
 # 影片发现 Known Issues
 
+## 2026-06-20 Ordinary Ranking Medal Digit Additional 0.35px Lift
+
+Blocker:
+
+- None confirmed by build.
+
+Deferred:
+
+- Verify ordinary one-digit and multi-digit rank numbers are approximately another 0.35px higher without looking over-corrected.
+
+Noise:
+
+- Transparent padding and sub-pixel WPF rendering can affect perceived optical centering.
+- Existing unrelated workspace edits remain preserved.
+
+## 2026-06-20 Ordinary Ranking Medal Digit Additional 0.23px Lift
+
+Blocker:
+
+- None confirmed by build.
+
+Deferred:
+
+- Verify ordinary one-digit and multi-digit rank numbers are approximately another 0.23px higher without looking over-corrected.
+
+Noise:
+
+- Transparent padding and sub-pixel WPF rendering can affect perceived optical centering.
+- Existing unrelated workspace edits remain preserved.
+
+## 2026-06-19 Ordinary Ranking Medal Digit Upward Follow-up
+
+Blocker:
+
+- None confirmed by build.
+
+Deferred:
+
+- Verify ordinary one-digit and multi-digit rank numbers are slightly higher without looking over-corrected.
+
+Noise:
+
+- Transparent padding and sub-pixel WPF rendering can affect perceived optical centering.
+- Existing unrelated workspace edits remain preserved.
+
+## 2026-06-19 Ordinary Ranking Medal Digit Micro-adjustment
+
+Blocker:
+
+- None confirmed by build.
+
+Deferred:
+
+- Verify ordinary one-digit and multi-digit rank numbers are only slightly higher than before.
+
+Noise:
+
+- The medal PNG transparent padding can affect perceived optical centering.
+- Existing unrelated workspace edits remain preserved.
+
 ## 2026-06-16 Ranking Medal Size And Number Alignment Polish
 
 Blocker:

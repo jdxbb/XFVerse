@@ -176,6 +176,7 @@ public sealed class MpvPlayerSession : IAsyncDisposable
             TrySetOptionString("input-default-bindings", "no");
             TrySetOptionString("force-window", "yes");
             TrySetOptionString("wid", hostHandle.ToInt64().ToString(CultureInfo.InvariantCulture));
+            TrySetOptionString("volume-max", "200");
             TrySetOptionString("cache", "yes");
             TrySetOptionString("network-timeout", "20");
             ConfigureHwdecOption();

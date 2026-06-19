@@ -22,8 +22,8 @@ SetupIconFile={#AppIcon}
 UninstallDisplayIcon={app}\MediaLibrary.App.exe
 OutputDir={#OutputDir}
 OutputBaseFilename=XFVerse-TestSetup-{#AppVersion}
-Compression=none
-SolidCompression=no
+Compression=lzma2/max
+SolidCompression=yes
 SetupLogging=yes
 CloseApplications=yes
 

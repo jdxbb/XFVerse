@@ -82,6 +82,22 @@
 - Move resolved issues into the stage log or mark their resolved stage here.
 - Stage-out-of-scope issues are recorded here and are not fixed opportunistically.
 
+## 2026-06-19 Player Volume And Brightness Standards Audit
+
+Blocker:
+
+- None confirmed by build.
+
+Deferred:
+
+- Manually verify the full 101%-200% volume boost range after mpv initialization and check for clipping on loud sources.
+- True monitor-backlight or perceptual dimming remains a separate design; the current brightness control adjusts decoded video brightness only.
+
+Noise:
+
+- Volume 100 is intentionally neutral rather than maximum.
+- Brightness 100 intentionally preserves source brightness rather than applying extra brightening.
+
 ## 2026-06-16 Playback History Refresh And Percent Follow-up
 
 Blocker:

@@ -36,6 +36,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
     private int? _connectionId;
     private bool _hasConnection;
     private bool _isRunning;
+    private bool _isTestingConnection;
     private bool _isApplyingConnection;
     private bool _isConnectionEnabled = true;
     private bool _savedIsConnectionEnabled = true;
@@ -89,8 +90,8 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         _dataRefreshService = dataRefreshService;
 
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsRunning);
-        SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync, () => !IsRunning && HasConnectionConfigChanges);
-        TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, () => !IsRunning);
+        SaveConnectionCommand = new AsyncRelayCommand(SaveConnectionAsync, () => !IsRunning && !IsTestingConnection && HasConnectionConfigChanges);
+        TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, () => !IsRunning && !IsTestingConnection);
         AddWebDavScanPathFromPickerCommand = new AsyncRelayCommand(AddWebDavScanPathFromPickerAsync, () => !IsRunning);
         BeginAddScanPathCommand = new RelayCommand(BeginAddScanPath, () => !IsRunning);
         PickWebDavScanPathCommand = new AsyncRelayCommand(PickWebDavScanPathAsync, () => !IsRunning);
@@ -245,6 +246,18 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 OnPropertyChanged(nameof(IsProgressIndeterminate));
                 OnPropertyChanged(nameof(RunScanButtonText));
                 OnPropertyChanged(nameof(LocalRunScanButtonText));
+                RaiseCommandStates();
+            }
+        }
+    }
+
+    public bool IsTestingConnection
+    {
+        get => _isTestingConnection;
+        private set
+        {
+            if (SetProperty(ref _isTestingConnection, value))
+            {
                 RaiseCommandStates();
             }
         }
@@ -689,6 +702,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
 
     private async Task SaveConnectionAsync()
     {
+        IsTestingConnection = true;
         try
         {
             var connection = await _settingsService.SaveConnectionAsync(
@@ -705,7 +719,7 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             ApplyConnection(connection);
             ConnectionStatusMessage = "WebDAV 连接配置已保存，正在测试连接。";
 
-            await TestConnectionCoreAsync();
+            await TestConnectionCoreAsync(false);
 
             if (ConnectionId.HasValue)
             {
@@ -725,6 +739,10 @@ public sealed class ScanTasksViewModel : PageViewModelBase
             SetConnectionConfigStatusKind(ConnectionConfigStatusFailure);
             ConnectionStatusMessage = exception.Message;
         }
+        finally
+        {
+            IsTestingConnection = false;
+        }
     }
 
     private async Task TestConnectionAsync()
@@ -732,8 +750,13 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         await TestConnectionCoreAsync();
     }
 
-    private async Task TestConnectionCoreAsync()
+    private async Task TestConnectionCoreAsync(bool manageTestingState = true)
     {
+        if (manageTestingState)
+        {
+            IsTestingConnection = true;
+        }
+
         try
         {
             SetConnectionConfigStatusKind(ConnectionConfigStatusUntested);
@@ -749,6 +772,13 @@ public sealed class ScanTasksViewModel : PageViewModelBase
         {
             SetConnectionConfigStatusKind(ConnectionConfigStatusFailure);
             ConnectionStatusMessage = $"测试连接失败：{exception.Message}";
+        }
+        finally
+        {
+            if (manageTestingState)
+            {
+                IsTestingConnection = false;
+            }
         }
     }
 
@@ -1804,9 +1834,11 @@ public sealed class ScanTasksViewModel : PageViewModelBase
                 : item.ScanPathDisplayName;
             ScanPath = item.ScanPath;
             TitleText = FormatTitlePath(ScanPath, ScanPathDisplayName, isLocal);
-            BaseUrlText = isLocal ? "本地文件系统" : FormatBaseUrl(baseUrl);
+            var historicalBaseUrl = string.IsNullOrWhiteSpace(item.BaseUrl) ? baseUrl : item.BaseUrl;
+            var historicalUsername = string.IsNullOrWhiteSpace(item.Username) ? username : item.Username;
+            BaseUrlText = isLocal ? "本地文件系统" : FormatBaseUrl(historicalBaseUrl);
             TargetText = isLocal ? $"本地目录：{TitleText}" : $"WebDAV 路径：{TitleText}";
-            UsernameText = isLocal ? "--" : FormatUsername(username);
+            UsernameText = isLocal ? "--" : FormatUsername(historicalUsername);
             StatusText = FormatStatus(item.Status);
             StatusKind = FormatStatusKind(item.Status);
             StartedAt = item.StartedAt;

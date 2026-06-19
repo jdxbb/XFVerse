@@ -8,6 +8,10 @@ public sealed class ScanTaskLogItem
 
     public int? ScanPathId { get; set; }
 
+    public string BaseUrl { get; set; } = string.Empty;
+
+    public string Username { get; set; } = string.Empty;
+
     public string ScanPathDisplayName { get; set; } = string.Empty;
 
     public string ScanPath { get; set; } = string.Empty;

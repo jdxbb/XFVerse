@@ -1,5 +1,29 @@
 # UI 初级重构阶段日志
 
+## 2026-06-17 - Settings Test Button And Ranking Medal Micro Polish
+
+Goal:
+- Prevent duplicate connection probes when save actions automatically trigger tests.
+- Apply a very small ranking medal number position adjustment.
+
+Completed:
+- Added WebDAV testing state to the Scan Tasks connection commands so the test button is disabled while a save-triggered or manual WebDAV test is running.
+- Added testing state for TMDB, OMDb, OpenSubtitles, and AI API config commands so each test button is disabled while its corresponding save-triggered or manual test is running.
+- Nudged the gold medal number slightly left and moved ordinary medal numbers slightly upward.
+- Raised ordinary medal numbers one more small step after follow-up visual feedback.
+- Raised ordinary medal numbers by one final, very small step after visual review.
+
+Explicitly not done:
+- No scan logic, API probe endpoint, credential persistence format, database schema, migration, commit, or push was changed.
+
+Validation:
+- `dotnet build MediaLibrary.sln` passed with 0 warnings and 0 errors.
+
+Known Issues:
+- Blocker: none.
+- Deferred: manually verify disabled-button states in the running WPF app during slow WebDAV/API probes and visually confirm medal number placement.
+- Noise: none.
+
 ## 2026-06-17 - Cross-Page Micro Polish Follow-up
 
 Goal:

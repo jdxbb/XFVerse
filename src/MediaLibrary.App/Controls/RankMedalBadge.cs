@@ -7,11 +7,12 @@ namespace MediaLibrary.App.Controls;
 
 public sealed class RankMedalBadge : FrameworkElement
 {
-    private const double GoldNumberLeftNudgeRatio = -0.003d;
+    private const double GoldNumberLeftNudgeRatio = -0.006d;
     private const double GoldNumberTinyUpNudgeRatio = -0.002d;
     private const double SilverNumberUpNudgeRatio = -0.016d;
     private const double BronzeNumberExtraUpNudgeRatio = -0.012d;
-    private const double OrdinaryNumberUpNudgeRatio = -0.010d;
+    private const double OrdinaryNumberLeftNudgeRatio = -0.004d;
+    private const double OrdinaryNumberUpNudgeRatio = -0.037d;
     private static readonly FontFamily RankNumberFontFamily = new("Arial Black, Segoe UI Variable Display, Segoe UI, Arial");
 
     public static readonly DependencyProperty RankProperty = DependencyProperty.Register(
@@ -209,7 +210,7 @@ public sealed class RankMedalBadge : FrameworkElement
             1 => new Point(-0.012d + GoldNumberLeftNudgeRatio, -0.058d + GoldNumberTinyUpNudgeRatio),
             2 => new Point(-0.014d, -0.078d + SilverNumberUpNudgeRatio),
             3 => new Point(-0.014d, -0.102d + SilverNumberUpNudgeRatio + BronzeNumberExtraUpNudgeRatio),
-            _ => new Point(0d, -0.090d + OrdinaryNumberUpNudgeRatio)
+            _ => new Point(OrdinaryNumberLeftNudgeRatio, -0.090d + OrdinaryNumberUpNudgeRatio)
         };
     }
 

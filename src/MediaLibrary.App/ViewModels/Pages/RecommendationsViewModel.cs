@@ -1090,6 +1090,13 @@ public sealed class RecommendationsViewModel : PageViewModelBase
 
             if (ShouldUpdateAfterCandidatePoolRefill(requestVersion, queryOptions))
             {
+                var wasWaitingForRefill = _isWaitingForCandidatePoolRefill;
+                if (wasWaitingForRefill)
+                {
+                    await ApplyRecommendationsFromRefilledCandidatePoolAsync(queryOptions, requestVersion);
+                    return;
+                }
+
                 SetWaitingForCandidatePoolRefill(false);
                 StatusMessage = BuildRecommendationStatusMessage();
             }
@@ -1122,6 +1129,72 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             {
                 StatusMessage = "推荐候选后台补充未完成，当前结果已保留";
             }
+        }
+    }
+
+    private async Task ApplyRecommendationsFromRefilledCandidatePoolAsync(
+        RecommendationQueryOptions queryOptions,
+        int requestVersion)
+    {
+        var consumeOptions = new RecommendationQueryOptions
+        {
+            WatchFilter = queryOptions.WatchFilter,
+            LibraryScope = queryOptions.LibraryScope,
+            BatchSeed = queryOptions.BatchSeed,
+            Take = queryOptions.Take,
+            ForceRefresh = true
+        };
+        var combinationKey = BuildRecommendationCombinationKey(consumeOptions);
+
+        try
+        {
+            var recommendations = await _recommendationService.GetRecommendationsAsync(
+                consumeOptions,
+                CancellationToken.None);
+            if (!ShouldUpdateAfterCandidatePoolRefill(requestVersion, consumeOptions))
+            {
+                return;
+            }
+
+            SetWaitingForCandidatePoolRefill(false);
+            if (recommendations.Count > 0)
+            {
+                ApplyRecommendations(recommendations, combinationKey);
+                SetRetryMode(false);
+                StatusMessage = BuildRecommendationStatusMessage();
+                NotifyRecommendationChangedWithoutReload();
+                StartLowWaterCandidatePoolRefill(
+                    consumeOptions,
+                    requestVersion,
+                    "refill-wait-consume-success");
+                return;
+            }
+
+            var refreshedState = await _recommendationService.GetRecommendationPreviewStateAsync(
+                consumeOptions,
+                CancellationToken.None);
+            if (!ShouldUpdateAfterCandidatePoolRefill(requestVersion, consumeOptions)
+                && !IsDisplayedCombination(combinationKey))
+            {
+                return;
+            }
+
+            ApplyFinalPreviewState(refreshedState, combinationKey, CandidatePoolRefillNoCandidatesMessage);
+            NotifyRecommendationChangedWithoutReload();
+        }
+        catch
+        {
+            if (!ShouldUpdateAfterCandidatePoolRefill(requestVersion, consumeOptions))
+            {
+                return;
+            }
+
+            SetWaitingForCandidatePoolRefill(false);
+            await SaveCandidatePoolRefillFailureForRetryAsync(consumeOptions);
+            SetRetryMode(true);
+            StatusMessage = CandidatePoolRefillFailedMessage;
+            WriteAiPoolRefillUiRecover("consume-after-refill-failed", combinationKey, retryMode: true);
+            NotifyRecommendationChangedWithoutReload();
         }
     }
 

@@ -166,6 +166,7 @@ $publishByRid = @{
 $seedDataRoot = Join-Path $packageRoot "seed-data\MediaLibrary"
 $reportsRoot = Join-Path $packageRoot "reports"
 $toolRoot = Resolve-RepoPath ".tmp\packaging\inno"
+$appLogoSvg = Resolve-RepoPath "logo.svg"
 $appIcon = Resolve-RepoPath "src\MediaLibrary.App\Assets\app-logo.ico"
 $appIconPng = Resolve-RepoPath "src\MediaLibrary.App\Assets\app-logo.png"
 $sourceDatabase = Join-Path $SourceAppData "media-library.db"
@@ -209,6 +210,7 @@ if (-not (Test-Path -LiteralPath $PythonPath)) {
 
 Invoke-Checked $PythonPath @(
     (Resolve-RepoPath "scripts\packaging\generate_app_icon.py"),
+    $appLogoSvg,
     $appIcon,
     $appIconPng
 )

@@ -1,5 +1,42 @@
 # Local Folder Stage Log
 
+## 2026-06-17 - Scan Log History Snapshot Migration Follow-up
+
+Goal:
+
+- Keep scan history cards from changing their displayed WebDAV BaseUrl / username / scan path after the user edits current scan settings.
+- Check whether scan path history had true historical data.
+
+Completed:
+
+- Added formal nullable snapshot columns on `ScanTaskLogs`: `SourceBaseUrlSnapshot`, `SourceUsernameSnapshot`, `ScanPathSnapshot`, and `ScanPathDisplayNameSnapshot`.
+- Added migration `20260617073620_AddScanTaskLogHistorySnapshots`.
+- The migration backfills snapshot columns from existing `ReasonSummaryJson` snapshots when present, then falls back to the currently related `SourceConnection` / `ScanPath` values.
+- New WebDAV scan logs now write BaseUrl, username, scan path, and scan path display name to formal snapshot columns at scan start.
+- New Local scan logs now write scan path and display name to formal snapshot columns at scan start.
+- WebDAV and Local scan overview read models now prefer the formal snapshot columns, then fall back to current `SourceConnection` / `ScanPath` data, then JSON snapshot compatibility data.
+- Scan-log cards now prefer per-log BaseUrl / username values instead of always using the current scan settings.
+- Existing JSON snapshot compatibility remains as a fallback, but formal columns are now the primary history source.
+
+Not done:
+
+- No commit or push was added.
+- Existing old logs without a previous JSON snapshot cannot recover a prior BaseUrl / username / path if the old value was already overwritten before this migration; they are backfilled with the relation values available during migration.
+- No scan matching, media-file creation, local file deletion, WebDAV deletion, or library visibility semantics were changed.
+
+Validation:
+
+- `dotnet build MediaLibrary.sln -m:1 -v:minimal -p:OutDir="%TEMP%\\XFVerseCodexBuildScanLogSnapshotMigration\\"` passed with 0 warnings and 0 errors.
+- `dotnet ef database update --project src/MediaLibrary.Core/MediaLibrary.Core.csproj --startup-project src/MediaLibrary.Core/MediaLibrary.Core.csproj --context AppDbContext` succeeded and applied `20260617073620_AddScanTaskLogHistorySnapshots`.
+- `git diff --name-only -- src/MediaLibrary.Core/Data/Migrations` includes the new migration and updated model snapshot.
+
+Known Issues:
+
+- Blocker: none confirmed by build.
+- Deferred: manually run a new WebDAV scan, edit BaseUrl / username, and verify the new history card keeps the original values.
+- Deferred: manually run a new Local scan, edit that local scan path, and verify the new history card keeps the original path text.
+- Noise: old scan logs created before the snapshot existed can only be backfilled with the best available relation data from migration time.
+
 ## Phase 3.1
 
 ### Modified Files

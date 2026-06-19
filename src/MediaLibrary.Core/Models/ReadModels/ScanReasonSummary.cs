@@ -7,7 +7,20 @@ public sealed class ScanReasonSummary
 {
     public int Version { get; set; } = 1;
 
+    public ScanTaskLogSnapshot? Snapshot { get; set; }
+
     public List<ScanReasonSummaryEntry> Entries { get; set; } = [];
+}
+
+public sealed class ScanTaskLogSnapshot
+{
+    public string BaseUrl { get; set; } = string.Empty;
+
+    public string Username { get; set; } = string.Empty;
+
+    public string ScanPath { get; set; } = string.Empty;
+
+    public string ScanPathDisplayName { get; set; } = string.Empty;
 }
 
 public sealed class ScanReasonSummaryEntry
@@ -24,6 +37,7 @@ public sealed class ScanReasonSummaryEntry
 public sealed class ScanReasonSummaryBuilder
 {
     private readonly Dictionary<string, ScanReasonSummaryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private ScanTaskLogSnapshot? _snapshot;
 
     public void AddSuccess(string key, string label, int count)
     {
@@ -54,6 +68,7 @@ public sealed class ScanReasonSummaryBuilder
     {
         var summary = new ScanReasonSummary
         {
+            Snapshot = _snapshot,
             Entries = _entries.Values
                 .Where(x => x.Count > 0)
                 .OrderBy(x => CategoryOrder(x.Category))
@@ -62,9 +77,22 @@ public sealed class ScanReasonSummaryBuilder
                 .ToList()
         };
 
-        return summary.Entries.Count == 0
+        return summary.Entries.Count == 0 && summary.Snapshot is null
             ? string.Empty
             : JsonSerializer.Serialize(summary, ScanReasonSummaryJson.Options);
+    }
+
+    public void SetSnapshot(ScanTaskLogSnapshot? snapshot)
+    {
+        _snapshot = snapshot is null
+            ? null
+            : new ScanTaskLogSnapshot
+            {
+                BaseUrl = snapshot.BaseUrl?.Trim() ?? string.Empty,
+                Username = snapshot.Username?.Trim() ?? string.Empty,
+                ScanPath = snapshot.ScanPath?.Trim() ?? string.Empty,
+                ScanPathDisplayName = snapshot.ScanPathDisplayName?.Trim() ?? string.Empty
+            };
     }
 
     private void Add(string category, string key, string label, int count)
