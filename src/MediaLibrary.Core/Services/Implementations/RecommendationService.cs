@@ -4528,8 +4528,9 @@ public sealed class RecommendationService : IRecommendationService
     // TODO: Remove AI-POOL temporary diagnostics after candidate pool validation.
     private static void WriteAiPoolDiagnostic(string message)
     {
-        Debug.WriteLine(message);
-        Console.WriteLine(message);
+        var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
+        Debug.WriteLine(safeMessage);
+        Console.WriteLine(safeMessage);
         try
         {
             lock (AiPoolDiagnosticFileLock)
@@ -4537,7 +4538,7 @@ public sealed class RecommendationService : IRecommendationService
                 Directory.CreateDirectory(Path.GetDirectoryName(AiPoolDiagnosticLogPath)!);
                 File.AppendAllText(
                     AiPoolDiagnosticLogPath,
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}");
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {safeMessage}{Environment.NewLine}");
             }
         }
         catch

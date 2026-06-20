@@ -54,7 +54,7 @@ public static class MpvNativeLoader
             {
                 ConfigureWindowsDllSearchPath(nativeDirectory);
 
-                MpvPlaybackDiagnostics.Write($"mpv-native-load-begin libmpvPath={libraryPath}");
+                MpvPlaybackDiagnostics.Write("mpv-native-load-begin library=libmpv-2.dll");
                 _libraryHandle = NativeLibrary.Load(libraryPath);
                 _lastResult = new MpvNativeLoadResult
                 {
@@ -148,7 +148,7 @@ public static class MpvNativeLoader
     {
         var errorType = exception.GetType().Name;
         MpvPlaybackDiagnostics.Write(
-            $"mpv-native-load-failed errorType={errorType} hresult=0x{exception.HResult:X8} message={NormalizeLogValue(exception.Message)}");
+            $"mpv-native-load-failed errorType={errorType} hresult=0x{exception.HResult:X8}");
         MpvPlaybackDiagnostics.Write($"mpv-native-load-result success=false errorType={errorType}");
         return new MpvNativeLoadResult
         {
@@ -164,11 +164,7 @@ public static class MpvNativeLoader
     {
         try
         {
-            MpvPlaybackDiagnostics.Write($"mpv-native-app-base-directory value={AppContext.BaseDirectory}");
-            MpvPlaybackDiagnostics.Write($"mpv-native-current-directory value={Directory.GetCurrentDirectory()}");
             MpvPlaybackDiagnostics.Write($"mpv-native-selected selectedRid={selectedRid}");
-            MpvPlaybackDiagnostics.Write($"mpv-native-selected-mpv-dir selectedMpvDir={nativeDirectory}");
-            MpvPlaybackDiagnostics.Write($"mpv-native-selected-libmpv-path selectedLibmpvPath={libraryPath}");
             MpvPlaybackDiagnostics.Write(
                 $"mpv-native-path-check selectedRid={selectedRid} directoryExists={Directory.Exists(nativeDirectory).ToString().ToLowerInvariant()} fileExists={File.Exists(libraryPath).ToString().ToLowerInvariant()}");
             MpvPlaybackDiagnostics.Write(
@@ -300,13 +296,6 @@ public static class MpvNativeLoader
         {
             MpvPlaybackDiagnostics.Write($"mpv-native-set-dll-directory-failed errorType={exception.GetType().Name}");
         }
-    }
-
-    private static string NormalizeLogValue(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value)
-            ? "empty"
-            : value.Replace('\r', ' ').Replace('\n', ' ').Trim();
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]

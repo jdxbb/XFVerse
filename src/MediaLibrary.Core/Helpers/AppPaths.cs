@@ -43,4 +43,14 @@ public static class AppPaths
         Directory.CreateDirectory(subtitleCacheDirectory);
         return subtitleCacheDirectory;
     }
+
+    /// <summary>
+    /// Returns the per-user diagnostics directory used by installed and development builds.
+    /// </summary>
+    public static string GetLogsDirectory()
+    {
+        var logsDirectory = Path.Combine(GetAppDataDirectory(), "Logs");
+        Directory.CreateDirectory(logsDirectory);
+        return logsDirectory;
+    }
 }

@@ -21,7 +21,8 @@ public static class MpvPlaybackDiagnostics
 
         try
         {
-            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [MPV] {message}";
+            var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [MPV] {safeMessage}";
             Debug.WriteLine(line);
 
             var logPath = LogPath;
@@ -44,17 +45,6 @@ public static class MpvPlaybackDiagnostics
 
     private static string ResolveLogPath()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "MediaLibrary.sln")))
-            {
-                return Path.Combine(directory.FullName, "logs", "mpv-playback.log");
-            }
-
-            directory = directory.Parent;
-        }
-
-        return Path.Combine(AppContext.BaseDirectory, "logs", "mpv-playback.log");
+        return DiagnosticLogPathResolver.Resolve("mpv-playback.log");
     }
 }

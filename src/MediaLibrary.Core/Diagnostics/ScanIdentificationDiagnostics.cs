@@ -21,7 +21,8 @@ public static partial class ScanIdentificationDiagnostics
 
         try
         {
-            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [SCAN-ID] {message}";
+            var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [SCAN-ID] {safeMessage}";
             Debug.WriteLine(line);
 
             var logPath = _logPath ??= ResolveLogPath();
@@ -110,18 +111,7 @@ public static partial class ScanIdentificationDiagnostics
 
     private static string ResolveLogPath()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "MediaLibrary.sln")))
-            {
-                return Path.Combine(directory.FullName, "logs", "scan-identification-debug.log");
-            }
-
-            directory = directory.Parent;
-        }
-
-        return Path.Combine(AppContext.BaseDirectory, "logs", "scan-identification-debug.log");
+        return DiagnosticLogPathResolver.Resolve("scan-identification-debug.log");
     }
 
     private static string SanitizePath(string? path, int keepSegments)

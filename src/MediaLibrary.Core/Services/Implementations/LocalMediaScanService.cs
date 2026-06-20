@@ -493,8 +493,8 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
             TaskType = ScanTaskType.Refresh,
             Status = ScanTaskStatus.Running,
             StartedAt = now,
-            ScanPathSnapshot = scanPath.Path,
-            ScanPathDisplayNameSnapshot = scanPath.DisplayName,
+            ScanPathSnapshot = SecretProtector.Protect(scanPath.Path),
+            ScanPathDisplayNameSnapshot = SecretProtector.Protect(scanPath.DisplayName),
             ReasonSummaryJson = BuildSnapshotReasonSummaryJson(CreateScanTaskLogSnapshot(scanPath)),
             CreatedAt = now,
             UpdatedAt = now
@@ -1383,8 +1383,8 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
     {
         return new ScanTaskLogSnapshot
         {
-            ScanPath = scanPath.Path,
-            ScanPathDisplayName = scanPath.DisplayName
+            ScanPath = SecretProtector.Protect(scanPath.Path),
+            ScanPathDisplayName = SecretProtector.Protect(scanPath.DisplayName)
         };
     }
 
@@ -1410,11 +1410,22 @@ public sealed class LocalMediaScanService : ILocalMediaScanService
     {
         foreach (var log in logs)
         {
+            // New history snapshots are protected at rest; legacy plaintext remains readable.
+            log.BaseUrl = SecretProtector.UnprotectDiagnosticValue(log.BaseUrl);
+            log.Username = SecretProtector.UnprotectDiagnosticValue(log.Username);
+            log.ScanPath = SecretProtector.UnprotectDiagnosticValue(log.ScanPath);
+            log.ScanPathDisplayName = SecretProtector.UnprotectDiagnosticValue(log.ScanPathDisplayName);
+
             var snapshot = ScanReasonSummaryFormatter.Parse(log.ReasonSummaryJson)?.Snapshot;
             if (snapshot is null)
             {
                 continue;
             }
+
+            snapshot.BaseUrl = SecretProtector.UnprotectDiagnosticValue(snapshot.BaseUrl);
+            snapshot.Username = SecretProtector.UnprotectDiagnosticValue(snapshot.Username);
+            snapshot.ScanPath = SecretProtector.UnprotectDiagnosticValue(snapshot.ScanPath);
+            snapshot.ScanPathDisplayName = SecretProtector.UnprotectDiagnosticValue(snapshot.ScanPathDisplayName);
 
             if (string.IsNullOrWhiteSpace(log.BaseUrl) && !string.IsNullOrWhiteSpace(snapshot.BaseUrl))
             {

@@ -1625,7 +1625,8 @@ public sealed class RecommendationsViewModel : PageViewModelBase
             return;
         }
 
-        Debug.WriteLine(message);
+        var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
+        Debug.WriteLine(safeMessage);
         try
         {
             lock (AiPoolDiagnosticFileLock)
@@ -1633,7 +1634,7 @@ public sealed class RecommendationsViewModel : PageViewModelBase
                 Directory.CreateDirectory(Path.GetDirectoryName(AiPoolDiagnosticLogPath)!);
                 File.AppendAllText(
                     AiPoolDiagnosticLogPath,
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}");
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {safeMessage}{Environment.NewLine}");
             }
         }
         catch

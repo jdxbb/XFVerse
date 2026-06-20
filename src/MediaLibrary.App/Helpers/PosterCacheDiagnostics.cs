@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using MediaLibrary.Core.Diagnostics;
 
 namespace MediaLibrary.App.Helpers;
 
@@ -26,7 +27,9 @@ public static class PosterCacheDiagnostics
 
         try
         {
-            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [POSTER-CACHE] event={eventName} {message}";
+            var safeEventName = DiagnosticLogSanitizer.Sanitize(eventName);
+            var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [POSTER-CACHE] event={safeEventName} {safeMessage}";
             Debug.WriteLine(line);
 
             var logPath = LogPath;
@@ -92,17 +95,6 @@ public static class PosterCacheDiagnostics
 
     private static string ResolveLogPath()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "MediaLibrary.sln")))
-            {
-                return Path.Combine(directory.FullName, "logs", "poster-cache-debug.log");
-            }
-
-            directory = directory.Parent;
-        }
-
-        return Path.Combine(AppContext.BaseDirectory, "logs", "poster-cache-debug.log");
+        return DiagnosticLogPathResolver.Resolve("poster-cache-debug.log");
     }
 }

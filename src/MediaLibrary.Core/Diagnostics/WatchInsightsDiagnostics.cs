@@ -26,7 +26,7 @@ public static class WatchInsightsDiagnostics
 
     public static void Write(string message)
     {
-        var safeMessage = string.IsNullOrWhiteSpace(message) ? "event=empty" : message.Trim();
+        var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
         if (!IsVerboseEnabled && !DiagnosticMessageFilter.ShouldWriteReleaseMessage(safeMessage))
         {
             return;

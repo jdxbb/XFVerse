@@ -1,8 +1,8 @@
 param(
     [string] $Configuration = "Release",
-    [string] $PackageVersion = (Get-Date -Format "yyyy.MM.dd.HHmm"),
+    [string] $PackageVersion = "",
     [string] $SourceAppData = (Join-Path $env:LOCALAPPDATA "MediaLibrary"),
-    [string] $PythonPath = "C:\Users\32184\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe",
+    [string] $PythonPath = "",
     [string] $InnoSetupDownloadUrl = "https://jrsoftware.org/download.php/is.exe",
     [ValidateSet("win-x64", "win-arm64")]
     [string[]] $RuntimeIdentifiers = @("win-x64", "win-arm64"),
@@ -155,6 +155,26 @@ function Prune-PublishDirectory([string] $publishDirectory, [string] $rid) {
 $script:RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 Set-Location $script:RepoRoot
 
+# Keep test package metadata aligned with the repository version source unless explicitly overridden.
+if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
+    $versionPropertiesPath = Resolve-RepoPath "Directory.Build.props"
+    if (-not (Test-Path -LiteralPath $versionPropertiesPath)) {
+        throw "Repository version properties were not found."
+    }
+
+    [xml] $versionProperties = Get-Content -LiteralPath $versionPropertiesPath -Raw
+    $versionNode = $versionProperties.SelectSingleNode("/Project/PropertyGroup/Version")
+    $PackageVersion = if ($versionNode) { [string] $versionNode.InnerText } else { [string]::Empty }
+    if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
+        $versionPrefixNode = $versionProperties.SelectSingleNode("/Project/PropertyGroup/VersionPrefix")
+        $PackageVersion = if ($versionPrefixNode) { [string] $versionPrefixNode.InnerText } else { [string]::Empty }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
+        throw "Repository version properties do not define Version or VersionPrefix."
+    }
+}
+
 $packageRoot = Resolve-RepoPath "artifacts\test-installer"
 $publishRoot = Join-Path $packageRoot "publish"
 $publishX64 = Join-Path $publishRoot "win-x64"
@@ -199,7 +219,7 @@ foreach ($rid in $RuntimeIdentifiers) {
 Ensure-Directory $seedDataRoot
 Ensure-Directory $reportsRoot
 
-if (-not (Test-Path -LiteralPath $PythonPath)) {
+if ([string]::IsNullOrWhiteSpace($PythonPath) -or -not (Test-Path -LiteralPath $PythonPath)) {
     $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
     if (-not $pythonCommand) {
         throw "Python was not found. Pass -PythonPath to a Python runtime with Pillow available."

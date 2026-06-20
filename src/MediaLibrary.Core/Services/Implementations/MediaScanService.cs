@@ -457,10 +457,10 @@ public sealed class MediaScanService : IMediaScanService
             TaskType = ScanTaskType.Refresh,
             Status = ScanTaskStatus.Running,
             StartedAt = now,
-            SourceBaseUrlSnapshot = connection.BaseUrl,
-            SourceUsernameSnapshot = connection.Username,
-            ScanPathSnapshot = scanPath.Path,
-            ScanPathDisplayNameSnapshot = scanPath.DisplayName,
+            SourceBaseUrlSnapshot = SecretProtector.Protect(connection.BaseUrl),
+            SourceUsernameSnapshot = SecretProtector.Protect(connection.Username),
+            ScanPathSnapshot = SecretProtector.Protect(scanPath.Path),
+            ScanPathDisplayNameSnapshot = SecretProtector.Protect(scanPath.DisplayName),
             ReasonSummaryJson = BuildSnapshotReasonSummaryJson(CreateScanTaskLogSnapshot(connection, scanPath)),
             CreatedAt = now,
             UpdatedAt = now
@@ -1107,10 +1107,10 @@ public sealed class MediaScanService : IMediaScanService
     {
         return new ScanTaskLogSnapshot
         {
-            BaseUrl = connection.BaseUrl,
-            Username = connection.Username,
-            ScanPath = scanPath.Path,
-            ScanPathDisplayName = scanPath.DisplayName
+            BaseUrl = SecretProtector.Protect(connection.BaseUrl),
+            Username = SecretProtector.Protect(connection.Username),
+            ScanPath = SecretProtector.Protect(scanPath.Path),
+            ScanPathDisplayName = SecretProtector.Protect(scanPath.DisplayName)
         };
     }
 
@@ -1136,11 +1136,22 @@ public sealed class MediaScanService : IMediaScanService
     {
         foreach (var log in logs)
         {
+            // New history snapshots are protected at rest; legacy plaintext remains readable.
+            log.BaseUrl = SecretProtector.UnprotectDiagnosticValue(log.BaseUrl);
+            log.Username = SecretProtector.UnprotectDiagnosticValue(log.Username);
+            log.ScanPath = SecretProtector.UnprotectDiagnosticValue(log.ScanPath);
+            log.ScanPathDisplayName = SecretProtector.UnprotectDiagnosticValue(log.ScanPathDisplayName);
+
             var snapshot = ScanReasonSummaryFormatter.Parse(log.ReasonSummaryJson)?.Snapshot;
             if (snapshot is null)
             {
                 continue;
             }
+
+            snapshot.BaseUrl = SecretProtector.UnprotectDiagnosticValue(snapshot.BaseUrl);
+            snapshot.Username = SecretProtector.UnprotectDiagnosticValue(snapshot.Username);
+            snapshot.ScanPath = SecretProtector.UnprotectDiagnosticValue(snapshot.ScanPath);
+            snapshot.ScanPathDisplayName = SecretProtector.UnprotectDiagnosticValue(snapshot.ScanPathDisplayName);
 
             if (string.IsNullOrWhiteSpace(log.BaseUrl) && !string.IsNullOrWhiteSpace(snapshot.BaseUrl))
             {

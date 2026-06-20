@@ -18,7 +18,8 @@ internal static class WatchCompletionDiagnostics
 
         try
         {
-            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [WATCH-COMPLETION] {message}";
+            var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [WATCH-COMPLETION] {safeMessage}";
             Debug.WriteLine(line);
 
             var logPath = _logPath ??= ResolveLogPath();
@@ -41,17 +42,6 @@ internal static class WatchCompletionDiagnostics
 
     private static string ResolveLogPath()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "MediaLibrary.sln")))
-            {
-                return Path.Combine(directory.FullName, "logs", "watch-completion.log");
-            }
-
-            directory = directory.Parent;
-        }
-
-        return Path.Combine(AppContext.BaseDirectory, "logs", "watch-completion.log");
+        return DiagnosticLogPathResolver.Resolve("watch-completion.log");
     }
 }

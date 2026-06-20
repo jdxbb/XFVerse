@@ -21,7 +21,8 @@ public static class VideoCacheDiagnostics
 
         try
         {
-            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{category}] {message}";
+            var safeMessage = DiagnosticLogSanitizer.Sanitize(message);
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{category}] {safeMessage}";
             Debug.WriteLine(line);
 
             var logPath = LogPath;
@@ -44,17 +45,6 @@ public static class VideoCacheDiagnostics
 
     private static string ResolveLogPath()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "MediaLibrary.sln")))
-            {
-                return Path.Combine(directory.FullName, "logs", "video-cache-debug.log");
-            }
-
-            directory = directory.Parent;
-        }
-
-        return Path.Combine(AppContext.BaseDirectory, "logs", "video-cache-debug.log");
+        return DiagnosticLogPathResolver.Resolve("video-cache-debug.log");
     }
 }

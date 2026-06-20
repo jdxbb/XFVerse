@@ -74,7 +74,7 @@ public static class AiPerfDiagnostics
             return;
         }
 
-        var line = $"[AI-PERF] {message}";
+        var line = $"[AI-PERF] {DiagnosticLogSanitizer.Sanitize(message)}";
         Debug.WriteLine(line);
         try
         {
