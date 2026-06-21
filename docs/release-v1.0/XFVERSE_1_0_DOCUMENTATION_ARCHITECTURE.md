@@ -1,6 +1,6 @@
 # XFVerse 1.0 文档信息架构
 
-Last updated: 2026-06-20
+Last updated: 2026-06-21
 
 ## 1. 目标
 
@@ -40,6 +40,7 @@ docs/
     XFVerse-1.0.0-发布说明.md
   third-party/
     THIRD_PARTY_NOTICES.md
+    CORRESPONDING_SOURCE.md
   release-v1.0/
     PHASE_8_PLAN.md
     PHASE_8_STAGE_LOG.md
@@ -54,7 +55,8 @@ docs/
 
 说明：
 
-- 当前 `docs/使用说明.md` 在 Phase 8.6 重写为 `docs/使用说明书.md`；如仓库链接较多，可保留简短跳转页，避免静默断链。
+- Phase 8.6 已建立 `docs/使用说明书.md` 作为正式功能说明，并将 `docs/使用说明.md` 保留为简短兼容跳转页，避免旧链接静默断开。
+- Phase 8.8 已建立根 README、1.0.0 发布说明、第三方声明和 GPL 对应源代码状态文档；其中对应源代码归档仍是公开 GA 前的 Blocker。
 - `docs/third-party/SMARTDATE_NOTICE.md` 保留为组件级证据，最终由 `THIRD_PARTY_NOTICES.md` 索引或合并。
 - 阶段文档不随普通终端用户安装包分发，除非发布流程明确需要。
 
@@ -134,8 +136,8 @@ docs/
 
 - 用“删除影片”同时指软件记录删除和真实文件删除。
 - 用“账号”描述当前仅存在的本地用户资料。
-- 用“加密”描述当前 Base64 凭据保护。
-- 用“支持 ARM64”描述只有测试发布脚本、没有正式验收的状态。
+- 不把历史 Base64 编码称为加密；当前 DPAPI 保护应准确描述为当前 Windows 用户上下文的本机凭据保护。
+- 在只有 ARM64 候选安装包、尚未完成 Phase 8.9 应用级 RC 时，直接宣称具体 Windows ARM64 系统版本已正式支持。
 - 用“自动更新”描述手动下载安装器升级。
 
 ## 7. 截图规范

@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MediaLibrary.App.Services;
 using MediaLibrary.App.Services.Implementations;
 using MediaLibrary.App.Services.Interfaces;
@@ -92,7 +93,7 @@ public partial class MainWindow : Window
         }
 
         _isExitRequested = true;
-        Close();
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(Close));
     }
 
     private void ExitFromTray()

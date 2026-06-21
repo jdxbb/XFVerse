@@ -1,6 +1,6 @@
 # XFVerse 1.0 功能证据矩阵
 
-Last updated: 2026-06-20
+Last updated: 2026-06-21
 
 ## 1. 文档目的
 
@@ -20,7 +20,7 @@ Last updated: 2026-06-20
 ## 3. 产品边界
 
 - XFVerse 1.0 是 Windows 桌面媒体库、播放器、扫描识别、影片发现、推荐和观影洞察应用。
-- 1.0 GA 目标平台冻结为 Windows 10 / Windows 11 x64。
+- 1.0 正式候选架构为 Windows x64 与 Windows ARM64；最终系统版本支持声明由 Phase 8.9 RC 证据决定。
 - 本地目录和 WebDAV 都是媒体来源；WebDAV 不是使用本地媒体功能的前置条件。
 - TMDB、OMDb、OpenSubtitles 和 AI 服务是分功能可选依赖，未配置时不得导致基础媒体库和本地播放不可用。
 - Watch Insights、AI 推荐画像和 fingerprint 的 1.0 范围保持 Movie-only；TV 不进入这些能力。
@@ -113,13 +113,13 @@ Last updated: 2026-06-20
 | ID | 功能与用户入口 | 当前实际能力 | 前置条件、错误与降级 | 数据影响与 Movie / TV 边界 | 代码证据 | 文档归属 | RC 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | F-070 | 常规设置 | 关闭行为、启动全屏、自动 WebDAV 扫描、System/Light/Dark 主题 | 无效配置应回退默认值 | 写入应用设置；与媒体类型无关 | `SettingsViewModel.cs`、`SettingsService.cs` | 使用说明书、帮助文档 | 代码已审计；RC 待验证 |
-| F-071 | 外部服务设置 | TMDB、OMDb、OpenSubtitles、AI 配置、保存和连接测试 | 各服务独立可选；凭据不得写入日志或文档 | 写入本地配置；当前凭据保护存在 P8-B04 | `SettingsViewModel.cs`、`SettingsService.cs`、各外部服务实现 | 安装说明、使用说明书、帮助文档 | 代码已审计；RC 待验证；Blocked |
+| F-071 | 外部服务设置 | TMDB、OMDb、OpenSubtitles、AI 配置、保存和连接测试 | 各服务独立可选；凭据不得写入日志或文档 | 写入本地配置；Phase 8.3 已改用当前 Windows 用户上下文的 DPAPI 保护并兼容旧格式迁移 | `SettingsViewModel.cs`、`SettingsService.cs`、`ProtectedCredentialService.cs`、各外部服务实现 | 安装说明、使用说明书、帮助文档 | 代码与安全回归已验证；应用级 RC 待验证 |
 | F-072 | 缓存管理 | 查看和清理视频、海报、metadata、在线字幕缓存 | 清理失败应指出被占用项；不得扩大到原始媒体目录 | 仅删除 XFVerse 缓存和缓存记录 | `SettingsViewModel.cs`、`VideoCacheService.cs`、`ExternalMetadataCacheMaintenanceService.cs`、`OnlineSubtitleCacheService.cs` | 使用说明书、帮助文档 | 代码已审计；RC 待验证 |
 | F-073 | 用户资料 | 本地保存昵称、简介和头像 | 头像不可读时使用默认头像；当前无账号同步 | 写入本地 JSON 和头像目录；不上传 | `UserProfileService`、`UserProfileDialogWindow.*` | 使用说明书、帮助文档 | 代码已审计；RC 待验证 |
-| F-074 | 关于与版本 | 显示应用名称、版本和产品说明 | 当前未建立显式统一版本源，受 P8-B03 阻断 | 只读 | `SettingsViewModel.cs`、`MediaLibrary.App.csproj` | README、使用说明书 | 代码已审计；RC 待验证；Blocked |
+| F-074 | 关于与版本 | 显示应用名称、版本和产品说明 | Phase 8.3 已建立 1.0.0 统一版本源；正式包和界面必须继续保持一致 | 只读 | `Directory.Build.props`、`SettingsViewModel.cs`、`MediaLibrary.App.csproj` | README、使用说明书 | 版本源与正式包已验证；应用级 RC 待验证 |
 | F-075 | 用户数据目录 | 数据库、缓存、字幕和资料默认位于当前用户 LocalAppData 下，可由 `XFVERSE_APPDATA_DIR` 覆盖 | 目录不可写时应用启动应失败并给出诊断；文档不公开用户具体路径 | 数据库存储所有软件记录；目录名为兼容历史保留 `MediaLibrary` | `AppPaths.cs`、`AppDbContext.cs` | 安装说明、帮助文档、软件设计说明书 | 代码已审计；RC 待验证 |
 | F-076 | 数据库初始化 | 启动时初始化数据库并应用仓库内 EF Core migrations | Migration 失败不得继续到不可预测状态；正式升级需备份与回滚验证 | 可能迁移软件数据库，不修改真实媒体文件 | `App.xaml.cs`、`DatabaseInitializer.cs`、`Data/Migrations/*` | 安装说明、帮助文档、软件设计说明书 | 代码已审计；RC 待验证 |
-| F-077 | 日志与诊断 | 应用和服务记录诊断日志；扫描任务另有数据库日志 | 必须脱敏；当前日志目录尚未完全统一到用户数据目录 | 写入软件日志，不应记录完整路径、URL 或凭据 | 日志初始化代码、`ScanTaskLogConfiguration.cs` | 帮助文档、软件设计说明书 | 代码已审计；RC 待验证 |
+| F-077 | 日志与诊断 | 应用和服务记录诊断日志；扫描任务另有数据库日志 | 必须脱敏；Phase 8.7 已完成按错误现象组织的诊断入口、日志文件说明和提交模板 | 统一写入用户数据目录下的 `Logs`；公共脱敏与扫描历史隐私保护已在 Phase 8.3 收口 | `AppPaths.cs`、`DiagnosticLogPathResolver.cs`、`ScanTaskLogConfiguration.cs` | 帮助文档、软件设计说明书 | 代码、安全回归和帮助文档已验证；应用级 RC 待验证 |
 
 ### 4.9 安装与发布
 
@@ -127,7 +127,7 @@ Last updated: 2026-06-20
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | F-080 | 应用运行时与原生资源 | WPF .NET 8 应用，发布时复制 mpv、ffmpeg/ffprobe 和 WatchPersona 资源 | 原生架构必须与发布架构一致；X86 不在 1.0 范围 | 与媒体类型无关 | `MediaLibrary.App.csproj`、`NativeRuntimeResolver.cs` | README、安装说明、软件设计说明书 | 代码已审计；RC 待验证 |
 | F-081 | 现有测试安装器 | 可构建 x64/ARM64 自包含测试包和 Inno 安装器 | 会复制/覆盖用户数据，仅限内部测试，禁止作为正式包 | 可能破坏用户软件数据，受 P8-B01/P8-B02 阻断 | `scripts/packaging/Build-TestInstaller.ps1`、`XFVerse.TestInstaller*.iss` | 仅内部阶段文档 | Blocked；不得发布 |
-| F-082 | 正式安装器 | 尚未实现；8.4 必须建立独立空 staging、x64、当前用户安装链路 | 不得复用测试 seed-data 或危险删除逻辑 | 升级/卸载默认保留用户数据 | `PHASE_8_4_PACKAGING_PLAN.md`、发布决策记录 | 安装说明、README | Blocked；Phase 8.4 实现 |
+| F-082 | 正式安装器 | 已建立独立 x64/ARM64 self-contained staging、当前用户安装、修复、卸载和双向架构切换链路 | 不复用测试 seed-data；每包只携带目标架构原生文件；应用首次启动和播放仍待 RC | 升级、架构切换和卸载默认保留用户数据 | `Build-ReleaseInstaller.ps1`、`Test-ReleaseInstaller.ps1`、`XFVerse.ReleaseInstaller.iss`、正式打包记录 | 安装说明、README | 打包与安装生命周期已验证；应用级 RC 待验证 |
 | F-083 | 自动更新 | 当前没有正式自动更新器 | 1.0 采用手动下载新版安装器升级 | 升级必须保留用户数据库和配置 | 发布决策记录 | README、安装说明、帮助文档 | Deferred |
 | F-084 | 数字签名 | 当前没有代码签名配置 | 若无证书，Windows 可能显示未知发布者 | 不影响应用数据，但影响安装信任提示 | 发布决策记录 | 安装说明、发布说明 | Deferred |
 
@@ -145,7 +145,7 @@ Last updated: 2026-06-20
 
 ## 6. 1.0 明确不承诺
 
-- ARM64 正式支持。
+- 未经 Phase 8.9 应用级 RC 即宣称具体 Windows ARM64 系统版本已正式支持。
 - X86 支持。
 - 自动更新。
 - 云账号、登录、跨设备同步或真实“退出登录”。

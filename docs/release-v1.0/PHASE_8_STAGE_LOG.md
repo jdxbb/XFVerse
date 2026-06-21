@@ -1,8 +1,300 @@
 # Phase 8 Stage Log
 
-Last updated: 2026-06-20
+Last updated: 2026-06-21
 
-## 2026-06-20 - Phase 8.4 正式打包与安装器工程
+## 2026-06-21 - Phase 8.9 RC 自动与进程级验收
+
+### 完成内容
+
+- 在 Windows 11 ARM64 环境执行 x64 仿真与 ARM64 原生候选版验收。
+- 双架构在隔离应用数据目录完成首次启动、空数据库创建、主窗口形成和正常退出。
+- ARM64 使用现有用户数据副本完成启动验证，原始数据库哈希保持不变。
+- 三个测试数据库均通过 `PRAGMA integrity_check`，包含 22 张表和 27 条 migration 记录。
+- x64 与 ARM64 libmpv 均完成原生进程加载、初始化、测试媒体载入和 duration 探测。
+- 验证开始菜单快捷方式、卸载注册项、默认卸载和双向架构覆盖安装。
+- 复核正式包、运行日志、第三方声明、对应源代码包和敏感信息。
+- 生成根发布目录 `SHA256SUMS.txt` 与 `release-manifest.json`，四个制品哈希复算一致。
+- 新增 `XFVERSE_1_0_RC_REPORT.md`，记录已通过证据、未执行矩阵和 GA Blocker。
+
+### RC 发现与修复
+
+- 发现 `MainWindow.OnClosing` 在异步关闭流程快速完成时可能重入 WPF `Closing` 事件。
+- 异常会阻止应用正常退出，属于发布阻断问题。
+- 将第二次关闭改为通过 Dispatcher 排队执行，避免在原关闭事件调用栈中再次调用 `Close()`。
+- 未改变媒体业务语义、数据库结构、页面布局或用户可见功能。
+- 修复后 Release build、双架构首次启动、现有数据副本启动和正常退出均通过。
+- 修复后重新构建 x64 与 ARM64 安装包，并重新执行安装/修复/卸载生命周期。
+
+### 最终候选制品
+
+- x64 安装包：266,950,555 bytes，SHA-256 `6D7641FBEB7E20FC282EE23BF81DF7ECA1CE81DFE6D4366ED1DE38D167F04A15`。
+- ARM64 安装包：240,257,892 bytes，SHA-256 `6C75397ADAD4CEDF6374CA936D367D989C817ABB0ADAF9A0A31ECD6DADA52BC8`。
+- x64 对应源代码包：41,353,342 bytes，SHA-256 `295DD94628A74B0D85890882B14EC4A2F1D42015AF31D28A3E8018F84941D8E9`。
+- ARM64 对应源代码包：41,353,339 bytes，SHA-256 `7836F690311094DC3CDE280A53D09A4A0C7C1A68C417E3F8BC9ED5ACDE7883C6`。
+- 两个安装包 Authenticode 状态均为 `NotSigned`。
+
+### 未完成事项
+
+- 未取得 Windows 11 x64 原生 RC 环境。
+- 未取得 Windows 10 x64 RC 环境。
+- Windows UI 自动化运行环境不可用；用户随后确认当前 Windows 11 ARM64 设备人工验收无异常，未形成自动化截图记录。
+- 未执行损坏数据库恢复、显示缩放、深色主题、HEVC 4K 和大体积 WebDAV 长时播放。
+- 未 commit、未 push、未执行 database update、未新增 migration。
+
+### Known Issues
+
+- Blocker：P8-B06 GA 构建不可追踪。
+- Blocker：P8-B07 Windows 11 x64 原生环境缺失。
+- Blocker：P8-B08 Windows 10 x64 环境缺失。
+- 已关闭：P8-B09，用户确认当前设备人工验收通过。
+- Deferred：数字签名、体积优化、自动更新器和高负载播放场景。
+- Noise：Windows ARM64 上运行 x64 仿真包后，少量运行时文件可能因仿真进程锁定而延迟删除。
+
+### 结论
+
+- 当前候选制品保持 RC 状态，不标记为 GA。
+- 不建议发布，存在以下 Blocker。
+- 详细证据见 `XFVERSE_1_0_RC_REPORT.md` 和 `XFVERSE_1_0_RC_ENVIRONMENT_MATRIX.md`。
+
+## 2026-06-21 - P8-B05 关闭与双架构合规重建
+
+### 完成内容
+
+- 用户授权替换来源不可验证的原生 ffprobe。
+- 将 x64 和 ARM64 ffprobe 统一替换为 BtbN `autobuild-2026-06-20-13-30` 的 FFmpeg 8.1.2 GPL 构建。
+- 两个原始发布包均通过上游 `checksums.sha256` 验证。
+- 新增 `Build-CorrespondingSource.ps1`，固定 mpv、FFmpeg、mpv-winbuild-cmake 和 FFmpeg-Builds 源码/构建快照。
+- 生成 x64 与 ARM64 对应源代码包、对象映射、内部文件清单和 SHA-256。
+- 正式打包脚本要求源码包校验清单存在，并将其复制到安装目录。
+- 安装生命周期脚本新增第三方声明、对应源代码说明和源码包校验文件检查。
+- 重建 x64 与 ARM64 正式候选安装包，更新 README、安装说明、发布说明、第三方文档和打包记录。
+
+### 产物
+
+- x64 安装包：266,950,555 bytes，SHA-256 `6D7641FBEB7E20FC282EE23BF81DF7ECA1CE81DFE6D4366ED1DE38D167F04A15`。
+- ARM64 安装包：240,257,892 bytes，SHA-256 `6C75397ADAD4CEDF6374CA936D367D989C817ABB0ADAF9A0A31ECD6DADA52BC8`。
+- x64 源码包：41,353,342 bytes，SHA-256 `295DD94628A74B0D85890882B14EC4A2F1D42015AF31D28A3E8018F84941D8E9`。
+- ARM64 源码包：41,353,339 bytes，SHA-256 `7836F690311094DC3CDE280A53D09A4A0C7C1A68C417E3F8BC9ED5ACDE7883C6`。
+
+### 验证结果
+
+- x64 ffprobe：PE `8664`，ARM64 ffprobe：PE `AA64`。
+- 两个 ffprobe 均报告 `n8.1.2-20260620`，并对 1 秒 WAV 返回 JSON duration `1.000000`、退出码 0。
+- 两个源码包内部 9 个文件的 SHA-256 全部通过。
+- 双架构 publish、安装器编译、禁止文件检查和敏感信息扫描通过。
+- 双架构首次安装、同版本修复、卸载和合规文件安装检查通过。
+- Authenticode 仍为 `NotSigned`。
+- Migration diff 和 XAML diff 均为空。
+
+### 结论
+
+- P8-B05 已关闭。
+- 当前没有已确认发布 Blocker。
+- 可以进入 Phase 8.9 全量应用级 RC；尚未宣布 GA。
+
+## 2026-06-21 - Phase 8.8 README、发布说明与合规文档
+
+### 完成内容
+
+- 重写根 README，准确说明 XFVerse 1.0.0 候选状态、双架构安装包、核心能力、文档导航、构建打包入口、数据语义、隐私和许可证状态。
+- 新增 1.0.0 发布说明，记录 x64/ARM64 文件名、大小、SHA-256、未签名状态、升级、回滚、外部服务和已知限制。
+- 新增第三方声明和 GPL 对应源代码状态文档，并同步第三方清单。
+- 确认两个 libmpv 来自 `shinchiro/mpv-winbuild-cmake` 20260419 发布，x64 ffprobe 来自 Gyan FFmpeg 8.1。
+- 正式打包脚本和安装生命周期验证脚本增加 `THIRD-PARTY-NOTICES.txt` 与 `CORRESPONDING-SOURCE.txt`。
+- 更新正式打包记录、文档信息架构、Phase 8 总计划、8.9 进入条件和 Known Issues。
+
+### 验证结果
+
+- `dotnet restore MediaLibrary.sln` 通过。
+- Release build 通过，0 警告、0 错误。
+- 两个打包相关 PowerShell 脚本语法检查通过。
+- 正式文档本地相对链接检查和敏感信息模式扫描通过。
+- README 与发布说明中的双架构 SHA-256 和 Phase 8.4 正式打包记录一致。
+- Migration diff 和 XAML diff 均为空。
+- 8.8-A01～A06、A08～A11 通过；8.8-A07 因完整对应源代码归档未完成而阻断。
+
+### 明确未做与 Known Issues
+
+- 未修改业务逻辑、ViewModel、XAML、数据库模型或 migration。
+- 未重建安装包；现有候选安装包尚不包含两个新增声明文件。
+- 未执行应用级 RC、首次启动、数据库初始化、旧数据升级或实际播放。
+- Blocker：P8-B05。ARM64 ffprobe 原始构建提供方和全部 GPL 原生组件的完整对应源代码归档尚未闭环。
+- Deferred：双架构应用级 RC、数字签名、最终截图和文案实机复核。
+- Noise：`git diff --check` 仅有 LF/CRLF 转换提示。
+- 结论：Phase 8.8 文档产物完成，但不建议正式进入 Phase 8.9；先关闭 P8-B05。
+
+## 2026-06-21 - Phase 8.7 帮助文档与故障排查
+
+### 完成内容
+
+- 建立 `docs/help/README.md` 帮助中心索引和 8 篇主题帮助文档，共 9 个文件、2313 行。
+- 按安装启动、扫描识别、媒体库数据操作、播放字幕、影片发现外部服务、历史收藏洞察、缓存备份恢复、诊断隐私拆分问题。
+- 每篇按症状、影响、原因、检查、修复、禁止事项、诊断信息和相关完整章节组织，不复制整本使用说明书。
+- 覆盖 WebDAV、TMDB、OMDb、OpenSubtitles、AI 的配置、认证、网络、额度、模型和降级。
+- 覆盖播放器黑屏、Range、远程卡顿、音轨、嵌入/外挂/在线字幕、多源、续播和 Episode 导航。
+- 明确移出媒体库、删除记录、删除扫描路径、缓存清理、卸载和完全清除的软件数据与真实文件边界。
+- 建立 XFVerse 版本、Windows 架构、SHA-256、日志目录、日志文件、脱敏和最小问题报告模板。
+- 安装说明、正式使用说明书和旧兼容入口已链接到正式帮助中心及对应主题。
+- 修正文档信息架构中关于历史 Base64 状态的陈旧表述，并同步功能矩阵、RC 矩阵和 Known Issues。
+
+### 修改与新增
+
+- 新增：`docs/help/README.md` 和 8 篇主题帮助文档。
+- 修改：`docs/安装说明.md`、`docs/使用说明书.md`、`docs/使用说明.md`。
+- 修改：Phase 8.7 阶段文档、Phase 8 总计划、阶段日志、Known Issues、文档信息架构、功能矩阵和 RC 矩阵。
+- 删除：无。
+
+### 验证结果
+
+- 9 个帮助文件逐篇写入并检查；单篇最多 322 行，未超过单次 400 行限制。
+- 帮助中心共 2313 行，全部相对链接有效，无空链接。
+- Markdown 代码围栏总数为 34，数量成对。
+- 未发现完整私有本地用户路径、真实凭据、完整私有 URL 或真实样本。
+- Windows 版本、系统架构、日志列表、日志尾部读取和 `Get-FileHash` 命令已执行验证。
+- x64 安装包 SHA-256 命令结果与正式打包记录一致。
+- 8.7-A01～A10 全部通过文档和命令检查。
+- Migration diff 为空。
+- 本阶段为纯文档阶段，未执行 build。
+
+### 明确未做与 Known Issues
+
+- 未修改业务逻辑、ViewModel、XAML、项目文件、安装器或数据库结构。
+- 未启动应用执行业务功能，未执行扫描、播放、外部服务请求或 database update。
+- 未执行 publish、安装器构建、commit 或 push。
+- 未添加含私有数据的截图；最终脱敏 RC 截图、错误提示和日志一致性由 Phase 8.9 复核。
+- Blocker：P8-B05 GPL 对应源代码公开获取安排仍待 Phase 8.8。
+- Deferred：最终 x64/ARM64 RC 的错误提示、日志名称和排障步骤实机复核。
+- Noise：部分日志只在对应功能运行后生成，目录中不存在所有日志是正常现象。
+- 建议进入 Phase 8.8 README、发布说明与合规文档。
+
+## 2026-06-21 - Phase 8.6 软件使用说明书
+
+### 完成内容
+
+- 新建 `docs/使用说明书.md`，形成适用于 XFVerse 1.0.0 的正式软件使用说明书。
+- 正文共 13 章、4 个附录，覆盖产品概念、主导航、首次使用、本地/WebDAV 来源、扫描识别、媒体库、Movie/TV 详情、播放器、字幕、发现、状态、历史、收藏、洞察、设置、数据安全和依赖边界。
+- 明确移出媒体库、删除记录、删除来源配置和清理缓存均不删除真实本地或 WebDAV 媒体文件。
+- 明确 Movie、Series、Season、Episode 的层级、状态和 1.0 Movie-only 洞察/AI 推荐边界。
+- 按代码记录播放器快捷键、多播放源、音轨、嵌入/外挂/在线字幕、续播和 WebDAV 缓存语义。
+- 按实际设置页区分 TMDB、OMDb、OpenSubtitles、AI、WebDAV、主题、关闭行为、自动全屏、自动扫描和缓存管理。
+- 记录 `%LOCALAPPDATA%\MediaLibrary` 用户数据结构、备份、恢复、卸载保留和凭据本机保护边界。
+- 将旧 `docs/使用说明.md` 改为兼容跳转页，避免历史链接静默失效。
+- 将安装说明中的功能文档引用更新为正式 `使用说明书.md`。
+- 修正功能矩阵中 Phase 8.3 已解决的凭据保护、统一版本源和日志目录旧状态。
+
+### 修改与新增
+
+- 新增：`docs/使用说明书.md`。
+- 修改：`docs/使用说明.md`、`docs/安装说明.md`。
+- 修改：Phase 8.6 阶段文档、Phase 8 总计划、阶段日志、Known Issues、文档信息架构和功能矩阵。
+- 删除：无。
+
+### 验证结果
+
+- 正式说明书共 993 行；分 349、355、289 行三批写入，每批均未超过 400 行，并在每批后重新读取检查。
+- 旧兼容入口共 10 行，不再重复维护过期功能正文。
+- 13 个主章节和 4 个附录均存在，Markdown 代码围栏数量成对，未发现空链接。
+- 使用说明书、兼容入口、安装说明交叉链接和阶段文档均通过 `git diff --check` 内容检查；仅存在 Git 的 LF/CRLF 工作区提示。
+- 8.6-A01～A08、A10、A12 的代码/文档检查通过。
+- 8.6-A09 的脱敏 RC 截图和 8.6-A11 的最终 RC 实机复核纳入 Phase 8.9。
+- Migration diff 为空。
+- 本阶段为纯文档阶段，未执行 build。
+
+### 明确未做与 Known Issues
+
+- 未修改业务逻辑、ViewModel、XAML、项目文件、安装器或数据库结构。
+- 未启动应用，未执行 database update、publish、安装器构建或实际播放。
+- 未添加截图，避免使用历史 DesignDraft 冒充最终 RC；由 Phase 8.9 使用脱敏 RC 截图复核。
+- 未编写 Phase 8.7 帮助文档、Phase 8.8 README 或发布说明。
+- Blocker：Phase 8 总 Blocker P8-B05 的 GPL 对应源代码公开获取安排仍待 Phase 8.8。
+- Deferred：帮助中心、双架构应用级 RC、使用说明书截图和最终文案一致性复核。
+- Noise：旧 `docs/使用说明.md` 仅为兼容入口，不是第二份说明书事实源。
+- 建议进入 Phase 8.7 帮助文档。
+
+## 2026-06-21 - Phase 8.5 正式安装说明
+
+### 完成内容
+
+- 将原有开发/测试安装说明更新为面向终端用户的 XFVerse 1.0 正式安装说明。
+- 删除 Visual Studio、额外 .NET Runtime、测试打包脚本、测试数据库快照和用户数据覆盖等正式用户不应执行的流程。
+- 明确安装说明只负责部署生命周期；功能教程转 Phase 8.6，完整故障排查转 Phase 8.7。
+- 记录 Windows x64 与 ARM64 安装包选择方法、正式文件名、大小和 SHA-256。
+- 记录 self-contained 运行时、磁盘空间、网络和外部服务要求。
+- 按正式 Inno Setup 中文文案记录安装位置、附加任务、安装和完成步骤。
+- 记录未签名安装包的 SmartScreen/未知发布者处理原则，不要求关闭安全软件。
+- 根据代码记录首次启动的数据目录、SQLite migration、主题和应用服务初始化行为。
+- 记录程序目录、用户数据库、视频/海报/字幕缓存、日志和资料的默认位置。
+- 记录升级、修复、x64/ARM64 双向切换、默认卸载和完全清理流程。
+- 明确安装、升级、修复、卸载和软件数据清理均不会删除本地或 WebDAV 媒体文件。
+
+### 修改与新增
+
+- 修改：`docs/安装说明.md`。
+- 修改：Phase 8.5 阶段文档、Phase 8 总计划、阶段日志和 Known Issues。
+- 新增：无。
+- 删除：无。
+
+### 验证结果
+
+- 正式安装说明共 321 行，单次写入未超过 400 行，写入后已重新读取检查。
+- 文件名、大小和 SHA-256 与两个正式 release manifest 一致。
+- 安装按钮、默认目录、桌面快捷方式默认状态、完成页启动选项与正式 `.iss` 一致。
+- x64/ARM64 安装、同版本修复、卸载和跨架构生命周期报告均为 PASS。
+- Authenticode 状态为 NotSigned，文档已如实披露。
+- 用户数据、数据库、缓存和日志位置与 `AppPaths` 和数据库初始化代码一致。
+- 文档内相对链接指向现有软件使用说明、设计说明书和正式打包记录。
+- Migration diff 为空。
+
+### 明确未做与 Known Issues
+
+- 未修改业务逻辑、项目运行行为、XAML、安装器或数据库结构。
+- 未重新 build、publish 或编译安装器。
+- 未启动应用，未执行 database update、数据库初始化或旧数据升级。
+- Blocker：Phase 8 总 Blocker P8-B05 的 GPL 对应源代码公开获取安排仍待 Phase 8.8。
+- Deferred：Phase 8.7 完整帮助中心链接、Phase 8.9 应用首次启动和干净环境 RC、数字签名。
+- Noise：未添加安装器截图；正式安装器流程可由稳定中文文案完整说明。
+- 建议进入 Phase 8.6 软件使用说明书。
+
+## 2026-06-20 - Phase 8.4 ARM64 独立正式包补充
+
+### 完成内容
+
+- 用户将原 x64 单架构决策更新为 x64 与 ARM64 两个独立正式候选安装包。
+- 正式打包脚本增加 `win-x64`、`win-arm64` 参数化构建，按 RID 隔离 publish、staging、reports 和 output。
+- ARM64 包只携带 ARM64 应用入口、libmpv 与 ffprobe；x64 包继续只携带 x64 原生文件。
+- 发布打包不再把原始人格海报和双架构原生目录先复制到 publish，降低峰值磁盘占用；普通开发构建资源行为不变。
+- 安装器使用同一稳定正式 AppId，架构切换时清理另一架构的 mpv 与 ffprobe 程序目录。
+- 重建 x64 包并生成 ARM64 包，分别完成安装、同版本修复和卸载。
+- 完成 x64→ARM64、ARM64→x64 双向覆盖安装验证。
+
+### 产物
+
+- x64：`XFVerse-Setup-1.0.0-win-x64.exe`，253,966,095 bytes，SHA-256 `164AA04901D00FDFDB7A5B1D92013B4E534F2837052EA2A07F469345C0A9DB3A`。
+- ARM64：`XFVerse-Setup-1.0.0-win-arm64.exe`，245,878,081 bytes，SHA-256 `8C8A29DAAC8C36F3CBE68E668CCC46FAB93C382184B453C84C18E4653C2D268E`。
+- x64 staging：547 个文件，541,551,120 bytes。
+- ARM64 staging：546 个文件，549,843,224 bytes。
+- 两个架构分别保留 manifest、文件清单、体积、SHA-256、敏感扫描、第三方清单和安装生命周期报告。
+
+### 验证结果
+
+- x64 应用入口、libmpv、ffprobe 的 PE Machine 均为 `8664`。
+- ARM64 应用入口、libmpv、ffprobe 的 PE Machine 均为 `AA64`。
+- 两个 ffprobe 均能执行 `-version`。
+- 两架构首次安装、同版本修复和卸载退出码均为 0。
+- 双向架构切换后，目标架构文件存在，另一架构原生程序目录已删除。
+- 用户数据目录存在状态和时间戳不变。
+- 两个 staging 的数据库、日志、PDB、非目标架构、私有路径和可疑秘密命中均为 0。
+- Migration diff 为空。
+
+### 明确未做与 Known Issues
+
+- 未修改业务逻辑、XAML、导航或功能行为。
+- 未启动安装后的应用，未执行数据库初始化、database update、旧数据库升级或实际播放。
+- Blocker：公开分发前仍需完成 GPL 对应源代码获取安排。
+- Deferred：双架构干净环境应用级 RC、数字签名、首次启动和旧数据库升级。
+- Noise：旧单目录 x64 生成物已删除，正式产物只保留按 RID 隔离的新目录。
+
+## 2026-06-20 - Phase 8.4 初始 x64 候选（已由上方双架构记录取代）
 
 ### 完成内容
 
@@ -28,10 +320,10 @@ Last updated: 2026-06-20
 
 ### 产物
 
+初始 x64 候选已被双架构重建产物取代，不再保留其旧校验值；当前值以上方 ARM64 补充记录和正式打包记录为准。
+
 - 文件名：`XFVerse-Setup-1.0.0-win-x64.exe`。
-- 大小：253,965,595 bytes，242.20 MiB。
-- SHA-256：`50E20EE9890FD18539428B2C1F71380E69B97B0BE9FFF212DDAB396E515CE301`。
-- Staging：547 个文件，516.47 MiB。
+- 大小、SHA-256 和 staging：已废弃，见当前双架构记录。
 - FileVersion：1.0.0.0。
 - ProductVersion：1.0.0。
 - 数字签名：未签名。

@@ -1,10 +1,10 @@
 # Phase 8.7：帮助文档与故障排查
 
-Last updated: 2026-06-20
+Last updated: 2026-06-21
 
 ## 阶段状态
 
-- 状态：待开始。
+- 状态：正文已完成；最终安装包错误提示和日志一致性复核纳入 Phase 8.9。
 - 前置条件：Phase 8.4 安装行为稳定；Phase 8.6 术语和正常流程稳定。
 - 完成后下一阶段：Phase 8.8。
 
@@ -20,7 +20,7 @@ Last updated: 2026-06-20
 
 ## 建议文档结构
 
-### `docs/help/帮助中心.md`
+### `docs/help/README.md`
 
 - 按症状导航。
 - 快速链接。
@@ -57,14 +57,32 @@ Last updated: 2026-06-20
 - 在线字幕搜索、登录或下载失败。
 - 续播或播放进度异常。
 
-### `docs/help/网络与外部服务.md`
+### `docs/help/影片发现与外部服务.md`
 
 - TMDB、OMDb、OpenSubtitles、AI 配置错误。
 - 网络、代理、防火墙、DNS 和 TLS 问题。
 - API 额度、认证和模型不兼容。
 - 哪些功能会降级，哪些仍可使用。
 
-### `docs/help/数据缓存与恢复.md`
+### `docs/help/媒体库与数据操作.md`
+
+- 搜索或筛选无结果。
+- 批量操作部分失败。
+- 移出媒体库与恢复。
+- 删除记录的影响。
+- 已移出内容无法恢复。
+- 状态冲突或更新失败。
+
+### `docs/help/观影历史收藏与洞察.md`
+
+- 历史为空或无法打开。
+- 收藏状态不一致。
+- 电影状态互斥。
+- 电视剧状态层级。
+- 统计为空或失败。
+- 画像未配置、数据不足或使用缓存。
+
+### `docs/help/缓存备份与恢复.md`
 
 - 数据目录和备份。
 - 海报、元数据、字幕、视频缓存。
@@ -73,7 +91,7 @@ Last updated: 2026-06-20
 - 卸载后恢复。
 - 不删除真实媒体文件的说明。
 
-### `docs/help/诊断信息.md`
+### `docs/help/诊断与隐私.md`
 
 - 获取应用版本。
 - 获取 Windows 版本和架构。
@@ -128,21 +146,68 @@ Last updated: 2026-06-20
 
 ## 阶段执行记录
 
-- 完成内容：待执行后填写。
-- 修改文件：待执行后填写。
-- 新增文件：待执行后填写。
-- 删除文件：待执行后填写。
-- 明确未做事项：待执行后填写。
-- build 结果：纯文档阶段可不执行；如执行必须记录。
-- 命令和排障步骤验证结果：待执行后填写。
-- migration 状态：待执行后填写。
-- 人工验收矩阵结果：待执行后填写。
+- 完成内容：
+  - 建立 `docs/help/README.md` 帮助中心索引。
+  - 新增安装启动、扫描识别、媒体库数据操作、播放字幕、影片发现外部服务、历史收藏洞察、缓存备份恢复、诊断隐私共 8 篇主题文档。
+  - 帮助中心共 9 个文件、2313 行，均按具体症状、原因、检查、修复、禁止事项、诊断信息和相关文档组织。
+  - 明确移出媒体库、删除记录、删除扫描路径、缓存清理、卸载和完全清除的数据影响。
+  - 分别覆盖 WebDAV、TMDB、OMDb、OpenSubtitles 和 AI 的配置、认证、网络、额度与降级。
+  - 覆盖播放器黑屏、WebDAV Range、卡顿、音轨、字幕、在线字幕、多播放源和续播。
+  - 建立版本、Windows 架构、日志文件、脱敏规则和最小问题报告模板。
+  - 更新安装说明、正式使用说明书和旧兼容入口的帮助链接。
+  - 同步文档信息架构、功能矩阵、RC 矩阵、Phase 8 总计划、阶段日志和 Known Issues。
+- 修改文件：
+  - `docs/安装说明.md`
+  - `docs/使用说明书.md`
+  - `docs/使用说明.md`
+  - `docs/release-v1.0/PHASE_8_PLAN.md`
+  - `docs/release-v1.0/PHASE_8_7_HELP_DOCUMENTATION_PLAN.md`
+  - `docs/release-v1.0/PHASE_8_STAGE_LOG.md`
+  - `docs/release-v1.0/PHASE_8_KNOWN_ISSUES.md`
+  - `docs/release-v1.0/XFVERSE_1_0_DOCUMENTATION_ARCHITECTURE.md`
+  - `docs/release-v1.0/XFVERSE_1_0_FEATURE_MATRIX.md`
+  - `docs/release-v1.0/XFVERSE_1_0_RC_ENVIRONMENT_MATRIX.md`
+- 新增文件：
+  - `docs/help/README.md`
+  - `docs/help/安装与启动.md`
+  - `docs/help/扫描与识别.md`
+  - `docs/help/媒体库与数据操作.md`
+  - `docs/help/播放与字幕.md`
+  - `docs/help/影片发现与外部服务.md`
+  - `docs/help/观影历史收藏与洞察.md`
+  - `docs/help/缓存备份与恢复.md`
+  - `docs/help/诊断与隐私.md`
+- 删除文件：无。
+- 明确未做事项：
+  - 未修改业务逻辑、ViewModel、XAML、项目文件、安装器或数据库。
+  - 未启动 XFVerse 执行业务功能、扫描、播放或外部服务请求。
+  - 未执行 database update、publish、安装器构建、commit 或 push。
+  - 未添加含私有数据的截图；最终脱敏 RC 截图和错误提示复核由 Phase 8.9 完成。
+  - 未编写 Phase 8.8 README、发布说明和最终第三方声明。
+- build 结果：纯文档阶段，未执行 build。
+- 命令和排障步骤验证结果：
+  - Windows 版本和架构 PowerShell 命令执行通过。
+  - 日志文件列表和日志尾部读取命令执行通过；缺少目标日志时行为与文档说明一致。
+  - `Get-FileHash` 已对正式 x64 安装包执行，结果与正式打包记录一致。
+  - 所有命令均为只读诊断命令，不修改用户数据。
+- migration 状态：diff 为空；未新增 migration，未执行 database update。
+- 人工验收矩阵结果：
+  - 8.7-A01：通过，索引可按安装、扫描、媒体库、播放、外部服务、历史洞察、数据和诊断导航。
+  - 8.7-A02：通过，各主题按统一排障顺序编写，简短问题复用主题级禁止事项和诊断信息。
+  - 8.7-A03：通过，没有把删除数据库或真实媒体写成首选修复。
+  - 8.7-A04：通过，五类外部服务分别覆盖。
+  - 8.7-A05：通过，播放器、音轨、嵌入/外挂/在线字幕分别覆盖。
+  - 8.7-A06：通过，日志、截图、路径、URL、账号和凭据脱敏规则明确。
+  - 8.7-A07：通过，日志与数据目录和当前 `AppPaths` 一致。
+  - 8.7-A08：通过，链接使用说明书但未复制整章。
+  - 8.7-A09：通过，文档中的 PowerShell 命令已执行验证。
+  - 8.7-A10：通过，未发现凭据、完整私有 URL、完整本地用户路径或真实样本。
 - Known Issues：
-  - Blocker：待执行后填写。
-  - Deferred：待执行后填写。
-  - Noise：待执行后填写。
-- `git diff --stat`：待执行后填写。
-- 是否建议进入 Phase 8.8：待执行后填写。
+  - Blocker：执行当时 P8-B05 待 Phase 8.8；已于 2026-06-21 关闭。
+  - Deferred：Phase 8.9 最终 x64/ARM64 RC 中的错误提示、日志文件、截图和排障步骤一致性复核。
+  - Noise：部分日志仅在对应功能实际运行后生成，目录中不存在全部日志是正常现象。
+- `git diff --stat`：当前 tracked 工作区为 23 files changed、1009 insertions、324 deletions；本阶段涉及的 tracked 路径为 9 files changed、613 insertions、112 deletions。新建 `docs/help/` 的 9 个文件共 2313 行，且 Phase 8.6 新建的 `docs/使用说明书.md` 仍为未跟踪文件，均不计入 `git diff --stat`；统计同时包含重叠阶段文件中的既有 Phase 8 改动。
+- 是否建议进入 Phase 8.8：建议。
 
 ## 建议 commit message
 

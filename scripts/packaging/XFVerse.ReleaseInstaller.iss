@@ -4,6 +4,9 @@
 #define StagingRoot GetEnv("XFVERSE_RELEASE_STAGING")
 #define OutputDir GetEnv("XFVERSE_RELEASE_OUTPUT_DIR")
 #define AppIcon GetEnv("XFVERSE_APP_ICON")
+#define ReleaseArchitecture GetEnv("XFVERSE_RELEASE_ARCHITECTURE")
+#define InnoArchitecture GetEnv("XFVERSE_INNO_ARCHITECTURE")
+#define OppositeRuntime GetEnv("XFVERSE_OPPOSITE_RUNTIME")
 
 [Setup]
 AppId={{C0D20576-16FD-4539-94AA-FA7041348EEB}
@@ -21,14 +24,14 @@ DefaultDirName={localappdata}\Programs\XFVerse
 DefaultGroupName=XFVerse
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed={#InnoArchitecture}
+ArchitecturesInstallIn64BitMode={#InnoArchitecture}
 WizardStyle=modern
 SetupIconFile={#AppIcon}
 UninstallDisplayIcon={app}\MediaLibrary.App.exe
 UninstallDisplayName={#AppName} {#AppVersion}
 OutputDir={#OutputDir}
-OutputBaseFilename=XFVerse-Setup-{#AppVersion}-win-x64
+OutputBaseFilename=XFVerse-Setup-{#AppVersion}-{#ReleaseArchitecture}
 Compression=lzma2/max
 SolidCompression=yes
 SetupLogging=yes
@@ -89,6 +92,10 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 
 [Files]
 Source: "{#StagingRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\mpv\{#OppositeRuntime}"
+Type: filesandordirs; Name: "{app}\tools\ffmpeg\{#OppositeRuntime}"
 
 [Icons]
 Name: "{userprograms}\XFVerse"; Filename: "{app}\MediaLibrary.App.exe"; WorkingDir: "{app}"

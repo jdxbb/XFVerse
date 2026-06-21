@@ -40,10 +40,10 @@ Last updated: 2026-06-20
 
 - 正式脚本：`scripts/packaging/Build-ReleaseInstaller.ps1`
 - 正式安装器：`scripts/packaging/XFVerse.ReleaseInstaller.iss`
-- 正式 staging：`artifacts/release/1.0.0/staging/`
-- 正式 publish：`artifacts/release/1.0.0/publish/win-x64/`
-- 正式报告：`artifacts/release/1.0.0/reports/`
-- 正式产物：`XFVerse-Setup-1.0.0-win-x64.exe`
+- 正式 staging：`artifacts/release/1.0.0/<RID>/staging/`
+- 正式 publish：`artifacts/release/1.0.0/<RID>/publish/`，打包完成后删除。
+- 正式报告：`artifacts/release/1.0.0/<RID>/reports/`
+- 正式产物：`XFVerse-Setup-1.0.0-win-x64.exe`、`XFVerse-Setup-1.0.0-win-arm64.exe`
 
 正式脚本必须有显式断言：
 
@@ -149,6 +149,7 @@ Last updated: 2026-06-20
 | 8.4-A10 | SHA-256、manifest 和敏感扫描报告已生成。 |
 | 8.4-A11 | `dotnet build`、`dotnet publish` 和 Inno 编译通过。 |
 | 8.4-A12 | migration diff 状态明确。 |
+| 8.4-A13 | x64 与 ARM64 双向覆盖安装会清理另一架构原生程序目录且不触碰用户数据。 |
 
 ## 完成时维护
 
@@ -162,24 +163,27 @@ Last updated: 2026-06-20
 
 - 完成内容：
   - 新增与测试链路完全隔离的正式打包脚本和 Inno Setup 定义。
-  - 正式版仅构建 win-x64 self-contained Release。
-  - 建立干净 release root、临时 raw publish、验证后 staging、reports 和 output 目录。
+  - 正式版分别构建 win-x64 与 win-arm64 self-contained Release。
+  - 按 RID 建立相互独立的 raw publish、staging、reports 和 output 目录。
   - raw publish 在验证和 staging 完成后删除，避免重复占用磁盘。
-  - 正式 staging 排除 ARM64、PDB、mpv 头文件、导入库、开发 README、数据库、日志、缓存和测试数据。
+  - 每个正式 staging 排除另一架构、PDB、mpv 头文件、导入库、开发 README、数据库、日志、缓存和测试数据。
   - 对 50 张超大人格海报进行 staging-only 高质量等比缩放，源文件不修改。
+  - 发布打包时不再把原始人格海报和双架构原生资源复制到 publish；脚本直接生成优化后海报并只复制目标架构原生文件，普通开发构建行为不变。
   - 新增包内容、架构、私有路径、敏感字段和必需文件自动检查。
   - 新增正式安装、同版本覆盖修复和卸载自动化测试脚本。
   - 建立固定正式 AppId、当前用户安装、可选桌面快捷方式和保留用户数据的卸载行为。
+  - x64 与 ARM64 共用正式 AppId；双向切换架构时会删除另一架构的 mpv 与 ffprobe 程序目录。
   - 生成 manifest、文件清单、体积、SHA-256、敏感扫描、第三方清单和安装生命周期报告。
   - 完成 mpv、FFmpeg、.NET、EF Core、SQLitePCLRaw、SmartDate、Phosphor Icons 和 Inno Setup 许可清单。
 - 修改文件：
   - `Directory.Build.props`
+  - `src/MediaLibrary.App/MediaLibrary.App.csproj`
   - `scripts/packaging/Build-TestInstaller.ps1`
-  - 本阶段计划、Phase 8 总计划、阶段日志和 Known Issues。
-- 新增文件：
   - `scripts/packaging/Build-ReleaseInstaller.ps1`
   - `scripts/packaging/Test-ReleaseInstaller.ps1`
   - `scripts/packaging/XFVerse.ReleaseInstaller.iss`
+  - 本阶段计划、Phase 8 总计划、阶段日志和 Known Issues。
+- 新增文件：
   - `docs/third-party/XFVERSE_1_0_THIRD_PARTY_INVENTORY.md`
   - `docs/third-party/PHOSPHOR_ICONS_NOTICE.md`
   - `docs/third-party/licenses/APACHE-2.0.txt`
@@ -189,37 +193,39 @@ Last updated: 2026-06-20
   - 未修改业务逻辑、XAML、导航、扫描识别、推荐或播放器功能。
   - 未启动安装后的应用。
   - 未执行数据库初始化、database update 或旧数据库升级。
-  - 未在独立 Windows x64 设备或虚拟机执行 RC。
+  - 未在干净 Windows x64 独立设备或虚拟机执行 RC。
+  - 未在干净 Windows ARM64 环境执行应用首次启动、数据库初始化和实际播放 RC。
   - 未进行数字签名。
   - 未发布公共下载页面或 GPL 对应源代码归档。
   - 未 commit，未 push。
 - build / publish / installer 结果：
-  - Release publish：通过。
+  - win-x64 Release publish：通过。
+  - win-arm64 Release publish：通过。
   - Inno Setup 6.7.1 编译：通过。
-  - 首次静默安装：退出码 0。
-  - 同版本覆盖修复：退出码 0。
-  - 静默卸载：退出码 0。
+  - 两架构首次静默安装、同版本覆盖修复和静默卸载：退出码均为 0。
+  - x64→ARM64、ARM64→x64 双向覆盖安装：通过。
 - 产物、体积和 SHA-256：
-  - 安装包：`XFVerse-Setup-1.0.0-win-x64.exe`。
-  - 安装包大小：253,965,595 bytes，242.20 MiB。
-  - 安装包 SHA-256：`50E20EE9890FD18539428B2C1F71380E69B97B0BE9FFF212DDAB396E515CE301`。
-  - Staging：547 个文件，541,555,700 bytes，516.47 MiB。
+  - x64：`XFVerse-Setup-1.0.0-win-x64.exe`，253,966,095 bytes，242.20 MiB，SHA-256 `164AA04901D00FDFDB7A5B1D92013B4E534F2837052EA2A07F469345C0A9DB3A`。
+  - ARM64：`XFVerse-Setup-1.0.0-win-arm64.exe`，245,878,081 bytes，234.49 MiB，SHA-256 `8C8A29DAAC8C36F3CBE68E668CCC46FAB93C382184B453C84C18E4653C2D268E`。
+  - x64 staging：547 个文件，541,551,120 bytes，516.46 MiB。
+  - ARM64 staging：546 个文件，549,843,224 bytes，524.37 MiB。
   - 人格海报：732,263,089 bytes 降至 133,373,311 bytes。
 - 敏感信息扫描结果：
-  - 数据库、日志、PDB、ARM64 文件均为 0。
+  - 两个 staging 的数据库、日志、PDB、非目标架构文件均为 0。
   - 私有路径和可疑秘密命中均为 0。
   - 安装文件哈希与 staging 一致。
 - migration 状态：Git 范围检查确认 migration diff 为空。
 - 人工验收矩阵结果：
   - 8.4-A01～A05：通过。
-  - 8.4-A06：三个关键 PE 均为 x64，ffprobe 可运行；libmpv 实际播放加载转 RC。
+  - 8.4-A06：每个包的应用入口、libmpv、ffprobe 均为目标 PE 架构，两个 ffprobe 均可运行；libmpv 实际播放加载转 RC。
   - 8.4-A07：通过。
   - 8.4-A08：许可文本和清单已随包；公开发布的 GPL 对应源代码获取方式转 8.8。
   - 8.4-A09～A11：通过。
   - 8.4-A12：通过，migration diff 为空。
+  - 8.4-A13：通过，双向切换架构后错误架构原生目录被清理，用户数据目录状态和时间戳不变。
 - Known Issues：
-  - Blocker：P8-B05 仍需在 8.8 为公开分发完成对应源代码获取安排。
-  - Deferred：数字签名、独立 x64 RC、首次启动和旧数据库升级。
+  - Blocker：执行当时 P8-B05 尚未完成；已于 2026-06-21 在 Phase 8.8 通过双架构 ffprobe 替换、源码包和合规重建关闭。
+  - Deferred：数字签名、双架构干净环境 RC、首次启动和旧数据库升级。
   - Noise：测试安装包和测试 seed-data 不进入正式产物；raw publish 为临时目录。
 - `git diff --stat`：最终报告提供；artifacts 被 Git 忽略。
 - 是否建议进入 Phase 8.5：建议进入。

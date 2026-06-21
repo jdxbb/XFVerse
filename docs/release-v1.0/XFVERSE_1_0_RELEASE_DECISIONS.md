@@ -4,7 +4,7 @@ Last updated: 2026-06-20
 
 ## 1. 目的
 
-本文冻结 Phase 8.1 已能决定的 XFVerse 1.0 发布边界。后续阶段若要改变已冻结决策，必须在阶段文档中记录原因、影响、验证方式和回滚方案。
+本文冻结 XFVerse 1.0 发布边界。Phase 8.4 根据用户新增的 ARM64 正式包要求，已按本文件约定记录并更新 Phase 8.1 的单架构决策。
 
 ## 2. 已冻结决策
 
@@ -12,11 +12,11 @@ Last updated: 2026-06-20
 | --- | --- | --- | --- |
 | RD-001 | 正式产品名为 XFVerse。 | 已冻结 | README、安装器、EXE 信息、设置页和发布说明统一使用该名称。历史内部命名只在兼容路径或代码名中保留。 |
 | RD-002 | 正式版本号为 `1.0.0`。 | 已冻结 | Phase 8.3 建立单一版本源，贯穿程序集、文件属性、设置页、安装器和发布说明。 |
-| RD-003 | 1.0 GA 平台为 Windows 10 / Windows 11 x64。 | 已冻结 | 两个平台都必须通过 RC 环境矩阵；若 Windows 10 无可用验证环境，则在 GA 前缩减支持声明。 |
-| RD-004 | ARM64 不进入 1.0 GA。 | 已冻结 | 当前只有测试发布路径，没有真实设备完整验收。可保留内部实验构建，不对外宣称正式支持。 |
+| RD-003 | 1.0 正式候选架构为 Windows x64 与 Windows ARM64。 | 已更新 | 两种架构分别生成 self-contained 安装包；最终操作系统版本支持声明仍以 Phase 8.9 RC 环境矩阵为准。 |
+| RD-004 | ARM64 以独立正式候选安装包进入 1.0。 | 已更新 | Phase 8.4 已在 Windows ARM64 环境完成原生 publish、PE 架构、ffprobe 执行、安装/修复/卸载及双向架构切换验证；应用首次启动和播放仍转 Phase 8.9。 |
 | RD-005 | X86 不支持。 | 已冻结 | 当前原生资源和运行时解析未形成完整 X86 发布链路。 |
-| RD-006 | 正式包采用 x64 self-contained 发布。 | 已冻结 | 终端用户无需单独安装 .NET Desktop Runtime；Phase 8.4 必须评估体积并只做有证据的裁剪。 |
-| RD-007 | 正式版只提供单架构 x64 安装器。 | 已冻结 | 不使用现有双架构测试安装器，避免包体积、原生依赖和验收面扩大。 |
+| RD-006 | x64 与 ARM64 正式包均采用 self-contained 发布。 | 已更新 | 终端用户无需单独安装 .NET Desktop Runtime；每个安装包只携带自身架构的应用入口、libmpv 和 ffprobe。 |
+| RD-007 | 正式版提供相互独立的 x64 与 ARM64 安装包。 | 已更新 | 两包共用稳定正式 AppId、版本和用户数据格式；切换架构时覆盖程序文件并删除另一架构的原生程序目录，不触碰用户数据。 |
 | RD-008 | 安装范围为当前用户，不请求管理员权限。 | 已冻结 | 默认安装到当前用户 LocalAppData 下的 Programs 目录；不得写入系统级受保护目录。 |
 | RD-009 | 1.0 不提供 Portable 包。 | 已冻结 | 当前数据路径、启动初始化和原生资源模型均按安装版设计。 |
 | RD-010 | 正式安装器必须使用全新、稳定的正式 AppId。 | 已冻结 | 不复用 `XFVerse.TestInstaller*.iss` 中的测试 AppId，防止正式包误升级、覆盖或继承测试包危险行为。 |
@@ -79,6 +79,8 @@ Phase 8.4 可根据工具限制调整分隔符，但含义必须保持：
 ```text
 XFVerse-1.0.0-win-x64-setup.exe
 XFVerse-1.0.0-win-x64-setup.exe.sha256
+XFVerse-1.0.0-win-arm64-setup.exe
+XFVerse-1.0.0-win-arm64-setup.exe.sha256
 XFVerse-1.0.0-release-notes.md
 THIRD_PARTY_NOTICES.md
 ```
@@ -88,6 +90,8 @@ THIRD_PARTY_NOTICES.md
 ```text
 XFVerse-1.0.0-rc.N-win-x64-setup.exe
 XFVerse-1.0.0-win-x64-setup.exe
+XFVerse-1.0.0-rc.N-win-arm64-setup.exe
+XFVerse-1.0.0-win-arm64-setup.exe
 ```
 
 ## 6. 环境和依赖声明
@@ -104,7 +108,7 @@ XFVerse-1.0.0-win-x64-setup.exe
 
 以下不是范围待决，而是已确定方向但尚需产物验证：
 
-- Windows 10 x64 和 Windows 11 x64 的最低可用构建与安装行为。
+- Windows x64 与 Windows ARM64 的最低可用系统版本、首次启动和完整功能行为。
 - self-contained 包的最终体积、启动时间和原生依赖完整性。
 - 覆盖升级、修复和卸载的数据保留。
 - Windows 未签名安装提示的实际文案与帮助指引。

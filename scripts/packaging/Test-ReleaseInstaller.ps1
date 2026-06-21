@@ -1,5 +1,7 @@
 param(
     [string] $PackageVersion = "",
+    [ValidateSet("win-x64", "win-arm64")]
+    [string] $RuntimeIdentifier = "win-x64",
     [string] $InstallerPath = ""
 )
 
@@ -40,15 +42,15 @@ if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
     $PackageVersion = Read-ReleaseVersion
 }
 if ([string]::IsNullOrWhiteSpace($InstallerPath)) {
-    $InstallerPath = Resolve-RepoPath "artifacts\release\$PackageVersion\output\XFVerse-Setup-$PackageVersion-win-x64.exe"
+    $InstallerPath = Resolve-RepoPath "artifacts\release\$PackageVersion\$RuntimeIdentifier\output\XFVerse-Setup-$PackageVersion-$RuntimeIdentifier.exe"
 }
 if (-not (Test-Path -LiteralPath $InstallerPath)) {
     throw "The release installer was not found."
 }
 
-$stagingDirectory = Resolve-RepoPath "artifacts\release\$PackageVersion\staging"
-$reportsDirectory = Resolve-RepoPath "artifacts\release\$PackageVersion\reports"
-$testRoot = Resolve-RepoPath ".tmp\phase8-release-installer-test"
+$stagingDirectory = Resolve-RepoPath "artifacts\release\$PackageVersion\$RuntimeIdentifier\staging"
+$reportsDirectory = Resolve-RepoPath "artifacts\release\$PackageVersion\$RuntimeIdentifier\reports"
+$testRoot = Resolve-RepoPath ".tmp\phase8-release-installer-test-$RuntimeIdentifier"
 $installDirectory = Join-Path $testRoot "program"
 $tmpRoot = (Resolve-RepoPath ".tmp").TrimEnd('\') + '\'
 $resolvedTestRoot = [System.IO.Path]::GetFullPath($testRoot).TrimEnd('\') + '\'
@@ -87,9 +89,12 @@ Start-Sleep -Seconds 2
 
 $requiredFiles = @(
     "MediaLibrary.App.exe",
-    "mpv\win-x64\libmpv-2.dll",
-    "tools\ffmpeg\win-x64\ffprobe.exe",
-    "licenses\XFVERSE_1_0_THIRD_PARTY_INVENTORY.md"
+    "mpv\$RuntimeIdentifier\libmpv-2.dll",
+    "tools\ffmpeg\$RuntimeIdentifier\ffprobe.exe",
+    "licenses\XFVERSE_1_0_THIRD_PARTY_INVENTORY.md",
+    "licenses\THIRD-PARTY-NOTICES.txt",
+    "licenses\CORRESPONDING-SOURCE.txt",
+    "licenses\CORRESPONDING-SOURCE-SHA256.txt"
 )
 $missingFiles = @(
     $requiredFiles | Where-Object {
@@ -136,7 +141,7 @@ else {
 $report = [ordered]@{
     status = "PASS"
     version = $PackageVersion
-    architecture = "win-x64"
+    architecture = $RuntimeIdentifier
     firstInstallExitCode = $firstInstallExitCode
     repairExitCode = $repairExitCode
     uninstallExitCode = $uninstallExitCode

@@ -1,10 +1,10 @@
 # Phase 8.6：XFVerse 1.0 软件使用说明书
 
-Last updated: 2026-06-20
+Last updated: 2026-06-21
 
 ## 阶段状态
 
-- 状态：待开始。
+- 状态：正文已完成；脱敏 RC 截图和最终实机一致性复核纳入 Phase 8.9。
 - 前置条件：Phase 8.1 功能矩阵冻结；最终复核依赖 RC。
 - 完成后下一阶段：Phase 8.7。
 
@@ -181,21 +181,44 @@ Last updated: 2026-06-20
 
 ## 阶段执行记录
 
-- 完成内容：待执行后填写。
-- 修改文件：待执行后填写。
-- 新增文件：待执行后填写。
-- 删除文件：待执行后填写。
-- 明确未做事项：待执行后填写。
-- build 结果：纯文档阶段可不执行；如执行必须记录。
-- 代码证据和 RC 复核结果：待执行后填写。
-- migration 状态：待执行后填写。
-- 人工验收矩阵结果：待执行后填写。
+- 完成内容：
+  - 新建 993 行正式 `docs/使用说明书.md`，包含 13 章和 4 个附录。
+  - 覆盖界面、来源、扫描、识别、媒体库、详情、播放器、字幕、发现、状态、历史、收藏、洞察、设置、数据与外部依赖。
+  - 明确 Movie/TV、Season/Episode、元数据条目、未识别内容和多播放源边界。
+  - 明确移出媒体库、删除记录、删除路径配置、字幕绑定和缓存清理的实际数据影响。
+  - 将旧 `docs/使用说明.md` 改为 10 行兼容跳转页。
+  - 更新安装说明交叉链接、文档信息架构和功能矩阵旧状态。
+- 修改文件：
+  - `docs/使用说明.md`
+  - `docs/安装说明.md`
+  - `docs/release-v1.0/PHASE_8_PLAN.md`
+  - `docs/release-v1.0/PHASE_8_6_USER_MANUAL_PLAN.md`
+  - `docs/release-v1.0/PHASE_8_STAGE_LOG.md`
+  - `docs/release-v1.0/PHASE_8_KNOWN_ISSUES.md`
+  - `docs/release-v1.0/XFVERSE_1_0_DOCUMENTATION_ARCHITECTURE.md`
+  - `docs/release-v1.0/XFVERSE_1_0_FEATURE_MATRIX.md`
+- 新增文件：`docs/使用说明书.md`。
+- 删除文件：无。
+- 明确未做事项：
+  - 未修改业务逻辑、ViewModel、XAML、项目文件、安装器或数据库。
+  - 未编写 Phase 8.7 帮助文档、Phase 8.8 README 或发布说明。
+  - 未添加历史草图或开发数据截图；脱敏 RC 截图由 Phase 8.9 生成和复核。
+  - 未启动应用，未执行 publish、安装器构建、database update 或实机播放。
+- build 结果：纯文档阶段，未执行 build。
+- 代码证据和 RC 复核结果：
+  - 已按功能矩阵和当前 ViewModel/XAML/服务代码复核入口、命令、状态和数据语义。
+  - 最终安装包页面文案、截图和实机行为复核待 Phase 8.9。
+- migration 状态：diff 为空；未新增 migration，未执行 database update。
+- 人工验收矩阵结果：
+  - 8.6-A01～A08、A10、A12：通过代码与文档检查。
+  - 8.6-A09：Deferred，等待脱敏 RC 截图。
+  - 8.6-A11：代码证据检查通过，最终 RC 实机部分 Deferred 至 Phase 8.9。
 - Known Issues：
-  - Blocker：待执行后填写。
-  - Deferred：待执行后填写。
-  - Noise：待执行后填写。
-- `git diff --stat`：待执行后填写。
-- 是否建议进入 Phase 8.7：待执行后填写。
+  - Blocker：执行当时 P8-B05 待 Phase 8.8；已于 2026-06-21 关闭。
+  - Deferred：Phase 8.7 帮助中心；Phase 8.9 双架构应用级 RC、脱敏截图和最终一致性复核。
+  - Noise：旧 `docs/使用说明.md` 仅为兼容入口，不是第二份事实源。
+- `git diff --stat`：当前 tracked 工作区为 22 files changed、874 insertions、300 deletions；本阶段涉及的 8 个 tracked 路径为 514 insertions、102 deletions。新增 `docs/使用说明书.md` 为未跟踪文件，共 993 行，不计入 `git diff --stat`；统计同时包含重叠文件中尚未提交的早期 Phase 8 改动。
+- 是否建议进入 Phase 8.7：建议。
 
 ## 建议 commit message
 

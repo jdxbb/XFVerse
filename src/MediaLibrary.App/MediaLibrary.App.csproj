@@ -28,19 +28,22 @@
     <Resource Include="Assets\medals\**\*.png" />
     <None Remove="Assets\Icons\Phosphor\**\*.svg" />
     <Resource Include="Assets\Icons\Phosphor\**\*.svg" />
-    <Content Include="Assets\WatchPersonas\**\*.*">
+    <Content Include="Assets\WatchPersonas\**\*.*"
+             Condition="'$(XFVerseReleasePackaging)' != 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>Assets\WatchPersonas\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
     </Content>
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\native\mpv\**\*">
+    <Content Include="..\..\native\mpv\**\*"
+             Condition="'$(XFVerseReleasePackaging)' != 'true'">
       <Link>native\mpv\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>mpv\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
     </Content>
-    <Content Include="..\..\tools\ffmpeg\**\*">
+    <Content Include="..\..\tools\ffmpeg\**\*"
+             Condition="'$(XFVerseReleasePackaging)' != 'true'">
       <Link>tools\ffmpeg\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>tools\ffmpeg\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>

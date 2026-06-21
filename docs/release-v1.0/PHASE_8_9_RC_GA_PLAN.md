@@ -1,12 +1,13 @@
 # Phase 8.9：Release Candidate 验收与 1.0 GA 发布
 
-Last updated: 2026-06-20
+Last updated: 2026-06-21
 
 ## 阶段状态
 
-- 状态：待开始。
-- 前置条件：Phase 8.2～8.8 完成，Blocker 候选为零。
-- 完成后：Phase 8 结束。
+- 状态：RC 已执行，GA 阻断。
+- 前置条件：Phase 8.2～8.8 文档完成，P8-B05 已关闭。
+- 当前状态：双架构构建、安装生命周期、首次启动、数据库完整性、升级副本、原生播放核心和发布清单验证已完成；当前 Windows 11 ARM64 设备人工验收已由用户确认通过，规定的 x64 系统矩阵未完成。
+- 结论：不建议发布，存在以下 Blocker。
 
 ## 目标
 
@@ -37,24 +38,24 @@ Last updated: 2026-06-20
 
 1. 干净 Windows 11 x64 当前用户。
 2. 干净 Windows 10 x64 当前用户；若无法提供，必须记录为 Blocker 或明确调整支持范围。
-3. 已安装测试版或上一候选版的升级环境。
-4. 有现有数据库副本的升级环境。
-5. 无网络或外部 API 未配置环境。
-6. 本地目录媒体环境。
-7. WebDAV 测试环境。
-
-ARM64 仅在 8.1 决定正式支持时进入必测矩阵。
+3. 干净 Windows ARM64 当前用户；最低 Windows 版本根据可用设备和 RC 结果冻结。
+4. 已安装测试版或上一候选版的升级环境。
+5. 有现有数据库副本的升级环境。
+6. 无网络或外部 API 未配置环境。
+7. 本地目录媒体环境。
+8. WebDAV 测试环境。
 
 ## 自动验证
 
 - `dotnet build MediaLibrary.sln -c Release`
-- 正式 `dotnet publish`
-- 正式安装器编译
+- x64 与 ARM64 正式 `dotnet publish`
+- 两个正式安装器编译
 - 安装包 SHA-256
 - 文件清单
 - 目标架构原生依赖检查
 - 禁止文件检查
 - 敏感字符串扫描
+- 对应源代码归档、对象代码映射和 SHA-256 检查
 - 安装包静默或受控安装 smoke test（若脚本安全支持）
 - migration diff 检查
 - `git diff --check`
@@ -131,16 +132,20 @@ ARM64 仅在 8.1 决定正式支持时进入必测矩阵。
 | 8.9-D06 | 文档截图、按钮名、页面名与 RC 一致。 |
 | 8.9-D07 | 正式包和文档不含敏感信息。 |
 | 8.9-D08 | 第三方声明随包可访问。 |
+| 8.9-D09 | 每个 GPL 对象文件均有可下载的对应源代码归档、SHA-256 和明确映射。 |
 
 ## GA 产物
 
 至少包括：
 
 - `XFVerse-Setup-1.0.0-win-x64.exe`
+- `XFVerse-Setup-1.0.0-win-arm64.exe`
 - `SHA256SUMS.txt`
 - `release-manifest.json`
 - `XFVerse-1.0.0-发布说明.md`
 - `THIRD-PARTY-NOTICES.txt`
+- `CORRESPONDING-SOURCE.txt`
+- x64 与 ARM64 对应源代码归档及 SHA-256
 - 最终安装、升级、卸载和核心回归报告
 
 是否提供便携版由 8.1 决定；默认不额外增加未经验证的发布形态。
@@ -180,24 +185,51 @@ ARM64 仅在 8.1 决定正式支持时进入必测矩阵。
 
 ## 阶段执行记录
 
-- 完成内容：待执行后填写。
-- 修改文件：待执行后填写。
-- 新增文件：待执行后填写。
-- 删除文件：待执行后填写。
-- 明确未做事项：待执行后填写。
-- build / publish / installer 结果：待执行后填写。
-- RC 和 GA 产物、体积、SHA-256：待执行后填写。
-- 安装、升级、修复、卸载验证：待执行后填写。
-- 核心业务回归：待执行后填写。
-- 敏感信息扫描和第三方声明：待执行后填写。
-- migration 状态：待执行后填写。
+- 执行日期：2026-06-21。
+- 执行环境：Windows 11 ARM64，系统构建 26200；x64 应用通过系统仿真运行，ARM64 应用原生运行。
+- 完成内容：
+  - Release build 通过，0 警告、0 错误。
+  - x64 与 ARM64 正式安装包完成首次安装、同版本修复和默认卸载验证。
+  - x64 与 ARM64 双向覆盖安装验证通过，目标架构文件正确，用户数据库未被修改。
+  - 双架构在隔离数据目录完成干净首次启动、空数据库创建和正常退出。
+  - ARM64 使用现有用户数据副本完成启动升级验证，原始数据未修改。
+  - 三个测试数据库均通过 `PRAGMA integrity_check`，表结构和 27 个 migrations 一致。
+  - x64 与 ARM64 libmpv 均完成原生加载、初始化、媒体载入和 duration 探测。
+  - 正式包、运行日志和文档完成敏感信息抽查。
+  - 生成根 `SHA256SUMS.txt` 和 `release-manifest.json`，四个发布制品复算一致。
+  - RC 发现并修复主窗口关闭事件重入异常；修复后双架构启动与正常退出均通过。
+- 修改文件：
+  - `src/MediaLibrary.App/Views/MainWindow.xaml.cs`
+  - Phase 8 阶段文档、发布说明和发布清单。
+- 新增文件：
+  - `docs/release-v1.0/XFVERSE_1_0_RC_REPORT.md`
+  - `artifacts/release/1.0.0/SHA256SUMS.txt`
+  - `artifacts/release/1.0.0/release-manifest.json`
+- 删除文件：本阶段无新增删除。
+- 明确未做事项：
+  - 未执行 Windows 11 x64 原生环境验收。
+  - 未执行 Windows 10 x64 环境验收。
+  - 当前 Windows 11 ARM64 设备人工验收已由用户确认通过，但未形成自动化截图记录。
+  - 未验证损坏数据库恢复流程、不同显示缩放、深色主题、HEVC 4K 和大体积 WebDAV 长时播放。
+  - 未 commit、未 push、未执行 database update、未新增 migration。
+- build / publish / installer 结果：Release build PASS；双架构正式 publish、安装器构建和安装生命周期 PASS。
+- RC 产物：
+  - x64 安装包：266,950,555 bytes，SHA-256 `6D7641FBEB7E20FC282EE23BF81DF7ECA1CE81DFE6D4366ED1DE38D167F04A15`。
+  - ARM64 安装包：240,257,892 bytes，SHA-256 `6C75397ADAD4CEDF6374CA936D367D989C817ABB0ADAF9A0A31ECD6DADA52BC8`。
+  - x64 对应源代码包：41,353,342 bytes，SHA-256 `295DD94628A74B0D85890882B14EC4A2F1D42015AF31D28A3E8018F84941D8E9`。
+  - ARM64 对应源代码包：41,353,339 bytes，SHA-256 `7836F690311094DC3CDE280A53D09A4A0C7C1A68C417E3F8BC9ED5ACDE7883C6`。
+- GA 产物：未生成；当前制品保持 RC 状态。
+- 安装、升级、修复、卸载验证：自动化和进程级验证通过；当前设备人工验收通过。
+- 核心业务回归：数据库和 libmpv 核心验证通过；当前设备页面级业务回归由用户确认通过。
+- 敏感信息扫描和第三方声明：PASS；安装包未签名，状态为 `NotSigned`。
+- migration 状态：diff 为空；未新增 migration，未执行 database update。
 - Known Issues：
-  - Blocker：待执行后填写。
-  - Deferred：待执行后填写。
-  - Noise：待执行后填写。
-- `git diff --stat`：待执行后填写。
-- 发布结论：待执行后填写。
+  - Blocker：工作区非干净、缺 Windows 11 x64 原生环境、缺 Windows 10 x64 环境。
+  - Deferred：数字签名、包体积优化、自动更新器、高负载播放场景。
+  - Noise：ARM64 系统运行 x64 仿真包后，少量 x64 运行时文件可能因仿真进程锁定而延迟删除。
+- `git diff --stat`：以最终审计输出为准，不在阶段执行中写死动态统计。
+- 发布结论：不建议发布，存在以下 Blocker。
 
 ## 建议 commit message
 
-`release: prepare XFVerse 1.0.0 GA`
+`release: record XFVerse 1.0.0 RC validation and blockers`
