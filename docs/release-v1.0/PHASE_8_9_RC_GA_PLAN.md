@@ -211,7 +211,8 @@ Last updated: 2026-06-21
   - 未执行 Windows 10 x64 环境验收。
   - 当前 Windows 11 ARM64 设备人工验收已由用户确认通过，但未形成自动化截图记录。
   - 未验证损坏数据库恢复流程、不同显示缩放、深色主题、HEVC 4K 和大体积 WebDAV 长时播放。
-  - 未 commit、未 push、未执行 database update、未新增 migration。
+  - RC 验收执行时未 commit、未 push；后续已同步 GitHub，但尚未从已提交分支重新构建安装包。
+  - 未执行 database update、未新增 migration。
 - build / publish / installer 结果：Release build PASS；双架构正式 publish、安装器构建和安装生命周期 PASS。
 - RC 产物：
   - x64 安装包：266,950,555 bytes，SHA-256 `6D7641FBEB7E20FC282EE23BF81DF7ECA1CE81DFE6D4366ED1DE38D167F04A15`。
@@ -224,7 +225,7 @@ Last updated: 2026-06-21
 - 敏感信息扫描和第三方声明：PASS；安装包未签名，状态为 `NotSigned`。
 - migration 状态：diff 为空；未新增 migration，未执行 database update。
 - Known Issues：
-  - Blocker：工作区非干净、缺 Windows 11 x64 原生环境、缺 Windows 10 x64 环境。
+  - Blocker：候选包尚未从已提交干净分支重建、缺 Windows 11 x64 原生环境、缺 Windows 10 x64 环境。
   - Deferred：数字签名、包体积优化、自动更新器、高负载播放场景。
   - Noise：ARM64 系统运行 x64 仿真包后，少量 x64 运行时文件可能因仿真进程锁定而延迟删除。
 - `git diff --stat`：以最终审计输出为准，不在阶段执行中写死动态统计。
