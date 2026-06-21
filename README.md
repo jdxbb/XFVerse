@@ -2,6 +2,8 @@
 
 XFVerse 是基于 .NET 8 与 WPF 的 Windows 桌面影音管理系统，支持本地文件夹和 WebDAV 媒体的扫描、识别、管理与播放，并提供影片发现、在线字幕、推荐和电影观影洞察。
 
+**[访问 XFVerse 官网](https://xfverse.fun/)** · **[官网文档中心](https://xfverse.fun/docs/)** · [安装与升级](https://xfverse.fun/docs/install.html) · [使用指南](https://xfverse.fun/docs/guide.html) · [帮助与排障](https://xfverse.fun/docs/help.html)
+
 ## 当前版本
 
 - 产品版本：`1.0.0`
@@ -80,6 +82,8 @@ TMDB、OMDb、OpenSubtitles、AI 和 WebDAV 均按对应功能使用，不是本
 
 | 文档 | 用途 |
 | --- | --- |
+| [XFVerse 官网](https://xfverse.fun/) | 产品功能、界面预览、隐私说明和常见问题 |
+| [官网文档中心](https://xfverse.fun/docs/) | 面向最终用户的安装、使用、帮助、发布与隐私文档 |
 | [安装说明](docs/安装说明.md) | 架构选择、校验、安装、升级、修复、卸载与数据保留 |
 | [软件使用说明书](docs/使用说明书.md) | 完整功能、界面、操作流程和数据语义 |
 | [帮助中心](docs/help/README.md) | 按症状查找故障原因、安全检查和恢复步骤 |
